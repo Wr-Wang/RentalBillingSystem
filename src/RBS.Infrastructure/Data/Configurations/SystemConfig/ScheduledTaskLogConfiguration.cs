@@ -14,7 +14,7 @@ public class ScheduledTaskLogConfiguration : IEntityTypeConfiguration<ScheduledT
         builder.Property(e => e.TaskName).IsRequired().HasMaxLength(200).HasComment("任务名称");
         builder.Property(e => e.Status).IsRequired().HasMaxLength(20).HasDefaultValue("Pending").HasComment("执行状态（Pending/Running/Completed/Failed）");
         builder.Property(e => e.ErrorMessage).HasMaxLength(2000).HasComment("错误信息");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.ConfigureAuditFields();
     }
 }

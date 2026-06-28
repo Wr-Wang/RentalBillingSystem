@@ -56,7 +56,7 @@ public class ContractDomainService : IContractDomainService
         var newContract = new Contract(
             $"{oldContract.ContractNo}-R{new Random().Next(1, 99)}",
             oldContract.RoomId,
-            oldContract.LandlordId);
+            oldContract.CompanyId);
 
         newContract.SetRentAmount(newRentAmount ?? oldContract.RentAmount);
         newContract.SetDepositAmount(oldContract.DepositAmount);

@@ -20,9 +20,9 @@ public class ContractConfiguration : IEntityTypeConfiguration<ContractEntity>
         builder.Property(e => e.PaymentCycle).IsRequired().HasMaxLength(20).HasComment("付款周期（Monthly/Quarterly/Yearly）");
         builder.Property(e => e.StatusCode).IsRequired().HasMaxLength(20).HasColumnName("Status").HasComment("合同状态（Draft/Active/Suspended/Terminated等）");
         builder.HasIndex(e => e.StatusCode).HasDatabaseName("IX_Contracts_Status");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
-        builder.HasIndex(e => e.LandlordId);
-        builder.HasIndex(e => new { e.LandlordId, e.StatusCode }).HasDatabaseName("IX_Contracts_LandlordId_Status");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
+        builder.HasIndex(e => e.CompanyId);
+        builder.HasIndex(e => new { e.CompanyId, e.StatusCode }).HasDatabaseName("IX_Contracts_CompanyId_Status");
         builder.Property(e => e.RowVersion).IsRowVersion().HasComment("乐观锁版本号");
         builder.HasMany(e => e.ContractTenants).WithOne().HasForeignKey(e => e.ContractId);
         builder.HasMany(e => e.FeeConfigs).WithOne().HasForeignKey(e => e.ContractId);

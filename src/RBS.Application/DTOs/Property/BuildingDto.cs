@@ -6,7 +6,7 @@ public class BuildingDto
     public string Name { get; set; } = string.Empty;
     public string? Code { get; set; }
     public string? Address { get; set; }
-    public Guid LandlordId { get; set; }
+    public Guid CompanyId { get; set; }
     public bool IsActive { get; set; }
     public int FloorCount { get; set; }
     public int RoomCount { get; set; }
@@ -36,5 +36,5 @@ public class CreateBuildingRequest
     public string Name { get; set; } = string.Empty;
     public string? Code { get; set; }
     public string? Address { get; set; }
-    public Guid LandlordId { get; set; }
+    public Guid CompanyId { get; set; }
 }

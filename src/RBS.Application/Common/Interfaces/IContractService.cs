@@ -7,7 +7,7 @@ namespace RBS.Application.Common.Interfaces;
 /// </summary>
 public interface IContractService
 {
-    Task<List<ContractDto>> GetListAsync(Guid landlordId, CancellationToken ct = default);
+    Task<List<ContractDto>> GetListAsync(Guid companyId, CancellationToken ct = default);
     Task<ContractDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<ContractDto> CreateAsync(CreateContractRequest request, CancellationToken ct = default);
     Task ActivateAsync(Guid id, CancellationToken ct = default);

@@ -12,7 +12,7 @@ public class UnitOfWork : IUnitOfWork
     private IUserRepository? _users;
     private IRoleRepository? _roles;
     private IMenuRepository? _menus;
-    private ILandlordRepository? _landlords;
+    private ICompanyRepository? _companies;
     private IBuildingRepository? _buildings;
     private IRoomRepository? _rooms;
     private IContractRepository? _contracts;
@@ -32,7 +32,7 @@ public class UnitOfWork : IUnitOfWork
     public IUserRepository Users => _users ??= new UserRepository(_context);
     public IRoleRepository Roles => _roles ??= new RoleRepository(_context);
     public IMenuRepository Menus => _menus ??= new MenuRepository(_context);
-    public ILandlordRepository Landlords => _landlords ??= new LandlordRepository(_context);
+    public ICompanyRepository Companies => _companies ??= new CompanyRepository(_context);
     public IBuildingRepository Buildings => _buildings ??= new BuildingRepository(_context);
     public IRoomRepository Rooms => _rooms ??= new RoomRepository(_context);
     public IContractRepository Contracts => _contracts ??= new ContractRepository(_context);

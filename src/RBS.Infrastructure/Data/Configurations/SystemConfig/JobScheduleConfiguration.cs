@@ -15,7 +15,7 @@ public class JobScheduleConfiguration : IEntityTypeConfiguration<JobSchedule>
         builder.Property(e => e.CronExpression).IsRequired().HasMaxLength(100).HasComment("Cron 表达式");
         builder.Property(e => e.IsActive).HasDefaultValue(true).HasComment("是否启用");
         builder.Property(e => e.Description).HasMaxLength(500).HasComment("作业描述");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.ConfigureAuditFields();
     }
 }

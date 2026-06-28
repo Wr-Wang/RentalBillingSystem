@@ -14,8 +14,8 @@ public class HolidayCalendarConfiguration : IEntityTypeConfiguration<HolidayCale
         builder.Property(e => e.HolidayDate).IsRequired().HasComment("日期");
         builder.Property(e => e.Name).HasMaxLength(100).HasComment("节假日名称");
         builder.Property(e => e.IsWorkingDay).HasDefaultValue(false).HasComment("是否工作日（false=放假/true=调休上班）");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
-        builder.HasIndex(e => new { e.HolidayDate, e.LandlordId }).IsUnique();
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
+        builder.HasIndex(e => new { e.HolidayDate, e.CompanyId }).IsUnique();
         builder.ConfigureAuditFields();
     }
 }

@@ -15,7 +15,7 @@ public class FeeCodeTemplateConfiguration : IEntityTypeConfiguration<FeeCodeTemp
         builder.Property(e => e.Description).HasMaxLength(200).HasComment("模板描述");
         builder.Property(e => e.DefaultAmount).IsRequired().HasPrecision(18, 2).HasComment("默认金额");
         builder.Property(e => e.DefaultUnitPrice).HasPrecision(18, 4).HasComment("默认单价");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.ConfigureAuditFields();
     }
 }

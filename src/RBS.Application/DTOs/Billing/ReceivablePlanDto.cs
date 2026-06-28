@@ -31,5 +31,5 @@ public class CreateReceiptRequest
     public DateOnly ReceivedDate { get; set; }
     public Guid? PaymentChannelId { get; set; }
     public string? ReferenceNo { get; set; }
-    public Guid LandlordId { get; set; }
+    public Guid CompanyId { get; set; }
 }

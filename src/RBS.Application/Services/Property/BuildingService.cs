@@ -14,16 +14,16 @@ public class BuildingService : IBuildingService
 
     public BuildingService(IUnitOfWork uow) => _uow = uow;
 
-    public async Task<List<BuildingDto>> GetListAsync(Guid landlordId, CancellationToken ct = default)
+    public async Task<List<BuildingDto>> GetListAsync(Guid companyId, CancellationToken ct = default)
     {
-        var buildings = await _uow.Buildings.GetByLandlordIdAsync(landlordId, ct);
+        var buildings = await _uow.Buildings.GetByCompanyIdAsync(companyId, ct);
         return buildings.Select(b => new BuildingDto
         {
             Id = b.Id,
             Name = b.Name,
             Code = b.Code,
             Address = b.Address,
-            LandlordId = b.LandlordId,
+            CompanyId = b.CompanyId,
             IsActive = b.IsActive,
             FloorCount = b.Floors.Count,
             RoomCount = b.Floors.Sum(f => f.Rooms.Count)
@@ -40,7 +40,7 @@ public class BuildingService : IBuildingService
             Name = building.Name,
             Code = building.Code,
             Address = building.Address,
-            LandlordId = building.LandlordId,
+            CompanyId = building.CompanyId,
             IsActive = building.IsActive,
             Floors = building.Floors.Select(f => new FloorDto
             {
@@ -62,7 +62,7 @@ public class BuildingService : IBuildingService
 
     public async Task<BuildingDto> CreateAsync(CreateBuildingRequest request, CancellationToken ct = default)
     {
-        var building = new Building(request.Name, request.LandlordId);
+        var building = new Building(request.Name, request.CompanyId);
         if (!string.IsNullOrEmpty(request.Code)) building.SetCode(request.Code);
         if (!string.IsNullOrEmpty(request.Address)) building.SetAddress(request.Address);
 

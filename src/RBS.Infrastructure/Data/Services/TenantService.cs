@@ -4,7 +4,7 @@ using RBS.Core.Interfaces.Services;
 namespace RBS.Infrastructure.Data.Services;
 
 /// <summary>
-/// 多租户（多房东）服务实现
+/// 多租户（多公司）服务实现
 /// </summary>
 public class TenantService : ITenantService
 {
@@ -15,12 +15,12 @@ public class TenantService : ITenantService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public Guid? HomeLandlordId
+    public Guid? HomeCompanyId
     {
         get
         {
             var claim = _httpContextAccessor.HttpContext?.User
-                ?.FindFirst("HomeLandlordId");
+                ?.FindFirst("HomeCompanyId");
             return claim != null && Guid.TryParse(claim.Value, out var id) ? id : null;
         }
     }
@@ -35,28 +35,28 @@ public class TenantService : ITenantService
         }
     }
 
-    public List<Guid> LandlordScope { get; } = new();
+    public List<Guid> CompanyScope { get; } = new();
 
     /// <summary>
-    /// 当前生效的 LandlordId（用于 Query Filter）
+    /// 当前生效的 CompanyId（用于 Query Filter）
     /// 超管选择"全部数据"时返回 null，不过滤
     /// </summary>
-    public Guid? EffectiveLandlordId
+    public Guid? EffectiveCompanyId
     {
         get
         {
             if (IsSuperAdmin)
             {
                 var currentId = _httpContextAccessor.HttpContext?.Request
-                    .Query["landlordId"].FirstOrDefault();
+                    .Query["companyId"].FirstOrDefault();
                 if (string.IsNullOrEmpty(currentId))
                     return null;
                 return Guid.Parse(currentId);
             }
 
-            return HomeLandlordId;
+            return HomeCompanyId;
         }
     }
 
-    public bool IsViewingAll => IsSuperAdmin && EffectiveLandlordId == null;
+    public bool IsViewingAll => IsSuperAdmin && EffectiveCompanyId == null;
 }

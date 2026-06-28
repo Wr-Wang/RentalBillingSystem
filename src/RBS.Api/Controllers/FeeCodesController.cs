@@ -13,9 +13,9 @@ public class FeeCodesController : ControllerBase
     public FeeCodesController(IUnitOfWork uow) => _uow = uow;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? landlordId, CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, CancellationToken ct)
     {
-        if (landlordId == null) return Ok(new List<object>());
+        if (companyId == null) return Ok(new List<object>());
         var list = await _uow.FeeCodes.GetAllAsync(ct);
         return Ok(list);
     }

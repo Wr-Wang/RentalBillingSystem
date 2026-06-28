@@ -18,7 +18,7 @@ public class BillingAppService : IBillingService
         throw new NotImplementedException();
     }
 
-    public Task<List<ReceiptDto>> GetReceiptsAsync(Guid landlordId, CancellationToken ct = default)
+    public Task<List<ReceiptDto>> GetReceiptsAsync(Guid companyId, CancellationToken ct = default)
     {
         throw new NotImplementedException();
     }

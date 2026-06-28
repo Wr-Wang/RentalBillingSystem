@@ -38,7 +38,7 @@ public class AuthService : IAuthService
                 DisplayName = user.DisplayName,
                 Phone = user.Phone,
                 Email = user.Email,
-                HomeLandlordId = user.HomeLandlordId,
+                HomeCompanyId = user.HomeCompanyId,
                 IsSuperAdmin = user.IsSuperAdmin
             },
             Roles = roles.Select(r => new RoleInfo { Id = r.Id, Name = r.Name, Code = r.Code }).ToList(),
@@ -58,7 +58,7 @@ public class AuthService : IAuthService
             DisplayName = user.DisplayName,
             Phone = user.Phone,
             Email = user.Email,
-            HomeLandlordId = user.HomeLandlordId,
+            HomeCompanyId = user.HomeCompanyId,
             IsSuperAdmin = user.IsSuperAdmin
         };
     }

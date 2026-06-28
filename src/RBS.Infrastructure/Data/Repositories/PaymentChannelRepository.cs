@@ -8,10 +8,10 @@ public class PaymentChannelRepository : BaseRepository<PaymentChannel>, IPayment
 {
     public PaymentChannelRepository(AppDbContext context) : base(context) { }
 
-    public async Task<List<PaymentChannel>> GetActiveByLandlordAsync(Guid landlordId, CancellationToken ct = default)
+    public async Task<List<PaymentChannel>> GetActiveByCompanyAsync(Guid companyId, CancellationToken ct = default)
     {
         return await _dbSet
-            .Where(p => p.LandlordId == landlordId && p.IsActive)
+            .Where(p => p.CompanyId == companyId && p.IsActive)
             .ToListAsync(ct);
     }
 }

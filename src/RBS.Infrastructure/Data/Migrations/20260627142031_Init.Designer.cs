@@ -73,9 +73,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否末级科目");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<int>("Level")
                         .ValueGeneratedOnAdd()
@@ -112,7 +112,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("Code", "LandlordId")
+                    b.HasIndex("Code", "CompanyId")
                         .IsUnique();
 
                     b.ToTable("AccountingSubjects", (string)null);
@@ -297,9 +297,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<int>("Level")
                         .HasColumnType("int")
@@ -421,9 +421,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(1000)")
                         .HasComment("审批申请描述");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<int>("MaxLevel")
                         .ValueGeneratedOnAdd()
@@ -480,7 +480,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("LandlordId", "Status");
+                    b.HasIndex("CompanyId", "Status");
 
                     b.ToTable("ApprovalRequests", (string)null);
                 });
@@ -524,9 +524,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否启用");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -650,9 +650,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否启用");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -919,9 +919,9 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Property<bool>("IsRequired")
                         .HasColumnType("bit");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -958,7 +958,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("Code", "LandlordId")
+                    b.HasIndex("Code", "CompanyId")
                         .IsUnique();
 
                     b.ToTable("FeeCodes", (string)null);
@@ -1005,9 +1005,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasComment("费用项目ID");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1061,9 +1061,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasComment("费用项目ID");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Remark")
                         .HasMaxLength(200)
@@ -1201,9 +1201,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否启用");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1229,7 +1229,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("Code", "LandlordId")
+                    b.HasIndex("Code", "CompanyId")
                         .IsUnique();
 
                     b.ToTable("PaymentChannels", (string)null);
@@ -1271,9 +1271,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<Guid?>("PaymentChannelId")
                         .HasColumnType("uniqueidentifier");
@@ -1332,7 +1332,7 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.HasIndex("ReceiptNo")
                         .IsUnique();
 
-                    b.HasIndex("Status", "LandlordId");
+                    b.HasIndex("Status", "CompanyId");
 
                     b.ToTable("Receipts", (string)null);
                 });
@@ -1500,9 +1500,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("date")
                         .HasComment("合同结束日期");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("PaymentCycle")
                         .IsRequired()
@@ -1569,13 +1569,13 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("LandlordId");
+                    b.HasIndex("CompanyId");
 
                     b.HasIndex("StatusCode")
                         .HasDatabaseName("IX_Contracts_Status");
 
-                    b.HasIndex("LandlordId", "StatusCode")
-                        .HasDatabaseName("IX_Contracts_LandlordId_Status");
+                    b.HasIndex("CompanyId", "StatusCode")
+                        .HasDatabaseName("IX_Contracts_CompanyId_Status");
 
                     b.ToTable("Contracts", (string)null);
                 });
@@ -1730,9 +1730,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasComment("费用项目ID");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<Guid>("RoomId")
                         .HasColumnType("uniqueidentifier")
@@ -1795,9 +1795,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否启用");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1828,14 +1828,14 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("LandlordId");
+                    b.HasIndex("CompanyId");
 
                     b.HasIndex("Phone");
 
                     b.ToTable("Tenants", (string)null);
                 });
 
-            modelBuilder.Entity("RBS.Core.Entities.Organization.Landlord", b =>
+            modelBuilder.Entity("RBS.Core.Entities.Organization.Company", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1844,7 +1844,7 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Property<string>("Code")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
-                        .HasComment("房东编码");
+                        .HasComment("公司编码");
 
                     b.Property<string>("ContactPerson")
                         .HasMaxLength(100)
@@ -1877,7 +1877,7 @@ namespace RBS.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)")
-                        .HasComment("房东/租户名称");
+                        .HasComment("公司名称");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(20)
@@ -1906,7 +1906,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.ToTable("Landlords", (string)null);
+                    b.ToTable("Companies", (string)null);
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.Organization.Menu", b =>
@@ -2122,7 +2122,7 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(200)")
                         .HasComment("电子邮箱");
 
-                    b.Property<Guid?>("HomeLandlordId")
+                    b.Property<Guid?>("HomeCompanyId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("IsActive")
@@ -2178,7 +2178,7 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("RBS.Core.Entities.Organization.UserLandlordScope", b =>
+            modelBuilder.Entity("RBS.Core.Entities.Organization.UserCompanyScope", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2192,9 +2192,9 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("房东ID，用户可操作的数据范围");
+                        .HasComment("公司ID，用户可操作的数据范围");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier")
@@ -2202,10 +2202,10 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "LandlordId")
+                    b.HasIndex("UserId", "CompanyId")
                         .IsUnique();
 
-                    b.ToTable("UserLandlordScopes", (string)null);
+                    b.ToTable("UserCompanyScopes", (string)null);
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.Organization.UserRole", b =>
@@ -2278,9 +2278,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否启用");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2306,7 +2306,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("LandlordId");
+                    b.HasIndex("CompanyId");
 
                     b.ToTable("Buildings", (string)null);
                 });
@@ -2333,9 +2333,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasComment("楼层级别ID");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.HasKey("Id");
 
@@ -2577,9 +2577,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasComment("楼层级别ID");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<decimal>("RentAmount")
                         .HasPrecision(18, 2)
@@ -2608,7 +2608,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("RoomTypeId", "FloorLevelBandId", "LandlordId")
+                    b.HasIndex("RoomTypeId", "FloorLevelBandId", "CompanyId")
                         .IsUnique();
 
                     b.ToTable("RoomPricingStandards", (string)null);
@@ -2706,9 +2706,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(false)
                         .HasComment("是否工作日（false=放假/true=调休上班）");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .HasMaxLength(100)
@@ -2733,7 +2733,7 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("HolidayDate", "LandlordId")
+                    b.HasIndex("HolidayDate", "CompanyId")
                         .IsUnique();
 
                     b.ToTable("HolidayCalendars", (string)null);
@@ -2784,9 +2784,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(200)")
                         .HasComment("作业名称");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2848,9 +2848,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否启用");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<decimal?>("MaxRate")
                         .HasPrecision(5, 2)
@@ -2908,9 +2908,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(2000)")
                         .HasComment("错误信息");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");
@@ -2982,9 +2982,9 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasDefaultValue(true)
                         .HasComment("是否启用");
 
-                    b.Property<Guid>("LandlordId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属房东ID");
+                        .HasComment("所属公司ID");
 
                     b.Property<string>("Name")
                         .IsRequired()

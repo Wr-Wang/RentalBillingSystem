@@ -18,8 +18,8 @@ public class AccountingSubjectConfiguration : IEntityTypeConfiguration<Accountin
         builder.Property(e => e.Direction).IsRequired().HasMaxLength(10).HasDefaultValue("Debit").HasComment("借贷方向（Debit借方/Credit贷方）");
         builder.Property(e => e.IsLeaf).HasDefaultValue(true).HasComment("是否末级科目");
         builder.Property(e => e.IsActive).HasDefaultValue(true).HasComment("是否启用");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
-        builder.HasIndex(e => new { e.Code, e.LandlordId }).IsUnique();
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
+        builder.HasIndex(e => new { e.Code, e.CompanyId }).IsUnique();
         builder.ConfigureAuditFields();
     }
 }

@@ -5,12 +5,12 @@ using RBS.Core.Entities.Base;
 /// <summary>
 /// 楼宇聚合根 — 房产的顶层组织单位
 /// </summary>
-public class Building : AggregateRoot, IHasLandlord
+public class Building : AggregateRoot, IHasCompany
 {
     public string Name { get; private set; }
     public string? Code { get; private set; }
     public string? Address { get; private set; }
-    public Guid LandlordId { get; private set; }
+    public Guid CompanyId { get; private set; }
     public bool IsActive { get; private set; }
 
     private readonly List<Floor> _floors = new();
@@ -22,12 +22,12 @@ public class Building : AggregateRoot, IHasLandlord
     }
 
     /// <summary>领域构造函数</summary>
-    public Building(string name, Guid landlordId) : base()
+    public Building(string name, Guid companyId) : base()
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("楼宇名称不能为空", nameof(name));
         Name = name;
-        LandlordId = landlordId;
+        CompanyId = companyId;
         IsActive = true;
     }
 

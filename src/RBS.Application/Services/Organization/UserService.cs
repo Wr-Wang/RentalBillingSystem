@@ -36,7 +36,7 @@ public class UserService : IUserService
 
         var user = new User(request.Username, request.DisplayName, request.Password);
         if (request.IsSuperAdmin) user.GrantSuperAdmin();
-        if (request.HomeLandlordId.HasValue) user.SetHomeLandlord(request.HomeLandlordId.Value);
+        if (request.HomeCompanyId.HasValue) user.SetHomeCompany(request.HomeCompanyId.Value);
 
         await _uow.Users.AddAsync(user, ct);
 
@@ -67,8 +67,8 @@ public class UserService : IUserService
             else user.Deactivate();
         }
 
-        if (request.HomeLandlordId.HasValue && request.HomeLandlordId.Value != user.HomeLandlordId)
-            user.SetHomeLandlord(request.HomeLandlordId.Value);
+        if (request.HomeCompanyId.HasValue && request.HomeCompanyId.Value != user.HomeCompanyId)
+            user.SetHomeCompany(request.HomeCompanyId.Value);
 
         if (request.IsSuperAdmin.HasValue && request.IsSuperAdmin.Value != user.IsSuperAdmin)
         {
@@ -107,7 +107,7 @@ public class UserService : IUserService
             Phone = user.Phone,
             Email = user.Email,
             IsActive = user.IsActive,
-            HomeLandlordId = user.HomeLandlordId,
+            HomeCompanyId = user.HomeCompanyId,
             IsSuperAdmin = user.IsSuperAdmin,
             CreatedAt = user.CreatedAt,
             RoleIds = user.Roles.Select(r => r.RoleId).ToList()
@@ -120,11 +120,11 @@ public class UserService : IUserService
             if (role != null) dto.RoleNames.Add(role.Name);
         }
 
-        // 获取房东名称
-        if (user.HomeLandlordId.HasValue)
+        // 获取公司名称
+        if (user.HomeCompanyId.HasValue)
         {
-            var landlord = await _uow.Landlords.GetByIdAsync(user.HomeLandlordId.Value, ct);
-            if (landlord != null) dto.HomeLandlordName = landlord.Name;
+            var company = await _uow.Companies.GetByIdAsync(user.HomeCompanyId.Value, ct);
+            if (company != null) dto.HomeCompanyName = company.Name;
         }
 
         return dto;

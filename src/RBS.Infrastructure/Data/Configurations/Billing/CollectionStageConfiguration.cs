@@ -15,7 +15,7 @@ public class CollectionStageConfiguration : IEntityTypeConfiguration<CollectionS
         builder.Property(e => e.DaysOverdue).IsRequired().HasComment("逾期天数触发条件");
         builder.Property(e => e.SortOrder).HasDefaultValue(0).HasComment("排序号");
         builder.Property(e => e.IsActive).HasDefaultValue(true).HasComment("是否启用");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.ConfigureAuditFields();
     }
 }

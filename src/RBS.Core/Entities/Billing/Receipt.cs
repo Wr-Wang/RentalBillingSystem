@@ -6,7 +6,7 @@ using RBS.Core.Entities.Base;
 /// 收款聚合根 — 记录一笔来自租客的付款
 /// 包含收款确认、驳回、分配等业务行为
 /// </summary>
-public class Receipt : AggregateRoot, IHasLandlord
+public class Receipt : AggregateRoot, IHasCompany
 {
     public string ReceiptNo { get; private set; }
     public Guid? ContractId { get; private set; }
@@ -15,7 +15,7 @@ public class Receipt : AggregateRoot, IHasLandlord
     public Guid? PaymentChannelId { get; private set; }
     public string? ReferenceNo { get; private set; }
     public string Status { get; private set; }
-    public Guid LandlordId { get; private set; }
+    public Guid CompanyId { get; private set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     // ===== 驳回信息 =====
@@ -40,7 +40,7 @@ public class Receipt : AggregateRoot, IHasLandlord
     }
 
     /// <summary>领域构造函数</summary>
-    public Receipt(string receiptNo, decimal amount, DateOnly receivedDate, Guid landlordId) : base()
+    public Receipt(string receiptNo, decimal amount, DateOnly receivedDate, Guid companyId) : base()
     {
         if (string.IsNullOrWhiteSpace(receiptNo))
             throw new ArgumentException("收款单号不能为空", nameof(receiptNo));
@@ -49,7 +49,7 @@ public class Receipt : AggregateRoot, IHasLandlord
         ReceiptNo = receiptNo;
         Amount = amount;
         ReceivedDate = receivedDate;
-        LandlordId = landlordId;
+        CompanyId = companyId;
         Status = "Pending";
     }
 

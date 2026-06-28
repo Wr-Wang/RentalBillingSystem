@@ -14,10 +14,10 @@ public class AccountingSubjectsController : ControllerBase
     public AccountingSubjectsController(AppDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? landlordId, CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, CancellationToken ct)
     {
         var query = _db.Set<RBS.Core.Entities.Accounting.AccountingSubject>().AsNoTracking();
-        if (landlordId != null) query = query.Where(s => s.LandlordId == landlordId);
+        if (companyId != null) query = query.Where(s => s.CompanyId == companyId);
         return Ok(await query.ToListAsync(ct));
     }
 

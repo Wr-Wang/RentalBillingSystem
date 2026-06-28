@@ -1,6 +1,6 @@
 namespace RBS.Application.DTOs.Organization;
 
-public class LandlordDto
+public class CompanyDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -27,7 +27,7 @@ public class LandlordDto
     public decimal CollectionRate { get; set; }
 }
 
-public class CreateLandlordRequest
+public class CreateCompanyRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? Code { get; set; }
@@ -47,7 +47,7 @@ public class CreateLandlordRequest
     public bool? IsActive { get; set; }
 }
 
-public class LandlordStatsDto
+public class CompanyStatsDto
 {
     public int BuildingCount { get; set; }
     public int RoomCount { get; set; }
@@ -55,7 +55,7 @@ public class LandlordStatsDto
     public decimal CollectionRate { get; set; }
 }
 
-public class LandlordQuery
+public class CompanyQuery
 {
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;

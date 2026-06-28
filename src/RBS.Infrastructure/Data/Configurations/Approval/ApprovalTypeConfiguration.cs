@@ -16,7 +16,7 @@ public class ApprovalTypeConfiguration : IEntityTypeConfiguration<ApprovalType>
         builder.HasIndex(e => e.Code);
         builder.Property(e => e.Description).HasMaxLength(200).HasComment("审批类型描述");
         builder.Property(e => e.IsActive).HasDefaultValue(true).HasComment("是否启用");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.ConfigureAuditFields();
     }
 }

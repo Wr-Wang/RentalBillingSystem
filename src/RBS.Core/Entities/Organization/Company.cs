@@ -3,9 +3,9 @@ namespace RBS.Core.Entities.Organization;
 using RBS.Core.Entities.Base;
 
 /// <summary>
-/// 房东/租户 — 房产出租方聚合根
+/// 公司 — 房产出租方聚合根
 /// </summary>
-public class Landlord : AuditableEntity
+public class Company : AuditableEntity
 {
     public string Name { get; private set; } = string.Empty;
     public string? Code { get; private set; }
@@ -23,13 +23,13 @@ public class Landlord : AuditableEntity
     public string? Remark { get; private set; }
     public bool IsActive { get; private set; } = true;
 
-    private Landlord() { }
+    private Company() { }
 
     /// <summary>领域构造函数</summary>
-    public Landlord(string name)
+    public Company(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("房东名称不能为空", nameof(name));
+            throw new ArgumentException("公司名称不能为空", nameof(name));
         Name = name;
         IsActive = true;
     }
@@ -56,7 +56,7 @@ public class Landlord : AuditableEntity
     public void Rename(string newName)
     {
         if (string.IsNullOrWhiteSpace(newName))
-            throw new ArgumentException("房东名称不能为空", nameof(newName));
+            throw new ArgumentException("公司名称不能为空", nameof(newName));
         Name = newName;
     }
     public void Activate() => IsActive = true;

@@ -13,7 +13,7 @@ public class ContractAppService : IContractService
 
     public ContractAppService(IUnitOfWork uow) => _uow = uow;
 
-    public Task<List<ContractDto>> GetListAsync(Guid landlordId, CancellationToken ct = default)
+    public Task<List<ContractDto>> GetListAsync(Guid companyId, CancellationToken ct = default)
     {
         throw new NotImplementedException();
     }

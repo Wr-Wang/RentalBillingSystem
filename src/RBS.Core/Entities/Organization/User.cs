@@ -41,9 +41,9 @@ public class User : AggregateRoot
     public bool IsActive { get; private set; } = true;
 
     /// <summary>
-    /// 所属房东标识（为空表示平台级用户）
+    /// 所属公司标识（为空表示平台级用户）
     /// </summary>
-    public Guid? HomeLandlordId { get; private set; }
+    public Guid? HomeCompanyId { get; private set; }
 
     /// <summary>
     /// 是否为超级管理员（全局最高权限）
@@ -196,11 +196,11 @@ public class User : AggregateRoot
     }
 
     /// <summary>
-    /// 设置所属房东
+    /// 设置所属公司
     /// </summary>
-    /// <param name="landlordId">房东标识</param>
-    public void SetHomeLandlord(Guid? landlordId)
+    /// <param name="companyId">公司标识</param>
+    public void SetHomeCompany(Guid? companyId)
     {
-        HomeLandlordId = landlordId;
+        HomeCompanyId = companyId;
     }
 }

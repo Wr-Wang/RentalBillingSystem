@@ -13,10 +13,10 @@ public class BuildingsController : ControllerBase
     public BuildingsController(IBuildingService buildingService) => _buildingService = buildingService;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? landlordId, CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, CancellationToken ct)
     {
-        if (landlordId == null) return Ok(new List<object>());
-        var result = await _buildingService.GetListAsync(landlordId.Value, ct);
+        if (companyId == null) return Ok(new List<object>());
+        var result = await _buildingService.GetListAsync(companyId.Value, ct);
         return Ok(result);
     }
 

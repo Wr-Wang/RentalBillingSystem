@@ -13,10 +13,10 @@ public class ContractsController : ControllerBase
     public ContractsController(IUnitOfWork uow) => _uow = uow;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? landlordId, CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, CancellationToken ct)
     {
-        if (landlordId == null) return Ok(new List<object>());
-        var list = await _uow.Contracts.GetActiveContractsAsync(landlordId.Value, ct);
+        if (companyId == null) return Ok(new List<object>());
+        var list = await _uow.Contracts.GetActiveContractsAsync(companyId.Value, ct);
         return Ok(list);
     }
 

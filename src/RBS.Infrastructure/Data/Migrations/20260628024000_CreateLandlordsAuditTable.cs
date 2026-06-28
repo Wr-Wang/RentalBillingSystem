@@ -19,7 +19,7 @@ CREATE TABLE [Landlords_Audit] (
     [AuditChangedAt] datetime2 NOT NULL,
     [AuditChangedBy] uniqueidentifier NOT NULL,
 
-    -- 房东表全字段快照
+    -- 公司表全字段快照
     [Name] nvarchar(200) NULL,
     [Code] nvarchar(50) NULL,
     [ContactPerson] nvarchar(100) NULL,

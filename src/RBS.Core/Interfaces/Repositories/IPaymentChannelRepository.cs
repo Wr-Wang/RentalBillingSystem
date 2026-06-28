@@ -3,5 +3,5 @@ using RBS.Core.Entities.Billing;
 
 public interface IPaymentChannelRepository : IRepository<PaymentChannel>
 {
-    Task<List<PaymentChannel>> GetActiveByLandlordAsync(Guid landlordId, CancellationToken ct = default);
+    Task<List<PaymentChannel>> GetActiveByCompanyAsync(Guid companyId, CancellationToken ct = default);
 }

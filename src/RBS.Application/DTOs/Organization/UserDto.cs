@@ -8,8 +8,8 @@ public class UserDto
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public bool IsActive { get; set; }
-    public Guid? HomeLandlordId { get; set; }
-    public string? HomeLandlordName { get; set; }
+    public Guid? HomeCompanyId { get; set; }
+    public string? HomeCompanyName { get; set; }
     public bool IsSuperAdmin { get; set; }
     public List<Guid> RoleIds { get; set; } = new();
     public List<string> RoleNames { get; set; } = new();
@@ -23,7 +23,7 @@ public class CreateUserRequest
     public string DisplayName { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public string? Email { get; set; }
-    public Guid? HomeLandlordId { get; set; }
+    public Guid? HomeCompanyId { get; set; }
     public bool IsSuperAdmin { get; set; }
     public List<Guid>? RoleIds { get; set; }
 }
@@ -35,7 +35,7 @@ public class UpdateUserRequest
     public string? Email { get; set; }
     public string? Password { get; set; }
     public bool? IsActive { get; set; }
-    public Guid? HomeLandlordId { get; set; }
+    public Guid? HomeCompanyId { get; set; }
     public bool? IsSuperAdmin { get; set; }
     public List<Guid>? RoleIds { get; set; }
 }

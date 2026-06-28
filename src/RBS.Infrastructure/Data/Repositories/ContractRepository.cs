@@ -16,10 +16,10 @@ public class ContractRepository : BaseRepository<Contract>, IContractRepository
             .FirstOrDefaultAsync(c => c.ContractNo == contractNo, ct);
     }
 
-    public async Task<List<Contract>> GetActiveContractsAsync(Guid landlordId, CancellationToken ct = default)
+    public async Task<List<Contract>> GetActiveContractsAsync(Guid companyId, CancellationToken ct = default)
     {
         return await _dbSet
-            .Where(c => c.LandlordId == landlordId && c.StatusCode == "Active")
+            .Where(c => c.CompanyId == companyId && c.StatusCode == "Active")
             .OrderByDescending(c => c.StartDate)
             .ToListAsync(ct);
     }

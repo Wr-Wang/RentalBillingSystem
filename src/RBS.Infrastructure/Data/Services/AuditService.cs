@@ -173,19 +173,19 @@ public class AuditService : IAuditService
         var weekStart = now.AddDays(-(int)now.DayOfWeek).Date;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Local);
 
-        // 统计所有审计表（Landlords + Menus + Roles + Users）
+        // 统计所有审计表（Companies + Menus + Roles + Users）
         await using var cmd = _context.Database.GetDbConnection().CreateCommand();
         cmd.CommandText = @"
             SELECT
-                ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
+                ISNULL((SELECT COUNT(*) FROM [Companies_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @todayStart), 0) AS TodayCount,
-                ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
+                ISNULL((SELECT COUNT(*) FROM [Companies_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @weekStart), 0) AS WeekCount,
-                ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
+                ISNULL((SELECT COUNT(*) FROM [Companies_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @monthStart), 0) AS MonthCount,
@@ -218,6 +218,6 @@ public class AuditService : IAuditService
     {
         // 只允许字母、数字、下划线
         var sanitized = new string(tableName.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray());
-        return string.IsNullOrEmpty(sanitized) ? "Landlords" : sanitized;
+        return string.IsNullOrEmpty(sanitized) ? "Companies" : sanitized;
     }
 }

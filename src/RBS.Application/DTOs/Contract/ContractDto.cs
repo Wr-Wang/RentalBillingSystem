@@ -12,7 +12,7 @@ public class ContractDto
     public DateOnly EndDate { get; set; }
     public string PaymentCycle { get; set; } = "Monthly";
     public string Status { get; set; } = "Draft";
-    public Guid LandlordId { get; set; }
+    public Guid CompanyId { get; set; }
     public List<ContractTenantDto> Tenants { get; set; } = new();
     public List<ContractFeeConfigDto> FeeConfigs { get; set; } = new();
 }
@@ -41,7 +41,7 @@ public class CreateContractRequest
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public string PaymentCycle { get; set; } = "Monthly";
-    public Guid LandlordId { get; set; }
+    public Guid CompanyId { get; set; }
     public List<Guid> TenantIds { get; set; } = new();
     public List<ContractFeeDto> Fees { get; set; } = new();
 }

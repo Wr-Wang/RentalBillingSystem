@@ -18,8 +18,8 @@ public class FeeCodeConfiguration : IEntityTypeConfiguration<FeeCode>
         builder.Property(e => e.SortOrder).HasDefaultValue(0).HasComment("排序号");
         builder.Property(e => e.IsActive).HasDefaultValue(true).HasComment("是否启用");
         builder.Property(e => e.Category).HasMaxLength(50).HasDefaultValue("Other").HasComment("费用分类（Core核心/Utility公共事业）");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
-        builder.HasIndex(e => new { e.Code, e.LandlordId }).IsUnique();
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
+        builder.HasIndex(e => new { e.Code, e.CompanyId }).IsUnique();
         builder.ConfigureAuditFields();
     }
 }

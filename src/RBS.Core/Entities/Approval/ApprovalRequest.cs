@@ -5,7 +5,7 @@ using RBS.Core.Entities.Base;
 /// <summary>
 /// 审批请求聚合根 — 支持 0~N 级审批流转
 /// </summary>
-public class ApprovalRequest : AggregateRoot, IHasLandlord
+public class ApprovalRequest : AggregateRoot, IHasCompany
 {
     public Guid ApprovalTypeId { get; private set; }
     public string Title { get; private set; }
@@ -15,7 +15,7 @@ public class ApprovalRequest : AggregateRoot, IHasLandlord
     public int CurrentLevel { get; private set; }
     public int MaxLevel { get; private set; }
     public string Status { get; private set; }
-    public Guid LandlordId { get; private set; }
+    public Guid CompanyId { get; private set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     // ===== 审批跟踪 =====
@@ -35,7 +35,7 @@ public class ApprovalRequest : AggregateRoot, IHasLandlord
     /// <summary>领域构造函数</summary>
     public ApprovalRequest(
         Guid approvalTypeId, string title, Guid targetEntityId,
-        string targetEntityType, Guid landlordId, int maxLevel = 1) : base()
+        string targetEntityType, Guid companyId, int maxLevel = 1) : base()
     {
         if (string.IsNullOrWhiteSpace(title)) throw new ArgumentException("审批标题不能为空");
         if (string.IsNullOrWhiteSpace(targetEntityType)) throw new ArgumentException("目标实体类型不能为空");
@@ -44,7 +44,7 @@ public class ApprovalRequest : AggregateRoot, IHasLandlord
         Title = title;
         TargetEntityId = targetEntityId;
         TargetEntityType = targetEntityType;
-        LandlordId = landlordId;
+        CompanyId = companyId;
         CurrentLevel = 1;
         MaxLevel = Math.Max(0, maxLevel);
         Status = "Draft";

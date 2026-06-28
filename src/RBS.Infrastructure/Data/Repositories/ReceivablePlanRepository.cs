@@ -23,7 +23,7 @@ public class ReceivablePlanRepository : BaseRepository<ReceivablePlan>, IReceiva
             .FirstOrDefaultAsync(rp => rp.ContractId == contractId && rp.Period == period && rp.FeeCodeId == feeCodeId, ct);
     }
 
-    public async Task<List<ReceivablePlan>> GetOverdueAsync(Guid landlordId, CancellationToken ct = default)
+    public async Task<List<ReceivablePlan>> GetOverdueAsync(Guid companyId, CancellationToken ct = default)
     {
         return await _dbSet
             .Where(rp => rp.Status == "Pending" && rp.DueDate < DateOnly.FromDateTime(DateTime.Now))

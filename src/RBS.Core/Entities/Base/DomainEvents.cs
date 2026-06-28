@@ -7,14 +7,14 @@ public sealed record ContractActivatedEvent : IDomainEvent
 {
     public Guid ContractId { get; }
     public Guid RoomId { get; }
-    public Guid LandlordId { get; }
+    public Guid CompanyId { get; }
     public DateTime OccurredAt { get; }
 
-    public ContractActivatedEvent(Guid contractId, Guid roomId, Guid landlordId)
+    public ContractActivatedEvent(Guid contractId, Guid roomId, Guid companyId)
     {
         ContractId = contractId;
         RoomId = roomId;
-        LandlordId = landlordId;
+        CompanyId = companyId;
         OccurredAt = DateTime.Now;
     }
 }

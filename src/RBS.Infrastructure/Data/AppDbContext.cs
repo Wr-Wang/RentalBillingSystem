@@ -35,8 +35,8 @@ public class AppDbContext : DbContext
     public DbSet<Menu> Menus => Set<Menu>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RoleMenu> RoleMenus => Set<RoleMenu>();
-    public DbSet<Landlord> Landlords => Set<Landlord>();
-    public DbSet<UserLandlordScope> UserLandlordScopes => Set<UserLandlordScope>();
+    public DbSet<Company> Companies => Set<Company>();
+    public DbSet<UserCompanyScope> UserCompanyScopes => Set<UserCompanyScope>();
 
     // ===== 房屋管理 =====
     public DbSet<Building> Buildings => Set<Building>();
@@ -111,26 +111,26 @@ public class AppDbContext : DbContext
         // 按模块加载 Entity 配置
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
-        // 应用多房东查询过滤器
-        ApplyLandlordQueryFilter(modelBuilder);
+        // 应用多公司查询过滤器
+        ApplyCompanyQueryFilter(modelBuilder);
     }
 
-    private void ApplyLandlordQueryFilter(ModelBuilder modelBuilder)
+    private void ApplyCompanyQueryFilter(ModelBuilder modelBuilder)
     {
-        var effectiveLandlordId = _tenantService.EffectiveLandlordId;
-        if (effectiveLandlordId == null) return; // 超管查看全部数据时不过滤
+        var effectiveCompanyId = _tenantService.EffectiveCompanyId;
+        if (effectiveCompanyId == null) return; // 超管查看全部数据时不过滤
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (typeof(IHasLandlord).IsAssignableFrom(entityType.ClrType)
-                && entityType.FindProperty(nameof(IHasLandlord.LandlordId)) != null)
+            if (typeof(IHasCompany).IsAssignableFrom(entityType.ClrType)
+                && entityType.FindProperty(nameof(IHasCompany.CompanyId)) != null)
             {
                 var parameter = Expression.Parameter(entityType.ClrType, "e");
-                var property = Expression.Property(parameter, nameof(IHasLandlord.LandlordId));
-                var landlordId = Expression.Constant(effectiveLandlordId.Value);
+                var property = Expression.Property(parameter, nameof(IHasCompany.CompanyId));
+                var companyId = Expression.Constant(effectiveCompanyId.Value);
 
                 var lambda = Expression.Lambda(
-                    Expression.Equal(property, landlordId),
+                    Expression.Equal(property, companyId),
                     parameter);
 
                 entityType.SetQueryFilter(lambda);

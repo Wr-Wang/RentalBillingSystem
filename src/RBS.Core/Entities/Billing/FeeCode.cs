@@ -1,7 +1,7 @@
 namespace RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Base;
 
-public class FeeCode : AuditableEntity, IHasLandlord
+public class FeeCode : AuditableEntity, IHasCompany
 {
     public string Code { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
@@ -11,7 +11,7 @@ public class FeeCode : AuditableEntity, IHasLandlord
     public bool IsActive { get; private set; } = true;
     public string Category { get; private set; } = "Other";
     public bool IsRequired { get; private set; }
-    public Guid LandlordId { get; private set; }
+    public Guid CompanyId { get; private set; }
     private FeeCode() { }
-    public FeeCode(string code, string name, Guid landlordId) { Code = code; Name = name; LandlordId = landlordId; }
+    public FeeCode(string code, string name, Guid companyId) { Code = code; Name = name; CompanyId = companyId; }
 }

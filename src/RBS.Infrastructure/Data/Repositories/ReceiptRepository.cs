@@ -8,10 +8,10 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
 {
     public ReceiptRepository(AppDbContext context) : base(context) { }
 
-    public async Task<List<Receipt>> GetPendingConfirmAsync(Guid landlordId, CancellationToken ct = default)
+    public async Task<List<Receipt>> GetPendingConfirmAsync(Guid companyId, CancellationToken ct = default)
     {
         return await _dbSet
-            .Where(r => r.LandlordId == landlordId && r.Status == "Pending")
+            .Where(r => r.CompanyId == companyId && r.Status == "Pending")
             .OrderByDescending(r => r.ReceivedDate)
             .ToListAsync(ct);
     }

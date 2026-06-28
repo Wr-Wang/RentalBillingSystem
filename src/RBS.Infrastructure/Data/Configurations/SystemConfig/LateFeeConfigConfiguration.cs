@@ -15,7 +15,7 @@ public class LateFeeConfigConfiguration : IEntityTypeConfiguration<LateFeeConfig
         builder.Property(e => e.GraceDays).HasDefaultValue(0).HasComment("宽限天数");
         builder.Property(e => e.MaxRate).HasPrecision(5, 2).HasComment("滞纳金上限（百分比）");
         builder.Property(e => e.IsActive).HasDefaultValue(true).HasComment("是否启用");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.ConfigureAuditFields();
     }
 }

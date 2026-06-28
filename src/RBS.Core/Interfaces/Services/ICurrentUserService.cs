@@ -14,8 +14,8 @@ public interface ICurrentUserService
     /// <summary>是否为超级管理员</summary>
     bool IsSuperAdmin { get; }
 
-    /// <summary>用户所属房东 ID</summary>
-    Guid? HomeLandlordId { get; }
+    /// <summary>用户所属公司 ID</summary>
+    Guid? HomeCompanyId { get; }
 
     /// <summary>用户拥有的角色 ID 列表</summary>
     List<Guid> RoleIds { get; }

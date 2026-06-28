@@ -11,7 +11,7 @@ public interface IUnitOfWork : IDisposable
     IUserRepository Users { get; }
     IRoleRepository Roles { get; }
     IMenuRepository Menus { get; }
-    ILandlordRepository Landlords { get; }
+    ICompanyRepository Companies { get; }
 
     // 房屋管理
     IBuildingRepository Buildings { get; }

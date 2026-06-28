@@ -16,7 +16,7 @@ public class ApprovalLevelConfigConfiguration : IEntityTypeConfiguration<Approva
         builder.Property(e => e.RoleId).IsRequired().HasComment("审批角色ID");
         builder.Property(e => e.MinAmount).HasPrecision(18, 2).HasComment("金额下限（满足此金额范围才需本级别审批）");
         builder.Property(e => e.MaxAmount).HasPrecision(18, 2).HasComment("金额上限");
-        builder.Property(e => e.LandlordId).IsRequired().HasComment("所属房东ID");
+        builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.ConfigureAuditFields();
     }
 }

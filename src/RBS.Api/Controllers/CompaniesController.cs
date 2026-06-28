@@ -8,13 +8,13 @@ namespace RBS.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class LandlordsController : ControllerBase
+public class CompaniesController : ControllerBase
 {
-    private readonly ILandlordService _landlordService;
+    private readonly ICompanyService _companyService;
 
-    public LandlordsController(ILandlordService landlordService) => _landlordService = landlordService;
+    public CompaniesController(ICompanyService companyService) => _companyService = companyService;
 
-    /// <summary>分页查询房东列表</summary>
+    /// <summary>分页查询公司列表</summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
@@ -23,55 +23,55 @@ public class LandlordsController : ControllerBase
         [FromQuery] bool? isActive = null,
         CancellationToken ct = default)
     {
-        var query = new LandlordQuery
+        var query = new CompanyQuery
         {
             Page = page,
             PageSize = pageSize,
             Name = name,
             IsActive = isActive
         };
-        var result = await _landlordService.GetPagedAsync(query, ct);
+        var result = await _companyService.GetPagedAsync(query, ct);
         return Ok(result);
     }
 
-    /// <summary>获取房东详情</summary>
+    /// <summary>获取公司详情</summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        var result = await _landlordService.GetByIdAsync(id, ct);
+        var result = await _companyService.GetByIdAsync(id, ct);
         if (result == null) return NotFound();
         return Ok(result);
     }
 
-    /// <summary>创建房东</summary>
+    /// <summary>创建公司</summary>
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateLandlordRequest request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateCompanyRequest request, CancellationToken ct)
     {
-        var result = await _landlordService.CreateAsync(request, ct);
+        var result = await _companyService.CreateAsync(request, ct);
         return Ok(result);
     }
 
-    /// <summary>更新房东信息</summary>
+    /// <summary>更新公司信息</summary>
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] CreateLandlordRequest request, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateCompanyRequest request, CancellationToken ct)
     {
-        await _landlordService.UpdateAsync(id, request, ct);
+        await _companyService.UpdateAsync(id, request, ct);
         return NoContent();
     }
 
-    /// <summary>删除（停用）房东</summary>
+    /// <summary>删除（停用）公司</summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        await _landlordService.DeleteAsync(id, ct);
+        await _companyService.DeleteAsync(id, ct);
         return NoContent();
     }
 
-    /// <summary>获取房东资产概况</summary>
+    /// <summary>获取公司资产概况</summary>
     [HttpGet("{id}/stats")]
     public async Task<IActionResult> GetStats(Guid id, CancellationToken ct)
     {
-        var result = await _landlordService.GetStatsAsync(id, ct);
+        var result = await _companyService.GetStatsAsync(id, ct);
         if (result == null) return NotFound();
         return Ok(result);
     }

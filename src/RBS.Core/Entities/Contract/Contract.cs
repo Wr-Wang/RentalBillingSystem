@@ -5,7 +5,7 @@ using RBS.Core.Entities.Base;
 /// <summary>
 /// 合同聚合根 — 租赁合同，管理租约全生命周期
 /// </summary>
-public class Contract : AggregateRoot, IHasLandlord
+public class Contract : AggregateRoot, IHasCompany
 {
     // ===== 基本属性 =====
     public string ContractNo { get; private set; }
@@ -16,7 +16,7 @@ public class Contract : AggregateRoot, IHasLandlord
     public DateOnly EndDate { get; private set; }
     public string PaymentCycle { get; private set; }
     public string StatusCode { get; private set; }
-    public Guid LandlordId { get; private set; }
+    public Guid CompanyId { get; private set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     /// <summary>兼容旧代码</summary>
@@ -44,13 +44,13 @@ public class Contract : AggregateRoot, IHasLandlord
     }
 
     // ===== 领域构造函数 =====
-    public Contract(string contractNo, Guid roomId, Guid landlordId) : base()
+    public Contract(string contractNo, Guid roomId, Guid companyId) : base()
     {
         if (string.IsNullOrWhiteSpace(contractNo))
             throw new ArgumentException("合同编号不能为空", nameof(contractNo));
         ContractNo = contractNo;
         RoomId = roomId;
-        LandlordId = landlordId;
+        CompanyId = companyId;
         PaymentCycle = "Monthly";
         StatusCode = "Draft";
     }
@@ -144,7 +144,7 @@ public class Contract : AggregateRoot, IHasLandlord
     {
         AssertValidTransition("Active");
         StatusCode = "Active";
-        AddDomainEvent(new ContractActivatedEvent(Id, RoomId, LandlordId));
+        AddDomainEvent(new ContractActivatedEvent(Id, RoomId, CompanyId));
     }
 
     public void Suspend()
