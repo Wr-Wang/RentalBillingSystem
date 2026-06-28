@@ -17,6 +17,7 @@
         <el-option label="支付通道" value="PaymentChannels" />
         <el-option label="税率" value="TaxRateConfigs" />
         <el-option label="会计科目" value="AccountingSubjects" />
+        <el-option label="调度任务" value="JobSchedules" />
         <el-option label="菜单" value="Menus" />
         <el-option label="角色" value="Roles" />
         <el-option label="用户" value="Users" />

@@ -55,16 +55,17 @@
           </el-table-column>
           <el-table-column prop="status" label="状态" width="90">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'Executed' ? 'success' : row.status === 'Skipped' ? 'info' : 'primary'" size="small">
-                {{ row.status === 'Pending' ? '待执行' : row.status === 'Executed' ? '已执行' : '已跳过' }}
+              <el-tag :color="statusColor(row.status)" style="color:#fff;border:0" size="small">
+                {{ row.status === 'Pending' ? '待执行' : row.status === 'Running' ? '执行中' : row.status === 'Success' ? '执行成功' : row.status === 'Failed' ? '执行失败' : row.status === 'Skipped' ? '已跳过' : row.status === 'Paused' ? '已暂停' : row.status === 'Cancelled' ? '已取消' : row.status === 'Retrying' ? '重试中' : row.status === 'TimedOut' ? '已超时' : '-' }}
               </el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="reason" label="原因" min-width="180" />
-          <el-table-column label="操作" width="70" fixed="right">
-            <template #default="{ row, $index }">
-              <el-button v-if="row.status === 'Pending'" text type="primary" size="small" @click="openAdjust(row, $index)">改</el-button>
-              <span v-else style="color: #c0c4cc; font-size: 12px;">-</span>
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="{ row }">
+              <el-button text type="primary" size="small" @click="showScheduleDetail(row)">查看</el-button>
+              <el-button text type="primary" size="small" @click="openEditSchedule(row)">编辑</el-button>
+              <el-button text type="danger" size="small" @click="removeSchedule(row._id)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -92,7 +93,7 @@
           </el-table-column>
           <el-table-column label="详情" width="60">
             <template #default="{ row }">
-              <el-button text size="small" type="primary" @click="showLogDetail(row)">查</el-button>
+              <el-button text size="small" type="primary" @click="showLogDetail(row)">查看</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -103,7 +104,7 @@
     <el-card v-if="!selectedJob" style="margin-top: 0;">
       <el-tabs v-model="viewTab">
         <el-tab-pane label="列表视图" name="list">
-          <el-table :data="sortedLogs" stripe size="small" default-sort="{ prop: 'fireTime', order: 'descending' }">
+          <el-table :data="sortedLogs" stripe size="small" :default-sort="{ prop: 'fireTime', order: 'descending' }">
             <el-table-column prop="jobName" label="Job" width="180" sortable="custom" />
             <el-table-column prop="fireTime" label="执行时间" width="170" sortable="custom" />
             <el-table-column label="结果" width="70">
@@ -176,41 +177,73 @@
     <!-- 调整执行日期 Drawer -->
     <el-drawer
       v-model="drawerVisible"
-      title="调整执行日期"
+      :title="isAddingNew ? '添加自定义排期' : '调整执行日期'"
       :size="450"
     >
-      <template v-if="editingSchedule">
-        <el-form label-width="100px">
-          <el-form-item label="任务">
-            <span>{{ selectedJob.displayName }}</span>
+      <!-- 添加自定义排期 -->
+      <template v-if="isAddingNew">
+        <el-form label-width="110px">
+          <el-form-item label="任务"><span>{{ selectedJob?.displayName }}</span></el-form-item>
+          <el-form-item label="计划执行时间">
+            <el-date-picker
+              v-model="editForm.scheduledAt"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm"
+              format="YYYY-MM-DD HH:mm"
+              placeholder="选择执行日期和时间"
+              style="width:100%"
+            />
           </el-form-item>
-          <el-form-item label="月份">
-            <span>{{ editingSchedule.month }}</span>
+          <el-form-item label="状态">
+            <el-select v-model="editForm.status" style="width:100%">
+              <el-option label="待执行" value="Pending" />
+              <el-option label="执行中" value="Running" />
+              <el-option label="执行成功" value="Success" />
+              <el-option label="执行失败" value="Failed" />
+              <el-option label="已跳过" value="Skipped" />
+              <el-option label="已暂停" value="Paused" />
+              <el-option label="已取消" value="Cancelled" />
+              <el-option label="重试中" value="Retrying" />
+              <el-option label="已超时" value="TimedOut" />
+            </el-select>
           </el-form-item>
-          <el-form-item label="原计划">
-            <span style="color: #909399;">{{ editingSchedule.originalDate }}</span>
+          <el-form-item label="原因说明">
+            <el-input v-model="editForm.reason" type="textarea" :rows="2" placeholder="说明添加此排期的原因" />
           </el-form-item>
-          <el-form-item label="调整到">
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <el-input-number v-model="editForm.day" :min="1" :max="31" size="small" style="width: 90px;" controls-position="right" />
-              <span style="color: #909399;">日</span>
-              <el-select v-model="editForm.hour" size="small" style="width: 90px;">
-                <el-option v-for="h in 24" :key="h - 1" :label="`${String(h - 1).padStart(2, '0')}`" :value="h - 1" />
-              </el-select>
-              <span style="color: #909399;">:</span>
-              <el-select v-model="editForm.minute" size="small" style="width: 90px;">
-                <el-option v-for="m in 60" :key="m - 1" :label="`${String(m - 1).padStart(2, '0')}`" :value="m - 1" />
-              </el-select>
-            </div>
+        </el-form>
+      </template>
+      <!-- 编辑排期 -->
+      <template v-else-if="editingId">
+        <el-form label-width="110px">
+          <el-form-item label="任务"><span>{{ selectedJob?.displayName }}</span></el-form-item>
+          <el-form-item label="原计划"><span style="color:#909399;">{{ currentSchedule?.originalDate }}</span></el-form-item>
+          <el-form-item label="调整时间">
+            <el-date-picker
+              v-model="editForm.scheduledAt"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm"
+              format="YYYY-MM-DD HH:mm"
+              placeholder="选择调整后的执行时间"
+              style="width:100%"
+            />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="editForm.status" style="width:100%">
+              <el-option label="待执行" value="Pending" /><el-option label="执行中" value="Running" />
+              <el-option label="执行成功" value="Success" /><el-option label="执行失败" value="Failed" />
+              <el-option label="已跳过" value="Skipped" /><el-option label="已暂停" value="Paused" />
+              <el-option label="已取消" value="Cancelled" /><el-option label="重试中" value="Retrying" />
+              <el-option label="已超时" value="TimedOut" />
+            </el-select>
           </el-form-item>
           <el-form-item label="调整原因">
             <el-input v-model="editForm.reason" type="textarea" :rows="2" placeholder="如：25日逢周末，提前至24日" />
           </el-form-item>
           <el-form-item label="同时调整">
-            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-              <el-checkbox v-for="(s, i) in schedules" :key="i" v-model="s._batch" :label="s.month" :disabled="i === editingIndex" />
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <el-checkbox v-for="s in schedules" :key="s._id" v-model="s._batch" :label="s.month" :disabled="s._id === editingId" />
             </div>
-            <div style="font-size: 12px; color: #909399; margin-top: 4px;">勾选后续月份同步应用此调整</div>
+            <div style="font-size:12px;color:#909399;margin-top:4px;">勾选后续月份同步应用此调整</div>
           </el-form-item>
         </el-form>
       </template>
@@ -226,36 +259,116 @@
         <pre style="background: #f5f7fa; padding: 12px; border-radius: 4px; font-size: 13px; white-space: pre-wrap;">{{ JSON.stringify(logDetail, null, 2) }}</pre>
       </template>
     </el-dialog>
+
+    <!-- 排期详情 Dialog -->
+    <el-dialog v-model="scheduleDetailVisible" title="排期详情" :width="500">
+      <template v-if="scheduleDetail">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="任务名">{{ scheduleDetail.jobName }}</el-descriptions-item>
+          <el-descriptions-item label="月份">{{ scheduleDetail.month }}</el-descriptions-item>
+          <el-descriptions-item label="计划时间">{{ scheduleDetail.targetDate }}</el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :color="statusColor(scheduleDetail.status)" style="color:#fff;border:0" size="small">
+              {{ scheduleDetail.status === 'Success' ? '执行成功' : scheduleDetail.status === 'Failed' ? '执行失败' : scheduleDetail.status === 'Pending' ? '待执行' : scheduleDetail.status === 'Running' ? '执行中' : scheduleDetail.status === 'Custom' ? '自定义' : scheduleDetail.status === 'Skipped' ? '已跳过' : scheduleDetail.status === 'Paused' ? '已暂停' : scheduleDetail.status || '-' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="原因">{{ scheduleDetail.reason || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="调整">{{ scheduleDetail.isAdjusted ? '是' : '否' }}</el-descriptions-item>
+        </el-descriptions>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { getSchedulerJobs, updateSchedulerJob } from '../../api/index'
 
 // ==================== Job 定义 ====================
-const jobs = ref([
-  {
-    name: 'MonthlyFeeBillJob', displayName: '📅 月度应收生成', enabled: true,
-    nextTime: '07-25 08:00', lastRun: '06-25 08:00 ✅',
-    defaultDay: 25, defaultHour: 8, defaultMinute: 0, shortName: '月度应收'
-  },
-  {
-    name: 'LateFeeCalcJob', displayName: '💰 滞纳金计算', enabled: true,
-    nextTime: '每天 02:00', lastRun: '06-27 02:00 ✅',
-    defaultDay: null, defaultHour: 2, defaultMinute: 0, shortName: '滞纳金'
-  },
-  {
-    name: 'AutoRenewJob', displayName: '🔄 自动续签', enabled: true,
-    nextTime: '每天 00:00', lastRun: '06-27 00:00 ✅',
-    defaultDay: null, defaultHour: 0, defaultMinute: 0, shortName: '续签'
-  },
-  {
-    name: 'CollectionJob', displayName: '📢 催缴任务', enabled: true,
-    nextTime: '每天 09:00', lastRun: '06-27 09:00 ✅',
-    defaultDay: null, defaultHour: 9, defaultMinute: 0, shortName: '催缴'
+const jobs = ref([])
+const loading = ref(false)
+
+// 解析 CronExpression → { defaultDay, defaultHour, defaultMinute, type }
+function parseCron(cron) {
+  const parts = (cron || '').split(' ')
+  // 标准 Cron: sec min hour day-of-month month day-of-week
+  // 0 0 8 25 * ?  → 每月25日08:00
+  // 0 0 2 * * ?   → 每天02:00
+  const minute = parts.length > 1 ? parseInt(parts[1]) : 0
+  const hour = parts.length > 2 ? parseInt(parts[2]) : 0
+  const day = parts.length > 3 ? parseInt(parts[3]) : null
+  return {
+    defaultDay: day && !isNaN(day) && day > 0 ? day : null,
+    defaultHour: hour || 0,
+    defaultMinute: minute || 0,
+    isDaily: !day || isNaN(day) || day <= 0  // 无指定日 → 每天执行
   }
-])
+}
+
+// 从 Description 提取显示名
+const JOB_NAMES = {
+  MonthlyFeeBillJob: { displayName: '📅 月度应收生成', shortName: '月度应收' },
+  LateFeeCalcJob: { displayName: '💰 滞纳金计算', shortName: '滞纳金' },
+  AutoRenewJob: { displayName: '🔄 自动续签', shortName: '续签' },
+  CollectionJob: { displayName: '📢 催缴任务', shortName: '催缴' }
+}
+
+async function fetchJobs() {
+  loading.value = true
+  try {
+    const res = await getSchedulerJobs()
+    const raw = Array.isArray(res) ? res : []
+    jobs.value = raw.map(j => {
+      const meta = JOB_NAMES[j.jobName] || { displayName: j.jobName, shortName: j.jobName }
+      const cron = parseCron(j.cronExpression)
+      const nextTime = cron.isDaily
+        ? `每天 ${String(cron.defaultHour).padStart(2, '0')}:${String(cron.defaultMinute).padStart(2, '0')}`
+        : `每月${cron.defaultDay}日 ${String(cron.defaultHour).padStart(2, '0')}:${String(cron.defaultMinute).padStart(2, '0')}`
+      // 解析 Description 中的排期状态映射（兼容新旧格式）
+      let scheduleStates = {}
+      let deletedMonths = []
+      let customSchedules = []
+      let globalUpdatedAt = null
+      try {
+        if (j.description) {
+          const parsed = JSON.parse(j.description)
+          if (parsed.scheduleStates) {
+            // 新格式: { scheduleStates: {...}, deletedMonths: [...], customSchedules: [...], updatedAt: "..." }
+            scheduleStates = parsed.scheduleStates
+            deletedMonths = Array.isArray(parsed.deletedMonths) ? parsed.deletedMonths : []
+            customSchedules = Array.isArray(parsed.customSchedules) ? parsed.customSchedules : []
+            globalUpdatedAt = parsed.updatedAt
+          } else if (parsed.month) {
+            // 旧格式: { status, reason, month, updatedAt } → 转为映射
+            scheduleStates[parsed.month] = { status: parsed.status, reason: parsed.reason }
+            globalUpdatedAt = parsed.updatedAt
+          }
+        }
+      } catch (e) {}
+      return {
+        id: j.id,
+        name: j.jobName,
+        displayName: meta.displayName,
+        shortName: meta.shortName,
+        enabled: j.isActive,
+        cronExpression: j.cronExpression,
+        description: j.description || '',
+        scheduleStates,
+        deletedMonths,
+        customSchedules,
+        nextTime,
+        lastRun: globalUpdatedAt ? new Date(globalUpdatedAt).toLocaleString() + ' (已编辑)' : '-',
+        defaultDay: cron.defaultDay,
+        defaultHour: cron.defaultHour,
+        defaultMinute: cron.defaultMinute
+      }
+    })
+  } catch (e) {
+    jobs.value = []
+  }
+  loading.value = false
+}
 
 // ==================== 视图切换 ====================
 const viewTab = ref('list')
@@ -393,6 +506,8 @@ function selectJob(job) {
 
 function loadSchedules(job) {
   const now = new Date()
+  // 过滤已删除的月份
+  const filteredMonths = new Set(job.deletedMonths || [])
   const list = []
   for (let i = 1; i <= 6; i++) {
     const m = now.getMonth() + i
@@ -400,6 +515,7 @@ function loadSchedules(job) {
     const month = (m % 12 || 12)
     const year = y
     const label = `${year}-${String(month).padStart(2, '0')}`
+    if (filteredMonths.has(label)) continue  // 跳过已删除的月份
 
     if (job.defaultDay !== null) {
       const day = job.defaultDay
@@ -407,6 +523,7 @@ function loadSchedules(job) {
       const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
       const adjusted = (i === 1)
       list.push({
+        _id: crypto.randomUUID(),
         jobName: job.name, month: label,
         targetDate: adjusted
           ? `${label}-${String(day - 1).padStart(2, '0')}(${weekday === '六' ? '五' : weekday}) ${String(job.defaultHour).padStart(2, '0')}:${String(job.defaultMinute).padStart(2, '0')}`
@@ -417,6 +534,7 @@ function loadSchedules(job) {
       })
     } else {
       list.push({
+        _id: crypto.randomUUID(),
         jobName: job.name, month: label,
         targetDate: `每日 ${String(job.defaultHour).padStart(2, '0')}:${String(job.defaultMinute).padStart(2, '0')}`,
         status: 'Pending', reason: '每日执行', isAdjusted: false,
@@ -424,6 +542,33 @@ function loadSchedules(job) {
       })
     }
   }
+  // 从 Description 恢复各月份排期的状态（scheduleStates 映射）
+  if (job.scheduleStates && list.length > 0) {
+    list.forEach(s => {
+      const state = job.scheduleStates[s.month]
+      if (state) {
+        if (state.status) s.status = state.status
+        if (state.reason) s.reason = state.reason
+        if (state.isAdjusted) s.isAdjusted = true
+      }
+    })
+  }
+  // 追加自定义排期（用户手动添加的执行日期）
+  const customs = job.customSchedules || []
+  customs.forEach(cs => {
+    // 跳过已被 deletedMonths 过滤掉的月份对应的自定义排期
+    // （deletedMonths 过滤在 loadSchedules 开头通过 continue 跳过循环，不影响这里）
+    list.push({
+      _id: crypto.randomUUID(),
+      jobName: job.name,
+      month: cs.month,
+      targetDate: cs.targetDate,
+      status: cs.status || 'Pending',
+      reason: cs.reason || '自定义',
+      isAdjusted: true,
+      originalDate: cs.originalDate || cs.targetDate
+    })
+  })
   schedules.value = list
 }
 
@@ -438,73 +583,223 @@ function loadLogs(job) {
 // ==================== 调整 Drawer ====================
 const drawerVisible = ref(false)
 const editingSchedule = ref(null)
-const editingIndex = ref(-1)
-const editForm = reactive({ day: 1, hour: 8, minute: 0, reason: '' })
+const editingId = ref(null)  // 正在编辑的排期 _id，null 表示新增模式
+const editForm = reactive({ scheduledAt: '', status: 'Pending', reason: '' })
+const isAddingNew = computed(() => editingId.value === null)
+const currentSchedule = computed(() => {
+  if (editingSchedule.value) return editingSchedule.value
+  if (editingId.value) return schedules.value.find(s => s._id === editingId.value) || null
+  return null
+})
 
-function openAdjust(row, index) {
+function statusColor(status) {
+  const colors = { Success: '#67c23a', Failed: '#f56c6c', TimedOut: '#e6a23c', Running: '#409eff', Retrying: '#9c27b0', Paused: '#009688', Pending: '#607d8b', Skipped: '#9e9e9e', Cancelled: '#795548' }
+  return colors[status] || '#909399'
+}
+
+function openEditSchedule(row) {
   editingSchedule.value = row
-  editingIndex.value = index
-  // 从 targetDate 解析当前值
-  const match = row.targetDate.match(/(\d{4}-\d{2})-(\d{2})/)
+  editingId.value = row._id
+  // 从 targetDate 解析日期时间
+  const match = row.targetDate.match(/(\d{4}-\d{2}-\d{2})\(.*?\)\s*(\d{2}:\d{2})/)
   if (match) {
-    editForm.day = parseInt(match[2])
+    editForm.scheduledAt = `${match[1]} ${match[2]}`
   } else {
-    editForm.day = selectedJob.value.defaultDay || 1
+    editForm.scheduledAt = ''
   }
-  editForm.hour = selectedJob.value.defaultHour
-  editForm.minute = selectedJob.value.defaultMinute
+  editForm.status = row.status || 'Pending'
   editForm.reason = row.reason !== '默认' ? row.reason : ''
-  // 重置批量勾选
   schedules.value.forEach(s => (s._batch = false))
   drawerVisible.value = true
+}
+
+async function removeSchedule(id) {
+  const idx = schedules.value.findIndex(s => s._id === id)
+  if (idx < 0) return
+  const removedMonth = schedules.value[idx].month
+  schedules.value.splice(idx, 1)
+  // 持久化删除操作到后端
+  if (selectedJob.value?.id) {
+    try {
+      const newStates = { ...(selectedJob.value.scheduleStates || {}) }
+      delete newStates[removedMonth]  // 同时清理该月的状态
+      const newDeleted = [...(selectedJob.value.deletedMonths || [])]
+      if (!newDeleted.includes(removedMonth)) newDeleted.push(removedMonth)
+      await updateSchedulerJob(selectedJob.value.id, {
+        description: JSON.stringify({
+          scheduleStates: newStates,
+          deletedMonths: newDeleted,
+          updatedAt: new Date().toISOString()
+        })
+      })
+      selectedJob.value.scheduleStates = newStates
+      selectedJob.value.deletedMonths = newDeleted
+    } catch (e) { /* 静默失败 */ }
+  }
+  ElMessage.success('排期已删除')
 }
 
 function openAdd() {
   editingSchedule.value = null
-  editingIndex.value = -1
-  editForm.day = selectedJob.value.defaultDay || 1
-  editForm.hour = selectedJob.value.defaultHour
-  editForm.minute = selectedJob.value.defaultMinute
+  editingId.value = null
+  editForm.scheduledAt = ''
+  editForm.status = 'Pending'
   editForm.reason = ''
-  schedules.value.forEach(s => (s._batch = false))
   drawerVisible.value = true
 }
 
-function saveAdjust() {
+async function saveAdjust() {
   if (!editForm.reason) {
     ElMessage.warning('请填写调整原因')
     return
   }
-  // 更新当前行
-  if (editingIndex.value >= 0) {
-    const row = schedules.value[editingIndex.value]
-    const monthLabel = row.month
-    const d = new Date(parseInt(monthLabel.split('-')[0]), parseInt(monthLabel.split('-')[1]) - 1, editForm.day)
+  // 新增自定义排期
+  if (!editingId.value) {
+    if (!editForm.scheduledAt) {
+      ElMessage.warning('请选择计划执行时间')
+      return
+    }
+    const parts = editForm.scheduledAt.split(' ')
+    const dateParts = parts[0].split('-')
+    const timeParts = parts[1].split(':')
+    const year = parseInt(dateParts[0]), month = parseInt(dateParts[1])
+    const day = parseInt(dateParts[2]), hour = parseInt(timeParts[0]), minute = parseInt(timeParts[1])
+    const label = `${year}-${String(month).padStart(2, '0')}`
+    const d = new Date(year, month - 1, day)
     const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
-    row.targetDate = `${monthLabel}-${String(editForm.day).padStart(2, '0')}(${weekday}) ${String(editForm.hour).padStart(2, '0')}:${String(editForm.minute).padStart(2, '0')}`
-    row.isAdjusted = true
-    row.reason = editForm.reason
+    const targetDate = `${label}-${String(day).padStart(2, '0')}(${weekday}) ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    schedules.value.push({
+      _id: crypto.randomUUID(),
+      jobName: selectedJob.value.name, month: label,
+      targetDate, status: editForm.status,
+      reason: editForm.reason, isAdjusted: true, originalDate: targetDate
+    })
+    // 持久化自定义排期到后端
+    if (selectedJob.value?.id) {
+      try {
+        const newCustom = [...(selectedJob.value.customSchedules || [])]
+        newCustom.push({ month: label, targetDate, originalDate: targetDate, status: editForm.status, reason: editForm.reason })
+        // 该月的默认 cron 排期不再显示（仅显示自定义排期）
+        const newDeleted = [...(selectedJob.value.deletedMonths || [])]
+        if (!newDeleted.includes(label)) newDeleted.push(label)
+        await updateSchedulerJob(selectedJob.value.id, {
+          description: JSON.stringify({
+            scheduleStates: selectedJob.value.scheduleStates || {},
+            deletedMonths: newDeleted,
+            customSchedules: newCustom,
+            updatedAt: new Date().toISOString()
+          })
+        })
+        selectedJob.value.deletedMonths = newDeleted
+        selectedJob.value.customSchedules = newCustom
+      } catch (e) { /* 静默失败 */ }
+    }
+    drawerVisible.value = false
+    ElMessage.success('自定义排期已添加')
+    return
   }
-  // 批量更新后续勾选的行
+  // 根据 _id 找到当前编辑的行
+  const rowIdx = schedules.value.findIndex(s => s._id === editingId.value)
+  if (rowIdx < 0) {
+    ElMessage.error('找不到要编辑的排期')
+    return
+  }
+  const row = schedules.value[rowIdx]
+  // 更新当前行
+  if (editForm.scheduledAt) {
+    const parts = editForm.scheduledAt.split(' ')
+    const dateParts = parts[0].split('-')
+    const timeParts = parts[1].split(':')
+    const year = parseInt(dateParts[0]), month = parseInt(dateParts[1])
+    const day = parseInt(dateParts[2]), hour = parseInt(timeParts[0]), minute = parseInt(timeParts[1])
+    const monthLabel = `${year}-${String(month).padStart(2, '0')}`
+    const d = new Date(year, month - 1, day)
+    const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+    row.targetDate = `${monthLabel}-${String(day).padStart(2, '0')}(${weekday}) ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    row.month = monthLabel
+  }
+  row.status = editForm.status
+  row.isAdjusted = true
+  row.reason = editForm.reason
+  // 批量更新后续勾选的行（用 rowIdx 判断位置）
   schedules.value.forEach((s, i) => {
-    if (s._batch && i > editingIndex.value) {
-      const monthLabel = s.month
-      const d = new Date(parseInt(monthLabel.split('-')[0]), parseInt(monthLabel.split('-')[1]) - 1, editForm.day)
-      const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
-      s.targetDate = `${monthLabel}-${String(editForm.day).padStart(2, '0')}(${weekday}) ${String(editForm.hour).padStart(2, '0')}:${String(editForm.minute).padStart(2, '0')}`
+    if (s._batch && i > rowIdx) {
+      if (editForm.scheduledAt) {
+        const parts = editForm.scheduledAt.split(' ')
+        const dateParts = parts[0].split('-')
+        const timeParts = parts[1].split(':')
+        const day = parseInt(dateParts[2]), hour = parseInt(timeParts[0]), minute = parseInt(timeParts[1])
+        const monthLabel = s.month
+        const monthNum = parseInt(monthLabel.split('-')[1])
+        const d = new Date(parseInt(monthLabel.split('-')[0]), monthNum - 1, day)
+        const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+        s.targetDate = `${monthLabel}-${String(day).padStart(2, '0')}(${weekday}) ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      }
       s.isAdjusted = true
       s.reason = editForm.reason
       s._batch = false
     }
   })
   drawerVisible.value = false
+  // 持久化状态到后端（合并到 scheduleStates 映射中）
+  if (selectedJob.value?.id && editForm.status) {
+    const monthKey = row.month || ''
+    try {
+      const newStates = { ...(selectedJob.value.scheduleStates || {}) }
+      if (monthKey) {
+        newStates[monthKey] = { status: editForm.status, reason: editForm.reason, isAdjusted: true }
+      }
+      // 编辑的是 cron 排期（非自定义）时，从 deletedMonths 中恢复
+      const isCustom = selectedJob.value.customSchedules?.some(cs => cs.month === monthKey)
+      const newDeleted = [...(selectedJob.value.deletedMonths || [])]
+      if (!isCustom) {
+        const delIdx = monthKey ? newDeleted.indexOf(monthKey) : -1
+        if (delIdx >= 0) newDeleted.splice(delIdx, 1)
+      }
+      await updateSchedulerJob(selectedJob.value.id, {
+        description: JSON.stringify({
+          scheduleStates: newStates,
+          deletedMonths: newDeleted,
+          updatedAt: new Date().toISOString()
+        })
+      })
+      // 同步更新本地的 scheduleStates 和 deletedMonths
+      selectedJob.value.scheduleStates = newStates
+      selectedJob.value.deletedMonths = newDeleted
+    } catch (e) { /* 静默失败 */ }
+  }
   ElMessage.success('排期已更新')
 }
 
-function generateDefault() {
+async function generateDefault() {
   if (!selectedJob.value) return
+  // 清空所有自定义状态（编辑 + 删除 + 自定义排期）
+  selectedJob.value.scheduleStates = {}
+  selectedJob.value.deletedMonths = []
+  selectedJob.value.customSchedules = []
+  if (selectedJob.value.id) {
+    try {
+      await updateSchedulerJob(selectedJob.value.id, {
+        description: JSON.stringify({
+          scheduleStates: {},
+          deletedMonths: [],
+          customSchedules: [],
+          updatedAt: new Date().toISOString()
+        })
+      })
+    } catch (e) { /* 静默失败 */ }
+  }
   loadSchedules(selectedJob.value)
-  ElMessage.success('已重新生成默认排期')
+  ElMessage.success('已重置为默认排期')
+}
+
+// ==================== 排期详情 ====================
+const scheduleDetailVisible = ref(false)
+const scheduleDetail = ref(null)
+
+function showScheduleDetail(row) {
+  scheduleDetail.value = row
+  scheduleDetailVisible.value = true
 }
 
 // ==================== 日志详情 ====================
@@ -519,4 +814,17 @@ function showLogDetail(row) {
   logDetail.value = row
   logDialogVisible.value = true
 }
+
+// 保存 Job 启用/停用
+async function toggleJobEnabled(job) {
+  try {
+    await updateSchedulerJob(job.id, { isActive: !job.enabled })
+    job.enabled = !job.enabled
+    ElMessage.success(job.enabled ? '已启用' : '已停用')
+  } catch (e) {
+    ElMessage.error('操作失败')
+  }
+}
+
+onMounted(() => fetchJobs())
 </script>

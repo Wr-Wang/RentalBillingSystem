@@ -38,6 +38,7 @@ public class UnitOfWork : IUnitOfWork
     private IRepository<RoomPricingStandard>? _roomPricingStandards;
     private IRepository<TaxRateConfig>? _taxRateConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
+    private IRepository<JobSchedule>? _jobSchedules;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -66,6 +67,7 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new BaseRepository<RoomPricingStandard>(_context);
     public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new BaseRepository<TaxRateConfig>(_context);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new BaseRepository<AccountingSubject>(_context);
+    public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new BaseRepository<JobSchedule>(_context);
 
     public async Task<int> CommitAsync(CancellationToken ct = default)
     {

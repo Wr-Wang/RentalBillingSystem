@@ -11,4 +11,8 @@ public class JobSchedule : AuditableEntity, IHasCompany
     private JobSchedule() { }
     public JobSchedule(string jobName, string cronExpression, Guid companyId)
     { JobName = jobName; CronExpression = cronExpression; CompanyId = companyId; }
+    public void SetCron(string cron) => CronExpression = cron;
+    public void SetDescription(string? desc) => Description = desc;
+    public void Activate() => IsActive = true;
+    public void Deactivate() => IsActive = false;
 }

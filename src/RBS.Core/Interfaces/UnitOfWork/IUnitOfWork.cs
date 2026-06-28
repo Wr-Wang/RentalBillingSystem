@@ -48,6 +48,7 @@ public interface IUnitOfWork : IDisposable
     IHolidayCalendarRepository HolidayCalendars { get; }
     IRepository<TaxRateConfig> TaxRateConfigs { get; }
     IRepository<AccountingSubject> AccountingSubjects { get; }
+    IRepository<JobSchedule> JobSchedules { get; }
 
     /// <summary>提交所有变更（自动事务）</summary>
     Task<int> CommitAsync(CancellationToken ct = default);

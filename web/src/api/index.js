@@ -163,9 +163,6 @@ export function getDebitNote(id) { return request({ url: `/debitnotes/${id}`, me
 export function generateDebitNotes(data) { return request({ url: '/debitnotes/generate', method: 'post', data }) }
 export function exportDebitNotePdf(id) { return request({ url: `/debitnotes/${id}/pdf`, method: 'get', responseType: 'blob' }) }
 
-// Scheduler
-export function getSchedulerJobs() { return request({ url: '/scheduler/jobs', method: 'get' }) }
-export function triggerSchedulerJob(name) { return request({ url: `/scheduler/jobs/${name}/trigger`, method: 'post' }) }
 
 // Holidays
 export function getHolidayCalendars(params) { return request({ url: '/holidaycalendars', method: 'get', params }) }
@@ -185,6 +182,12 @@ export function getTaxRateConfigs() { return request({ url: '/taxrateconfigs', m
 export function createTaxRateConfig(data) { return request({ url: '/taxrateconfigs', method: 'post', data }) }
 export function updateTaxRateConfig(id, data) { return request({ url: `/taxrateconfigs/${id}`, method: 'put', data }) }
 export function deleteTaxRateConfig(id) { return request({ url: '/taxrateconfigs/' + id, method: 'delete' }) }
+
+// Scheduler
+export function getSchedulerJobs() { return request({ url: '/scheduler/jobs', method: 'get' }) }
+export function createSchedulerJob(data) { return request({ url: '/scheduler/jobs', method: 'post', data }) }
+export function updateSchedulerJob(id, data) { return request({ url: '/scheduler/jobs/' + id, method: 'put', data }) }
+export function deleteSchedulerJob(id) { return request({ url: '/scheduler/jobs/' + id, method: 'delete' }) }
 
 // Audit
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }
