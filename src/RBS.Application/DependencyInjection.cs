@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
         services.AddScoped<IFeeCodeService, FeeCodeService>();
         services.AddScoped<IPricingStandardService, PricingStandardService>();
+        services.AddScoped<IPaymentChannelService, PaymentChannelService>();
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
 
         return services;

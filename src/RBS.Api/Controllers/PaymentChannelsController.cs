@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Billing;
 
 namespace RBS.Api.Controllers;
 
@@ -8,15 +10,30 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class PaymentChannelsController : ControllerBase
 {
+    private readonly IPaymentChannelService _service;
+    public PaymentChannelsController(IPaymentChannelService service) => _service = service;
+
     [HttpGet]
-    public IActionResult GetAll() => Ok(new List<object>());
+    public async Task<IActionResult> GetAll(CancellationToken ct) => Ok(await _service.GetListAsync(ct));
 
     [HttpPost]
-    public IActionResult Create([FromBody] object dto) => Ok(new { });
+    public async Task<IActionResult> Create([FromBody] CreatePaymentChannelRequest request, CancellationToken ct)
+    {
+        var result = await _service.CreateAsync(request, ct);
+        return Ok(result);
+    }
 
     [HttpPut("{id}")]
-    public IActionResult Update(Guid id, [FromBody] object dto) => NoContent();
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePaymentChannelRequest request, CancellationToken ct)
+    {
+        await _service.UpdateAsync(id, request, ct);
+        return NoContent();
+    }
 
     [HttpDelete("{id}")]
-    public IActionResult Delete(Guid id) => NoContent();
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await _service.DeleteAsync(id, ct);
+        return NoContent();
+    }
 }
