@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Billing;
 
 namespace RBS.Api.Controllers;
 
@@ -9,41 +10,34 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class FeeCodesController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    public FeeCodesController(IUnitOfWork uow) => _uow = uow;
+    private readonly IFeeCodeService _service;
+    public FeeCodesController(IFeeCodeService service) => _service = service;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, CancellationToken ct)
+    public async Task<IActionResult> GetAll(CancellationToken ct)
     {
-        if (companyId == null) return Ok(new List<object>());
-        var list = await _uow.FeeCodes.GetAllAsync(ct);
-        return Ok(list);
+        var result = await _service.GetListAsync(ct);
+        return Ok(result);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] RBS.Core.Entities.Billing.FeeCode dto, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateFeeCodeRequest request, CancellationToken ct)
     {
-        await _uow.FeeCodes.AddAsync(dto, ct);
-        await _uow.CommitAsync(ct);
-        return Ok(dto);
+        var result = await _service.CreateAsync(request, ct);
+        return Ok(result);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] RBS.Core.Entities.Billing.FeeCode dto, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFeeCodeRequest request, CancellationToken ct)
     {
-        var entity = await _uow.FeeCodes.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        await _uow.CommitAsync(ct);
+        await _service.UpdateAsync(id, request, ct);
         return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var entity = await _uow.FeeCodes.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        await _uow.FeeCodes.DeleteAsync(entity, ct);
-        await _uow.CommitAsync(ct);
+        await _service.DeleteAsync(id, ct);
         return NoContent();
     }
 }

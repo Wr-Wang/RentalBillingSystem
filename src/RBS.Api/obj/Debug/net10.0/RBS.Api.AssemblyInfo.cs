@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RBS.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1eff92e084ef65582561d3ae7b37b394c4804093")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7ff1e505c2d0c155f5b8073056a062da563722e5")]
 [assembly: System.Reflection.AssemblyProductAttribute("RBS.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RBS.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

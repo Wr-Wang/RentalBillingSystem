@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IContractService, ContractAppService>();
         services.AddScoped<IBillingService, BillingAppService>();
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
+        services.AddScoped<IFeeCodeService, FeeCodeService>();
 
         return services;
     }

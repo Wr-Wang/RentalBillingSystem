@@ -14,4 +14,14 @@ public class FeeCode : AuditableEntity, IHasCompany
     public Guid CompanyId { get; private set; }
     private FeeCode() { }
     public FeeCode(string code, string name, Guid companyId) { Code = code; Name = name; CompanyId = companyId; }
+
+    public void Rename(string name) => Name = name;
+    public void SetCode(string code) => Code = code;
+    public void SetBillingMode(string mode) => BillingMode = mode;
+    public void SetUnit(string? unit) => Unit = unit;
+    public void SetSortOrder(int order) => SortOrder = order;
+    public void SetCategory(string category) => Category = category;
+    public void SetRequired(bool required) => IsRequired = required;
+    public void Activate() => IsActive = true;
+    public void Deactivate() => IsActive = false;
 }
