@@ -1,13 +1,13 @@
 <template>
   <div>
     <div class="page-header">
-      <h2>房东管理</h2>
+      <h2>公司管理</h2>
       <div class="page-actions">
         <el-button @click="fetchList">
           <el-icon><Refresh /></el-icon>刷新
         </el-button>
         <el-button type="primary" @click="openCreate">
-          <el-icon><Plus /></el-icon>新增房东
+          <el-icon><Plus /></el-icon>新增公司
         </el-button>
       </div>
     </div>
@@ -15,8 +15,8 @@
     <!-- 搜索栏 -->
     <el-card shadow="never" class="search-bar">
       <el-form :model="searchForm" inline>
-        <el-form-item label="房东名称">
-          <el-input v-model="searchForm.name" placeholder="搜索房东名称" clearable @clear="fetchList" @keyup.enter="fetchList" />
+        <el-form-item label="公司名称">
+          <el-input v-model="searchForm.name" placeholder="搜索公司名称" clearable @clear="fetchList" @keyup.enter="fetchList" />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.isActive" placeholder="全部" clearable @change="fetchList" style="width:120px">
@@ -30,12 +30,12 @@
       </el-form>
     </el-card>
 
-    <!-- 房东列表 -->
+    <!-- 公司列表 -->
     <el-card shadow="never">
       <el-table :data="list" v-loading="loading" stripe>
         <el-table-column type="index" label="#" width="50" />
         <el-table-column prop="code" label="编号" width="90" />
-        <el-table-column prop="name" label="房东名称" min-width="140">
+        <el-table-column prop="name" label="公司名称" min-width="140">
           <template #default="{ row }">
             <el-button text type="primary" @click="openDetail(row)">{{ row.name }}</el-button>
           </template>
@@ -84,18 +84,18 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑房东 Dialog -->
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑房东' : '新增房东'" width="650px">
+    <!-- 新增/编辑公司 Dialog -->
+    <el-dialog v-model="showDialog" :title="isEdit ? '编辑公司' : '新增公司'" width="650px">
       <el-form :model="form" label-width="110px" :rules="rules" ref="formRef">
         <el-divider content-position="left">基础信息</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="房东名称" prop="name">
-              <el-input v-model="form.name" placeholder="个人姓名或公司名称" />
+            <el-form-item label="公司名称" prop="name">
+              <el-input v-model="form.name" placeholder="公司全称或个人姓名" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="房东编号" prop="code">
+            <el-form-item label="公司编号" prop="code">
               <el-input v-model="form.code" placeholder="自动生成" :disabled="isEdit" />
             </el-form-item>
           </el-col>
@@ -182,8 +182,8 @@
       </template>
     </el-dialog>
 
-    <!-- 房东详情 Dialog -->
-    <el-dialog v-model="showDetail" :title="detailForm?.name || '房东详情'" width="800px">
+    <!-- 公司详情 Dialog -->
+    <el-dialog v-model="showDetail" :title="detailForm?.name || '公司详情'" width="800px">
       <template v-if="detailForm">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="编号">{{ detailForm.code }}</el-descriptions-item>
@@ -227,7 +227,7 @@
     </el-dialog>
 
     <!-- 创建登录账号 Dialog -->
-    <el-dialog v-model="showUserDialog" title="创建房东登录账号" width="450px">
+    <el-dialog v-model="showUserDialog" title="创建公司登录账号" width="450px">
       <el-form :model="userForm" label-width="100px">
         <el-form-item label="用户名" prop="username">
           <el-input v-model="userForm.username" />
@@ -240,7 +240,7 @@
         </el-form-item>
         <el-form-item label="角色">
           <el-select v-model="userForm.roleIds" multiple style="width:100%">
-            <el-option label="房东（只读）" value="Landlord" />
+            <el-option label="公司（只读）" value="Company" />
             <el-option label="运营主管" value="OpsSupervisor" />
             <el-option label="运营人员" value="Operator" />
             <el-option label="财务主管" value="FinanceSupervisor" />
@@ -261,7 +261,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getLandlords, createLandlord, updateLandlord, deleteLandlord, createUser } from '../../../api/index'
+import { getCompanies, createCompany, updateCompany, deleteCompany, createUser } from '../../../api/index'
 
 const list = ref([])
 const loading = ref(false)
@@ -302,7 +302,7 @@ const form = reactive({
 const detailForm = ref(null)
 
 const userForm = reactive({
-  landlordId: null,
+  companyId: null,
   username: '',
   displayName: '',
   password: '123456',
@@ -311,8 +311,8 @@ const userForm = reactive({
 })
 
 const rules = {
-  name: [{ required: true, message: '请输入房东名称', trigger: 'blur' }],
-  code: [{ required: true, message: '请输入房东编号', trigger: 'blur' }]
+  name: [{ required: true, message: '请输入公司名称', trigger: 'blur' }],
+  code: [{ required: true, message: '请输入公司编号', trigger: 'blur' }]
 }
 
 async function fetchList() {
@@ -324,19 +324,19 @@ async function fetchList() {
       name: searchForm.name || undefined,
       isActive: searchForm.isActive === '' || searchForm.isActive === null ? undefined : searchForm.isActive
     }
-    const res = await getLandlords(params)
+    const res = await getCompanies(params)
     // 后端返回 PagedResult：{ items, total, page, pageSize, totalPages }
     list.value = res.items || res.data || []
     total.value = res.total ?? list.value.length
   } catch (e) {
     // 开发阶段使用 mock 数据
-    list.value = getMockLandlords()
+    list.value = getMockCompanies()
     total.value = list.value.length
   }
   loading.value = false
 }
 
-function getMockLandlords() {
+function getMockCompanies() {
   return [
     { id: 'ld1', code: 'LD001', name: '张建国', contactPerson: '张建国', contactPhone: '13912345678', buildingCount: 8, roomCount: 180, collectionRate: 92, occupancyRate: 88, isActive: true, idType: 'ID_CARD', idNumber: '310101198001011234', bankName: '中国银行上海分行', bankAccount: '6222001234567890', bankAccountName: '张建国', settlementCycle: 'MONTHLY', settlementDay: 5, commissionRate: 5, address: '上海市浦东新区陆家嘴金融中心A座', remark: '' },
     { id: 'ld2', code: 'LD002', name: '李春华', contactPerson: '李春华', contactPhone: '13898765432', buildingCount: 5, roomCount: 120, collectionRate: 88, occupancyRate: 82, isActive: true, idType: 'ID_CARD', idNumber: '320102198505152345', bankName: '工商银行南京分行', bankAccount: '6222009876543210', bankAccountName: '李春华', settlementCycle: 'MONTHLY', settlementDay: 10, commissionRate: 8, address: '南京市鼓楼区新街口广场B座', remark: '' },
@@ -368,11 +368,11 @@ function openDetail(row) {
 }
 
 function openInitUser(row) {
-  userForm.landlordId = row.id
+  userForm.companyId = row.id
   userForm.username = row.code ? row.code.toLowerCase() : ''
   userForm.displayName = row.name
   userForm.password = '123456'
-  userForm.roleIds = ['Landlord']
+  userForm.roleIds = ['Company']
   userForm.phone = row.contactPhone || ''
   showUserDialog.value = true
 }
@@ -384,16 +384,16 @@ async function save() {
   saving.value = true
   try {
     if (isEdit.value) {
-      await updateLandlord(form.id, form)
-      ElMessage.success('房东信息已更新')
+      await updateCompany(form.id, form)
+      ElMessage.success('公司信息已更新')
     } else {
-      await createLandlord(form)
-      ElMessage.success('房东创建成功')
+      await createCompany(form)
+      ElMessage.success('公司创建成功')
     }
     showDialog.value = false
     await fetchList()
   } catch (e) {
-    ElMessage.error(isEdit.value ? '更新房东信息失败' : '创建房东失败')
+    ElMessage.error(isEdit.value ? '更新公司信息失败' : '创建公司失败')
   }
   saving.value = false
 }
@@ -401,13 +401,13 @@ async function save() {
 async function toggleStatus(row) {
   const action = row.isActive ? '停用' : '启用'
   try {
-    await ElMessageBox.confirm(`确定${action}房东「${row.name}」吗？`, '提示', {
+    await ElMessageBox.confirm(`确定${action}公司「${row.name}」吗？`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
     // 发送全字段更新 + 状态切换
-    await updateLandlord(row.id, {
+    await updateCompany(row.id, {
       name: row.name,
       code: row.code,
       contactPerson: row.contactPerson,
@@ -424,11 +424,11 @@ async function toggleStatus(row) {
       remark: row.remark,
       isActive: !row.isActive
     })
-    ElMessage.success(`房东已${action}`)
+    ElMessage.success(`公司已${action}`)
     await fetchList()
   } catch (e) {
     if (e !== 'cancel') {
-      ElMessage.error(`${action}房东失败`)
+      ElMessage.error(`${action}公司失败`)
     }
   }
 }

@@ -5,15 +5,15 @@ export function login(data) { return request({ url: '/auth/login', method: 'post
 export function refreshToken(data) { return request({ url: '/auth/refresh', method: 'post', data }) }
 export function changePassword(data) { return request({ url: '/auth/change-password', method: 'post', data }) }
 
-// Landlords (多房东管理)
-export function getLandlords(params) { return request({ url: '/landlords', method: 'get', params }) }
-export function getLandlord(id) { return request({ url: `/landlords/${id}`, method: 'get' }) }
-export function createLandlord(data) { return request({ url: '/landlords', method: 'post', data }) }
-export function updateLandlord(id, data) { return request({ url: `/landlords/${id}`, method: 'put', data }) }
-export function deleteLandlord(id) { return request({ url: `/landlords/${id}`, method: 'delete' }) }
-export function getLandlordStats(id) { return request({ url: `/landlords/${id}/stats`, method: 'get' }) }
-export function getUserLandlordScope(userId) { return request({ url: `/users/${userId}/landlord-scope`, method: 'get' }) }
-export function updateUserLandlordScope(userId, data) { return request({ url: `/users/${userId}/landlord-scope`, method: 'put', data }) }
+// Companies (多公司管理)
+export function getCompanies(params) { return request({ url: '/companies', method: 'get', params }) }
+export function getCompany(id) { return request({ url: `/companies/${id}`, method: 'get' }) }
+export function createCompany(data) { return request({ url: '/companies', method: 'post', data }) }
+export function updateCompany(id, data) { return request({ url: `/companies/${id}`, method: 'put', data }) }
+export function deleteCompany(id) { return request({ url: `/companies/${id}`, method: 'delete' }) }
+export function getCompanyStats(id) { return request({ url: `/companies/${id}/stats`, method: 'get' }) }
+export function getUserCompanyScope(userId) { return request({ url: `/users/${userId}/company-scope`, method: 'get' }) }
+export function updateUserCompanyScope(userId, data) { return request({ url: `/users/${userId}/company-scope`, method: 'put', data }) }
 
 // Users
 export function getUsers(params) { return request({ url: '/users', method: 'get', params }) }

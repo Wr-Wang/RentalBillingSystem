@@ -6,11 +6,11 @@
         <span>房屋租赁收租结算系统</span>
       </div>
       <div class="header-right">
-        <!-- 超级管理员：房东视角切换器 -->
-        <el-dropdown v-if="userStore.isSuperAdmin" @command="handleLandlordSwitch">
-          <span class="landlord-switcher">
+        <!-- 超级管理员：公司视角切换器 -->
+        <el-dropdown v-if="userStore.isSuperAdmin" @command="handleCompanySwitch">
+          <span class="company-switcher">
             <el-icon><OfficeBuilding /></el-icon>
-            <span>{{ userStore.currentLandlordName }}</span>
+            <span>{{ userStore.currentCompanyName }}</span>
             <el-icon><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
@@ -18,16 +18,16 @@
               <el-dropdown-item command="all">
                 <el-icon><DataAnalysis /></el-icon>全部数据
               </el-dropdown-item>
-              <el-dropdown-item v-for="l in landlordOptions" :key="l.id" :command="l.id" divided>
+              <el-dropdown-item v-for="l in companyOptions" :key="l.id" :command="l.id" divided>
                 <el-icon><HomeFilled /></el-icon>{{ l.name }}
               </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
 
-        <!-- 普通用户：显示当前所属房东 -->
-        <span v-else-if="userStore.homeLandlordId" class="landlord-tag">
-          <el-tag size="small" type="info">{{ userStore.currentLandlordName }}</el-tag>
+        <!-- 普通用户：显示当前所属公司 -->
+        <span v-else-if="userStore.homeCompanyId" class="company-tag">
+          <el-tag size="small" type="info">{{ userStore.currentCompanyName }}</el-tag>
         </span>
 
         <el-dropdown trigger="click">
@@ -164,16 +164,16 @@ const activeMenu = computed(() => {
   return route.path
 })
 
-// 房东切换器数据
-const landlordOptions = computed(() => {
-  return userStore.landlordList || []
+// 公司切换器数据
+const companyOptions = computed(() => {
+  return userStore.companyList || []
 })
 
-function handleLandlordSwitch(command) {
+function handleCompanySwitch(command) {
   if (command === 'all') {
     userStore.switchToAll()
   } else {
-    userStore.switchToLandlord(command)
+    userStore.switchToCompany(command)
   }
   // 强制刷新当前页面数据（通过重新加载路由）
   const currentPath = route.path
@@ -219,7 +219,7 @@ function changePassword() {
   align-items: center;
   gap: 16px;
 }
-.landlord-switcher {
+.company-switcher {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -231,10 +231,10 @@ function changePassword() {
   font-size: 13px;
   transition: border-color 0.2s;
 }
-.landlord-switcher:hover {
+.company-switcher:hover {
   border-color: rgba(255,255,255,0.5);
 }
-.landlord-tag {
+.company-tag {
   display: flex;
   align-items: center;
 }

@@ -272,16 +272,16 @@ const routes = [
         meta: { title: '通知中心', icon: 'Bell', roles: ['Admin', 'OpsSupervisor', 'Operator', 'FinanceSupervisor', 'FinanceDirector', 'Accountant', 'DeptManager', 'GeneralManager', 'Legal'] }
       },
 
-      // ========== 多房东相关页面 ==========
-      // 多房东总览（仅超级管理员可见）
+      // ========== 多公司相关页面 ==========
+      // 多公司总览（仅超级管理员可见）
       {
-        path: 'reports/landlordoverview',
-        name: 'ReportLandlordOverview',
-        component: () => import('../views/report/landlordOverview.vue'),
-        meta: { title: '多房东总览', icon: 'DataAnalysis', roles: ['Admin'] }
+        path: 'reports/companyoverview',
+        name: 'ReportCompanyOverview',
+        component: () => import('../views/report/companyOverview.vue'),
+        meta: { title: '多公司总览', icon: 'DataAnalysis', roles: ['Admin'] }
       },
-      // Report shortcuts for landlordoverview
-      { path: 'landlordoverview', redirect: '/reports/landlordoverview', meta: { hidden: true } },
+      // Report shortcuts for companyoverview
+      { path: 'companyoverview', redirect: '/reports/companyoverview', meta: { hidden: true } },
       // 变更审计
       {
         path: 'audit',
@@ -335,10 +335,10 @@ const routes = [
         meta: { title: '系统设置', icon: 'Setting', roles: ['Admin'] },
         children: [
           {
-            path: 'landlords',
-            name: 'SystemLandlords',
-            component: () => import('../views/system/landlord/index.vue'),
-            meta: { title: '房东管理', icon: 'OfficeBuilding' }
+            path: 'companies',
+            name: 'SystemCompanies',
+            component: () => import('../views/system/company/index.vue'),
+            meta: { title: '公司管理', icon: 'OfficeBuilding' }
           },
           {
             path: 'organization/users',

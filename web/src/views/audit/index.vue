@@ -7,7 +7,7 @@
     <!-- 搜索栏 -->
     <div class="search-bar">
       <el-select v-model="search.tableName" placeholder="选择实体类型" clearable style="width: 160px;" @change="fetchHistory">
-        <el-option label="房东" value="Landlords" />
+        <el-option label="公司" value="Companies" />
         <el-option label="菜单" value="Menus" />
         <el-option label="角色" value="Roles" />
         <el-option label="用户" value="Users" />
@@ -107,7 +107,7 @@ import { ElMessage } from 'element-plus'
 import { getAuditHistory, getAuditStats, compareAuditVersions } from '../../api/index'
 
 const search = reactive({
-  tableName: 'Landlords',
+  tableName: 'Companies',
   recordId: '',
   dateRange: null
 })
@@ -168,7 +168,7 @@ async function fetchStats() {
 }
 
 function resetSearch() {
-  search.tableName = 'Landlords'
+  search.tableName = 'Companies'
   search.recordId = ''
   search.dateRange = null
   pagination.page = 1

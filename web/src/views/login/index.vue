@@ -114,10 +114,10 @@ async function mockLogin() {
     role: 'Admin',
     phone: '13800138000',
     email: 'admin@rental.com',
-    homeLandlordId: isAdmin ? null : 'ld1',
+    homeCompanyId: isAdmin ? null : 'ld1',
     isSuperAdmin: isAdmin,
-    landlordScope: ['ld1', 'ld2', 'ld3', 'ld4'],
-    landlordList: [
+    companyScope: ['ld1', 'ld2', 'ld3', 'ld4'],
+    companyList: [
       { id: 'ld1', name: '张建国' },
       { id: 'ld2', name: '李春华' },
       { id: 'ld3', name: '王芳投资有限公司' },
@@ -130,16 +130,16 @@ async function mockLogin() {
   userStore.token = token
   userStore.user = mockUser
   userStore.permissions = permissions
-  userStore.homeLandlordId = mockUser.homeLandlordId
+  userStore.homeCompanyId = mockUser.homeCompanyId
   userStore.isSuperAdmin = mockUser.isSuperAdmin
-  userStore.landlordScope = mockUser.landlordScope
-  userStore.landlordList = mockUser.landlordList
-  userStore.currentLandlordId = null
+  userStore.companyScope = mockUser.companyScope
+  userStore.companyList = mockUser.companyList
+  userStore.currentCompanyId = null
 
   localStorage.setItem('token', token)
   localStorage.setItem('user', JSON.stringify(mockUser))
   localStorage.setItem('permissions', JSON.stringify(permissions))
-  localStorage.removeItem('currentLandlordId')
+  localStorage.removeItem('currentCompanyId')
 
   if (userStore.isSuperAdmin) userStore.restoreView()
   ElMessage.success('离线模式登录成功')

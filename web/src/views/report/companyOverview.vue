@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="page-header">
-      <h2>多房东总览</h2>
+      <h2>多公司总览</h2>
       <div class="page-actions">
         <el-date-picker
           v-model="queryMonth"
@@ -22,8 +22,8 @@
       <el-col :span="4">
         <el-card shadow="never">
           <div class="stat-item">
-            <div class="stat-label">房东总数</div>
-            <div class="stat-value">{{ summary.landlordTotal }}</div>
+            <div class="stat-label">公司总数</div>
+            <div class="stat-value">{{ summary.companyTotal }}</div>
           </div>
         </el-card>
       </el-col>
@@ -69,16 +69,16 @@
       </el-col>
     </el-row>
 
-    <!-- 各房东对比表格 -->
+    <!-- 各公司对比表格 -->
     <el-card shadow="never" class="section-card">
       <template #header>
-        <span>各房东经营指标对比</span>
+        <span>各公司经营指标对比</span>
       </template>
-      <el-table :data="landlordStats" stripe @row-click="handleRowClick" style="cursor:pointer">
+      <el-table :data="companyStats" stripe @row-click="handleRowClick" style="cursor:pointer">
         <el-table-column type="index" label="#" width="50" />
-        <el-table-column prop="name" label="房东名称" min-width="140">
+        <el-table-column prop="name" label="公司名称" min-width="140">
           <template #default="{ row }">
-            <el-button text type="primary" @click="switchToLandlord(row)">{{ row.name }}</el-button>
+            <el-button text type="primary" @click="switchToCompany(row)">{{ row.name }}</el-button>
           </template>
         </el-table-column>
         <el-table-column prop="buildingCount" label="楼栋数" width="80" align="center" />
@@ -183,7 +183,7 @@ const userStore = useUserStore()
 const queryMonth = ref('2026-06')
 
 const summary = ref({
-  landlordTotal: 0,
+  companyTotal: 0,
   buildingTotal: 0,
   roomTotal: 0,
   avgOccupancyRate: 0,
@@ -191,7 +191,7 @@ const summary = ref({
   avgCollectionRate: 0
 })
 
-const landlordStats = ref([])
+const companyStats = ref([])
 
 function formatMoney(val) {
   if (!val && val !== 0) return '¥0.00'
@@ -202,14 +202,14 @@ function formatMoney(val) {
 function getMockData() {
   return {
     summary: {
-      landlordTotal: 4,
+      companyTotal: 4,
       buildingTotal: 28,
       roomTotal: 675,
       avgOccupancyRate: 85,
       monthlyReceivable: 1332000,
       avgCollectionRate: 91
     },
-    landlordStats: [
+    companyStats: [
       { id: 'ld1', name: '张建国', buildingCount: 8, roomCount: 180, rentedCount: 158, occupancyRate: 88, monthlyReceivable: 520000, monthlyReceived: 479600, collectionRate: 92, overdueAmount: 42000, isActive: true },
       { id: 'ld2', name: '李春华', buildingCount: 5, roomCount: 120, rentedCount: 98, occupancyRate: 82, monthlyReceivable: 312000, monthlyReceived: 273000, collectionRate: 88, overdueAmount: 58000, isActive: true },
       { id: 'ld3', name: '王芳投资有限公司', buildingCount: 12, roomCount: 310, rentedCount: 288, occupancyRate: 93, monthlyReceivable: 448000, monthlyReceived: 426000, collectionRate: 95, overdueAmount: 15000, isActive: true },
@@ -221,7 +221,7 @@ function getMockData() {
 function fetchData() {
   const data = getMockData()
   summary.value = data.summary
-  landlordStats.value = data.landlordStats
+  companyStats.value = data.companyStats
 }
 
 // 图表配置
@@ -230,13 +230,13 @@ const collectionRateChart = computed(() => ({
   grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
   xAxis: {
     type: 'category',
-    data: landlordStats.value.filter(l => l.isActive).map(l => l.name),
+    data: companyStats.value.filter(l => l.isActive).map(l => l.name),
     axisLabel: { rotate: 30 }
   },
   yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
   series: [{
     type: 'bar',
-    data: landlordStats.value.filter(l => l.isActive).map(l => ({
+    data: companyStats.value.filter(l => l.isActive).map(l => ({
       value: l.collectionRate,
       itemStyle: {
         color: l.collectionRate >= 90 ? '#67c23a' : l.collectionRate >= 70 ? '#e6a23c' : '#f56c6c'
@@ -248,7 +248,7 @@ const collectionRateChart = computed(() => ({
 }))
 
 const overdueChart = computed(() => {
-  const sorted = [...landlordStats.value].sort((a, b) => b.overdueAmount - a.overdueAmount)
+  const sorted = [...companyStats.value].sort((a, b) => b.overdueAmount - a.overdueAmount)
   return {
     tooltip: { trigger: 'axis', formatter: params => `${params[0].name}<br/>逾期金额: ¥${Number(params[0].value).toLocaleString()}` },
     grid: { left: '10%', right: '4%', bottom: '15%', containLabel: true },
@@ -275,13 +275,13 @@ const occupancyChart = computed(() => ({
   grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
   xAxis: {
     type: 'category',
-    data: landlordStats.value.filter(l => l.isActive).map(l => l.name),
+    data: companyStats.value.filter(l => l.isActive).map(l => l.name),
     axisLabel: { rotate: 30 }
   },
   yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
   series: [{
     type: 'bar',
-    data: landlordStats.value.filter(l => l.isActive).map(l => ({
+    data: companyStats.value.filter(l => l.isActive).map(l => ({
       value: l.occupancyRate,
       itemStyle: { color: '#409eff' }
     })),
@@ -292,7 +292,7 @@ const occupancyChart = computed(() => ({
 
 const trendChart = computed(() => ({
   tooltip: { trigger: 'axis' },
-  legend: { data: ['房东A', '房东B', '房东C'], bottom: 0 },
+  legend: { data: ['公司A', '公司B', '公司C'], bottom: 0 },
   grid: { left: '3%', right: '4%', bottom: '25%', containLabel: true },
   xAxis: {
     type: 'category',
@@ -307,12 +307,12 @@ const trendChart = computed(() => ({
 }))
 
 function handleRowClick(row) {
-  switchToLandlord(row)
+  switchToCompany(row)
 }
 
-function switchToLandlord(row) {
+function switchToCompany(row) {
   if (userStore.isSuperAdmin) {
-    userStore.switchToLandlord(row.id)
+    userStore.switchToCompany(row.id)
     ElMessage.success(`已切换到「${row.name}」视角`)
     router.push('/dashboard')
   }

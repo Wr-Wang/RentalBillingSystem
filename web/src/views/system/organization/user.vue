@@ -13,10 +13,10 @@
       <el-table-column prop="displayName" label="姓名" width="100" />
       <el-table-column prop="phone" label="手机号" width="120" />
       <el-table-column prop="email" label="邮箱" min-width="150" />
-      <el-table-column label="所属房东" width="130">
+      <el-table-column label="所属公司" width="130">
         <template #default="{ row }">
           <el-tag v-if="row.isSuperAdmin" type="danger" size="small">超级管理员</el-tag>
-          <el-tag v-else-if="row.homeLandlordName" type="info" size="small">{{ row.homeLandlordName }}</el-tag>
+          <el-tag v-else-if="row.homeCompanyName" type="info" size="small">{{ row.homeCompanyName }}</el-tag>
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
@@ -60,10 +60,10 @@
         <el-form-item label="邮箱">
           <el-input v-model="form.email" />
         </el-form-item>
-        <el-form-item label="所属房东">
-          <el-select v-model="form.homeLandlordId" placeholder="选择房东（选填）" clearable style="width:100%">
+        <el-form-item label="所属公司">
+          <el-select v-model="form.homeCompanyId" placeholder="选择公司（选填）" clearable style="width:100%">
             <el-option label="系统用户（无归属）" :value="null" />
-            <el-option v-for="l in landlordList" :key="l.id" :label="l.name" :value="l.id" />
+            <el-option v-for="l in companyList" :key="l.id" :label="l.name" :value="l.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="超级管理员">
@@ -100,7 +100,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getUsers, createUser, updateUser, getRoles, getLandlords } from '../../../api/index'
+import { getUsers, createUser, updateUser, getRoles, getCompanies } from '../../../api/index'
 
 const loading = ref(false)
 const showDialog = ref(false)
@@ -109,7 +109,7 @@ const saving = ref(false)
 const formRef = ref(null)
 const list = ref([])
 const roleList = ref([])
-const landlordList = ref([])
+const companyList = ref([])
 
 const form = ref({
   id: null,
@@ -118,7 +118,7 @@ const form = ref({
   displayName: '',
   phone: '',
   email: '',
-  homeLandlordId: null,
+  homeCompanyId: null,
   isSuperAdmin: false,
   roleIds: []
 })
@@ -156,18 +156,18 @@ async function fetchRoles() {
   }
 }
 
-async function fetchLandlords() {
+async function fetchCompanies() {
   try {
-    const res = await getLandlords({ pageSize: 100 })
-    landlordList.value = Array.isArray(res) ? (res.items || res) : []
+    const res = await getCompanies({ pageSize: 100 })
+    companyList.value = Array.isArray(res) ? (res.items || res) : []
   } catch (e) {
-    landlordList.value = []
+    companyList.value = []
   }
 }
 
 function openCreate() {
   isEdit.value = false
-  form.value = { id: null, username: '', password: '', displayName: '', phone: '', email: '', homeLandlordId: null, isSuperAdmin: false, roleIds: [] }
+  form.value = { id: null, username: '', password: '', displayName: '', phone: '', email: '', homeCompanyId: null, isSuperAdmin: false, roleIds: [] }
   showDialog.value = true
 }
 
@@ -180,7 +180,7 @@ function openEdit(row) {
     displayName: row.displayName || '',
     phone: row.phone || '',
     email: row.email || '',
-    homeLandlordId: row.homeLandlordId || null,
+    homeCompanyId: row.homeCompanyId || null,
     isSuperAdmin: row.isSuperAdmin || false,
     roleIds: row.roleIds ? [...row.roleIds] : []
   }
@@ -203,7 +203,7 @@ async function save() {
         displayName: form.value.displayName || undefined,
         phone: form.value.phone || undefined,
         email: form.value.email || undefined,
-        homeLandlordId: form.value.homeLandlordId || undefined,
+        homeCompanyId: form.value.homeCompanyId || undefined,
         isSuperAdmin: form.value.isSuperAdmin,
         roleIds: form.value.roleIds.length > 0 ? form.value.roleIds : []
       }
@@ -216,7 +216,7 @@ async function save() {
         displayName: form.value.displayName,
         phone: form.value.phone || undefined,
         email: form.value.email || undefined,
-        homeLandlordId: form.value.homeLandlordId || undefined,
+        homeCompanyId: form.value.homeCompanyId || undefined,
         isSuperAdmin: form.value.isSuperAdmin,
         roleIds: form.value.roleIds.length > 0 ? form.value.roleIds : undefined
       }
@@ -263,7 +263,7 @@ async function toggleStatus(row) {
 onMounted(() => {
   fetchUsers()
   fetchRoles()
-  fetchLandlords()
+  fetchCompanies()
 })
 </script>
 

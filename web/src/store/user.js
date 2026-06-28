@@ -7,34 +7,34 @@ export const useUserStore = defineStore('user', () => {
   const user = ref(JSON.parse(localStorage.getItem('user') || '{}'))
   const permissions = ref(JSON.parse(localStorage.getItem('permissions') || '[]'))
 
-  // ========== 多房东扩展字段 ==========
-  const homeLandlordId = ref(user.value.homeLandlordId || null)   // 所属房东
+  // ========== 多公司扩展字段 ==========
+  const homeCompanyId = ref(user.value.homeCompanyId || null)   // 所属公司
   const isSuperAdmin = ref(user.value.isSuperAdmin || false)       // 是否超级管理员
-  const landlordScope = ref(user.value.landlordScope || [])       // 可查看的房东ID列表
-  const currentLandlordId = ref(null)                              // 当前切换的视角（超管专用）
-  const landlordList = ref(user.value.landlordList || [])          // 用户可选的房东列表
+  const companyScope = ref(user.value.companyScope || [])       // 可查看的公司ID列表
+  const currentCompanyId = ref(null)                              // 当前切换的视角（超管专用）
+  const companyList = ref(user.value.companyList || [])          // 用户可选的公司列表
 
   // 计算属性：是否在查看全部数据（超管专用）
-  const isViewingAll = computed(() => isSuperAdmin.value && currentLandlordId.value === null)
+  const isViewingAll = computed(() => isSuperAdmin.value && currentCompanyId.value === null)
 
-  // 计算属性：当前生效的 landlordId（用于 API 请求）
-  const effectiveLandlordId = computed(() => {
-    if (isSuperAdmin.value && currentLandlordId.value) {
-      return currentLandlordId.value
+  // 计算属性：当前生效的 companyId（用于 API 请求）
+  const effectiveCompanyId = computed(() => {
+    if (isSuperAdmin.value && currentCompanyId.value) {
+      return currentCompanyId.value
     }
-    return homeLandlordId.value
+    return homeCompanyId.value
   })
 
-  // 当前视角的房东名称
-  const currentLandlordName = computed(() => {
+  // 当前视角的公司名称
+  const currentCompanyName = computed(() => {
     if (isViewingAll.value) return '全部数据'
-    if (currentLandlordId.value) {
-      const found = landlordList.value.find(l => l.id === currentLandlordId.value)
-      return found ? found.name : '未知房东'
+    if (currentCompanyId.value) {
+      const found = companyList.value.find(l => l.id === currentCompanyId.value)
+      return found ? found.name : '未知公司'
     }
-    if (homeLandlordId.value) {
-      const found = landlordList.value.find(l => l.id === homeLandlordId.value)
-      return found ? found.name : '未知房东'
+    if (homeCompanyId.value) {
+      const found = companyList.value.find(l => l.id === homeCompanyId.value)
+      return found ? found.name : '未知公司'
     }
     return '系统'
   })
@@ -45,12 +45,12 @@ export const useUserStore = defineStore('user', () => {
     user.value = res.user
     permissions.value = res.permissions || []
 
-    // 解析多房东字段
-    homeLandlordId.value = res.user?.homeLandlordId || null
+    // 解析多公司字段
+    homeCompanyId.value = res.user?.homeCompanyId || null
     isSuperAdmin.value = res.user?.isSuperAdmin || false
-    landlordScope.value = res.user?.landlordScope || []
-    landlordList.value = res.user?.landlordList || []
-    currentLandlordId.value = null  // 登录后默认查看全部数据（超管）或自己的数据
+    companyScope.value = res.user?.companyScope || []
+    companyList.value = res.user?.companyList || []
+    currentCompanyId.value = null  // 登录后默认查看全部数据（超管）或自己的数据
 
     localStorage.setItem('token', token.value)
     localStorage.setItem('user', JSON.stringify(user.value))
@@ -68,16 +68,16 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     user.value = {}
     permissions.value = []
-    homeLandlordId.value = null
+    homeCompanyId.value = null
     isSuperAdmin.value = false
-    landlordScope.value = []
-    currentLandlordId.value = null
-    landlordList.value = []
+    companyScope.value = []
+    currentCompanyId.value = null
+    companyList.value = []
 
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('permissions')
-    localStorage.removeItem('currentLandlordId')
+    localStorage.removeItem('currentCompanyId')
   }
 
   function hasPermission(code) {
@@ -85,38 +85,38 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // ========== 超级管理员视角切换 ==========
-  function switchToLandlord(landlordId) {
-    currentLandlordId.value = landlordId
-    localStorage.setItem('currentLandlordId', landlordId || '')
+  function switchToCompany(companyId) {
+    currentCompanyId.value = companyId
+    localStorage.setItem('currentCompanyId', companyId || '')
   }
 
   function switchToAll() {
-    currentLandlordId.value = null
-    localStorage.removeItem('currentLandlordId')
+    currentCompanyId.value = null
+    localStorage.removeItem('currentCompanyId')
   }
 
   // 初始化时从 localStorage 恢复视角状态
   function restoreView() {
-    const saved = localStorage.getItem('currentLandlordId')
+    const saved = localStorage.getItem('currentCompanyId')
     if (saved && saved.length > 0 && isSuperAdmin.value) {
-      currentLandlordId.value = saved
+      currentCompanyId.value = saved
     }
   }
 
-  // 判断是否需要显示房东筛选器（跨房东用户可见）
-  const showLandlordFilter = computed(() => {
+  // 判断是否需要显示公司筛选器（跨公司用户可见）
+  const showCompanyFilter = computed(() => {
     if (isSuperAdmin.value) return true
-    return landlordScope.value.length > 1
+    return companyScope.value.length > 1
   })
 
   return {
     token, user, permissions,
-    homeLandlordId, isSuperAdmin, landlordScope,
-    currentLandlordId, landlordList,
-    isViewingAll, effectiveLandlordId, currentLandlordName,
-    showLandlordFilter,
+    homeCompanyId, isSuperAdmin, companyScope,
+    currentCompanyId, companyList,
+    isViewingAll, effectiveCompanyId, currentCompanyName,
+    showCompanyFilter,
     login, logout, hasPermission,
-    switchToLandlord, switchToAll,
+    switchToCompany, switchToAll,
     restoreView
   }
 })

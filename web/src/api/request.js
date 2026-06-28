@@ -15,24 +15,24 @@ request.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     }
 
-    // ========== 多房东：自动附加 landlordId ==========
+    // ========== 多公司：自动附加 companyId ==========
     // 从 localStorage 读取用户信息（避免 import store 循环引用）
     try {
       const userStr = localStorage.getItem('user')
       if (userStr) {
         const user = JSON.parse(userStr)
-        const currentLandlordId = localStorage.getItem('currentLandlordId')
+        const currentCompanyId = localStorage.getItem('currentCompanyId')
 
-        // 如果用户选择了特定视角，用那个 landlordId
-        if (currentLandlordId) {
+        // 如果用户选择了特定视角，用那个 companyId
+        if (currentCompanyId) {
           config.params = config.params || {}
-          config.params.landlordId = currentLandlordId
-        } else if (user.homeLandlordId && !user.isSuperAdmin) {
-          // 普通用户自动带上自己的 homeLandlordId
+          config.params.companyId = currentCompanyId
+        } else if (user.homeCompanyId && !user.isSuperAdmin) {
+          // 普通用户自动带上自己的 homeCompanyId
           config.params = config.params || {}
-          config.params.landlordId = user.homeLandlordId
+          config.params.companyId = user.homeCompanyId
         }
-        // 超级管理员选择"全部数据"时，不传 landlordId（后端不限制）
+        // 超级管理员选择"全部数据"时，不传 companyId（后端不限制）
       }
     } catch (e) {
       // ignore parse errors
