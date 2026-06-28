@@ -134,8 +134,8 @@ export function updateApprovalType(id, data) { return request({ url: `/approvalt
 export function deleteApprovalType(id) { return request({ url: `/approvaltypes/${id}`, method: 'delete' }) }
 export function getApprovalLevels(typeId) { return request({ url: `/approvaltypes/${typeId}/levels`, method: 'get' }) }
 export function createApprovalLevel(typeId, data) { return request({ url: `/approvaltypes/${typeId}/levels`, method: 'post', data }) }
-export function updateApprovalLevel(id, data) { return request({ url: `/approval-levels/${id}`, method: 'put', data }) }
-export function deleteApprovalLevel(id) { return request({ url: `/approval-levels/${id}`, method: 'delete' }) }
+export function updateApprovalLevel(id, data) { return request({ url: `/approvallevels/${id}`, method: 'put', data }) }
+export function deleteApprovalLevel(id) { return request({ url: `/approvallevels/${id}`, method: 'delete' }) }
 
 // Accounting
 export function getAccountingSubjects(params) { return request({ url: '/accountingsubjects', method: 'get', params }) }

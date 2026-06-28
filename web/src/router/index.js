@@ -374,7 +374,7 @@ const routes = [
             path: 'approvallevels',
             name: 'SystemApprovalLevels',
             component: () => import('../views/system/approvalConfig/levels.vue'),
-            meta: { title: '审批级别配置', icon: 'Sort' }
+            meta: { title: '审批级别配置', icon: 'Sort', hidden: true }
           },
           {
             path: 'feecodes',

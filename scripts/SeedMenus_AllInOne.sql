@@ -262,15 +262,14 @@ VALUES ('A1111111-1111-1111-1111-111111111304','编辑审批类型','system:appr
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111305','级别配置','system:approvaltypelevel','A1111111-1111-1111-1111-111111111178',12,1,@SysUserId,@Now);
 
--- 16.7 审批级别配置
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111179','审批级别配置','system:approvallevel','/system/approvallevels','Sort','A1111111-1111-1111-1111-111111111016',7,1,@SysUserId,@Now);
+-- 级别按钮权限
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111306','新增级别','system:approvallevelcreate','A1111111-1111-1111-1111-111111111179',10,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111306',N'新增级别','system:approvallevelcreate','A1111111-1111-1111-1111-111111111178',15,1,@SysUserId,@Now);
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111307','编辑级别','system:approvalleveledit','A1111111-1111-1111-1111-111111111179',11,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111307',N'编辑级别','system:approvalleveledit','A1111111-1111-1111-1111-111111111178',16,1,@SysUserId,@Now);
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111308','删除级别','system:approvalleveldelete','A1111111-1111-1111-1111-111111111179',12,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111308',N'删除级别','system:approvalleveldelete','A1111111-1111-1111-1111-111111111178',17,1,@SysUserId,@Now);
+
 
 -- 16.8 收费项目管理
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
