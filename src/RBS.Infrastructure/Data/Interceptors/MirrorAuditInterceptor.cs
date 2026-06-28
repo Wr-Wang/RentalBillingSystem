@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.Services;
 
 namespace RBS.Infrastructure.Data.Interceptors;
@@ -30,7 +31,7 @@ public class MirrorAuditInterceptor : SaveChangesInterceptor
         if (context == null) return result;
 
         var userId = _currentUserService.UserId;
-        var utcNow = DateTime.UtcNow;
+        var utcNow = RBS.Core.Common.ChinaTime.Now;
 
         var auditEntries = new List<AuditEntry>();
 

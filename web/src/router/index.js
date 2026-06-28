@@ -148,7 +148,7 @@ const routes = [
         meta: { title: '审批中心', icon: 'CircleCheck', roles: ['Admin', 'OpsSupervisor', 'FinanceSupervisor', 'FinanceDirector', 'DeptManager', 'GeneralManager', 'Legal'] }
       },
       {
-        path: 'approvals/my-requests',
+        path: 'approvals/myrequests',
         name: 'ApprovalMyRequests',
         component: () => import('../views/approval/myRequests.vue'),
         meta: { title: '我的提交', icon: 'EditPen', hidden: true }
@@ -275,13 +275,13 @@ const routes = [
       // ========== 多房东相关页面 ==========
       // 多房东总览（仅超级管理员可见）
       {
-        path: 'reports/landlord-overview',
+        path: 'reports/landlordoverview',
         name: 'ReportLandlordOverview',
         component: () => import('../views/report/landlordOverview.vue'),
         meta: { title: '多房东总览', icon: 'DataAnalysis', roles: ['Admin'] }
       },
-      // Report shortcuts for landlord-overview
-      { path: 'landlord-overview', redirect: '/reports/landlord-overview', meta: { hidden: true } },
+      // Report shortcuts for landlordoverview
+      { path: 'landlordoverview', redirect: '/reports/landlordoverview', meta: { hidden: true } },
       // 变更审计
       {
         path: 'audit',
@@ -353,7 +353,7 @@ const routes = [
             meta: { title: '角色管理', icon: 'Avatar' }
           },
           {
-            path: 'organization/user-scope',
+            path: 'organization/userscope',
             name: 'SystemUserScope',
             component: () => import('../views/system/organization/userScope.vue'),
             meta: { title: '用户数据权限', icon: 'Unlock' }

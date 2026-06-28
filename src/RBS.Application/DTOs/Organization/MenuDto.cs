@@ -9,5 +9,16 @@ public class MenuDto
     public string? Icon { get; set; }
     public Guid? ParentId { get; set; }
     public int SortOrder { get; set; }
+    public bool IsActive { get; set; }
     public List<MenuDto> Children { get; set; } = new();
+}
+
+public class CreateMenuRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? PermissionCode { get; set; }
+    public string? Path { get; set; }
+    public string? Icon { get; set; }
+    public Guid? ParentId { get; set; }
+    public int SortOrder { get; set; }
 }

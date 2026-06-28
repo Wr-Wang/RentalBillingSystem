@@ -141,7 +141,7 @@ public class AppDbContext : DbContext
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var userId = _currentUserService.UserId;
-        var utcNow = DateTime.Now;
+        var now = RBS.Core.Common.ChinaTime.Now;
 
         // 审计字段自动注入
         foreach (var entry in ChangeTracker.Entries<AuditableEntity>())
@@ -149,10 +149,10 @@ public class AppDbContext : DbContext
             switch (entry.State)
             {
                 case EntityState.Added:
-                    entry.Entity.SetCreated(userId, utcNow, null, null);
+                    entry.Entity.SetCreated(userId, now, null, null);
                     break;
                 case EntityState.Modified:
-                    entry.Entity.SetUpdated(userId, utcNow, null, null);
+                    entry.Entity.SetUpdated(userId, now, null, null);
                     entry.Property(nameof(AuditableEntity.CreatedBy)).IsModified = false;
                     entry.Property(nameof(AuditableEntity.CreatedAt)).IsModified = false;
                     entry.Property(nameof(AuditableEntity.CreatedIp)).IsModified = false;
@@ -166,7 +166,7 @@ public class AppDbContext : DbContext
         {
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.SetCreated(userId, utcNow);
+                entry.Entity.SetCreated(userId, now);
             }
         }
 

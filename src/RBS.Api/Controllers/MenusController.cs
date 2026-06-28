@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Organization;
 
 namespace RBS.Api.Controllers;
 
@@ -9,40 +10,38 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class MenusController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    public MenusController(IUnitOfWork uow) => _uow = uow;
+    private readonly IMenuService _menuService;
+    public MenusController(IMenuService menuService) => _menuService = menuService;
 
+    /// <summary>获取菜单树（平铺列表，前端自行构建树）</summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
-        var list = await _uow.Menus.GetTreeAsync(ct);
-        return Ok(list);
+        var result = await _menuService.GetTreeAsync(ct);
+        return Ok(result);
     }
 
+    /// <summary>创建菜单</summary>
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] RBS.Core.Entities.Organization.Menu dto, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateMenuRequest request, CancellationToken ct)
     {
-        await _uow.Menus.AddAsync(dto, ct);
-        await _uow.CommitAsync(ct);
-        return Ok(dto);
+        var result = await _menuService.CreateAsync(request, ct);
+        return Ok(result);
     }
 
+    /// <summary>更新菜单</summary>
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] RBS.Core.Entities.Organization.Menu dto, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateMenuRequest request, CancellationToken ct)
     {
-        var entity = await _uow.Menus.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        await _uow.CommitAsync(ct);
+        await _menuService.UpdateAsync(id, request, ct);
         return NoContent();
     }
 
+    /// <summary>删除菜单</summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var entity = await _uow.Menus.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        await _uow.Menus.DeleteAsync(entity, ct);
-        await _uow.CommitAsync(ct);
+        await _menuService.DeleteAsync(id, ct);
         return NoContent();
     }
 }

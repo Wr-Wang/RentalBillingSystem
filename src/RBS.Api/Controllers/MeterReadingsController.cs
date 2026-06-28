@@ -16,7 +16,7 @@ public class MeterReadingsController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractFeeConfigId, CancellationToken ct)
     {
         if (contractFeeConfigId == null) return Ok(new List<object>());
-        var list = await _uow.MeterReadings.GetHistoryAsync(contractFeeConfigId.Value, DateTime.UtcNow.Year, DateTime.UtcNow.Month, ct);
+        var list = await _uow.MeterReadings.GetHistoryAsync(contractFeeConfigId.Value, RBS.Core.Common.ChinaTime.Now.Year, RBS.Core.Common.ChinaTime.Now.Month, ct);
         return Ok(list);
     }
 

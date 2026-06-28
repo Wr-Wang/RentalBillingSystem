@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Organization;
 
 namespace RBS.Api.Controllers;
 
@@ -9,55 +10,63 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class RolesController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    public RolesController(IUnitOfWork uow) => _uow = uow;
+    private readonly IRoleService _roleService;
+    public RolesController(IRoleService roleService) => _roleService = roleService;
 
+    /// <summary>获取角色列表</summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
-        var list = await _uow.Roles.GetAllAsync(ct);
-        return Ok(list);
+        var result = await _roleService.GetListAsync(ct);
+        return Ok(result);
     }
 
+    /// <summary>获取角色详情（含菜单权限）</summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        var entity = await _uow.Roles.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        return Ok(entity);
+        var result = await _roleService.GetByIdAsync(id, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
     }
 
+    /// <summary>创建角色</summary>
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] RBS.Core.Entities.Organization.Role dto, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateRoleRequest request, CancellationToken ct)
     {
-        await _uow.Roles.AddAsync(dto, ct);
-        await _uow.CommitAsync(ct);
-        return Ok(dto);
+        var result = await _roleService.CreateAsync(request, ct);
+        return Ok(result);
     }
 
+    /// <summary>更新角色</summary>
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] RBS.Core.Entities.Organization.Role dto, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateRoleRequest request, CancellationToken ct)
     {
-        var entity = await _uow.Roles.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        await _uow.CommitAsync(ct);
+        await _roleService.UpdateAsync(id, request, ct);
         return NoContent();
     }
 
+    /// <summary>删除角色</summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var entity = await _uow.Roles.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        await _uow.Roles.DeleteAsync(entity, ct);
-        await _uow.CommitAsync(ct);
+        await _roleService.DeleteAsync(id, ct);
         return NoContent();
     }
 
+    /// <summary>获取角色的菜单权限 ID 列表</summary>
     [HttpGet("{id}/menus")]
     public async Task<IActionResult> GetMenus(Guid id, CancellationToken ct)
     {
-        var menus = await _uow.Menus.GetByRoleIdsAsync(new List<Guid> { id }, ct);
-        return Ok(menus);
+        var menuIds = await _roleService.GetMenuIdsAsync(id, ct);
+        return Ok(menuIds);
+    }
+
+    /// <summary>保存角色的菜单权限</summary>
+    [HttpPost("{id}/menus")]
+    public async Task<IActionResult> SaveMenus(Guid id, [FromBody] List<Guid> menuIds, CancellationToken ct)
+    {
+        await _roleService.SaveMenuIdsAsync(id, menuIds, ct);
+        return NoContent();
     }
 }

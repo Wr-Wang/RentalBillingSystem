@@ -168,17 +168,25 @@ public class AuditService : IAuditService
 
     public async Task<AuditStatsDto> GetStatsAsync(CancellationToken ct = default)
     {
-        var utcNow = DateTime.UtcNow;
-        var todayStart = utcNow.Date;
-        var weekStart = utcNow.AddDays(-(int)utcNow.DayOfWeek).Date;
-        var monthStart = new DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var now = RBS.Core.Common.ChinaTime.Now;
+        var todayStart = now.Date;
+        var weekStart = now.AddDays(-(int)now.DayOfWeek).Date;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Local);
 
+        // 统计所有审计表（Landlords_Audit + Menus_Audit + Roles_Audit）
         await using var cmd = _context.Database.GetDbConnection().CreateCommand();
         cmd.CommandText = @"
             SELECT
-                (SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @todayStart) AS TodayCount,
-                (SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @weekStart) AS WeekCount,
-                (SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @monthStart) AS MonthCount";
+                ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @todayStart), 0) AS TodayCount,
+                ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @weekStart), 0) AS WeekCount,
+                ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @monthStart), 0) AS MonthCount,
+                3 AS TotalTables";
 
         cmd.Parameters.Add(new SqlParameter("@todayStart", todayStart));
         cmd.Parameters.Add(new SqlParameter("@weekStart", weekStart));
@@ -195,7 +203,7 @@ public class AuditService : IAuditService
                 TodayCount = reader.GetInt32(0),
                 WeekCount = reader.GetInt32(1),
                 MonthCount = reader.GetInt32(2),
-                TotalTables = 1 // 当前仅房东表有审计
+                TotalTables = reader.GetInt32(3)
             };
         }
 

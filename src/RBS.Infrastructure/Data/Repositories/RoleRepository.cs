@@ -19,4 +19,11 @@ public class RoleRepository : BaseRepository<Role>, IRoleRepository
             .Where(r => r.UserRoles.Any(ur => ur.UserId == userId))
             .ToListAsync(ct);
     }
+
+    public async Task<Role?> GetByIdWithRoleMenusAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _dbSet
+            .Include(r => r.RoleMenus)
+            .FirstOrDefaultAsync(r => r.Id == id, ct);
+    }
 }

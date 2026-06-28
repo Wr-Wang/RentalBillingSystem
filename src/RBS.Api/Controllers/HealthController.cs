@@ -17,7 +17,7 @@ public class HealthController : ControllerBase
         return Ok(new
         {
             Status = "Healthy",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = RBS.Core.Common.ChinaTime.Now,
             Version = "1.0.0"
         });
     }

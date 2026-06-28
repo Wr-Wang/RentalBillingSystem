@@ -13,5 +13,28 @@ public class Menu : AuditableEntity
     public bool IsActive { get; private set; } = true;
 
     private Menu() { }
-    public Menu(string name) { Name = name; }
+
+    /// <summary>领域构造函数</summary>
+    public Menu(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("菜单名称不能为空", nameof(name));
+        Name = name;
+        IsActive = true;
+    }
+
+    // ===== 属性设置 =====
+    public void Rename(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("菜单名称不能为空", nameof(name));
+        Name = name;
+    }
+    public void SetPermissionCode(string? code) => PermissionCode = code;
+    public void SetPath(string? path) => Path = path;
+    public void SetIcon(string? icon) => Icon = icon;
+    public void SetParentId(Guid? parentId) => ParentId = parentId;
+    public void SetSortOrder(int order) => SortOrder = order;
+    public void Activate() => IsActive = true;
+    public void Deactivate() => IsActive = false;
 }
