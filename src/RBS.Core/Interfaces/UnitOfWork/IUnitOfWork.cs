@@ -1,6 +1,7 @@
 namespace RBS.Core.Interfaces.UnitOfWork;
 
 using RBS.Core.Entities.Approval;
+using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Entities.Property;
 using RBS.Core.Interfaces.Repositories;
 
@@ -44,6 +45,7 @@ public interface IUnitOfWork : IDisposable
 
     // 系统配置
     IHolidayCalendarRepository HolidayCalendars { get; }
+    IRepository<TaxRateConfig> TaxRateConfigs { get; }
 
     /// <summary>提交所有变更（自动事务）</summary>
     Task<int> CommitAsync(CancellationToken ct = default);

@@ -15,6 +15,7 @@
         <el-option label="定价标准" value="RoomPricingStandards" />
         <el-option label="楼层级别" value="FloorLevelBands" />
         <el-option label="支付通道" value="PaymentChannels" />
+        <el-option label="税率" value="TaxRateConfigs" />
         <el-option label="菜单" value="Menus" />
         <el-option label="角色" value="Roles" />
         <el-option label="用户" value="Users" />

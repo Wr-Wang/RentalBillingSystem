@@ -184,6 +184,7 @@ export function deletePaymentChannel(id) { return request({ url: `/paymentchanne
 export function getTaxRateConfigs() { return request({ url: '/taxrateconfigs', method: 'get' }) }
 export function createTaxRateConfig(data) { return request({ url: '/taxrateconfigs', method: 'post', data }) }
 export function updateTaxRateConfig(id, data) { return request({ url: `/taxrateconfigs/${id}`, method: 'put', data }) }
+export function deleteTaxRateConfig(id) { return request({ url: '/taxrateconfigs/' + id, method: 'delete' }) }
 
 // Audit
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }

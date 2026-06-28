@@ -11,4 +11,9 @@ public class TaxRateConfig : AuditableEntity, IHasCompany
     private TaxRateConfig() { }
     public TaxRateConfig(string name, decimal rate, DateOnly effectiveDate, Guid companyId)
     { Name = name; Rate = rate; EffectiveDate = effectiveDate; CompanyId = companyId; }
+    public void Rename(string name) => Name = name;
+    public void SetRate(decimal rate) => Rate = rate;
+    public void SetEffectiveDate(DateOnly date) => EffectiveDate = date;
+    public void Activate() => IsActive = true;
+    public void Deactivate() => IsActive = false;
 }

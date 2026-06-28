@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RBS.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6b9381dfd80c4e6c6ac5e2b6b49eba332dd65b96")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+514099cd1bd1453b846f2f8943ea48ae425afe54")]
 [assembly: System.Reflection.AssemblyProductAttribute("RBS.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RBS.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
