@@ -185,7 +185,7 @@ export function createTaxRateConfig(data) { return request({ url: '/tax-rate-con
 export function updateTaxRateConfig(id, data) { return request({ url: `/tax-rate-configs/${id}`, method: 'put', data }) }
 
 // Audit
-export function getAuditHistory(tableName, recordId) { return request({ url: `/audit/${tableName}/history`, method: 'get', params: { recordId } }) }
+export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }
 export function compareAuditVersions(tableName, recordId, v1, v2) { return request({ url: `/audit/${tableName}/compare`, method: 'get', params: { recordId, v1, v2 } }) }
 export function rollbackAudit(tableName, recordId, versionNo) { return request({ url: `/audit/${tableName}/rollback`, method: 'post', params: { recordId, versionNo } }) }
 export function getAuditStats(params) { return request({ url: '/audit/stats', method: 'get', params }) }

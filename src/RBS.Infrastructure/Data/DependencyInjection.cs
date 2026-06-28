@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using RBS.Application.Common.Interfaces;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -63,6 +64,9 @@ public static class DependencyInjection
 
         // 多租户
         services.AddScoped<ITenantService, TenantService>();
+
+        // 审计
+        services.AddScoped<IAuditService, AuditService>();
 
         // 领域服务
         services.AddScoped<IContractDomainService, ContractDomainService>();

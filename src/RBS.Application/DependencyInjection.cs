@@ -17,6 +17,7 @@ public static class DependencyInjection
         // 应用服务
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ILandlordService, LandlordService>();
         services.AddScoped<IBuildingService, BuildingService>();
         services.AddScoped<IContractService, ContractAppService>();
         services.AddScoped<IBillingService, BillingAppService>();

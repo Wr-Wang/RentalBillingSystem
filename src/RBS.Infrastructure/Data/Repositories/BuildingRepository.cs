@@ -11,6 +11,8 @@ public class BuildingRepository : BaseRepository<Building>, IBuildingRepository
     public async Task<List<Building>> GetByLandlordIdAsync(Guid landlordId, CancellationToken ct = default)
     {
         return await _dbSet
+            .Include(b => b.Floors)
+                .ThenInclude(f => f.Rooms)
             .Where(b => b.LandlordId == landlordId)
             .OrderBy(b => b.Name)
             .ToListAsync(ct);

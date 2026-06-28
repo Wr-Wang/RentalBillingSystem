@@ -166,3 +166,4 @@ E:\Demo\source\repos\RentalBillingSystem\src\RBS.Api\obj\Debug\net10.0\refint\RB
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Api\obj\Debug\net10.0\RBS.Api.pdb
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Api\obj\Debug\net10.0\RBS.Api.genruntimeconfig.cache
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Api\obj\Debug\net10.0\ref\RBS.Api.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Api\obj\Debug\net10.0\RBS.Api.sourcelink.json

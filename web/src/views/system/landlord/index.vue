@@ -321,16 +321,15 @@ async function fetchList() {
     const params = {
       page: page.value,
       pageSize: pageSize.value,
-      ...searchForm
-    }
-    if (searchForm.isActive === '' || searchForm.isActive === null) {
-      delete params.isActive
+      name: searchForm.name || undefined,
+      isActive: searchForm.isActive === '' || searchForm.isActive === null ? undefined : searchForm.isActive
     }
     const res = await getLandlords(params)
-    list.value = res.data || res.items || []
-    total.value = res.total || res.count || list.value.length
+    // 后端返回 PagedResult：{ items, total, page, pageSize, totalPages }
+    list.value = res.items || res.data || []
+    total.value = res.total ?? list.value.length
   } catch (e) {
-    // 使用 mock 数据
+    // 开发阶段使用 mock 数据
     list.value = getMockLandlords()
     total.value = list.value.length
   }
@@ -392,11 +391,9 @@ async function save() {
       ElMessage.success('房东创建成功')
     }
     showDialog.value = false
-    fetchList()
+    await fetchList()
   } catch (e) {
-    ElMessage.success(isEdit.value ? '房东信息已更新' : '房东创建成功')
-    showDialog.value = false
-    fetchList()
+    ElMessage.error(isEdit.value ? '更新房东信息失败' : '创建房东失败')
   }
   saving.value = false
 }
@@ -409,12 +406,30 @@ async function toggleStatus(row) {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    row.isActive = !row.isActive
-    await updateLandlord(row.id, { ...row })
+    // 发送全字段更新 + 状态切换
+    await updateLandlord(row.id, {
+      name: row.name,
+      code: row.code,
+      contactPerson: row.contactPerson,
+      contactPhone: row.contactPhone,
+      address: row.address,
+      idType: row.idType,
+      idNumber: row.idNumber,
+      bankName: row.bankName,
+      bankAccount: row.bankAccount,
+      bankAccountName: row.bankAccountName,
+      settlementCycle: row.settlementCycle,
+      settlementDay: row.settlementDay,
+      commissionRate: row.commissionRate,
+      remark: row.remark,
+      isActive: !row.isActive
+    })
     ElMessage.success(`房东已${action}`)
-    fetchList()
+    await fetchList()
   } catch (e) {
-    // cancelled
+    if (e !== 'cancel') {
+      ElMessage.error(`${action}房东失败`)
+    }
   }
 }
 
