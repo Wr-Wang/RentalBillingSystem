@@ -46,7 +46,7 @@ SET @description = N'是否末级科目';
 EXEC sp_addextendedproperty 'MS_Description', @description, 'SCHEMA', @defaultSchema, 'TABLE', N'AccountingSubjects', 'COLUMN', N'IsLeaf';
 SET @description = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description, 'SCHEMA', @defaultSchema, 'TABLE', N'AccountingSubjects', 'COLUMN', N'IsActive';
-SET @description = N'所属房东ID';
+SET @description = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description, 'SCHEMA', @defaultSchema, 'TABLE', N'AccountingSubjects', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [ApprovalLevelConfigs] (
@@ -80,7 +80,7 @@ SET @description1 = N'金额下限（满足此金额范围才需本级别审批�
 EXEC sp_addextendedproperty 'MS_Description', @description1, 'SCHEMA', @defaultSchema1, 'TABLE', N'ApprovalLevelConfigs', 'COLUMN', N'MinAmount';
 SET @description1 = N'金额上限';
 EXEC sp_addextendedproperty 'MS_Description', @description1, 'SCHEMA', @defaultSchema1, 'TABLE', N'ApprovalLevelConfigs', 'COLUMN', N'MaxAmount';
-SET @description1 = N'所属房东ID';
+SET @description1 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description1, 'SCHEMA', @defaultSchema1, 'TABLE', N'ApprovalLevelConfigs', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [ApprovalRequests] (
@@ -124,7 +124,7 @@ SET @description2 = N'最大审批级别';
 EXEC sp_addextendedproperty 'MS_Description', @description2, 'SCHEMA', @defaultSchema2, 'TABLE', N'ApprovalRequests', 'COLUMN', N'MaxLevel';
 SET @description2 = N'审批状态（Pending/Approved/Rejected/Cancelled）';
 EXEC sp_addextendedproperty 'MS_Description', @description2, 'SCHEMA', @defaultSchema2, 'TABLE', N'ApprovalRequests', 'COLUMN', N'Status';
-SET @description2 = N'所属房东ID';
+SET @description2 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description2, 'SCHEMA', @defaultSchema2, 'TABLE', N'ApprovalRequests', 'COLUMN', N'LandlordId';
 SET @description2 = N'乐观锁版本号';
 EXEC sp_addextendedproperty 'MS_Description', @description2, 'SCHEMA', @defaultSchema2, 'TABLE', N'ApprovalRequests', 'COLUMN', N'RowVersion';
@@ -157,7 +157,7 @@ SET @description3 = N'审批类型描述';
 EXEC sp_addextendedproperty 'MS_Description', @description3, 'SCHEMA', @defaultSchema3, 'TABLE', N'ApprovalTypes', 'COLUMN', N'Description';
 SET @description3 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description3, 'SCHEMA', @defaultSchema3, 'TABLE', N'ApprovalTypes', 'COLUMN', N'IsActive';
-SET @description3 = N'所属房东ID';
+SET @description3 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description3, 'SCHEMA', @defaultSchema3, 'TABLE', N'ApprovalTypes', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [BuildingFloorLevelConfigs] (
@@ -176,7 +176,7 @@ SET @description4 = N'楼宇ID';
 EXEC sp_addextendedproperty 'MS_Description', @description4, 'SCHEMA', @defaultSchema4, 'TABLE', N'BuildingFloorLevelConfigs', 'COLUMN', N'BuildingId';
 SET @description4 = N'楼层级别ID';
 EXEC sp_addextendedproperty 'MS_Description', @description4, 'SCHEMA', @defaultSchema4, 'TABLE', N'BuildingFloorLevelConfigs', 'COLUMN', N'FloorLevelBandId';
-SET @description4 = N'所属房东ID';
+SET @description4 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description4, 'SCHEMA', @defaultSchema4, 'TABLE', N'BuildingFloorLevelConfigs', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [Buildings] (
@@ -205,7 +205,7 @@ SET @description5 = N'楼宇编码';
 EXEC sp_addextendedproperty 'MS_Description', @description5, 'SCHEMA', @defaultSchema5, 'TABLE', N'Buildings', 'COLUMN', N'Code';
 SET @description5 = N'楼宇地址';
 EXEC sp_addextendedproperty 'MS_Description', @description5, 'SCHEMA', @defaultSchema5, 'TABLE', N'Buildings', 'COLUMN', N'Address';
-SET @description5 = N'所属房东ID';
+SET @description5 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description5, 'SCHEMA', @defaultSchema5, 'TABLE', N'Buildings', 'COLUMN', N'LandlordId';
 SET @description5 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description5, 'SCHEMA', @defaultSchema5, 'TABLE', N'Buildings', 'COLUMN', N'IsActive';
@@ -266,7 +266,7 @@ SET @description7 = N'排序号';
 EXEC sp_addextendedproperty 'MS_Description', @description7, 'SCHEMA', @defaultSchema7, 'TABLE', N'CollectionStages', 'COLUMN', N'SortOrder';
 SET @description7 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description7, 'SCHEMA', @defaultSchema7, 'TABLE', N'CollectionStages', 'COLUMN', N'IsActive';
-SET @description7 = N'所属房东ID';
+SET @description7 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description7, 'SCHEMA', @defaultSchema7, 'TABLE', N'CollectionStages', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [Contracts] (
@@ -312,7 +312,7 @@ SET @description8 = N'付款周期（Monthly/Quarterly/Yearly）';
 EXEC sp_addextendedproperty 'MS_Description', @description8, 'SCHEMA', @defaultSchema8, 'TABLE', N'Contracts', 'COLUMN', N'PaymentCycle';
 SET @description8 = N'合同状态（Draft/Active/Suspended/Terminated等）';
 EXEC sp_addextendedproperty 'MS_Description', @description8, 'SCHEMA', @defaultSchema8, 'TABLE', N'Contracts', 'COLUMN', N'Status';
-SET @description8 = N'所属房东ID';
+SET @description8 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description8, 'SCHEMA', @defaultSchema8, 'TABLE', N'Contracts', 'COLUMN', N'LandlordId';
 SET @description8 = N'乐观锁版本号';
 EXEC sp_addextendedproperty 'MS_Description', @description8, 'SCHEMA', @defaultSchema8, 'TABLE', N'Contracts', 'COLUMN', N'RowVersion';
@@ -417,7 +417,7 @@ SET @description11 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description11, 'SCHEMA', @defaultSchema11, 'TABLE', N'FeeCodes', 'COLUMN', N'IsActive';
 SET @description11 = N'费用分类（Core核心/Utility公共事业）';
 EXEC sp_addextendedproperty 'MS_Description', @description11, 'SCHEMA', @defaultSchema11, 'TABLE', N'FeeCodes', 'COLUMN', N'Category';
-SET @description11 = N'所属房东ID';
+SET @description11 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description11, 'SCHEMA', @defaultSchema11, 'TABLE', N'FeeCodes', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [FeeCodeTemplates] (
@@ -448,7 +448,7 @@ SET @description12 = N'默认金额';
 EXEC sp_addextendedproperty 'MS_Description', @description12, 'SCHEMA', @defaultSchema12, 'TABLE', N'FeeCodeTemplates', 'COLUMN', N'DefaultAmount';
 SET @description12 = N'默认单价';
 EXEC sp_addextendedproperty 'MS_Description', @description12, 'SCHEMA', @defaultSchema12, 'TABLE', N'FeeCodeTemplates', 'COLUMN', N'DefaultUnitPrice';
-SET @description12 = N'所属房东ID';
+SET @description12 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description12, 'SCHEMA', @defaultSchema12, 'TABLE', N'FeeCodeTemplates', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [FloorLevelBands] (
@@ -500,7 +500,7 @@ SET @description14 = N'节假日名称';
 EXEC sp_addextendedproperty 'MS_Description', @description14, 'SCHEMA', @defaultSchema14, 'TABLE', N'HolidayCalendars', 'COLUMN', N'Name';
 SET @description14 = N'是否工作日（false=放假/true=调休上班）';
 EXEC sp_addextendedproperty 'MS_Description', @description14, 'SCHEMA', @defaultSchema14, 'TABLE', N'HolidayCalendars', 'COLUMN', N'IsWorkingDay';
-SET @description14 = N'所属房东ID';
+SET @description14 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description14, 'SCHEMA', @defaultSchema14, 'TABLE', N'HolidayCalendars', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [JobSchedules] (
@@ -531,7 +531,7 @@ SET @description15 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description15, 'SCHEMA', @defaultSchema15, 'TABLE', N'JobSchedules', 'COLUMN', N'IsActive';
 SET @description15 = N'作业描述';
 EXEC sp_addextendedproperty 'MS_Description', @description15, 'SCHEMA', @defaultSchema15, 'TABLE', N'JobSchedules', 'COLUMN', N'Description';
-SET @description15 = N'所属房东ID';
+SET @description15 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description15, 'SCHEMA', @defaultSchema15, 'TABLE', N'JobSchedules', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [Landlords] (
@@ -554,9 +554,9 @@ CREATE TABLE [Landlords] (
 DECLARE @defaultSchema16 AS sysname;
 SET @defaultSchema16 = SCHEMA_NAME();
 DECLARE @description16 AS sql_variant;
-SET @description16 = N'房东/租户名称';
+SET @description16 = N'公司名称';
 EXEC sp_addextendedproperty 'MS_Description', @description16, 'SCHEMA', @defaultSchema16, 'TABLE', N'Landlords', 'COLUMN', N'Name';
-SET @description16 = N'房东编码';
+SET @description16 = N'公司编码';
 EXEC sp_addextendedproperty 'MS_Description', @description16, 'SCHEMA', @defaultSchema16, 'TABLE', N'Landlords', 'COLUMN', N'Code';
 SET @description16 = N'联系人';
 EXEC sp_addextendedproperty 'MS_Description', @description16, 'SCHEMA', @defaultSchema16, 'TABLE', N'Landlords', 'COLUMN', N'ContactPerson';
@@ -593,7 +593,7 @@ SET @description17 = N'滞纳金上限（百分比）';
 EXEC sp_addextendedproperty 'MS_Description', @description17, 'SCHEMA', @defaultSchema17, 'TABLE', N'LateFeeConfigs', 'COLUMN', N'MaxRate';
 SET @description17 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description17, 'SCHEMA', @defaultSchema17, 'TABLE', N'LateFeeConfigs', 'COLUMN', N'IsActive';
-SET @description17 = N'所属房东ID';
+SET @description17 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description17, 'SCHEMA', @defaultSchema17, 'TABLE', N'LateFeeConfigs', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [Menus] (
@@ -656,7 +656,7 @@ SET @description19 = N'预估用量';
 EXEC sp_addextendedproperty 'MS_Description', @description19, 'SCHEMA', @defaultSchema19, 'TABLE', N'MeterEstimationConfigs', 'COLUMN', N'EstimatedUsage';
 SET @description19 = N'备注说明';
 EXEC sp_addextendedproperty 'MS_Description', @description19, 'SCHEMA', @defaultSchema19, 'TABLE', N'MeterEstimationConfigs', 'COLUMN', N'Remark';
-SET @description19 = N'所属房东ID';
+SET @description19 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description19, 'SCHEMA', @defaultSchema19, 'TABLE', N'MeterEstimationConfigs', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [MeterReadings] (
@@ -718,7 +718,7 @@ SET @description21 = N'支付通道编码';
 EXEC sp_addextendedproperty 'MS_Description', @description21, 'SCHEMA', @defaultSchema21, 'TABLE', N'PaymentChannels', 'COLUMN', N'Code';
 SET @description21 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description21, 'SCHEMA', @defaultSchema21, 'TABLE', N'PaymentChannels', 'COLUMN', N'IsActive';
-SET @description21 = N'所属房东ID';
+SET @description21 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description21, 'SCHEMA', @defaultSchema21, 'TABLE', N'PaymentChannels', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [Receipts] (
@@ -758,7 +758,7 @@ SET @description22 = N'外部参考号（银行流水号等）';
 EXEC sp_addextendedproperty 'MS_Description', @description22, 'SCHEMA', @defaultSchema22, 'TABLE', N'Receipts', 'COLUMN', N'ReferenceNo';
 SET @description22 = N'状态（Pending待确认/Confirmed已确认/Rejected已驳回）';
 EXEC sp_addextendedproperty 'MS_Description', @description22, 'SCHEMA', @defaultSchema22, 'TABLE', N'Receipts', 'COLUMN', N'Status';
-SET @description22 = N'所属房东ID';
+SET @description22 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description22, 'SCHEMA', @defaultSchema22, 'TABLE', N'Receipts', 'COLUMN', N'LandlordId';
 SET @description22 = N'乐观锁版本号';
 EXEC sp_addextendedproperty 'MS_Description', @description22, 'SCHEMA', @defaultSchema22, 'TABLE', N'Receipts', 'COLUMN', N'RowVersion';
@@ -856,7 +856,7 @@ SET @description25 = N'费用项目ID';
 EXEC sp_addextendedproperty 'MS_Description', @description25, 'SCHEMA', @defaultSchema25, 'TABLE', N'RoomFeeDefaults', 'COLUMN', N'FeeCodeId';
 SET @description25 = N'默认金额';
 EXEC sp_addextendedproperty 'MS_Description', @description25, 'SCHEMA', @defaultSchema25, 'TABLE', N'RoomFeeDefaults', 'COLUMN', N'Amount';
-SET @description25 = N'所属房东ID';
+SET @description25 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description25, 'SCHEMA', @defaultSchema25, 'TABLE', N'RoomFeeDefaults', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [RoomPricingStandards] (
@@ -884,7 +884,7 @@ SET @description26 = N'楼层级别ID';
 EXEC sp_addextendedproperty 'MS_Description', @description26, 'SCHEMA', @defaultSchema26, 'TABLE', N'RoomPricingStandards', 'COLUMN', N'FloorLevelBandId';
 SET @description26 = N'标准租金';
 EXEC sp_addextendedproperty 'MS_Description', @description26, 'SCHEMA', @defaultSchema26, 'TABLE', N'RoomPricingStandards', 'COLUMN', N'RentAmount';
-SET @description26 = N'所属房东ID';
+SET @description26 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description26, 'SCHEMA', @defaultSchema26, 'TABLE', N'RoomPricingStandards', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [RoomTypes] (
@@ -939,7 +939,7 @@ SET @description28 = N'执行状态（Pending/Running/Completed/Failed）';
 EXEC sp_addextendedproperty 'MS_Description', @description28, 'SCHEMA', @defaultSchema28, 'TABLE', N'ScheduledTaskLogs', 'COLUMN', N'Status';
 SET @description28 = N'错误信息';
 EXEC sp_addextendedproperty 'MS_Description', @description28, 'SCHEMA', @defaultSchema28, 'TABLE', N'ScheduledTaskLogs', 'COLUMN', N'ErrorMessage';
-SET @description28 = N'所属房东ID';
+SET @description28 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description28, 'SCHEMA', @defaultSchema28, 'TABLE', N'ScheduledTaskLogs', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [TaxRateConfigs] (
@@ -970,7 +970,7 @@ SET @description29 = N'生效日期';
 EXEC sp_addextendedproperty 'MS_Description', @description29, 'SCHEMA', @defaultSchema29, 'TABLE', N'TaxRateConfigs', 'COLUMN', N'EffectiveDate';
 SET @description29 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description29, 'SCHEMA', @defaultSchema29, 'TABLE', N'TaxRateConfigs', 'COLUMN', N'IsActive';
-SET @description29 = N'所属房东ID';
+SET @description29 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description29, 'SCHEMA', @defaultSchema29, 'TABLE', N'TaxRateConfigs', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [Tenants] (
@@ -999,7 +999,7 @@ SET @description30 = N'身份证号';
 EXEC sp_addextendedproperty 'MS_Description', @description30, 'SCHEMA', @defaultSchema30, 'TABLE', N'Tenants', 'COLUMN', N'IdCard';
 SET @description30 = N'联系电话';
 EXEC sp_addextendedproperty 'MS_Description', @description30, 'SCHEMA', @defaultSchema30, 'TABLE', N'Tenants', 'COLUMN', N'Phone';
-SET @description30 = N'所属房东ID';
+SET @description30 = N'所属公司ID';
 EXEC sp_addextendedproperty 'MS_Description', @description30, 'SCHEMA', @defaultSchema30, 'TABLE', N'Tenants', 'COLUMN', N'LandlordId';
 SET @description30 = N'是否启用';
 EXEC sp_addextendedproperty 'MS_Description', @description30, 'SCHEMA', @defaultSchema30, 'TABLE', N'Tenants', 'COLUMN', N'IsActive';
@@ -1017,7 +1017,7 @@ SET @defaultSchema31 = SCHEMA_NAME();
 DECLARE @description31 AS sql_variant;
 SET @description31 = N'用户ID';
 EXEC sp_addextendedproperty 'MS_Description', @description31, 'SCHEMA', @defaultSchema31, 'TABLE', N'UserLandlordScopes', 'COLUMN', N'UserId';
-SET @description31 = N'房东ID，用户可操作的数据范围';
+SET @description31 = N'公司ID，用户可操作的数据范围';
 EXEC sp_addextendedproperty 'MS_Description', @description31, 'SCHEMA', @defaultSchema31, 'TABLE', N'UserLandlordScopes', 'COLUMN', N'LandlordId';
 
 CREATE TABLE [Users] (

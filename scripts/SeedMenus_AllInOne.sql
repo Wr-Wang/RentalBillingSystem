@@ -198,9 +198,9 @@ VALUES ('A1111111-1111-1111-1111-111111111134','确认导入','bank:confirmimpor
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111135','手动匹配','bank:manualmatch','A1111111-1111-1111-1111-111111111013',11,1,@SysUserId,@Now);
 
--- ==================== 14. 多房东总览 ====================
+-- ==================== 14. 多公司总览 ====================
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111014','多房东总览','landlordoverview:view','/reports/landlordoverview','DataAnalysis',NULL,14,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111014','多公司总览','companyoverview:view','/reports/companyoverview','DataAnalysis',NULL,14,1,@SysUserId,@Now);
 
 -- ==================== 15. 变更审计 ====================
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -232,15 +232,15 @@ VALUES ('A1111111-1111-1111-1111-111111111164','用户数据权限','system:user
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111302','配置权限','system:userscopeconfig','A1111111-1111-1111-1111-111111111164',10,1,@SysUserId,@Now);
 
--- 16.4 房东管理
+-- 16.4 公司管理
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111169','房东管理','system:landlord','/system/landlords','OfficeBuilding','A1111111-1111-1111-1111-111111111016',4,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111169','公司管理','system:company','/system/companies','OfficeBuilding','A1111111-1111-1111-1111-111111111016',4,1,@SysUserId,@Now);
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111170','新增房东','system:landlordcreate','A1111111-1111-1111-1111-111111111169',10,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111170','新增公司','system:companycreate','A1111111-1111-1111-1111-111111111169',10,1,@SysUserId,@Now);
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111171','编辑房东','system:landlordedit','A1111111-1111-1111-1111-111111111169',11,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111171','编辑公司','system:companyedit','A1111111-1111-1111-1111-111111111169',11,1,@SysUserId,@Now);
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111172','创建房东账号','system:landlordcreateuser','A1111111-1111-1111-1111-111111111169',12,1,@SysUserId,@Now);
+VALUES ('A1111111-1111-1111-1111-111111111172','创建公司账号','system:companycreateuser','A1111111-1111-1111-1111-111111111169',12,1,@SysUserId,@Now);
 
 -- 16.5 菜单权限配置
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])

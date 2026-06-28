@@ -43,12 +43,12 @@ BEGIN
     PRINT N'wangwu 用户已创建';
 END
 
--- ==================== 房东账号 ====================
-IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'landlord_a')
+-- ==================== 公司账号 ====================
+IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'company_a')
 BEGIN
     INSERT INTO [Users] ([Id], [Username], [PasswordHash], [DisplayName], [Phone], [Email], [IsActive], [IsSuperAdmin], [HomeLandlordId], [CreatedBy], [CreatedAt])
-    VALUES ('C1111111-1111-1111-1111-111111111005', 'landlord_a', '123456', N'张建国（房东）', '13912345678', 'landlord_a@rental.com', 1, 0, 'A1111111-1111-1111-1111-111111111001', @SysUserId, @Now);
-    PRINT N'landlord_a 用户已创建';
+    VALUES ('C1111111-1111-1111-1111-111111111005', 'company_a', '123456', N'张建国（公司）', '13912345678', 'company_a@rental.com', 1, 0, 'A1111111-1111-1111-1111-111111111001', @SysUserId, @Now);
+    PRINT N'company_a 用户已创建';
 END
 
 -- ==================== 分配角色 ====================
@@ -91,8 +91,8 @@ BEGIN
     VALUES (NEWID(), @WangWuId, @RoleFinanceSupervisorId, @SysUserId, @Now);
 END
 
--- landlord_a → Landlord
-DECLARE @LandlordAId uniqueidentifier = (SELECT [Id] FROM [Users] WHERE [Username] = 'landlord_a');
+-- company_a → Landlord
+DECLARE @LandlordAId uniqueidentifier = (SELECT [Id] FROM [Users] WHERE [Username] = 'company_a');
 IF @LandlordAId IS NOT NULL AND @RoleLandlordId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [UserRoles] WHERE [UserId] = @LandlordAId AND [RoleId] = @RoleLandlordId)
 BEGIN
     INSERT INTO [UserRoles] ([Id], [UserId], [RoleId], [CreatedBy], [CreatedAt])
