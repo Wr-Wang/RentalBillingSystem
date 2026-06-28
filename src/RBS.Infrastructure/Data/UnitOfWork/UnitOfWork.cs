@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Property;
 using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.Property;
 using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Entities.Accounting;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
 using RBS.Infrastructure.Data.Repositories;
@@ -35,6 +37,7 @@ public class UnitOfWork : IUnitOfWork
     private IRepository<FloorLevelBand>? _floorLevelBands;
     private IRepository<RoomPricingStandard>? _roomPricingStandards;
     private IRepository<TaxRateConfig>? _taxRateConfigs;
+    private IRepository<AccountingSubject>? _accountingSubjects;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -62,6 +65,7 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<FloorLevelBand> FloorLevelBands => _floorLevelBands ??= new BaseRepository<FloorLevelBand>(_context);
     public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new BaseRepository<RoomPricingStandard>(_context);
     public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new BaseRepository<TaxRateConfig>(_context);
+    public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new BaseRepository<AccountingSubject>(_context);
 
     public async Task<int> CommitAsync(CancellationToken ct = default)
     {

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RBS.Infrastructure.Data;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Accounting;
 
 namespace RBS.Api.Controllers;
 
@@ -10,41 +10,38 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class AccountingSubjectsController : ControllerBase
 {
-    private readonly AppDbContext _db;
-    public AccountingSubjectsController(AppDbContext db) => _db = db;
+    private readonly IAccountingSubjectService _service;
+    public AccountingSubjectsController(IAccountingSubjectService service) => _service = service;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, CancellationToken ct)
+    public async Task<IActionResult> GetAll(CancellationToken ct) => Ok(await _service.GetTreeAsync(ct));
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        var query = _db.Set<RBS.Core.Entities.Accounting.AccountingSubject>().AsNoTracking();
-        if (companyId != null) query = query.Where(s => s.CompanyId == companyId);
-        return Ok(await query.ToListAsync(ct));
+        var result = await _service.GetByIdAsync(id, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] RBS.Core.Entities.Accounting.AccountingSubject dto, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateAccountingSubjectRequest request, CancellationToken ct)
     {
-        _db.Add(dto);
-        await _db.SaveChangesAsync(ct);
-        return Ok(dto);
+        var result = await _service.CreateAsync(request, ct);
+        return Ok(result);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] RBS.Core.Entities.Accounting.AccountingSubject dto, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAccountingSubjectRequest request, CancellationToken ct)
     {
-        var entity = await _db.FindAsync<RBS.Core.Entities.Accounting.AccountingSubject>(id, ct);
-        if (entity == null) return NotFound();
-        await _db.SaveChangesAsync(ct);
+        await _service.UpdateAsync(id, request, ct);
         return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var entity = await _db.FindAsync<RBS.Core.Entities.Accounting.AccountingSubject>(id, ct);
-        if (entity == null) return NotFound();
-        _db.Remove(entity);
-        await _db.SaveChangesAsync(ct);
+        await _service.DeleteAsync(id, ct);
         return NoContent();
     }
 }

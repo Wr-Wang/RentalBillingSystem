@@ -6,6 +6,7 @@ using RBS.Application.Services.Organization;
 using RBS.Application.Services.Property;
 using RBS.Application.Services.Approval;
 using RBS.Application.Services.SystemConfig;
+using RBS.Application.Services.Accounting;
 
 namespace RBS.Application;
 
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
         services.AddScoped<IFeeCodeService, FeeCodeService>();
         services.AddScoped<ITaxRateConfigService, TaxRateConfigService>();
+        services.AddScoped<IAccountingSubjectService, AccountingSubjectService>();
         services.AddScoped<IPricingStandardService, PricingStandardService>();
         services.AddScoped<IPaymentChannelService, PaymentChannelService>();
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
