@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RBS.Api/RBS.Api.csproj" />
+    <Project Path="src/RBS.Application/RBS.Application.csproj" />
+    <Project Path="src/RBS.Core/RBS.Core.csproj" />
+    <Project Path="src/RBS.Infrastructure/RBS.Infrastructure.csproj" />
+  </Folder>
+</Solution>

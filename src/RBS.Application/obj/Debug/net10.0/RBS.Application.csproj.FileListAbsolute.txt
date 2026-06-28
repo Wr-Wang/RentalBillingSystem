@@ -1,0 +1,15 @@
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\bin\Debug\net10.0\RBS.Application.deps.json
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\bin\Debug\net10.0\RBS.Application.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\bin\Debug\net10.0\RBS.Application.pdb
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\bin\Debug\net10.0\RBS.Core.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\bin\Debug\net10.0\RBS.Core.pdb
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Application.csproj.AssemblyReference.cache
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Application.GeneratedMSBuildEditorConfig.editorconfig
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Application.AssemblyInfoInputs.cache
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Application.AssemblyInfo.cs
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Application.csproj.CoreCompileInputs.cache
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Appl.AC168730.Up2Date
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Application.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\refint\RBS.Application.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\RBS.Application.pdb
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Application\obj\Debug\net10.0\ref\RBS.Application.dll

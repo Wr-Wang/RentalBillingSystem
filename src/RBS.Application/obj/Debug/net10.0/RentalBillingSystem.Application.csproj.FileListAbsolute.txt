@@ -1,0 +1,15 @@
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBillingSystem.Application.csproj.AssemblyReference.cache
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBillingSystem.Application.GeneratedMSBuildEditorConfig.editorconfig
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBillingSystem.Application.AssemblyInfoInputs.cache
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBillingSystem.Application.AssemblyInfo.cs
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBillingSystem.Application.csproj.CoreCompileInputs.cache
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\bin\Debug\net10.0\RentalBillingSystem.Application.deps.json
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\bin\Debug\net10.0\RentalBillingSystem.Application.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\bin\Debug\net10.0\RentalBillingSystem.Application.pdb
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\bin\Debug\net10.0\RentalBillingSystem.Core.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\bin\Debug\net10.0\RentalBillingSystem.Core.pdb
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBi.56FC3523.Up2Date
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBillingSystem.Application.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\refint\RentalBillingSystem.Application.dll
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\RentalBillingSystem.Application.pdb
+E:\Demo\source\repos\RentalBillingSystem\src\RentalBillingSystem.Application\obj\Debug\net10.0\ref\RentalBillingSystem.Application.dll
