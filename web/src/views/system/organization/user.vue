@@ -159,7 +159,7 @@ async function fetchRoles() {
 async function fetchCompanies() {
   try {
     const res = await getCompanies({ pageSize: 100 })
-    companyList.value = Array.isArray(res) ? (res.items || res) : []
+    companyList.value = res?.items || (Array.isArray(res) ? res : [])
   } catch (e) {
     companyList.value = []
   }

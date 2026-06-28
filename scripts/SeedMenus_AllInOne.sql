@@ -358,6 +358,10 @@ VALUES ('A1111111-1111-1111-1111-111111111220','添加自定义排期','system:s
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111221','查看日志','system:schedulerviewlog','A1111111-1111-1111-1111-111111111190',14,1,@SysUserId,@Now);
 
+-- 16.17 系统日志
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES ('A1111111-1111-1111-1111-111111111222','系统日志','system:logs','/system/logs','Document','A1111111-1111-1111-1111-111111111016',17,1,@SysUserId,@Now);
+
 PRINT N'菜单种子数据插入完成！';
 
 -- ==================== 创建 Admin 角色并分配权限 ====================
