@@ -9,6 +9,7 @@ using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Interfaces.Services;
 using RBS.Infrastructure.Data.Extensions;
 using RBS.Infrastructure.Data.Interceptors;
@@ -100,6 +101,7 @@ public class AppDbContext : DbContext
     // ===== 调度 =====
     public DbSet<ScheduledTaskLog> ScheduledTaskLogs => Set<ScheduledTaskLog>();
     public DbSet<JobSchedule> JobSchedules => Set<JobSchedule>();
+    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

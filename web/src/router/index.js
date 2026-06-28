@@ -429,6 +429,12 @@ const routes = [
             name: 'SystemLateFee',
             component: () => import('../views/system/lateFeeConfig.vue'),
             meta: { title: '滞纳金配置', icon: 'WarningFilled' }
+          },
+          {
+            path: 'logs',
+            name: 'SystemLogs',
+            component: () => import('../views/system/log/index.vue'),
+            meta: { title: '系统日志', icon: 'Document', roles: ['Admin'] }
           }
         ]
       }

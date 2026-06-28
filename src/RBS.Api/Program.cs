@@ -76,6 +76,9 @@ var app = builder.Build();
 
 // ===== 中间件管道 =====
 
+// 全局异常捕获（需放在最前面）
+app.UseMiddleware<RBS.Api.Middleware.ExceptionLoggingMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

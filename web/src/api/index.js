@@ -190,6 +190,12 @@ export function compareAuditVersions(tableName, recordId, v1, v2) { return reque
 export function rollbackAudit(tableName, recordId, versionNo) { return request({ url: `/audit/${tableName}/rollback`, method: 'post', params: { recordId, versionNo } }) }
 export function getAuditStats(params) { return request({ url: '/audit/stats', method: 'get', params }) }
 
+// System Logs
+export function getSystemLogs(params) { return request({ url: '/systemlogs', method: 'get', params }) }
+export function getSystemLog(id) { return request({ url: `/systemlogs/${id}`, method: 'get' }) }
+export function deleteSystemLog(id) { return request({ url: `/systemlogs/${id}`, method: 'delete' }) }
+export function clearSystemLogs() { return request({ url: '/systemlogs', method: 'delete' }) }
+
 // Room Types
 export function getRoomTypes() { return request({ url: '/room-types', method: 'get' }) }
 export function createRoomType(data) { return request({ url: '/room-types', method: 'post', data }) }
