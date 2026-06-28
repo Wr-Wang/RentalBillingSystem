@@ -12,4 +12,7 @@ public class ApprovalLevelConfig : AuditableEntity, IHasCompany
     private ApprovalLevelConfig() { }
     public ApprovalLevelConfig(Guid approvalTypeId, int level, Guid roleId, Guid companyId)
     { ApprovalTypeId = approvalTypeId; Level = level; RoleId = roleId; CompanyId = companyId; }
+    public void SetLevel(int level) => Level = level;
+    public void SetRole(Guid roleId) => RoleId = roleId;
+    public void SetAmountRange(decimal? min, decimal? max) { MinAmount = min; MaxAmount = max; }
 }

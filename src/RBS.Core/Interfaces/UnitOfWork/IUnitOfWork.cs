@@ -1,5 +1,6 @@
 namespace RBS.Core.Interfaces.UnitOfWork;
 
+using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Property;
 using RBS.Core.Interfaces.Repositories;
 
@@ -36,6 +37,8 @@ public interface IUnitOfWork : IDisposable
 
     // 审批
     IApprovalRequestRepository ApprovalRequests { get; }
+    IRepository<ApprovalType> ApprovalTypes { get; }
+    IRepository<ApprovalLevelConfig> ApprovalLevelConfigs { get; }
 
     // 系统配置
     IHolidayCalendarRepository HolidayCalendars { get; }

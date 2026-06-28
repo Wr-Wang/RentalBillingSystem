@@ -4,6 +4,7 @@ using RBS.Application.Services.Billing;
 using RBS.Application.Services.Contract;
 using RBS.Application.Services.Organization;
 using RBS.Application.Services.Property;
+using RBS.Application.Services.Approval;
 using RBS.Application.Services.SystemConfig;
 
 namespace RBS.Application;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IRoomTypeService, RoomTypeService>();
         services.AddScoped<IContractService, ContractAppService>();
         services.AddScoped<IBillingService, BillingAppService>();
+        services.AddScoped<IApprovalTypeService, ApprovalTypeService>();
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
         services.AddScoped<IFeeCodeService, FeeCodeService>();
 

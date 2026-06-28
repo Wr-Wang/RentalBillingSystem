@@ -10,4 +10,8 @@ public class ApprovalType : AuditableEntity, IHasCompany
     public Guid CompanyId { get; private set; }
     private ApprovalType() { }
     public ApprovalType(string name, string code, Guid companyId) { Name = name; Code = code; CompanyId = companyId; }
+    public void Rename(string name) => Name = name;
+    public void SetDescription(string? description) => Description = description;
+    public void Activate() => IsActive = true;
+    public void Deactivate() => IsActive = false;
 }

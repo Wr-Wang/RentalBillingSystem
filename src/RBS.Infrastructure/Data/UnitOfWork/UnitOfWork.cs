@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Property;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -26,6 +27,8 @@ public class UnitOfWork : IUnitOfWork
     private IApprovalRequestRepository? _approvalRequests;
     private IHolidayCalendarRepository? _holidayCalendars;
     private IRepository<RoomType>? _roomTypes;
+    private IRepository<ApprovalType>? _approvalTypes;
+    private IRepository<ApprovalLevelConfig>? _approvalLevelConfigs;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -48,6 +51,8 @@ public class UnitOfWork : IUnitOfWork
     public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new ApprovalRequestRepository(_context);
     public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new HolidayCalendarRepository(_context);
     public IRepository<RoomType> RoomTypes => _roomTypes ??= new BaseRepository<RoomType>(_context);
+    public IRepository<ApprovalType> ApprovalTypes => _approvalTypes ??= new BaseRepository<ApprovalType>(_context);
+    public IRepository<ApprovalLevelConfig> ApprovalLevelConfigs => _approvalLevelConfigs ??= new BaseRepository<ApprovalLevelConfig>(_context);
 
     public async Task<int> CommitAsync(CancellationToken ct = default)
     {

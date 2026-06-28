@@ -2,67 +2,66 @@
   <div>
     <div class="page-header">
       <h2>审批类型配置</h2>
-      <el-button type="primary" @click="showDialog = true">
-        <el-icon><Plus /></el-icon>新增审批类型
-      </el-button>
+      <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon>新增审批类型</el-button>
     </div>
-
-    <el-table :data="list" stripe>
-      <el-table-column type="index" label="#" width="50" />
-      <el-table-column prop="code" label="类型编码" width="180" />
-      <el-table-column prop="name" label="名称" width="150" />
-      <el-table-column prop="routingStrategy" label="路由策略" width="120">
-        <template #default="{ row }">
-          <el-tag size="small">{{ row.routingStrategy === 'Fixed' ? '固定级数' : '金额阈值' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="levelCount" label="级别数" width="80" />
-      <el-table-column prop="isActive" label="启用" width="60">
-        <template #default="{ row }"><el-switch v-model="row.isActive" /></template>
-      </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
-        <template #default="{ row }">
-          <el-button text size="small" type="primary" @click="editType(row)">编辑</el-button>
-          <el-button text size="small" type="primary" @click="configLevels(row)">级别配置</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-dialog v-model="showDialog" title="审批类型" width="500px">
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="编码"><el-input v-model="form.code" /></el-form-item>
-        <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="路由策略">
-          <el-select v-model="form.routingStrategy" style="width: 100%">
-            <el-option label="固定级数 (Fixed)" value="Fixed" />
-            <el-option label="金额阈值 (AmountBased)" value="AmountBased" />
-          </el-select>
-        </el-form-item>
+    <el-card shadow="never">
+      <el-table :data="list" stripe v-loading="loading" style="width:100%">
+        <el-table-column type="index" label="#" width="50" />
+        <el-table-column prop="code" label="编码" width="180" />
+        <el-table-column prop="name" label="名称" width="160" />
+        <el-table-column prop="description" label="说明" min-width="250" />
+        <el-table-column label="状态" width="70">
+          <template #default="{ row }"><el-tag :type="row.isActive ? 'success' : 'danger'" size="small">{{ row.isActive ? '启用' : '停用' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="操作" width="220" fixed="right">
+          <template #default="{ row }">
+            <el-button text size="small" type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button text size="small" type="primary" @click="goLevels(row)">级别配置</el-button>
+            <el-button text size="small" :type="row.isActive ? 'warning' : 'success'" @click="toggleStatus(row)">{{ row.isActive ? '停用' : '启用' }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+    <el-dialog v-model="showDialog" :title="isEdit ? '编辑审批类型' : '新增审批类型'" width="500px">
+      <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
+        <el-form-item label="编码" prop="code"><el-input v-model="form.code" :disabled="isEdit" /></el-form-item>
+        <el-form-item label="名称" prop="name"><el-input v-model="form.name" /></el-form-item>
+        <el-form-item label="说明"><el-input v-model="form.description" type="textarea" :rows="3" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" @click="save">保存</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
-
 <script setup>
-import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
-
-const showDialog = ref(false)
-const form = ref({ code: '', name: '', routingStrategy: 'Fixed' })
-
-const list = ref([
-  { code: 'BATCH_IMPORT_ROOMS', name: '批量导入房屋', routingStrategy: 'Fixed', levelCount: 2, isActive: true },
-  { code: 'CONTRACT_CREATE', name: '新建合同', routingStrategy: 'Fixed', levelCount: 1, isActive: true },
-  { code: 'CONTRACT_TERMINATE', name: '提前解约', routingStrategy: 'AmountBased', levelCount: 3, isActive: true },
-  { code: 'RECEIPT_REVERSE', name: '收款冲销', routingStrategy: 'Fixed', levelCount: 2, isActive: true },
-  { code: 'DISCOUNT', name: '应收减免', routingStrategy: 'AmountBased', levelCount: 3, isActive: true }
-])
-
-function editType(row) { Object.assign(form.value, row); showDialog.value = true }
-function configLevels(row) { ElMessage.info('请前往"审批级别配置"页面') }
-function save() { ElMessage.success('保存成功'); showDialog.value = false }
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getApprovalTypes, createApprovalType, updateApprovalType, deleteApprovalType } from '../../../api/index'
+const router = useRouter()
+const loading = ref(false); const list = ref([]); const showDialog = ref(false)
+const isEdit = ref(false); const saving = ref(false); const formRef = ref(null)
+const form = ref({ id: null, code: '', name: '', description: '' })
+const rules = { code: [{ required: true, message: '请输入编码', trigger: 'blur' }], name: [{ required: true, message: '请输入名称', trigger: 'blur' }] }
+async function fetchList() { loading.value = true; try { const res = await getApprovalTypes(); list.value = Array.isArray(res) ? res : [] } catch { list.value = [] }; loading.value = false }
+function openCreate() { isEdit.value = false; form.value = { id: null, code: '', name: '', description: '' }; showDialog.value = true }
+function openEdit(row) { isEdit.value = true; form.value = { id: row.id, code: row.code, name: row.name, description: row.description || '' }; showDialog.value = true }
+function goLevels(row) { router.push(`/system/approvallevels?typeId=${row.id}&typeName=${encodeURIComponent(row.name)}`) }
+async function save() {
+  if (!formRef.value) return; if (!(await formRef.value.validate().catch(() => false))) return; saving.value = true
+  try {
+    if (isEdit.value) { await updateApprovalType(form.value.id, { name: form.value.name, description: form.value.description || undefined }); ElMessage.success('已更新') }
+    else { await createApprovalType({ code: form.value.code, name: form.value.name, description: form.value.description || undefined }); ElMessage.success('已创建') }
+    showDialog.value = false; await fetchList()
+  } catch { ElMessage.error(isEdit.value ? '更新失败' : '创建失败') }
+  saving.value = false
+}
+async function toggleStatus(row) {
+  const action = row.isActive ? '停用' : '启用'
+  try { await ElMessageBox.confirm(`确定${action}「${row.name}」？`, '提示', { type: 'warning' }); await updateApprovalType(row.id, { isActive: !row.isActive }); ElMessage.success(`已${action}`); await fetchList() }
+  catch (e) { if (e !== 'cancel') ElMessage.error(`${action}失败`) }
+}
+onMounted(() => fetchList())
 </script>

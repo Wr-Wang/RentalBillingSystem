@@ -8,6 +8,8 @@
     <div class="search-bar">
       <el-select v-model="search.tableName" placeholder="选择实体类型" clearable style="width: 160px;" @change="fetchHistory">
         <el-option label="公司" value="Companies" />
+        <el-option label="审批类型" value="ApprovalTypes" />
+        <el-option label="审批级别" value="ApprovalLevelConfigs" />
         <el-option label="房型" value="RoomTypes" />
         <el-option label="收费项目" value="FeeCodes" />
         <el-option label="菜单" value="Menus" />
