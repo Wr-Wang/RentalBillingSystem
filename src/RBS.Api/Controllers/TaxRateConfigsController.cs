@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/tax-rate-configs")]
+[Route("api/[controller]")]
 [Authorize]
 public class TaxRateConfigsController : ControllerBase
 {

@@ -6,7 +6,7 @@ using RBS.Infrastructure.Data;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/contract-fee-configs")]
+[Route("api/[controller]")]
 [Authorize]
 public class ContractFeeConfigsController : ControllerBase
 {

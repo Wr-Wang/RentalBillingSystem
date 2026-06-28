@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/payment-channels")]
+[Route("api/[controller]")]
 [Authorize]
 public class PaymentChannelsController : ControllerBase
 {

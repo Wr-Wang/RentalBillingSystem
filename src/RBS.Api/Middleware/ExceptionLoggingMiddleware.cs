@@ -24,6 +24,12 @@ public class ExceptionLoggingMiddleware
         {
             await _next(context);
         }
+        catch (OperationCanceledException)
+        {
+            // 请求被取消（用户刷新/关闭页面等），不属于服务端错误
+            if (!context.Response.HasStarted)
+                context.Response.StatusCode = 499;
+        }
         catch (Exception ex)
         {
             await LogExceptionAsync(context, ex);

@@ -5,7 +5,7 @@ using RBS.Core.Interfaces.UnitOfWork;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/fee-codes")]
+[Route("api/[controller]")]
 [Authorize]
 public class FeeCodesController : ControllerBase
 {

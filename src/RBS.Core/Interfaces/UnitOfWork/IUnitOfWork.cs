@@ -1,5 +1,6 @@
 namespace RBS.Core.Interfaces.UnitOfWork;
 
+using RBS.Core.Entities.Property;
 using RBS.Core.Interfaces.Repositories;
 
 /// <summary>
@@ -16,6 +17,7 @@ public interface IUnitOfWork : IDisposable
     // 房屋管理
     IBuildingRepository Buildings { get; }
     IRoomRepository Rooms { get; }
+    IRepository<RoomType> RoomTypes { get; }
 
     // 合同
     IContractRepository Contracts { get; }

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/collection-stages")]
+[Route("api/[controller]")]
 [Authorize]
 public class CollectionStagesController : ControllerBase
 {

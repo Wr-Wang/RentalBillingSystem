@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/room-pricing-standards")]
+[Route("api/[controller]")]
 [Authorize]
 public class RoomPricingStandardsController : ControllerBase
 {

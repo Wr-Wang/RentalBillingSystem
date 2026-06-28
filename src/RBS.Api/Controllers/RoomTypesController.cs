@@ -1,22 +1,43 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Property;
 
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/room-types")]
+[Route("api/[controller]")]
 [Authorize]
 public class RoomTypesController : ControllerBase
 {
+    private readonly IRoomTypeService _service;
+    public RoomTypesController(IRoomTypeService service) => _service = service;
+
     [HttpGet]
-    public IActionResult GetAll() => Ok(new List<object>());
+    public async Task<IActionResult> GetAll(CancellationToken ct)
+    {
+        var result = await _service.GetListAsync(ct);
+        return Ok(result);
+    }
 
     [HttpPost]
-    public IActionResult Create([FromBody] object dto) => Ok(new { });
+    public async Task<IActionResult> Create([FromBody] CreateRoomTypeRequest request, CancellationToken ct)
+    {
+        var result = await _service.CreateAsync(request, ct);
+        return Ok(result);
+    }
 
     [HttpPut("{id}")]
-    public IActionResult Update(Guid id, [FromBody] object dto) => NoContent();
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateRoomTypeRequest request, CancellationToken ct)
+    {
+        await _service.UpdateAsync(id, request, ct);
+        return NoContent();
+    }
 
     [HttpDelete("{id}")]
-    public IActionResult Delete(Guid id) => NoContent();
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await _service.DeleteAsync(id, ct);
+        return NoContent();
+    }
 }

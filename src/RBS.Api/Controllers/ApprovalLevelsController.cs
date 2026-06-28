@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/approval-levels")]
+[Route("api/[controller]")]
 [Authorize]
 public class ApprovalLevelsController : ControllerBase
 {

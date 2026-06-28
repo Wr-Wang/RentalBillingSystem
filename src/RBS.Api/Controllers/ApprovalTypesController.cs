@@ -5,7 +5,7 @@ using RBS.Core.Interfaces.UnitOfWork;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/approval-types")]
+[Route("api/[controller]")]
 [Authorize]
 public class ApprovalTypesController : ControllerBase
 {

@@ -6,7 +6,7 @@ using RBS.Infrastructure.Data;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/accounting-subjects")]
+[Route("api/[controller]")]
 [Authorize]
 public class AccountingSubjectsController : ControllerBase
 {

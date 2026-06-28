@@ -3,7 +3,7 @@ import request from './request'
 // Auth
 export function login(data) { return request({ url: '/auth/login', method: 'post', data }) }
 export function refreshToken(data) { return request({ url: '/auth/refresh', method: 'post', data }) }
-export function changePassword(data) { return request({ url: '/auth/change-password', method: 'post', data }) }
+export function changePassword(data) { return request({ url: '/auth/changepassword', method: 'post', data }) }
 
 // Companies (多公司管理)
 export function getCompanies(params) { return request({ url: '/companies', method: 'get', params }) }
@@ -78,21 +78,21 @@ export function resumeContract(id) { return request({ url: `/contracts/${id}/res
 export function getContractTimeline(id) { return request({ url: `/contracts/${id}/timeline`, method: 'get' }) }
 
 // Fee Codes
-export function getFeeCodes(params) { return request({ url: '/fee-codes', method: 'get', params }) }
-export function createFeeCode(data) { return request({ url: '/fee-codes', method: 'post', data }) }
-export function updateFeeCode(id, data) { return request({ url: `/fee-codes/${id}`, method: 'put', data }) }
-export function deleteFeeCode(id) { return request({ url: `/fee-codes/${id}`, method: 'delete' }) }
+export function getFeeCodes(params) { return request({ url: '/feecodes', method: 'get', params }) }
+export function createFeeCode(data) { return request({ url: '/feecodes', method: 'post', data }) }
+export function updateFeeCode(id, data) { return request({ url: `/feecodes/${id}`, method: 'put', data }) }
+export function deleteFeeCode(id) { return request({ url: `/feecodes/${id}`, method: 'delete' }) }
 
 // Contract Fee Configs
-export function getContractFeeConfigs(contractId) { return request({ url: `/contract-fee-configs?contractId=${contractId}`, method: 'get' }) }
-export function updateContractFeeConfig(id, data) { return request({ url: `/contract-fee-configs/${id}`, method: 'put', data }) }
+export function getContractFeeConfigs(contractId) { return request({ url: `/contractfeeconfigs?contractId=${contractId}`, method: 'get' }) }
+export function updateContractFeeConfig(id, data) { return request({ url: `/contractfeeconfigs/${id}`, method: 'put', data }) }
 
 // Meter Readings
-export function getMeterReadings(params) { return request({ url: '/meter-readings', method: 'get', params }) }
-export function createMeterReading(data) { return request({ url: '/meter-readings', method: 'post', data }) }
-export function updateMeterReading(id, data) { return request({ url: `/meter-readings/${id}`, method: 'put', data }) }
-export function confirmMeterReading(id) { return request({ url: `/meter-readings/${id}/confirm`, method: 'post' }) }
-export function importMeterReadings(data) { return request({ url: '/meter-readings/import', method: 'post', data }) }
+export function getMeterReadings(params) { return request({ url: '/meterreadings', method: 'get', params }) }
+export function createMeterReading(data) { return request({ url: '/meterreadings', method: 'post', data }) }
+export function updateMeterReading(id, data) { return request({ url: `/meterreadings/${id}`, method: 'put', data }) }
+export function confirmMeterReading(id) { return request({ url: `/meterreadings/${id}/confirm`, method: 'post' }) }
+export function importMeterReadings(data) { return request({ url: '/meterreadings/import', method: 'post', data }) }
 
 // Receivables
 export function getReceivables(params) { return request({ url: '/receivables', method: 'get', params }) }
@@ -106,7 +106,7 @@ export function confirmReceipt(id) { return request({ url: `/receipts/${id}/conf
 export function rejectReceipt(id, data) { return request({ url: `/receipts/${id}/reject`, method: 'put', data }) }
 export function reverseReceipt(id, data) { return request({ url: `/receipts/${id}/reverse`, method: 'post', data }) }
 export function refundReceipt(id, data) { return request({ url: `/receipts/${id}/refund`, method: 'post', data }) }
-export function batchConfirmReceipts(data) { return request({ url: '/receipts/batch-confirm', method: 'post', data }) }
+export function batchConfirmReceipts(data) { return request({ url: '/receipts/batchconfirm', method: 'post', data }) }
 
 // Deposits
 export function getDeposits(params) { return request({ url: '/deposits', method: 'get', params }) }
@@ -115,10 +115,10 @@ export function deductDeposit(data) { return request({ url: '/deposits/deduct', 
 
 // Collection
 export function getCollectionOverview() { return request({ url: '/collection/overview', method: 'get' }) }
-export function getCollectionStages() { return request({ url: '/collection-stages', method: 'get' }) }
-export function updateCollectionStage(id, data) { return request({ url: `/collection-stages/${id}`, method: 'put', data }) }
-export function getCollectionRecords(params) { return request({ url: '/collection-records', method: 'get', params }) }
-export function manualCollection(data) { return request({ url: '/collection-records/manual', method: 'post', data }) }
+export function getCollectionStages() { return request({ url: '/collectionstages', method: 'get' }) }
+export function updateCollectionStage(id, data) { return request({ url: `/collectionstages/${id}`, method: 'put', data }) }
+export function getCollectionRecords(params) { return request({ url: '/collectionrecords', method: 'get', params }) }
+export function manualCollection(data) { return request({ url: '/collectionrecords/manual', method: 'post', data }) }
 
 // Approvals
 export function submitApproval(data) { return request({ url: '/approvals/submit', method: 'post', data }) }
@@ -128,62 +128,62 @@ export function approveApproval(id, data) { return request({ url: `/approvals/${
 export function rejectApproval(id, data) { return request({ url: `/approvals/${id}/reject`, method: 'post', data }) }
 export function getApprovalHistory(id) { return request({ url: `/approvals/${id}/history`, method: 'get' }) }
 export function retryApprovalCallback(id) { return request({ url: `/approvals/${id}/retry-callback`, method: 'post' }) }
-export function getApprovalTypes() { return request({ url: '/approval-types', method: 'get' }) }
-export function createApprovalType(data) { return request({ url: '/approval-types', method: 'post', data }) }
-export function updateApprovalType(id, data) { return request({ url: `/approval-types/${id}`, method: 'put', data }) }
-export function deleteApprovalType(id) { return request({ url: `/approval-types/${id}`, method: 'delete' }) }
-export function getApprovalLevels(typeId) { return request({ url: `/approval-types/${typeId}/levels`, method: 'get' }) }
-export function createApprovalLevel(typeId, data) { return request({ url: `/approval-types/${typeId}/levels`, method: 'post', data }) }
+export function getApprovalTypes() { return request({ url: '/approvaltypes', method: 'get' }) }
+export function createApprovalType(data) { return request({ url: '/approvaltypes', method: 'post', data }) }
+export function updateApprovalType(id, data) { return request({ url: `/approvaltypes/${id}`, method: 'put', data }) }
+export function deleteApprovalType(id) { return request({ url: `/approvaltypes/${id}`, method: 'delete' }) }
+export function getApprovalLevels(typeId) { return request({ url: `/approvaltypes/${typeId}/levels`, method: 'get' }) }
+export function createApprovalLevel(typeId, data) { return request({ url: `/approvaltypes/${typeId}/levels`, method: 'post', data }) }
 export function updateApprovalLevel(id, data) { return request({ url: `/approval-levels/${id}`, method: 'put', data }) }
 export function deleteApprovalLevel(id) { return request({ url: `/approval-levels/${id}`, method: 'delete' }) }
 
 // Accounting
-export function getAccountingSubjects(params) { return request({ url: '/accounting-subjects', method: 'get', params }) }
-export function createAccountingSubject(data) { return request({ url: '/accounting-subjects', method: 'post', data }) }
-export function updateAccountingSubject(id, data) { return request({ url: `/accounting-subjects/${id}`, method: 'put', data }) }
-export function deleteAccountingSubject(id) { return request({ url: `/accounting-subjects/${id}`, method: 'delete' }) }
-export function getJournalEntries(params) { return request({ url: '/journal-entries', method: 'get', params }) }
+export function getAccountingSubjects(params) { return request({ url: '/accountingsubjects', method: 'get', params }) }
+export function createAccountingSubject(data) { return request({ url: '/accountingsubjects', method: 'post', data }) }
+export function updateAccountingSubject(id, data) { return request({ url: `/accountingsubjects/${id}`, method: 'put', data }) }
+export function deleteAccountingSubject(id) { return request({ url: `/accountingsubjects/${id}`, method: 'delete' }) }
+export function getJournalEntries(params) { return request({ url: '/journalentries', method: 'get', params }) }
 export function getVouchers(params) { return request({ url: '/vouchers', method: 'get', params }) }
 export function getVoucher(id) { return request({ url: `/vouchers/${id}`, method: 'get' }) }
 export function postVoucher(id) { return request({ url: `/vouchers/${id}/post`, method: 'put' }) }
 export function reverseVoucher(id, data) { return request({ url: `/vouchers/${id}/reverse`, method: 'post', data }) }
-export function getTrialBalance(params) { return request({ url: '/trial-balance', method: 'get', params }) }
+export function getTrialBalance(params) { return request({ url: '/trialbalance', method: 'get', params }) }
 
 // Reports
-export function getCollectionRate(params) { return request({ url: '/reports/collection-rate', method: 'get', params }) }
-export function getOverdueDetail(params) { return request({ url: '/reports/overdue-detail', method: 'get', params }) }
-export function getDailyReceipt(params) { return request({ url: '/reports/daily-receipt', method: 'get', params }) }
-export function getMonthlyReceipt(params) { return request({ url: '/reports/monthly-receipt', method: 'get', params }) }
-export function getFeeRevenue(params) { return request({ url: '/reports/fee-revenue', method: 'get', params }) }
-export function getOccupancyRate(params) { return request({ url: '/reports/occupancy-rate', method: 'get', params }) }
+export function getCollectionRate(params) { return request({ url: '/reports/collectionrate', method: 'get', params }) }
+export function getOverdueDetail(params) { return request({ url: '/reports/overduedetail', method: 'get', params }) }
+export function getDailyReceipt(params) { return request({ url: '/reports/dailyreceipt', method: 'get', params }) }
+export function getMonthlyReceipt(params) { return request({ url: '/reports/monthlyreceipt', method: 'get', params }) }
+export function getFeeRevenue(params) { return request({ url: '/reports/feerevenue', method: 'get', params }) }
+export function getOccupancyRate(params) { return request({ url: '/reports/occupancyrate', method: 'get', params }) }
 
 // Debit Notes (Bills)
-export function getDebitNotes(params) { return request({ url: '/debit-notes', method: 'get', params }) }
-export function getDebitNote(id) { return request({ url: `/debit-notes/${id}`, method: 'get' }) }
-export function generateDebitNotes(data) { return request({ url: '/debit-notes/generate', method: 'post', data }) }
-export function exportDebitNotePdf(id) { return request({ url: `/debit-notes/${id}/pdf`, method: 'get', responseType: 'blob' }) }
+export function getDebitNotes(params) { return request({ url: '/debitnotes', method: 'get', params }) }
+export function getDebitNote(id) { return request({ url: `/debitnotes/${id}`, method: 'get' }) }
+export function generateDebitNotes(data) { return request({ url: '/debitnotes/generate', method: 'post', data }) }
+export function exportDebitNotePdf(id) { return request({ url: `/debitnotes/${id}/pdf`, method: 'get', responseType: 'blob' }) }
 
 // Scheduler
 export function getSchedulerJobs() { return request({ url: '/scheduler/jobs', method: 'get' }) }
 export function triggerSchedulerJob(name) { return request({ url: `/scheduler/jobs/${name}/trigger`, method: 'post' }) }
 
 // Holidays
-export function getHolidayCalendars(params) { return request({ url: '/holiday-calendars', method: 'get', params }) }
-export function createHolidayCalendar(data) { return request({ url: '/holiday-calendars', method: 'post', data }) }
-export function updateHolidayCalendar(id, data) { return request({ url: `/holiday-calendars/${id}`, method: 'put', data }) }
-export function deleteHolidayCalendar(id) { return request({ url: `/holiday-calendars/${id}`, method: 'delete' }) }
-export function importHolidayYear(year) { return request({ url: `/holiday-calendars/import/${year}`, method: 'post' }) }
+export function getHolidayCalendars(params) { return request({ url: '/holidaycalendars', method: 'get', params }) }
+export function createHolidayCalendar(data) { return request({ url: '/holidaycalendars', method: 'post', data }) }
+export function updateHolidayCalendar(id, data) { return request({ url: `/holidaycalendars/${id}`, method: 'put', data }) }
+export function deleteHolidayCalendar(id) { return request({ url: `/holidaycalendars/${id}`, method: 'delete' }) }
+export function importHolidayYear(year) { return request({ url: `/holidaycalendars/import/${year}`, method: 'post' }) }
 
 // Payment Channels
-export function getPaymentChannels() { return request({ url: '/payment-channels', method: 'get' }) }
-export function createPaymentChannel(data) { return request({ url: '/payment-channels', method: 'post', data }) }
-export function updatePaymentChannel(id, data) { return request({ url: `/payment-channels/${id}`, method: 'put', data }) }
-export function deletePaymentChannel(id) { return request({ url: `/payment-channels/${id}`, method: 'delete' }) }
+export function getPaymentChannels() { return request({ url: '/paymentchannels', method: 'get' }) }
+export function createPaymentChannel(data) { return request({ url: '/paymentchannels', method: 'post', data }) }
+export function updatePaymentChannel(id, data) { return request({ url: `/paymentchannels/${id}`, method: 'put', data }) }
+export function deletePaymentChannel(id) { return request({ url: `/paymentchannels/${id}`, method: 'delete' }) }
 
 // Tax Rate Configs
-export function getTaxRateConfigs() { return request({ url: '/tax-rate-configs', method: 'get' }) }
-export function createTaxRateConfig(data) { return request({ url: '/tax-rate-configs', method: 'post', data }) }
-export function updateTaxRateConfig(id, data) { return request({ url: `/tax-rate-configs/${id}`, method: 'put', data }) }
+export function getTaxRateConfigs() { return request({ url: '/taxrateconfigs', method: 'get' }) }
+export function createTaxRateConfig(data) { return request({ url: '/taxrateconfigs', method: 'post', data }) }
+export function updateTaxRateConfig(id, data) { return request({ url: `/taxrateconfigs/${id}`, method: 'put', data }) }
 
 // Audit
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }
@@ -198,13 +198,13 @@ export function deleteSystemLog(id) { return request({ url: `/systemlogs/${id}`,
 export function clearSystemLogs() { return request({ url: '/systemlogs', method: 'delete' }) }
 
 // Room Types
-export function getRoomTypes() { return request({ url: '/room-types', method: 'get' }) }
-export function createRoomType(data) { return request({ url: '/room-types', method: 'post', data }) }
-export function updateRoomType(id, data) { return request({ url: `/room-types/${id}`, method: 'put', data }) }
-export function deleteRoomType(id) { return request({ url: `/room-types/${id}`, method: 'delete' }) }
+export function getRoomTypes() { return request({ url: '/roomtypes', method: 'get' }) }
+export function createRoomType(data) { return request({ url: '/roomtypes', method: 'post', data }) }
+export function updateRoomType(id, data) { return request({ url: `/roomtypes/${id}`, method: 'put', data }) }
+export function deleteRoomType(id) { return request({ url: `/roomtypes/${id}`, method: 'delete' }) }
 
 // Pricing Standards
-export function getPricingStandards(params) { return request({ url: '/room-pricing-standards', method: 'get', params }) }
-export function createPricingStandard(data) { return request({ url: '/room-pricing-standards', method: 'post', data }) }
-export function updatePricingStandard(id, data) { return request({ url: `/room-pricing-standards/${id}`, method: 'put', data }) }
-export function deletePricingStandard(id) { return request({ url: `/room-pricing-standards/${id}`, method: 'delete' }) }
+export function getPricingStandards(params) { return request({ url: '/roompricingstandards', method: 'get', params }) }
+export function createPricingStandard(data) { return request({ url: '/roompricingstandards', method: 'post', data }) }
+export function updatePricingStandard(id, data) { return request({ url: `/roompricingstandards/${id}`, method: 'put', data }) }
+export function deletePricingStandard(id) { return request({ url: `/roompricingstandards/${id}`, method: 'delete' }) }

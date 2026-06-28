@@ -6,7 +6,7 @@ using RBS.Infrastructure.Data;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/trial-balance")]
+[Route("api/[controller]")]
 [Authorize]
 public class TrialBalanceController : ControllerBase
 {

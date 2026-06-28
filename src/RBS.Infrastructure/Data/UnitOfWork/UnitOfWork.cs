@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RBS.Core.Entities.Property;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
 using RBS.Infrastructure.Data.Repositories;
@@ -24,6 +25,7 @@ public class UnitOfWork : IUnitOfWork
     private IMeterReadingRepository? _meterReadings;
     private IApprovalRequestRepository? _approvalRequests;
     private IHolidayCalendarRepository? _holidayCalendars;
+    private IRepository<RoomType>? _roomTypes;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -45,6 +47,7 @@ public class UnitOfWork : IUnitOfWork
     public IMeterReadingRepository MeterReadings => _meterReadings ??= new MeterReadingRepository(_context);
     public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new ApprovalRequestRepository(_context);
     public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new HolidayCalendarRepository(_context);
+    public IRepository<RoomType> RoomTypes => _roomTypes ??= new BaseRepository<RoomType>(_context);
 
     public async Task<int> CommitAsync(CancellationToken ct = default)
     {

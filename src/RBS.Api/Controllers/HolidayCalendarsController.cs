@@ -6,7 +6,7 @@ using RBS.Application.DTOs.SystemConfig;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/holiday-calendars")]
+[Route("api/[controller]")]
 [Authorize]
 public class HolidayCalendarsController : ControllerBase
 {

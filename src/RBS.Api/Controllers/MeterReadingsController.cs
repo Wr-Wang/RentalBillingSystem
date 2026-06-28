@@ -5,7 +5,7 @@ using RBS.Core.Interfaces.UnitOfWork;
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/meter-readings")]
+[Route("api/[controller]")]
 [Authorize]
 public class MeterReadingsController : ControllerBase
 {

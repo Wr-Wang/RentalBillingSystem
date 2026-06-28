@@ -8,6 +8,7 @@
     <div class="search-bar">
       <el-select v-model="search.tableName" placeholder="选择实体类型" clearable style="width: 160px;" @change="fetchHistory">
         <el-option label="公司" value="Companies" />
+        <el-option label="房型" value="RoomTypes" />
         <el-option label="菜单" value="Menus" />
         <el-option label="角色" value="Roles" />
         <el-option label="用户" value="Users" />
