@@ -10,4 +10,7 @@ public class RoomPricingStandard : AuditableEntity, IHasCompany
     private RoomPricingStandard() { }
     public RoomPricingStandard(Guid roomTypeId, Guid floorLevelBandId, decimal rentAmount, Guid companyId)
     { RoomTypeId = roomTypeId; FloorLevelBandId = floorLevelBandId; RentAmount = rentAmount; CompanyId = companyId; }
+    public void SetRoomType(Guid roomTypeId) => RoomTypeId = roomTypeId;
+    public void SetFloorLevelBand(Guid bandId) => FloorLevelBandId = bandId;
+    public void SetRentAmount(decimal amount) => RentAmount = amount;
 }

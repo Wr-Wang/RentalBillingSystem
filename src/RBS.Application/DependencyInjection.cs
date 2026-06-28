@@ -29,6 +29,8 @@ public static class DependencyInjection
         services.AddScoped<IApprovalTypeService, ApprovalTypeService>();
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
         services.AddScoped<IFeeCodeService, FeeCodeService>();
+        services.AddScoped<IPricingStandardService, PricingStandardService>();
+        services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
 
         return services;
     }

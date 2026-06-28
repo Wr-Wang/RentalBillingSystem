@@ -208,3 +208,9 @@ export function getPricingStandards(params) { return request({ url: '/roompricin
 export function createPricingStandard(data) { return request({ url: '/roompricingstandards', method: 'post', data }) }
 export function updatePricingStandard(id, data) { return request({ url: `/roompricingstandards/${id}`, method: 'put', data }) }
 export function deletePricingStandard(id) { return request({ url: `/roompricingstandards/${id}`, method: 'delete' }) }
+
+// Floor Level Bands
+export function getFloorLevelBands() { return request({ url: '/floorlevelbands', method: 'get' }) }
+export function createFloorLevelBand(data) { return request({ url: '/floorlevelbands', method: 'post', data }) }
+export function updateFloorLevelBand(id, data) { return request({ url: '/floorlevelbands/' + id, method: 'put', data }) }
+export function deleteFloorLevelBand(id) { return request({ url: '/floorlevelbands/' + id, method: 'delete' }) }

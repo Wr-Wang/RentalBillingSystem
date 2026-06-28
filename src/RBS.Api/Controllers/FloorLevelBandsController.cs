@@ -8,27 +8,23 @@ namespace RBS.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class RoomPricingStandardsController : ControllerBase
+public class FloorLevelBandsController : ControllerBase
 {
-    private readonly IPricingStandardService _service;
-    public RoomPricingStandardsController(IPricingStandardService service) => _service = service;
+    private readonly IFloorLevelBandService _service;
+    public FloorLevelBandsController(IFloorLevelBandService service) => _service = service;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
-    {
-        var result = await _service.GetListAsync(ct);
-        return Ok(result);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) => Ok(await _service.GetListAsync(ct));
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreatePricingStandardRequest request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateFloorLevelBandRequest request, CancellationToken ct)
     {
         var result = await _service.CreateAsync(request, ct);
         return Ok(result);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePricingStandardRequest request, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFloorLevelBandRequest request, CancellationToken ct)
     {
         await _service.UpdateAsync(id, request, ct);
         return NoContent();

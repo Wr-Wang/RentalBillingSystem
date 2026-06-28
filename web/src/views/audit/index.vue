@@ -12,6 +12,8 @@
         <el-option label="审批级别" value="ApprovalLevelConfigs" />
         <el-option label="房型" value="RoomTypes" />
         <el-option label="收费项目" value="FeeCodes" />
+        <el-option label="定价标准" value="RoomPricingStandards" />
+        <el-option label="楼层级别" value="FloorLevelBands" />
         <el-option label="菜单" value="Menus" />
         <el-option label="角色" value="Roles" />
         <el-option label="用户" value="Users" />

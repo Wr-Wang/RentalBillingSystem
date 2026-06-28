@@ -300,6 +300,12 @@ INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActi
 VALUES ('A1111111-1111-1111-1111-111111111205','编辑定价','system:pricingedit','A1111111-1111-1111-1111-111111111184',11,1,@SysUserId,@Now);
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111206','删除定价','system:pricingdelete','A1111111-1111-1111-1111-111111111184',12,1,@SysUserId,@Now);
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES ('A1111111-1111-1111-1111-111111111401','新增楼层级别','system:floorlevelcreate','A1111111-1111-1111-1111-111111111184',15,1,@SysUserId,@Now);
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES ('A1111111-1111-1111-1111-111111111402','编辑楼层级别','system:floorleveledit','A1111111-1111-1111-1111-111111111184',16,1,@SysUserId,@Now);
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES ('A1111111-1111-1111-1111-111111111403','删除楼层级别','system:floorleveldelete','A1111111-1111-1111-1111-111111111184',17,1,@SysUserId,@Now);
 
 -- 16.11 支付通道管理
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
