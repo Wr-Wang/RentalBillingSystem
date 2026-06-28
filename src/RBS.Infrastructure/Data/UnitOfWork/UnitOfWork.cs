@@ -23,6 +23,7 @@ public class UnitOfWork : IUnitOfWork
     private IPaymentChannelRepository? _paymentChannels;
     private IMeterReadingRepository? _meterReadings;
     private IApprovalRequestRepository? _approvalRequests;
+    private IHolidayCalendarRepository? _holidayCalendars;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -43,6 +44,7 @@ public class UnitOfWork : IUnitOfWork
     public IPaymentChannelRepository PaymentChannels => _paymentChannels ??= new PaymentChannelRepository(_context);
     public IMeterReadingRepository MeterReadings => _meterReadings ??= new MeterReadingRepository(_context);
     public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new ApprovalRequestRepository(_context);
+    public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new HolidayCalendarRepository(_context);
 
     public async Task<int> CommitAsync(CancellationToken ct = default)
     {

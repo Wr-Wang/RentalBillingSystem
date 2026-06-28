@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentChannelRepository, PaymentChannelRepository>();
         services.AddScoped<IMeterReadingRepository, MeterReadingRepository>();
         services.AddScoped<IApprovalRequestRepository, ApprovalRequestRepository>();
+        services.AddScoped<IHolidayCalendarRepository, HolidayCalendarRepository>();
 
         // 多租户
         services.AddScoped<ITenantService, TenantService>();

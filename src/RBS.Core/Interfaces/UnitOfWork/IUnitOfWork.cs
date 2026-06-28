@@ -35,6 +35,9 @@ public interface IUnitOfWork : IDisposable
     // 审批
     IApprovalRequestRepository ApprovalRequests { get; }
 
+    // 系统配置
+    IHolidayCalendarRepository HolidayCalendars { get; }
+
     /// <summary>提交所有变更（自动事务）</summary>
     Task<int> CommitAsync(CancellationToken ct = default);
 

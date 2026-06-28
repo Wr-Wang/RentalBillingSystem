@@ -4,6 +4,7 @@ using RBS.Application.Services.Billing;
 using RBS.Application.Services.Contract;
 using RBS.Application.Services.Organization;
 using RBS.Application.Services.Property;
+using RBS.Application.Services.SystemConfig;
 
 namespace RBS.Application;
 
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<IBuildingService, BuildingService>();
         services.AddScoped<IContractService, ContractAppService>();
         services.AddScoped<IBillingService, BillingAppService>();
+        services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
 
         return services;
     }

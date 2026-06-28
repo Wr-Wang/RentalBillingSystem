@@ -172,6 +172,7 @@ export function getHolidayCalendars(params) { return request({ url: '/holiday-ca
 export function createHolidayCalendar(data) { return request({ url: '/holiday-calendars', method: 'post', data }) }
 export function updateHolidayCalendar(id, data) { return request({ url: `/holiday-calendars/${id}`, method: 'put', data }) }
 export function deleteHolidayCalendar(id) { return request({ url: `/holiday-calendars/${id}`, method: 'delete' }) }
+export function importHolidayYear(year) { return request({ url: `/holiday-calendars/import/${year}`, method: 'post' }) }
 
 // Payment Channels
 export function getPaymentChannels() { return request({ url: '/payment-channels', method: 'get' }) }
