@@ -27,6 +27,20 @@ public class UserRepository : BaseRepository<User>, IUserRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<User>> GetAllWithRolesAsync(CancellationToken ct = default)
+    {
+        return await _dbSet
+            .Include(u => u.Roles)
+            .ToListAsync(ct);
+    }
+
+    public async Task<User?> GetByIdWithRolesAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _dbSet
+            .Include(u => u.Roles)
+            .FirstOrDefaultAsync(u => u.Id == id, ct);
+    }
+
     public async Task<bool> IsUsernameUniqueAsync(string username, Guid? excludeId = null, CancellationToken ct = default)
     {
         if (excludeId.HasValue)

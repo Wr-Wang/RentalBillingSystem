@@ -173,20 +173,23 @@ public class AuditService : IAuditService
         var weekStart = now.AddDays(-(int)now.DayOfWeek).Date;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Local);
 
-        // 统计所有审计表（Landlords_Audit + Menus_Audit + Roles_Audit）
+        // 统计所有审计表（Landlords + Menus + Roles + Users）
         await using var cmd = _context.Database.GetDbConnection().CreateCommand();
         cmd.CommandText = @"
             SELECT
                 ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @todayStart), 0) AS TodayCount,
+                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @todayStart), 0) AS TodayCount,
                 ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @weekStart), 0) AS WeekCount,
+                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @weekStart), 0) AS WeekCount,
                 ISNULL((SELECT COUNT(*) FROM [Landlords_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
                 + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @monthStart), 0) AS MonthCount,
-                3 AS TotalTables";
+                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
+                + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @monthStart), 0) AS MonthCount,
+                4 AS TotalTables";
 
         cmd.Parameters.Add(new SqlParameter("@todayStart", todayStart));
         cmd.Parameters.Add(new SqlParameter("@weekStart", weekStart));

@@ -16,37 +16,17 @@ public class UserService : IUserService
 
     public async Task<List<UserDto>> GetListAsync(CancellationToken ct = default)
     {
-        var users = await _uow.Users.GetAllAsync(ct);
-        return users.Select(u => new UserDto
-        {
-            Id = u.Id,
-            Username = u.Username,
-            DisplayName = u.DisplayName,
-            Phone = u.Phone,
-            Email = u.Email,
-            IsActive = u.IsActive,
-            HomeLandlordId = u.HomeLandlordId,
-            IsSuperAdmin = u.IsSuperAdmin,
-            CreatedAt = u.CreatedAt
-        }).ToList();
+        var users = await _uow.Users.GetAllWithRolesAsync(ct);
+        var dtos = new List<UserDto>();
+        foreach (var user in users)
+            dtos.Add(await MapToDtoAsync(user, ct));
+        return dtos;
     }
 
     public async Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) return null;
-        return new UserDto
-        {
-            Id = user.Id,
-            Username = user.Username,
-            DisplayName = user.DisplayName,
-            Phone = user.Phone,
-            Email = user.Email,
-            IsActive = user.IsActive,
-            HomeLandlordId = user.HomeLandlordId,
-            IsSuperAdmin = user.IsSuperAdmin,
-            CreatedAt = user.CreatedAt
-        };
+        var user = await _uow.Users.GetByIdWithRolesAsync(id, ct);
+        return user == null ? null : await MapToDtoAsync(user, ct);
     }
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
@@ -55,7 +35,9 @@ public class UserService : IUserService
         if (!unique) throw new InvalidOperationException($"用户名 '{request.Username}' 已存在");
 
         var user = new User(request.Username, request.DisplayName, request.Password);
-        // TODO: 使用 BCrypt 加密密码 user.ChangePassword(BCrypt.HashPassword(request.Password));
+        if (request.IsSuperAdmin) user.GrantSuperAdmin();
+        if (request.HomeLandlordId.HasValue) user.SetHomeLandlord(request.HomeLandlordId.Value);
+
         await _uow.Users.AddAsync(user, ct);
 
         if (request.RoleIds?.Any() == true)
@@ -70,14 +52,38 @@ public class UserService : IUserService
 
     public async Task UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
+        var user = await _uow.Users.GetByIdWithRolesAsync(id, ct);
         if (user == null) throw new KeyNotFoundException("用户不存在");
 
-        if (request.DisplayName != null) user.UpdateProfile(request.DisplayName, request.Phone, request.Email);
-        if (request.IsActive.HasValue) { if (request.IsActive.Value) user.Activate(); else user.Deactivate(); }
+        if (request.DisplayName != null || request.Phone != null || request.Email != null)
+            user.UpdateProfile(request.DisplayName ?? user.DisplayName, request.Phone, request.Email);
+
+        if (!string.IsNullOrEmpty(request.Password))
+            user.ChangePassword(request.Password);
+
+        if (request.IsActive.HasValue)
+        {
+            if (request.IsActive.Value) user.Activate();
+            else user.Deactivate();
+        }
+
+        if (request.HomeLandlordId.HasValue && request.HomeLandlordId.Value != user.HomeLandlordId)
+            user.SetHomeLandlord(request.HomeLandlordId.Value);
+
+        if (request.IsSuperAdmin.HasValue && request.IsSuperAdmin.Value != user.IsSuperAdmin)
+        {
+            if (request.IsSuperAdmin.Value) user.GrantSuperAdmin();
+            else user.RevokeSuperAdmin();
+        }
+
         if (request.RoleIds != null)
         {
-            // 重新分配角色
+            var currentRoleIds = user.Roles.Select(r => r.RoleId).ToHashSet();
+            var newRoleIds = request.RoleIds.ToHashSet();
+            foreach (var roleId in currentRoleIds.Except(newRoleIds))
+                user.RemoveRole(roleId);
+            foreach (var roleId in newRoleIds.Except(currentRoleIds))
+                user.AssignRole(roleId);
         }
 
         await _uow.CommitAsync(ct);
@@ -89,5 +95,38 @@ public class UserService : IUserService
         if (user == null) throw new KeyNotFoundException("用户不存在");
         user.Deactivate();
         await _uow.CommitAsync(ct);
+    }
+
+    private async Task<UserDto> MapToDtoAsync(User user, CancellationToken ct)
+    {
+        var dto = new UserDto
+        {
+            Id = user.Id,
+            Username = user.Username,
+            DisplayName = user.DisplayName,
+            Phone = user.Phone,
+            Email = user.Email,
+            IsActive = user.IsActive,
+            HomeLandlordId = user.HomeLandlordId,
+            IsSuperAdmin = user.IsSuperAdmin,
+            CreatedAt = user.CreatedAt,
+            RoleIds = user.Roles.Select(r => r.RoleId).ToList()
+        };
+
+        // 获取角色名称
+        foreach (var ur in user.Roles)
+        {
+            var role = await _uow.Roles.GetByIdAsync(ur.RoleId, ct);
+            if (role != null) dto.RoleNames.Add(role.Name);
+        }
+
+        // 获取房东名称
+        if (user.HomeLandlordId.HasValue)
+        {
+            var landlord = await _uow.Landlords.GetByIdAsync(user.HomeLandlordId.Value, ct);
+            if (landlord != null) dto.HomeLandlordName = landlord.Name;
+        }
+
+        return dto;
     }
 }

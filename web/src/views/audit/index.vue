@@ -10,6 +10,7 @@
         <el-option label="房东" value="Landlords" />
         <el-option label="菜单" value="Menus" />
         <el-option label="角色" value="Roles" />
+        <el-option label="用户" value="Users" />
         <el-option label="合同" value="Contracts" />
         <el-option label="房间" value="Rooms" />
         <el-option label="应收" value="ReceivablePlans" />
