@@ -12,4 +12,5 @@ public interface IUserService
     Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken ct = default);
     Task UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+    Task SetDefaultCompanyAsync(Guid userId, Guid? companyId, CancellationToken ct = default);
 }

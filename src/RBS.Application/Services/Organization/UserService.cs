@@ -89,6 +89,14 @@ public class UserService : IUserService
         await _uow.CommitAsync(ct);
     }
 
+    public async Task SetDefaultCompanyAsync(Guid userId, Guid? companyId, CancellationToken ct = default)
+    {
+        var user = await _uow.Users.GetByIdAsync(userId, ct)
+            ?? throw new KeyNotFoundException("用户不存在");
+        user.SetDefaultCompany(companyId);
+        await _uow.CommitAsync(ct);
+    }
+
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var user = await _uow.Users.GetByIdAsync(id, ct);

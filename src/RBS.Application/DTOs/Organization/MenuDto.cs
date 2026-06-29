@@ -10,6 +10,7 @@ public class MenuDto
     public Guid? ParentId { get; set; }
     public int SortOrder { get; set; }
     public bool IsActive { get; set; }
+    public string Scope { get; set; } = "Company";
     public List<MenuDto> Children { get; set; } = new();
 }
 
@@ -21,4 +22,5 @@ public class CreateMenuRequest
     public string? Icon { get; set; }
     public Guid? ParentId { get; set; }
     public int SortOrder { get; set; }
+    public string Scope { get; set; } = "Company";
 }

@@ -21,6 +21,7 @@ export function getUser(id) { return request({ url: `/users/${id}`, method: 'get
 export function createUser(data) { return request({ url: '/users', method: 'post', data }) }
 export function updateUser(id, data) { return request({ url: `/users/${id}`, method: 'put', data }) }
 export function deleteUser(id) { return request({ url: `/users/${id}`, method: 'delete' }) }
+export function setMyDefaultCompany(companyId) { return request({ url: '/users/me/default-company', method: 'put', data: { companyId } }) }
 
 // Roles
 export function getRoles(params) { return request({ url: '/roles', method: 'get', params }) }
@@ -188,6 +189,15 @@ export function getSchedulerJobs() { return request({ url: '/scheduler/jobs', me
 export function createSchedulerJob(data) { return request({ url: '/scheduler/jobs', method: 'post', data }) }
 export function updateSchedulerJob(id, data) { return request({ url: '/scheduler/jobs/' + id, method: 'put', data }) }
 export function deleteSchedulerJob(id) { return request({ url: '/scheduler/jobs/' + id, method: 'delete' }) }
+
+// Scheduler — Templates & Executions
+export function getSchedulerTemplates() { return request({ url: '/scheduler/templates', method: 'get' }) }
+export function getExecutions(jobId, params) { return request({ url: `/scheduler/jobs/${jobId}/executions`, method: 'get', params }) }
+export function getExecution(jobId, id) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}`, method: 'get' }) }
+export function createExecution(jobId, data) { return request({ url: `/scheduler/jobs/${jobId}/executions`, method: 'post', data }) }
+export function updateExecution(jobId, id, data) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}`, method: 'put', data }) }
+export function deleteExecution(jobId, id) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}`, method: 'delete' }) }
+export function generateExecutions(jobId) { return request({ url: `/scheduler/jobs/${jobId}/executions/generate`, method: 'post' }) }
 
 // Audit
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }

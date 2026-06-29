@@ -102,6 +102,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getRoles, createRole, updateRole, deleteRole, getRole, getMenus, updateRoleMenus } from '../../../api/index'
+import { useUserStore } from '../../../store/user'
 
 const loading = ref(false)
 const showDialog = ref(false)
@@ -140,10 +141,22 @@ async function fetchRoles() {
 async function fetchMenus() {
   try {
     const res = await getMenus()
-    allMenus.value = Array.isArray(res) ? res : []
+    let menus = Array.isArray(res) ? res : []
+    if (!useUserStore().isSuperAdmin) {
+      menus = filterSystemMenus(menus)
+    }
+    allMenus.value = menus
   } catch (e) {
     allMenus.value = []
   }
+}
+
+function filterSystemMenus(menus) {
+  return menus.filter(m => {
+    if (m.scope === 'System') return false
+    if (m.children?.length) m.children = filterSystemMenus(m.children)
+    return true
+  })
 }
 
 function filterMenuTree() {

@@ -46,6 +46,11 @@ public class User : AggregateRoot
     public Guid? HomeCompanyId { get; private set; }
 
     /// <summary>
+    /// 默认公司（用于写入操作，超管切换公司时持久化到数据库）
+    /// </summary>
+    public Guid? DefaultCompanyId { get; private set; }
+
+    /// <summary>
     /// 是否为超级管理员（全局最高权限）
     /// </summary>
     public bool IsSuperAdmin { get; private set; }
@@ -202,5 +207,10 @@ public class User : AggregateRoot
     public void SetHomeCompany(Guid? companyId)
     {
         HomeCompanyId = companyId;
+    }
+
+    public void SetDefaultCompany(Guid? companyId)
+    {
+        DefaultCompanyId = companyId;
     }
 }

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as loginApi } from '../api/index'
+import { login as loginApi, setMyDefaultCompany as setDefaultCompanyApi } from '../api/index'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
@@ -50,16 +50,12 @@ export const useUserStore = defineStore('user', () => {
     isSuperAdmin.value = res.user?.isSuperAdmin || false
     companyScope.value = res.user?.companyScope || []
     companyList.value = res.user?.companyList || []
-    currentCompanyId.value = null  // 登录后默认查看全部数据（超管）或自己的数据
+    // 优先使用数据库持久化的默认公司，否则超管默认查看全部
+    currentCompanyId.value = res.user?.defaultCompanyId || null
 
     localStorage.setItem('token', token.value)
     localStorage.setItem('user', JSON.stringify(user.value))
     localStorage.setItem('permissions', JSON.stringify(permissions.value))
-
-    // 如果是超管，恢复上次的视角状态
-    if (isSuperAdmin.value) {
-      restoreView()
-    }
 
     return res
   }
@@ -84,15 +80,17 @@ export const useUserStore = defineStore('user', () => {
     return permissions.value.includes(code)
   }
 
-  // ========== 超级管理员视角切换 ==========
-  function switchToCompany(companyId) {
+  // ========== 超级管理员视角切换（持久化到数据库） ==========
+  async function switchToCompany(companyId) {
     currentCompanyId.value = companyId
     localStorage.setItem('currentCompanyId', companyId || '')
+    try { await setDefaultCompanyApi(companyId) } catch (e) { /* 静默 */ }
   }
 
-  function switchToAll() {
+  async function switchToAll() {
     currentCompanyId.value = null
     localStorage.removeItem('currentCompanyId')
+    try { await setDefaultCompanyApi(null) } catch (e) { /* 静默 */ }
   }
 
   // 初始化时从 localStorage 恢复视角状态

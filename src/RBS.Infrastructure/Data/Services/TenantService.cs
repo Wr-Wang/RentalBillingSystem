@@ -59,4 +59,20 @@ public class TenantService : ITenantService
     }
 
     public bool IsViewingAll => IsSuperAdmin && EffectiveCompanyId == null;
+
+    private Guid? DefaultCompanyIdFromClaim
+    {
+        get
+        {
+            var claim = _httpContextAccessor.HttpContext?.User
+                ?.FindFirst("DefaultCompanyId");
+            return claim != null && Guid.TryParse(claim.Value, out var id) ? id : null;
+        }
+    }
+
+    /// <summary>
+    /// 默认公司（用于写入操作）
+    /// 优先级：EffectiveCompanyId → DefaultCompanyId(DB持久化) → HomeCompanyId
+    /// </summary>
+    public Guid DefaultCompanyId => EffectiveCompanyId ?? DefaultCompanyIdFromClaim ?? HomeCompanyId ?? Guid.Empty;
 }

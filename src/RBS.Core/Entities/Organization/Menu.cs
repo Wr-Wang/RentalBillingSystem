@@ -11,6 +11,7 @@ public class Menu : AuditableEntity
     public Guid? ParentId { get; private set; }
     public int SortOrder { get; private set; }
     public bool IsActive { get; private set; } = true;
+    public string Scope { get; private set; } = "Company";  // Company / System
 
     private Menu() { }
 
@@ -35,6 +36,7 @@ public class Menu : AuditableEntity
     public void SetIcon(string? icon) => Icon = icon;
     public void SetParentId(Guid? parentId) => ParentId = parentId;
     public void SetSortOrder(int order) => SortOrder = order;
+    public void SetScope(string scope) => Scope = scope;
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
 }

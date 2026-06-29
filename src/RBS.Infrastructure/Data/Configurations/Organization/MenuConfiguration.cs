@@ -17,6 +17,7 @@ public class MenuConfiguration : IEntityTypeConfiguration<Menu>
         builder.Property(e => e.Icon).HasMaxLength(50).HasComment("菜单图标类名");
         builder.Property(e => e.SortOrder).HasDefaultValue(0).HasComment("排序号");
         builder.Property(e => e.IsActive).HasDefaultValue(true).HasComment("是否启用");
+        builder.Property(e => e.Scope).IsRequired().HasMaxLength(10).HasDefaultValue("Company").HasComment("可见范围: Company(公司级,数据隔离) / System(仅超管)");
         builder.ConfigureAuditFields();
     }
 }

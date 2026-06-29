@@ -101,6 +101,8 @@ public class AppDbContext : DbContext
     // ===== 调度 =====
     public DbSet<ScheduledTaskLog> ScheduledTaskLogs => Set<ScheduledTaskLog>();
     public DbSet<JobSchedule> JobSchedules => Set<JobSchedule>();
+    public DbSet<JobTemplate> JobTemplates => Set<JobTemplate>();
+    public DbSet<JobScheduleExecution> JobScheduleExecutions => Set<JobScheduleExecution>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
 

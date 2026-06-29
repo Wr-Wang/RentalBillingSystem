@@ -19,6 +19,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.Email).HasMaxLength(200).HasComment("电子邮箱");
         builder.Property(e => e.IsActive).IsRequired().HasDefaultValue(true).HasComment("是否启用");
         builder.Property(e => e.IsSuperAdmin).HasDefaultValue(false).HasComment("是否为超级管理员");
+        builder.Property(e => e.DefaultCompanyId).HasComment("默认公司ID（用于写入操作）");
         builder.HasMany(e => e.Roles).WithOne().HasForeignKey(e => e.UserId);
         builder.ConfigureAuditFields();
     }

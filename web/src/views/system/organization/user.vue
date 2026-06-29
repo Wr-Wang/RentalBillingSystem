@@ -66,7 +66,7 @@
             <el-option v-for="l in companyList" :key="l.id" :label="l.name" :value="l.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="超级管理员">
+        <el-form-item v-if="userStore.isSuperAdmin" label="超级管理员">
           <el-switch v-model="form.isSuperAdmin" />
           <span style="font-size:12px;color:#909399;margin-left:8px">开启后不受数据权限限制</span>
         </el-form-item>
@@ -101,6 +101,8 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUsers, createUser, updateUser, getRoles, getCompanies } from '../../../api/index'
+import { useUserStore } from '../../../store/user'
+const userStore = useUserStore()
 
 const loading = ref(false)
 const showDialog = ref(false)

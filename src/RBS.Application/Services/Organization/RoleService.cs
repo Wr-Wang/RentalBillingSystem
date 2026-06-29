@@ -1,18 +1,21 @@
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Organization;
 using RBS.Core.Entities.Organization;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Organization;
 
-/// <summary>
-/// 角色管理应用服务
-/// </summary>
 public class RoleService : IRoleService
 {
     private readonly IUnitOfWork _uow;
+    private readonly ITenantService _tenant;
 
-    public RoleService(IUnitOfWork uow) => _uow = uow;
+    public RoleService(IUnitOfWork uow, ITenantService tenant)
+    {
+        _uow = uow;
+        _tenant = tenant;
+    }
 
     public async Task<List<RoleDto>> GetListAsync(CancellationToken ct = default)
     {
@@ -31,10 +34,10 @@ public class RoleService : IRoleService
         var role = new Role(request.Name, request.Code);
         role.SetDescription(request.Description);
 
-        // 分配菜单权限
         if (request.MenuIds?.Count > 0)
         {
-            foreach (var menuId in request.MenuIds)
+            var allowedIds = await FilterSystemMenusAsync(request.MenuIds, ct);
+            foreach (var menuId in allowedIds)
                 role.RoleMenus.Add(new RoleMenu(role.Id, menuId));
         }
 
@@ -52,11 +55,11 @@ public class RoleService : IRoleService
         role.SetCode(request.Code);
         role.SetDescription(request.Description);
 
-        // 更新菜单权限
         if (request.MenuIds != null)
         {
+            var allowedIds = await FilterSystemMenusAsync(request.MenuIds, ct);
             role.RoleMenus.Clear();
-            foreach (var menuId in request.MenuIds)
+            foreach (var menuId in allowedIds)
                 role.RoleMenus.Add(new RoleMenu(role.Id, menuId));
         }
 
@@ -82,11 +85,20 @@ public class RoleService : IRoleService
         var role = await _uow.Roles.GetByIdWithRoleMenusAsync(id, ct)
             ?? throw new KeyNotFoundException("角色不存在");
 
+        var allowedIds = await FilterSystemMenusAsync(menuIds, ct);
         role.RoleMenus.Clear();
-        foreach (var menuId in menuIds)
+        foreach (var menuId in allowedIds)
             role.RoleMenus.Add(new RoleMenu(role.Id, menuId));
 
         await _uow.CommitAsync(ct);
+    }
+
+    private async Task<List<Guid>> FilterSystemMenusAsync(List<Guid> menuIds, CancellationToken ct)
+    {
+        if (_tenant.IsSuperAdmin) return menuIds;
+        var allMenus = await _uow.Menus.GetAllAsync(ct);
+        var systemIds = allMenus.Where(m => m.Scope == "System").Select(m => m.Id).ToHashSet();
+        return menuIds.Where(id => !systemIds.Contains(id)).ToList();
     }
 
     private static RoleDto MapToDto(Role role) => new()

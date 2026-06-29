@@ -2006,6 +2006,14 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasComment("权限代码，用于接口鉴权");
 
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("Company")
+                        .HasComment("可见范围: Company(公司级,数据隔离) / System(仅超管)");
+
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -2155,6 +2163,10 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Property<string>("CreatedIp")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("DefaultCompanyId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("默认公司ID（用于写入操作）");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
@@ -2885,16 +2897,18 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("CronExpression")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasComment("Cron 表达式");
+                    b.Property<int?>("DayOfMonth")
+                        .HasColumnType("int")
+                        .HasComment("执行日 1~31（Monthly 类型使用）");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)")
                         .HasComment("作业描述");
+
+                    b.Property<int>("Hour")
+                        .HasColumnType("int")
+                        .HasComment("执行小时 0~23");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -2907,6 +2921,32 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)")
                         .HasComment("作业名称");
+
+                    b.Property<DateTime?>("LastRunAt")
+                        .HasColumnType("datetime2")
+                        .HasComment("上次执行时间");
+
+                    b.Property<string>("LastRunStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasComment("上次执行结果");
+
+                    b.Property<int>("Minute")
+                        .HasColumnType("int")
+                        .HasComment("执行分钟 0~59");
+
+                    b.Property<string>("ScheduleType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("Monthly")
+                        .HasComment("调度类型: Daily/Monthly");
+
+                    b.Property<string>("TemplateCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComment("创建来源模板代码");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2927,6 +2967,215 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.ToTable("JobSchedules", (string)null);
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.SystemConfig.JobScheduleExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("所属公司ID");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CreatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsAdjusted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasComment("是否手动调整");
+
+                    b.Property<bool>("IsCustom")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasComment("是否自定义排期");
+
+                    b.Property<Guid>("JobScheduleId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("所属任务定义ID");
+
+                    b.Property<string>("Month")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)")
+                        .HasComment("yyyy-MM");
+
+                    b.Property<DateTime?>("OriginalDate")
+                        .HasColumnType("datetime2")
+                        .HasComment("原始 Cron 时间");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasComment("备注/调整原因");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Pending")
+                        .HasComment("状态");
+
+                    b.Property<DateTime>("TargetDate")
+                        .HasColumnType("datetime2")
+                        .HasComment("排期执行时间");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasComment("更新时间");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UpdatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("UpdatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("IX_Executions_CompanyId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("JobScheduleId")
+                        .HasDatabaseName("IX_Executions_JobScheduleId");
+
+                    b.HasIndex("TargetDate")
+                        .HasDatabaseName("IX_Executions_TargetDate");
+
+                    b.HasIndex("JobScheduleId", "Month")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Executions_JobScheduleId_Month")
+                        .HasFilter("[IsCustom] = 0");
+
+                    b.ToTable("JobScheduleExecutions", (string)null);
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.SystemConfig.JobTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComment("分类");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComment("模板代码");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedHostname")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("DefaultDayOfMonth")
+                        .HasColumnType("int")
+                        .HasComment("默认执行日（Monthly类型）");
+
+                    b.Property<int>("DefaultHour")
+                        .HasColumnType("int")
+                        .HasComment("默认小时");
+
+                    b.Property<int>("DefaultMinute")
+                        .HasColumnType("int")
+                        .HasComment("默认分钟");
+
+                    b.Property<string>("DefaultScheduleType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("Monthly")
+                        .HasComment("默认调度类型");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasComment("模板说明");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasComment("显示名");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComment("前端图标");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true)
+                        .HasComment("是否启用");
+
+                    b.Property<string>("ShortName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComment("短名");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("排序号");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UpdatedHostname")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UpdatedIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("JobTemplates", (string)null);
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.SystemConfig.LateFeeConfig", b =>
@@ -3032,6 +3281,10 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(2000)")
                         .HasComment("错误信息");
 
+                    b.Property<DateTime?>("HeartbeatAt")
+                        .HasColumnType("datetime2")
+                        .HasComment("心跳时间");
+
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");
 
@@ -3041,7 +3294,12 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("Pending")
-                        .HasComment("执行状态（Pending/Running/Completed/Failed）");
+                        .HasComment("执行状态（Pending/Running/Completed/Failed/Stale）");
+
+                    b.Property<string>("TargetMonth")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)")
+                        .HasComment("目标月份 yyyy-MM");
 
                     b.Property<string>("TaskName")
                         .IsRequired()
@@ -3066,6 +3324,14 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
+
+                    b.HasIndex("HeartbeatAt")
+                        .HasDatabaseName("IX_ScheduledTaskLogs_HeartbeatAt");
+
+                    b.HasIndex("TaskName", "CompanyId", "TargetMonth")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ScheduledTaskLogs_JobLock")
+                        .HasFilter("[TargetMonth] IS NOT NULL");
 
                     b.ToTable("ScheduledTaskLogs", (string)null);
                 });
@@ -3313,6 +3579,17 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasForeignKey("FloorId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.SystemConfig.JobScheduleExecution", b =>
+                {
+                    b.HasOne("RBS.Core.Entities.SystemConfig.JobSchedule", "JobSchedule")
+                        .WithMany()
+                        .HasForeignKey("JobScheduleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("JobSchedule");
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.Accounting.Voucher", b =>

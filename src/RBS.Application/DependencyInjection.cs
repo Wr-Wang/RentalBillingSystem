@@ -33,6 +33,8 @@ public static class DependencyInjection
         services.AddScoped<ITaxRateConfigService, TaxRateConfigService>();
         services.AddScoped<IAccountingSubjectService, AccountingSubjectService>();
         services.AddScoped<ISchedulerService, SchedulerService>();
+        services.AddScoped<IJobTemplateService, JobTemplateService>();
+        services.AddScoped<IJobScheduleExecutionService, JobScheduleExecutionService>();
         services.AddScoped<IPricingStandardService, PricingStandardService>();
         services.AddScoped<IPaymentChannelService, PaymentChannelService>();
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();

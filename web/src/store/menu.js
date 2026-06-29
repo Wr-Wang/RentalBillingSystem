@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useUserStore } from './user'
 
 export const useMenuStore = defineStore('menu', () => {
   const sidebarMenus = ref([])
@@ -7,19 +8,22 @@ export const useMenuStore = defineStore('menu', () => {
 
   function initFromRoutes(routes) {
     currentRoutes.value = routes
-    const userRole = JSON.parse(localStorage.getItem('user') || '{}').role || 'Admin'
-    const builtMenus = buildMenusFromRoutes(routes, userRole)
+    const userStore = useUserStore()
+    const builtMenus = buildMenusFromRoutes(routes, userStore)
     sidebarMenus.value = builtMenus
   }
 
-  function buildMenusFromRoutes(routes, role) {
+  function buildMenusFromRoutes(routes, userStore) {
+    const isSuperAdmin = userStore.isSuperAdmin
+    // 获取用户有效角色：优先取 roles 数组第一个，无则取 role 字段，都无则默认 Admin
+    const userRole = userStore.user?.roles?.[0]?.code || userStore.user?.role || 'Admin'
     const result = []
     for (const route of routes) {
       if (route.hidden) continue
       const meta = route.meta || {}
-      if (meta.roles && meta.roles.length > 0 && !meta.roles.includes(role)) continue
+      if (meta.scope === 'System' && !isSuperAdmin) continue
+      if (meta.roles && meta.roles.length > 0 && !meta.roles.includes(userRole)) continue
       if (meta.hidden) continue
-      // Use meta.title as name; skip pure redirects without a name
       if (!meta.title && (!route.children || route.children.length === 0)) continue
       const item = {
         id: route.path || route.name,
@@ -35,9 +39,9 @@ export const useMenuStore = defineStore('menu', () => {
         const childRoutes = route.children.filter(c => !(c.meta && c.meta.hidden))
         for (const child of childRoutes) {
           const childMeta = child.meta || {}
-          if (childMeta.roles && childMeta.roles.length > 0 && !childMeta.roles.includes(role)) continue
+          if (childMeta.scope === 'System' && !isSuperAdmin) continue
+          if (childMeta.roles && childMeta.roles.length > 0 && !childMeta.roles.includes(userRole)) continue
           if (!childMeta.title) continue
-          // Build the full child path: /parentPath/childPath
           const childFullPath = '/' + (route.path || '') + '/' + (child.path || '')
           item.children.push({
             id: child.path || child.name,
@@ -58,7 +62,8 @@ export const useMenuStore = defineStore('menu', () => {
   }
 
   function refreshByRole(role) {
-    sidebarMenus.value = buildMenusFromRoutes(currentRoutes.value, role)
+    const userStore = useUserStore()
+    sidebarMenus.value = buildMenusFromRoutes(currentRoutes.value, userStore)
   }
 
   return { sidebarMenus, currentRoutes, initFromRoutes, refreshByRole }

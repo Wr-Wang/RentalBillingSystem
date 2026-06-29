@@ -90,6 +90,7 @@ public class AuthController : ControllerBase
             user.Phone,
             user.Email,
             user.HomeCompanyId,
+            DefaultCompanyId = user.DefaultCompanyId ?? user.HomeCompanyId,
             user.IsSuperAdmin,
             Roles = roles.Select(r => new { r.Id, r.Name, r.Code }),
             Permissions = permissions
@@ -110,7 +111,8 @@ public class AuthController : ControllerBase
             new(ClaimTypes.Name, user.Username),
             new("DisplayName", user.DisplayName),
             new("IsSuperAdmin", user.IsSuperAdmin.ToString()),
-            new("HomeCompanyId", user.HomeCompanyId?.ToString() ?? "")
+            new("HomeCompanyId", user.HomeCompanyId?.ToString() ?? ""),
+            new("DefaultCompanyId", (user.DefaultCompanyId ?? user.HomeCompanyId)?.ToString() ?? "")
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));

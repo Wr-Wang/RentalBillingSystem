@@ -17,6 +17,9 @@ public interface ITenantService
     /// <summary>视角切换——当前生效的CompanyId</summary>
     Guid? EffectiveCompanyId { get; }
 
+    /// <summary>默认公司（用于写入操作：取 EffectiveCompanyId → CompanyScope[0] → HomeCompanyId）</summary>
+    Guid DefaultCompanyId { get; }
+
     /// <summary>是否正在查看全部数据（超管专用）</summary>
     bool IsViewingAll { get; }
 }

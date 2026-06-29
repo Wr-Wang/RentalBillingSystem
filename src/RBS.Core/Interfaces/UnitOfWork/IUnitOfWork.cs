@@ -49,6 +49,8 @@ public interface IUnitOfWork : IDisposable
     IRepository<TaxRateConfig> TaxRateConfigs { get; }
     IRepository<AccountingSubject> AccountingSubjects { get; }
     IRepository<JobSchedule> JobSchedules { get; }
+    IRepository<JobTemplate> JobTemplates { get; }
+    IRepository<JobScheduleExecution> JobScheduleExecutions { get; }
 
     /// <summary>提交所有变更（自动事务）</summary>
     Task<int> CommitAsync(CancellationToken ct = default);

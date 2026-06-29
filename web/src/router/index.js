@@ -338,7 +338,7 @@ const routes = [
             path: 'companies',
             name: 'SystemCompanies',
             component: () => import('../views/system/company/index.vue'),
-            meta: { title: '公司管理', icon: 'OfficeBuilding' }
+            meta: { title: '公司管理', icon: 'OfficeBuilding', scope: 'System' }
           },
           {
             path: 'organization/users',
@@ -356,7 +356,7 @@ const routes = [
             path: 'organization/userscope',
             name: 'SystemUserScope',
             component: () => import('../views/system/organization/userScope.vue'),
-            meta: { title: '用户数据权限', icon: 'Unlock' }
+            meta: { title: '用户数据权限', icon: 'Unlock', scope: 'System' }
           },
           {
             path: 'menus',
@@ -434,13 +434,13 @@ const routes = [
             path: 'logs',
             name: 'SystemLogs',
             component: () => import('../views/system/log/index.vue'),
-            meta: { title: '系统日志', icon: 'Document', roles: ['Admin'] }
+            meta: { title: '系统日志', icon: 'Document', roles: ['Admin'], scope: 'System' }
           },
           {
             path: 'apilogs',
             name: 'SystemApiLogs',
             component: () => import('../views/system/apilog/index.vue'),
-            meta: { title: 'API 日志', icon: 'Monitor', roles: ['Admin'] }
+            meta: { title: 'API 日志', icon: 'Monitor', roles: ['Admin'], scope: 'System' }
           }
         ]
       }
@@ -461,6 +461,16 @@ router.beforeEach((to, from, next) => {
   } else if (to.path === '/login' && token) {
     next('/dashboard')
   } else {
+    // Scope 路由守卫：System 路由非超管不可访问
+    const meta = to.meta || {}
+    if (meta.scope === 'System') {
+      const userStr = localStorage.getItem('user')
+      const isSuperAdmin = userStr ? JSON.parse(userStr).isSuperAdmin : false
+      if (!isSuperAdmin) {
+        next('/dashboard')
+        return
+      }
+    }
     next()
   }
 })

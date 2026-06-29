@@ -54,6 +54,7 @@ public class MenuService : IMenuService
         menu.SetIcon(request.Icon);
         menu.SetParentId(request.ParentId);
         menu.SetSortOrder(request.SortOrder);
+        menu.SetScope(request.Scope);
     }
 
     internal static MenuDto MapToDto(Menu menu) => new()
@@ -65,7 +66,8 @@ public class MenuService : IMenuService
         Icon = menu.Icon,
         ParentId = menu.ParentId,
         SortOrder = menu.SortOrder,
-        IsActive = menu.IsActive
+        IsActive = menu.IsActive,
+        Scope = menu.Scope
     };
 
     private static List<MenuDto> BuildTree(List<MenuDto> flatList, Guid? parentId)

@@ -169,11 +169,11 @@ const companyOptions = computed(() => {
   return userStore.companyList || []
 })
 
-function handleCompanySwitch(command) {
+async function handleCompanySwitch(command) {
   if (command === 'all') {
-    userStore.switchToAll()
+    await userStore.switchToAll()
   } else {
-    userStore.switchToCompany(command)
+    await userStore.switchToCompany(command)
   }
   // 强制刷新当前页面数据（通过重新加载路由）
   const currentPath = route.path
