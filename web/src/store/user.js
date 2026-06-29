@@ -10,7 +10,6 @@ export const useUserStore = defineStore('user', () => {
   // ========== 多公司扩展字段 ==========
   const homeCompanyId = ref(user.value.homeCompanyId || null)   // 所属公司
   const isSuperAdmin = ref(user.value.isSuperAdmin || false)       // 是否超级管理员
-  const companyScope = ref(user.value.companyScope || [])       // 可查看的公司ID列表
   const currentCompanyId = ref(null)                              // 当前切换的视角（超管专用）
   const companyList = ref(user.value.companyList || [])          // 用户可选的公司列表
 
@@ -48,7 +47,6 @@ export const useUserStore = defineStore('user', () => {
     // 解析多公司字段
     homeCompanyId.value = res.user?.homeCompanyId || null
     isSuperAdmin.value = res.user?.isSuperAdmin || false
-    companyScope.value = res.user?.companyScope || []
     companyList.value = res.user?.companyList || []
     // 优先使用数据库持久化的默认公司，否则超管默认查看全部
     currentCompanyId.value = res.user?.defaultCompanyId || null
@@ -66,7 +64,6 @@ export const useUserStore = defineStore('user', () => {
     permissions.value = []
     homeCompanyId.value = null
     isSuperAdmin.value = false
-    companyScope.value = []
     currentCompanyId.value = null
     companyList.value = []
 
@@ -101,18 +98,11 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  // 判断是否需要显示公司筛选器（跨公司用户可见）
-  const showCompanyFilter = computed(() => {
-    if (isSuperAdmin.value) return true
-    return companyScope.value.length > 1
-  })
-
   return {
     token, user, permissions,
-    homeCompanyId, isSuperAdmin, companyScope,
+    homeCompanyId, isSuperAdmin,
     currentCompanyId, companyList,
     isViewingAll, effectiveCompanyId, currentCompanyName,
-    showCompanyFilter,
     login, logout, hasPermission,
     switchToCompany, switchToAll,
     restoreView

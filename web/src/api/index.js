@@ -12,9 +12,6 @@ export function createCompany(data) { return request({ url: '/companies', method
 export function updateCompany(id, data) { return request({ url: `/companies/${id}`, method: 'put', data }) }
 export function deleteCompany(id) { return request({ url: `/companies/${id}`, method: 'delete' }) }
 export function getCompanyStats(id) { return request({ url: `/companies/${id}/stats`, method: 'get' }) }
-export function getUserCompanyScope(userId) { return request({ url: `/users/${userId}/company-scope`, method: 'get' }) }
-export function updateUserCompanyScope(userId, data) { return request({ url: `/users/${userId}/company-scope`, method: 'put', data }) }
-
 // Users
 export function getUsers(params) { return request({ url: '/users', method: 'get', params }) }
 export function getUser(id) { return request({ url: `/users/${id}`, method: 'get' }) }

@@ -11,10 +11,10 @@ E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.AssemblyInfoInputs.cache
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.AssemblyInfo.cs
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.csproj.CoreCompileInputs.cache
+E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.sourcelink.json
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infr.A16189C4.Up2Date
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.dll
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\refint\RBS.Infrastructure.dll
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.pdb
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.genruntimeconfig.cache
 E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\ref\RBS.Infrastructure.dll
-E:\Demo\source\repos\RentalBillingSystem\src\RBS.Infrastructure\obj\Debug\net10.0\RBS.Infrastructure.sourcelink.json

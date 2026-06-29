@@ -353,12 +353,6 @@ const routes = [
             meta: { title: '角色管理', icon: 'Avatar' }
           },
           {
-            path: 'organization/userscope',
-            name: 'SystemUserScope',
-            component: () => import('../views/system/organization/userScope.vue'),
-            meta: { title: '用户数据权限', icon: 'Unlock', scope: 'System' }
-          },
-          {
             path: 'menus',
             name: 'SystemMenus',
             component: () => import('../views/system/menu/index.vue'),

@@ -116,7 +116,6 @@ async function mockLogin() {
     email: 'admin@rental.com',
     homeCompanyId: isAdmin ? null : 'ld1',
     isSuperAdmin: isAdmin,
-    companyScope: ['ld1', 'ld2', 'ld3', 'ld4'],
     companyList: [
       { id: 'ld1', name: '张建国' },
       { id: 'ld2', name: '李春华' },
@@ -132,7 +131,6 @@ async function mockLogin() {
   userStore.permissions = permissions
   userStore.homeCompanyId = mockUser.homeCompanyId
   userStore.isSuperAdmin = mockUser.isSuperAdmin
-  userStore.companyScope = mockUser.companyScope
   userStore.companyList = mockUser.companyList
   userStore.currentCompanyId = null
 

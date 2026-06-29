@@ -35,8 +35,6 @@ public class TenantService : ITenantService
         }
     }
 
-    public List<Guid> CompanyScope { get; } = new();
-
     /// <summary>
     /// 当前生效的 CompanyId（用于 Query Filter）
     /// 超管选择"全部数据"时返回 null，不过滤

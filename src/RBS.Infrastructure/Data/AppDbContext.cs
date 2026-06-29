@@ -37,7 +37,6 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RoleMenu> RoleMenus => Set<RoleMenu>();
     public DbSet<Company> Companies => Set<Company>();
-    public DbSet<UserCompanyScope> UserCompanyScopes => Set<UserCompanyScope>();
 
     // ===== 房屋管理 =====
     public DbSet<Building> Buildings => Set<Building>();

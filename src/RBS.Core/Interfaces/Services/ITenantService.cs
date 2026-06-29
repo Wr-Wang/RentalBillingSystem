@@ -11,9 +11,6 @@ public interface ITenantService
     /// <summary>当前用户是否为超级管理员</summary>
     bool IsSuperAdmin { get; }
 
-    /// <summary>当前用户可查看的公司ID列表</summary>
-    List<Guid> CompanyScope { get; }
-
     /// <summary>视角切换——当前生效的CompanyId</summary>
     Guid? EffectiveCompanyId { get; }
 

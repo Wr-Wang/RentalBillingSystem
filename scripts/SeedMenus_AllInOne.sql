@@ -226,12 +226,6 @@ VALUES ('A1111111-1111-1111-1111-111111111167','新增角色','system:rolecreate
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111168','分配菜单权限','system:roleassignmenu','A1111111-1111-1111-1111-111111111163',11,1,@SysUserId,@Now);
 
--- 16.3 用户数据权限
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111164','用户数据权限','system:userscope','/system/organization/userscope','Unlock','A1111111-1111-1111-1111-111111111016',3,1,@SysUserId,@Now);
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES ('A1111111-1111-1111-1111-111111111302','配置权限','system:userscopeconfig','A1111111-1111-1111-1111-111111111164',10,1,@SysUserId,@Now);
-
 -- 16.4 公司管理
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111169','公司管理','system:company','/system/companies','OfficeBuilding','A1111111-1111-1111-1111-111111111016',4,1,@SysUserId,@Now);
