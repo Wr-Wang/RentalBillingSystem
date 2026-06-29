@@ -47,6 +47,7 @@ public interface IUnitOfWork : IDisposable
     // 系统配置
     IHolidayCalendarRepository HolidayCalendars { get; }
     IRepository<TaxRateConfig> TaxRateConfigs { get; }
+    IRepository<LateFeeConfig> LateFeeConfigs { get; }
     IRepository<AccountingSubject> AccountingSubjects { get; }
     IRepository<JobSchedule> JobSchedules { get; }
     IRepository<JobTemplate> JobTemplates { get; }

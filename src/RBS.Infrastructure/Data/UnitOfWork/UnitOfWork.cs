@@ -37,6 +37,7 @@ public class UnitOfWork : IUnitOfWork
     private IRepository<FloorLevelBand>? _floorLevelBands;
     private IRepository<RoomPricingStandard>? _roomPricingStandards;
     private IRepository<TaxRateConfig>? _taxRateConfigs;
+    private IRepository<LateFeeConfig>? _lateFeeConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
     private IRepository<JobSchedule>? _jobSchedules;
     private IRepository<JobTemplate>? _jobTemplates;
@@ -68,6 +69,7 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<FloorLevelBand> FloorLevelBands => _floorLevelBands ??= new BaseRepository<FloorLevelBand>(_context);
     public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new BaseRepository<RoomPricingStandard>(_context);
     public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new BaseRepository<TaxRateConfig>(_context);
+    public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new BaseRepository<LateFeeConfig>(_context);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new BaseRepository<AccountingSubject>(_context);
     public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new BaseRepository<JobSchedule>(_context);
     public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new BaseRepository<JobTemplate>(_context);

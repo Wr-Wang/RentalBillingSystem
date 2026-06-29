@@ -3205,9 +3205,13 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<decimal>("DailyRate")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("decimal(5,4)")
+                        .HasPrecision(7, 5)
+                        .HasColumnType("decimal(7,5)")
                         .HasComment("日利率（如 0.0005 表示日息万分之五）");
+
+                    b.Property<DateOnly>("EffectiveDate")
+                        .HasColumnType("date")
+                        .HasComment("生效日期");
 
                     b.Property<int>("GraceDays")
                         .ValueGeneratedOnAdd()
@@ -3224,7 +3228,12 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Property<decimal?>("MaxRate")
                         .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)")
-                        .HasComment("滞纳金上限（百分比）");
+                        .HasComment("滞纳金上限百分比");
+
+                    b.Property<decimal?>("MinAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasComment("最低滞纳金金额");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");

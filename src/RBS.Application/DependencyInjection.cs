@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IPricingStandardService, PricingStandardService>();
         services.AddScoped<IPaymentChannelService, PaymentChannelService>();
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
+        services.AddScoped<ILateFeeConfigService, LateFeeConfigService>();
 
         return services;
     }
