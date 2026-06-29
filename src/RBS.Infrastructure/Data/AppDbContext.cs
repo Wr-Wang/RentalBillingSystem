@@ -102,6 +102,7 @@ public class AppDbContext : DbContext
     public DbSet<ScheduledTaskLog> ScheduledTaskLogs => Set<ScheduledTaskLog>();
     public DbSet<JobSchedule> JobSchedules => Set<JobSchedule>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
+    public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

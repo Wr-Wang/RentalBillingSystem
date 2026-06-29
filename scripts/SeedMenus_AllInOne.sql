@@ -367,6 +367,12 @@ VALUES ('A1111111-1111-1111-1111-111111111221','查看日志','system:schedulerv
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES ('A1111111-1111-1111-1111-111111111222','系统日志','system:logs','/system/logs','Document','A1111111-1111-1111-1111-111111111016',17,1,@SysUserId,@Now);
 
+-- 16.18 API 调用日志
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES ('A1111111-1111-1111-1111-111111111223','API 日志','system:apilogs','/system/apilogs','Monitor','A1111111-1111-1111-1111-111111111016',18,1,@SysUserId,@Now);
+INSERT INTO [RoleMenus] ([RoleId],[MenuId],[CreatedBy],[CreatedAt])
+VALUES ('A1111111-1111-1111-1111-111111111901','A1111111-1111-1111-1111-111111111223',@SysUserId,@Now);
+
 PRINT N'菜单种子数据插入完成！';
 
 -- ==================== 创建 Admin 角色并分配权限 ====================

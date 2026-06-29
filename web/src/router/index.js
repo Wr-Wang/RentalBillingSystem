@@ -435,6 +435,12 @@ const routes = [
             name: 'SystemLogs',
             component: () => import('../views/system/log/index.vue'),
             meta: { title: '系统日志', icon: 'Document', roles: ['Admin'] }
+          },
+          {
+            path: 'apilogs',
+            name: 'SystemApiLogs',
+            component: () => import('../views/system/apilog/index.vue'),
+            meta: { title: 'API 日志', icon: 'Monitor', roles: ['Admin'] }
           }
         ]
       }

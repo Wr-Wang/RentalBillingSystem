@@ -72,6 +72,10 @@ builder.Services.AddInfrastructureData(builder.Configuration);
 // Application layer
 builder.Services.AddApplicationLayer();
 
+// API 日志 — 共享通道（Singleton）+ 后台批量写入
+builder.Services.AddSingleton<RBS.Api.Middleware.ApiLogChannel>();
+builder.Services.AddHostedService<RBS.Api.Services.ApiLogWriterService>();
+
 var app = builder.Build();
 
 // ===== 中间件管道 =====
@@ -89,6 +93,9 @@ app.UseCors("AllowWebApp");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// API 调用日志（需在 Auth 之后，才能捕获用户信息）
+app.UseMiddleware<RBS.Api.Middleware.ApiLoggingMiddleware>();
 
 app.MapControllers();
 

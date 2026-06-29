@@ -201,6 +201,12 @@ export function getSystemLog(id) { return request({ url: `/systemlogs/${id}`, me
 export function deleteSystemLog(id) { return request({ url: `/systemlogs/${id}`, method: 'delete' }) }
 export function clearSystemLogs() { return request({ url: '/systemlogs', method: 'delete' }) }
 
+// Api Logs
+export function getApiLogs(params) { return request({ url: '/apilogs', method: 'get', params }) }
+export function getApiLog(id) { return request({ url: `/apilogs/${id}`, method: 'get' }) }
+export function deleteApiLog(id) { return request({ url: `/apilogs/${id}`, method: 'delete' }) }
+export function clearApiLogs(params) { return request({ url: '/apilogs', method: 'delete', params }) }
+
 // Room Types
 export function getRoomTypes() { return request({ url: '/roomtypes', method: 'get' }) }
 export function createRoomType(data) { return request({ url: '/roomtypes', method: 'post', data }) }
