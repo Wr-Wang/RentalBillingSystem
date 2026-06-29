@@ -184,6 +184,8 @@ async function handleCompanySwitch(command) {
 
 onMounted(() => {
   menuStore.initFromRoutes(router.options.routes.find(r => r.path === '/')?.children || [])
+  // 恢复上次的视角状态（超管切换公司）
+  userStore.restoreView()
 })
 
 function handleLogout() {

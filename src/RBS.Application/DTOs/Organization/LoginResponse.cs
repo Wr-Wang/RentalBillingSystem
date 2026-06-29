@@ -20,6 +20,14 @@ public class UserInfo
     public string? Email { get; set; }
     public Guid? HomeCompanyId { get; set; }
     public bool IsSuperAdmin { get; set; }
+    public Guid? DefaultCompanyId { get; set; }
+    public List<CompanyInfo> CompanyList { get; set; } = new();
+}
+
+public class CompanyInfo
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
 }
 
 public class RoleInfo

@@ -28,6 +28,14 @@ public class AuthService : IAuthService
         var permissions = await _uow.Users.GetUserPermissionsAsync(user.Id, ct);
         var roles = await _uow.Roles.GetByUserIdAsync(user.Id, ct);
 
+        // 加载所有公司列表（供前端下拉选择）
+        var allCompanies = await _uow.Companies.GetAllAsync(ct);
+        var companyList = allCompanies.Select(c => new CompanyInfo
+        {
+            Id = c.Id,
+            Name = c.Name
+        }).ToList();
+
         return new LoginResponse
         {
             Token = _tokenService.GenerateToken(user),
@@ -39,7 +47,9 @@ public class AuthService : IAuthService
                 Phone = user.Phone,
                 Email = user.Email,
                 HomeCompanyId = user.HomeCompanyId,
-                IsSuperAdmin = user.IsSuperAdmin
+                IsSuperAdmin = user.IsSuperAdmin,
+                DefaultCompanyId = user.DefaultCompanyId,
+                CompanyList = companyList
             },
             Roles = roles.Select(r => new RoleInfo { Id = r.Id, Name = r.Name, Code = r.Code }).ToList(),
             Permissions = permissions

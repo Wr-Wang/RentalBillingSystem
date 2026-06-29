@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as loginApi, setMyDefaultCompany as setDefaultCompanyApi } from '../api/index'
+import { login as loginApi, setMyDefaultCompany as setDefaultCompanyApi, getCompanies as getCompaniesApi } from '../api/index'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
@@ -48,12 +48,21 @@ export const useUserStore = defineStore('user', () => {
     homeCompanyId.value = res.user?.homeCompanyId || null
     isSuperAdmin.value = res.user?.isSuperAdmin || false
     companyList.value = res.user?.companyList || []
+
     // 优先使用数据库持久化的默认公司，否则超管默认查看全部
     currentCompanyId.value = res.user?.defaultCompanyId || null
+    if (currentCompanyId.value) {
+      localStorage.setItem('currentCompanyId', currentCompanyId.value)
+    } else {
+      localStorage.removeItem('currentCompanyId')
+    }
 
     localStorage.setItem('token', token.value)
     localStorage.setItem('user', JSON.stringify(user.value))
     localStorage.setItem('permissions', JSON.stringify(permissions.value))
+
+    // 登录未返回公司列表时主动加载（需在 localStorage 保存之后，避免被覆盖）
+    if (companyList.value.length === 0) await fetchCompanyList()
 
     return res
   }
@@ -90,8 +99,24 @@ export const useUserStore = defineStore('user', () => {
     try { await setDefaultCompanyApi(null) } catch (e) { /* 静默 */ }
   }
 
-  // 初始化时从 localStorage 恢复视角状态
-  function restoreView() {
+  // 主动加载公司列表（兜底：登录响应未返回时调用）
+  async function fetchCompanyList() {
+    try {
+      const res = await getCompaniesApi({ pageSize: 100, isActive: true })
+      const list = res.data || res.items || []
+      if (list.length > 0) {
+        companyList.value = list.map(c => ({ id: c.id, name: c.name }))
+        // 同步到 localStorage 中的 user 对象，刷新后不丢失
+        const stored = JSON.parse(localStorage.getItem('user') || '{}')
+        stored.companyList = companyList.value
+        localStorage.setItem('user', JSON.stringify(stored))
+      }
+    } catch (e) { /* 静默 */ }
+  }
+
+  // 初始化时从 localStorage 恢复视角状态，公司列表为空则主动加载
+  async function restoreView() {
+    if (companyList.value.length === 0) await fetchCompanyList()
     const saved = localStorage.getItem('currentCompanyId')
     if (saved && saved.length > 0 && isSuperAdmin.value) {
       currentCompanyId.value = saved
@@ -105,6 +130,6 @@ export const useUserStore = defineStore('user', () => {
     isViewingAll, effectiveCompanyId, currentCompanyName,
     login, logout, hasPermission,
     switchToCompany, switchToAll,
-    restoreView
+    restoreView, fetchCompanyList
   }
 })

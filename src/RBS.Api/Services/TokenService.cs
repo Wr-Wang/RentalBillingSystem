@@ -33,7 +33,8 @@ public class TokenService : ITokenService
             new(ClaimTypes.Name, user.Username),
             new("DisplayName", user.DisplayName),
             new("IsSuperAdmin", user.IsSuperAdmin.ToString()),
-            new("HomeCompanyId", user.HomeCompanyId?.ToString() ?? "")
+            new("HomeCompanyId", user.HomeCompanyId?.ToString() ?? ""),
+            new("DefaultCompanyId", user.DefaultCompanyId?.ToString() ?? "")
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
