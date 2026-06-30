@@ -39,19 +39,15 @@ public class AppDbContext : DbContext
     public DbSet<Company> Companies => Set<Company>();
 
     // ===== 房屋管理 =====
-    public DbSet<Building> Buildings => Set<Building>();
-    public DbSet<Floor> Floors => Set<Floor>();
-    public DbSet<Room> Rooms => Set<Room>();
+    public DbSet<HousingUnit> HousingUnits => Set<HousingUnit>();
     public DbSet<RoomType> RoomTypes => Set<RoomType>();
     public DbSet<FloorLevelBand> FloorLevelBands => Set<FloorLevelBand>();
-    public DbSet<BuildingFloorLevelConfig> BuildingFloorLevelConfigs => Set<BuildingFloorLevelConfig>();
     public DbSet<RoomPricingStandard> RoomPricingStandards => Set<RoomPricingStandard>();
 
     // ===== 合同管理 =====
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<ContractTenant> ContractTenants => Set<ContractTenant>();
     public DbSet<ContractFeeConfig> ContractFeeConfigs => Set<ContractFeeConfig>();
-    public DbSet<RoomFeeDefault> RoomFeeDefaults => Set<RoomFeeDefault>();
 
     // ===== 租客 =====
     public DbSet<Tenant> Tenants => Set<Tenant>();

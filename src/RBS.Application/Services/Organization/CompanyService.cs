@@ -113,14 +113,14 @@ public class CompanyService : ICompanyService
         var company = await _uow.Companies.GetByIdAsync(id, ct);
         if (company == null) return null;
 
-        // 查询该公司名下的楼宇和房间统计
-        var buildings = await _uow.Buildings.GetByCompanyIdAsync(id, ct);
-        var totalRooms = buildings.Sum(b => b.Floors.Sum(f => f.Rooms.Count));
-        var rentedRooms = buildings.Sum(b => b.Floors.Sum(f => f.Rooms.Count(r => r.IsRented)));
+        // 查询该公司名下的房源统计
+        var units = (await _uow.HousingUnits.GetAllAsync(ct)).Where(u => u.CompanyId == id).ToList();
+        var totalRooms = units.Count;
+        var rentedRooms = units.Count(u => u.IsRented);
 
         return new CompanyStatsDto
         {
-            BuildingCount = buildings.Count,
+            BuildingCount = units.Select(u => u.BuildingName).Distinct().Count(),
             RoomCount = totalRooms,
             OccupancyRate = totalRooms > 0 ? Math.Round((decimal)rentedRooms / totalRooms * 100, 2) : 0,
             CollectionRate = 0 // 收租率需要账单数据，暂时置 0

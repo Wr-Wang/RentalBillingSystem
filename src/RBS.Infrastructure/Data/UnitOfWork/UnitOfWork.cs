@@ -20,8 +20,7 @@ public class UnitOfWork : IUnitOfWork
     private IRoleRepository? _roles;
     private IMenuRepository? _menus;
     private ICompanyRepository? _companies;
-    private IBuildingRepository? _buildings;
-    private IRoomRepository? _rooms;
+    private IRepository<HousingUnit>? _housingUnits;
     private IContractRepository? _contracts;
     private ITenantRepository? _tenants;
     private IFeeCodeRepository? _feeCodes;
@@ -52,8 +51,7 @@ public class UnitOfWork : IUnitOfWork
     public IRoleRepository Roles => _roles ??= new RoleRepository(_context);
     public IMenuRepository Menus => _menus ??= new MenuRepository(_context);
     public ICompanyRepository Companies => _companies ??= new CompanyRepository(_context);
-    public IBuildingRepository Buildings => _buildings ??= new BuildingRepository(_context);
-    public IRoomRepository Rooms => _rooms ??= new RoomRepository(_context);
+    public IRepository<HousingUnit> HousingUnits => _housingUnits ??= new BaseRepository<HousingUnit>(_context);
     public IContractRepository Contracts => _contracts ??= new ContractRepository(_context);
     public ITenantRepository Tenants => _tenants ??= new TenantRepository(_context);
     public IFeeCodeRepository FeeCodes => _feeCodes ??= new FeeCodeRepository(_context);

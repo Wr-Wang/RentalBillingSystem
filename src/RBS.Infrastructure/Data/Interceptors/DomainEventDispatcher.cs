@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using RBS.Core.Common;
 using RBS.Core.Entities.Base;
 
 namespace RBS.Infrastructure.Data.Interceptors;
@@ -88,12 +89,4 @@ public class DomainEventDispatcher : SaveChangesInterceptor
             }
         }
     }
-}
-
-/// <summary>
-/// 领域事件处理器接口
-/// </summary>
-public interface IEventHandler<T> where T : IDomainEvent
-{
-    Task HandleAsync(T @event, CancellationToken ct);
 }

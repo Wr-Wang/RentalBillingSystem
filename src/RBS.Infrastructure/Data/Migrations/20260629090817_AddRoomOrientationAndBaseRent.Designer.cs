@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RBS.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using RBS.Infrastructure.Data;
 namespace RBS.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260629090817_AddRoomOrientationAndBaseRent")]
+    partial class AddRoomOrientationAndBaseRent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1696,6 +1699,69 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.ToTable("ContractTenants", (string)null);
                 });
 
+            modelBuilder.Entity("RBS.Core.Entities.Contract.RoomFeeDefault", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasComment("默认金额");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("所属公司ID");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CreatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("FeeCodeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("费用项目ID");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("房间ID");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UpdatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("UpdatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("RoomId", "FeeCodeId")
+                        .IsUnique();
+
+                    b.ToTable("RoomFeeDefaults", (string)null);
+                });
+
             modelBuilder.Entity("RBS.Core.Entities.Contract.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2204,6 +2270,173 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.ToTable("UserRoles", (string)null);
                 });
 
+            modelBuilder.Entity("RBS.Core.Entities.Property.Building", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasComment("楼宇地址");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComment("楼宇编码");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("所属公司ID");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CreatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true)
+                        .HasComment("是否启用");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasComment("楼宇名称");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UpdatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("UpdatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("Buildings", (string)null);
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Property.BuildingFloorLevelConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("楼宇ID");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("所属公司ID");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("FloorLevelBandId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("楼层级别ID");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuildingId", "FloorLevelBandId")
+                        .IsUnique();
+
+                    b.ToTable("BuildingFloorLevelConfigs", (string)null);
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Property.Floor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("所属楼宇ID");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CreatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasComment("楼层名称（如 1层、2层）");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("楼层排序号");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UpdatedHostname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("UpdatedIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("BuildingId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Floors", (string)null);
+                });
+
             modelBuilder.Entity("RBS.Core.Entities.Property.FloorLevelBand", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2264,7 +2497,7 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.ToTable("FloorLevelBands", (string)null);
                 });
 
-            modelBuilder.Entity("RBS.Core.Entities.Property.HousingUnit", b =>
+            modelBuilder.Entity("RBS.Core.Entities.Property.Room", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2273,32 +2506,16 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Property<decimal?>("Area")
                         .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)")
-                        .HasComment("面积");
+                        .HasComment("房间面积（平方米）");
 
                     b.Property<decimal?>("BaseRentAmount")
                         .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)")
                         .HasComment("基础月租金");
 
-                    b.Property<string>("BuildingAddress")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasComment("地址");
-
-                    b.Property<string>("BuildingCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasComment("座楼编码");
-
-                    b.Property<string>("BuildingName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasComment("座楼名称");
-
-                    b.Property<Guid>("CompanyId")
+                    b.Property<Guid>("BuildingId")
                         .HasColumnType("uniqueidentifier")
-                        .HasComment("所属公司");
+                        .HasComment("所属楼宇ID");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -2316,27 +2533,25 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("FloorName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasComment("楼层名称");
-
-                    b.Property<int>("FloorSortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0)
-                        .HasComment("楼层排序");
+                    b.Property<Guid>("FloorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasComment("所属楼层ID");
 
                     b.Property<string>("FullCode")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)")
-                        .HasComment("完整编码");
+                        .HasComment("房间完整编码（如 A栋-1层-101）");
 
                     b.Property<string>("Orientation")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
-                        .HasComment("朝向");
+                        .HasComment("朝向（东/南/西/北/南北通透）");
+
+                    b.Property<string>("RoomNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComment("房间编号（如 101）");
 
                     b.Property<Guid?>("RoomTypeId")
                         .HasColumnType("uniqueidentifier");
@@ -2347,13 +2562,7 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("Vacant")
-                        .HasComment("状态");
-
-                    b.Property<string>("UnitNo")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasComment("房源编号");
+                        .HasComment("房间状态：Vacant空置/Rented已租/Maintenance维修");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2371,20 +2580,15 @@ namespace RBS.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompanyId");
-
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("FullCode")
-                        .IsUnique()
-                        .HasFilter("[FullCode] IS NOT NULL");
+                    b.HasIndex("FloorId");
 
-                    b.HasIndex("BuildingName", "Status");
+                    b.HasIndex("FullCode");
 
-                    b.HasIndex("BuildingName", "FloorName", "UnitNo")
-                        .IsUnique();
+                    b.HasIndex("BuildingId", "Status");
 
-                    b.ToTable("HousingUnits", (string)null);
+                    b.ToTable("Rooms", (string)null);
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.Property.RoomPricingStandard", b =>
@@ -3351,6 +3555,24 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("RBS.Core.Entities.Property.Floor", b =>
+                {
+                    b.HasOne("RBS.Core.Entities.Property.Building", null)
+                        .WithMany("Floors")
+                        .HasForeignKey("BuildingId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Property.Room", b =>
+                {
+                    b.HasOne("RBS.Core.Entities.Property.Floor", null)
+                        .WithMany("Rooms")
+                        .HasForeignKey("FloorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RBS.Core.Entities.SystemConfig.JobScheduleExecution", b =>
                 {
                     b.HasOne("RBS.Core.Entities.SystemConfig.JobSchedule", "JobSchedule")
@@ -3399,6 +3621,16 @@ namespace RBS.Infrastructure.Data.Migrations
             modelBuilder.Entity("RBS.Core.Entities.Organization.User", b =>
                 {
                     b.Navigation("Roles");
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Property.Building", b =>
+                {
+                    b.Navigation("Floors");
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Property.Floor", b =>
+                {
+                    b.Navigation("Rooms");
                 });
 #pragma warning restore 612, 618
         }

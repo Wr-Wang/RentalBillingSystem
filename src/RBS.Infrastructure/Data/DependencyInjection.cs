@@ -9,6 +9,9 @@ using RBS.Infrastructure.Data.Interceptors;
 using RBS.Infrastructure.Data.Repositories;
 using RBS.Core.DomainServices;
 using RBS.Infrastructure.Data.Services;
+using RBS.Application.EventHandlers;
+using RBS.Core.Common;
+using RBS.Core.Entities.Base;
 using UnitOfWorkImpl = RBS.Infrastructure.Data.UnitOfWork.UnitOfWork;
 
 namespace RBS.Infrastructure.Data;
@@ -51,8 +54,6 @@ public static class DependencyInjection
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IMenuRepository, MenuRepository>();
         services.AddScoped<ICompanyRepository, CompanyRepository>();
-        services.AddScoped<IBuildingRepository, BuildingRepository>();
-        services.AddScoped<IRoomRepository, RoomRepository>();
         services.AddScoped<IContractRepository, ContractRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IFeeCodeRepository, FeeCodeRepository>();
@@ -71,6 +72,9 @@ public static class DependencyInjection
 
         // 领域服务
         services.AddScoped<IContractDomainService, ContractDomainService>();
+
+        // 领域事件处理器
+        services.AddScoped<IEventHandler<ApprovalCompletedEvent>, ApprovalCompletedEventHandler>();
         services.AddScoped<IBillingDomainService, BillingDomainService>();
         services.AddScoped<IApprovalDomainService, ApprovalDomainService>();
 

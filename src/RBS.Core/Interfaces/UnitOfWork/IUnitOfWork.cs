@@ -18,8 +18,7 @@ public interface IUnitOfWork : IDisposable
     ICompanyRepository Companies { get; }
 
     // 房屋管理
-    IBuildingRepository Buildings { get; }
-    IRoomRepository Rooms { get; }
+    IRepository<HousingUnit> HousingUnits { get; }
     IRepository<RoomType> RoomTypes { get; }
     IRepository<FloorLevelBand> FloorLevelBands { get; }
     IRepository<RoomPricingStandard> RoomPricingStandards { get; }

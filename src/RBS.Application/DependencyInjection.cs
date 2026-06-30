@@ -23,7 +23,6 @@ public static class DependencyInjection
         services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<IMenuService, MenuService>();
         services.AddScoped<IRoleService, RoleService>();
-        services.AddScoped<IBuildingService, BuildingService>();
         services.AddScoped<IRoomTypeService, RoomTypeService>();
         services.AddScoped<IContractService, ContractAppService>();
         services.AddScoped<IBillingService, BillingAppService>();
@@ -39,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IPaymentChannelService, PaymentChannelService>();
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
         services.AddScoped<ILateFeeConfigService, LateFeeConfigService>();
+        services.AddScoped<IHousingUnitService, HousingUnitService>();
+        services.AddScoped<IApprovalService, ApprovalService>();
 
         return services;
     }

@@ -2,7 +2,7 @@ namespace RBS.Core.DomainServices;
 
 using RBS.Core.Entities.Base;
 using RBS.Core.Entities.Contract;
-using RBS.Core.Interfaces.Repositories;
+using RBS.Core.Interfaces.UnitOfWork;
 
 /// <summary>
 /// 合同领域服务 — 跨聚合的业务逻辑编排
@@ -10,19 +10,19 @@ using RBS.Core.Interfaces.Repositories;
 /// </summary>
 public class ContractDomainService : IContractDomainService
 {
-    private readonly IRoomRepository _roomRepository;
+    private readonly IUnitOfWork _uow;
 
-    public ContractDomainService(IRoomRepository roomRepository)
+    public ContractDomainService(IUnitOfWork uow)
     {
-        _roomRepository = roomRepository;
+        _uow = uow;
     }
 
     public async Task ActivateContractAsync(Contract contract, CancellationToken ct = default)
     {
-        // 校验房间是否可租（跨聚合查询，适合放在领域服务）
-        var hasActive = await _roomRepository.HasActiveContractAsync(contract.RoomId, ct);
+        // 校验房屋单元是否已有生效合同
+        var hasActive = await _uow.Contracts.HasActiveForHousingUnitAsync(contract.RoomId, ct);
         if (hasActive)
-            throw new InvalidOperationException("该房间已有生效合同");
+            throw new InvalidOperationException("该房屋单元已有生效合同");
 
         // 聚合根自身执行状态变更 + 触发领域事件
         contract.Activate();

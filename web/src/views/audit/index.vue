@@ -10,6 +10,7 @@
         <el-option label="公司管理" value="Companies" />
         <el-option label="审批流程" value="ApprovalTypes" />
         <el-option label="审批级别" value="ApprovalLevelConfigs" />
+        <el-option label="房源" value="HousingUnits" />
         <el-option label="房型" value="RoomTypes" />
         <el-option label="费用项目" value="FeeCodes" />
         <el-option label="定价标准" value="RoomPricingStandards" />

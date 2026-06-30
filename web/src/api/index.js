@@ -35,27 +35,15 @@ export function createMenu(data) { return request({ url: '/menus', method: 'post
 export function updateMenu(id, data) { return request({ url: `/menus/${id}`, method: 'put', data }) }
 export function deleteMenu(id) { return request({ url: `/menus/${id}`, method: 'delete' }) }
 
-// Buildings
-export function getBuildings() { return request({ url: '/buildings', method: 'get' }) }
-export function getBuilding(id) { return request({ url: `/buildings/${id}`, method: 'get' }) }
-export function createBuilding(data) { return request({ url: '/buildings', method: 'post', data }) }
-export function updateBuilding(id, data) { return request({ url: `/buildings/${id}`, method: 'put', data }) }
-export function deleteBuilding(id) { return request({ url: `/buildings/${id}`, method: 'delete' }) }
-
-// Floors
-export function getFloors(buildingId) { return request({ url: `/buildings/${buildingId}/floors`, method: 'get' }) }
-export function createFloor(buildingId, data) { return request({ url: `/buildings/${buildingId}/floors`, method: 'post', data }) }
-export function updateFloor(id, data) { return request({ url: `/floors/${id}`, method: 'put', data }) }
-export function deleteFloor(id) { return request({ url: `/floors/${id}`, method: 'delete' }) }
-
-// Rooms
-export function getRooms(params) { return request({ url: '/rooms', method: 'get', params }) }
-export function getRoom(id) { return request({ url: `/rooms/${id}`, method: 'get' }) }
-export function createRoom(data) { return request({ url: '/rooms', method: 'post', data }) }
-export function updateRoom(id, data) { return request({ url: `/rooms/${id}`, method: 'put', data }) }
-export function deleteRoom(id) { return request({ url: `/rooms/${id}`, method: 'delete' }) }
-export function getRoomTree() { return request({ url: '/rooms/tree', method: 'get' }) }
-export function importRooms(data) { return request({ url: '/rooms/import', method: 'post', data }) }
+// HousingUnits（房源）
+export function getHousingUnits(params) { return request({ url: '/housingunits', method: 'get', params }) }
+export function getHousingUnit(id) { return request({ url: `/housingunits/${id}`, method: 'get' }) }
+export function createHousingUnit(data) { return request({ url: '/housingunits', method: 'post', data }) }
+export function updateHousingUnit(id, data) { return request({ url: `/housingunits/${id}`, method: 'put', data }) }
+export function deleteHousingUnit(id) { return request({ url: `/housingunits/${id}`, method: 'delete' }) }
+export function getHousingUnitTree() { return request({ url: '/housingunits/tree', method: 'get' }) }
+export function getBuildingList() { return request({ url: '/housingunits/buildinglist', method: 'get' }) }
+export function getHousingUnitStats() { return request({ url: '/housingunits/stats', method: 'get' }) }
 
 // Tenants
 export function getTenants(params) { return request({ url: '/tenants', method: 'get', params }) }

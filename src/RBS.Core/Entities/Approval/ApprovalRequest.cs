@@ -73,7 +73,7 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     /// <summary>记录审批操作</summary>
     public void AddRecord(Guid approverId, string action, string? comment)
     {
-        var record = new ApprovalRecord(Id, CurrentLevel, approverId, action);
+        var record = new ApprovalRecord(Id, CurrentLevel, approverId, action, comment);
         record.SetCreated(approverId, DateTime.Now);
         _records.Add(record);
     }

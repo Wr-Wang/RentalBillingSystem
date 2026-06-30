@@ -33,10 +33,10 @@ const routes = [
         meta: { title: '房屋管理', icon: 'HomeFilled', roles: ['Admin', 'OpsSupervisor', 'Operator', 'FinanceSupervisor'] }
       },
       {
-        path: 'buildings/room/:id',
-        name: 'RoomDetail',
+        path: 'buildings/unit/:id',
+        name: 'UnitDetail',
         component: () => import('../views/building/roomDetail.vue'),
-        meta: { title: '房间详情', icon: 'HomeFilled', hidden: true }
+        meta: { title: '房源详情', icon: 'HomeFilled', hidden: true }
       },
       {
         path: 'buildings/import',

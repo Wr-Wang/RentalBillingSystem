@@ -30,4 +30,9 @@ public class ContractRepository : BaseRepository<Contract>, IContractRepository
             .Where(c => c.StatusCode == "Active" && c.EndDate <= date)
             .ToListAsync(ct);
     }
+
+    public async Task<bool> HasActiveForHousingUnitAsync(Guid housingUnitId, CancellationToken ct = default)
+    {
+        return await _dbSet.AnyAsync(c => c.RoomId == housingUnitId && c.StatusCode == "Active", ct);
+    }
 }
