@@ -2,7 +2,9 @@ using Microsoft.Extensions.DependencyInjection;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.Services.Billing;
 using RBS.Application.Services.Contract;
+using RBS.Application.Services.Import;
 using RBS.Application.Services.Organization;
+using RBS.Core.Interfaces.Services;
 using RBS.Application.Services.Property;
 using RBS.Application.Services.Approval;
 using RBS.Application.Services.SystemConfig;
@@ -40,6 +42,8 @@ public static class DependencyInjection
         services.AddScoped<ILateFeeConfigService, LateFeeConfigService>();
         services.AddScoped<IHousingUnitService, HousingUnitService>();
         services.AddScoped<IApprovalService, ApprovalService>();
+        services.AddScoped<IImportService, ImportService>();
+        services.AddScoped<IImportTypeHandler, HousingUnitImportHandler>();
 
         return services;
     }

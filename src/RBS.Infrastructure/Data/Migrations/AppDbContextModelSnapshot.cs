@@ -429,13 +429,13 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasComment("最大审批级别");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion")
                         .HasComment("乐观锁版本号");
 
                     b.Property<string>("Status")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
@@ -1767,6 +1767,142 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.HasIndex("Phone");
 
                     b.ToTable("Tenants", (string)null);
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Import.ImportBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ApprovalRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedHostname")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("FailedRows")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("ImportType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UpdatedHostname")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UpdatedIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ValidRows")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Status");
+
+                    b.HasIndex("ImportType", "Status");
+
+                    b.ToTable("ImportBatches", (string)null);
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Import.ImportBatchItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedHostname")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FixSuggestion")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("ImportBatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ImportType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsValid")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RowIndex")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UpdatedHostname")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UpdatedIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportBatchId", "IsValid");
+
+                    b.ToTable("ImportBatchItems", (string)null);
+
+                    b.HasDiscriminator<string>("ImportType").HasValue("Base");
+
+                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.Organization.Company", b =>
@@ -3261,6 +3397,64 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.ToTable("TaxRateConfigs", (string)null);
                 });
 
+            modelBuilder.Entity("RBS.Core.Entities.Import.ImportBatchItemHousingUnit", b =>
+                {
+                    b.HasBaseType("RBS.Core.Entities.Import.ImportBatchItem");
+
+                    b.Property<decimal?>("Area")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("BaseRentAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("BuildingAddress")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("BuildingCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("BuildingName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FloorName")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("FloorSortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FullCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Orientation")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("PriceWarning")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("RoomTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RoomTypeName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("UnitNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasIndex("BuildingName", "FloorName", "UnitNo")
+                        .HasFilter("[ImportType] = 'HousingUnit' AND [BuildingName] IS NOT NULL");
+
+                    b.HasDiscriminator().HasValue("HousingUnit");
+                });
+
             modelBuilder.Entity("RBS.Core.Entities.Accounting.JournalEntry", b =>
                 {
                     b.HasOne("RBS.Core.Entities.Accounting.Voucher", null)
@@ -3313,6 +3507,17 @@ namespace RBS.Infrastructure.Data.Migrations
                         .HasForeignKey("ContractId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Import.ImportBatchItem", b =>
+                {
+                    b.HasOne("RBS.Core.Entities.Import.ImportBatch", "Batch")
+                        .WithMany("Items")
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Batch");
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.Organization.RoleMenu", b =>
@@ -3387,6 +3592,11 @@ namespace RBS.Infrastructure.Data.Migrations
                     b.Navigation("ContractTenants");
 
                     b.Navigation("FeeConfigs");
+                });
+
+            modelBuilder.Entity("RBS.Core.Entities.Import.ImportBatch", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("RBS.Core.Entities.Organization.Role", b =>

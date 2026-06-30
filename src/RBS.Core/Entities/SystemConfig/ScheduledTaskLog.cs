@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.SystemConfig;
+using RBS.Core.Common;
 using RBS.Core.Entities.Base;
 
 public class ScheduledTaskLog : AuditableEntity, IHasCompany
@@ -19,23 +20,23 @@ public class ScheduledTaskLog : AuditableEntity, IHasCompany
     {
         Status = "Running";
         TargetMonth = targetMonth;
-        StartedAt = DateTime.UtcNow;
-        HeartbeatAt = DateTime.UtcNow;
+        StartedAt = ChinaTime.Now;
+        HeartbeatAt = ChinaTime.Now;
     }
 
-    public void Heartbeat() => HeartbeatAt = DateTime.UtcNow;
+    public void Heartbeat() => HeartbeatAt = ChinaTime.Now;
 
     public void Complete()
     {
         Status = "Completed";
-        CompletedAt = DateTime.UtcNow;
+        CompletedAt = ChinaTime.Now;
     }
 
     public void Fail(string errorMessage)
     {
         Status = "Failed";
         ErrorMessage = errorMessage;
-        CompletedAt = DateTime.UtcNow;
+        CompletedAt = ChinaTime.Now;
     }
 
     public void MarkStale()

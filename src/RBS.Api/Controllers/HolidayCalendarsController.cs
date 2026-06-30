@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
+using RBS.Core.Common;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Core.Common;
 using RBS.Application.Common.Interfaces;
+using RBS.Core.Common;
 using RBS.Application.DTOs.SystemConfig;
+using RBS.Core.Common;
 
 namespace RBS.Api.Controllers;
 
@@ -17,7 +21,7 @@ public class HolidayCalendarsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int? year, CancellationToken ct)
     {
-        var result = await _service.GetByYearAsync(year ?? DateTime.Now.Year, ct);
+        var result = await _service.GetByYearAsync(year ?? ChinaTime.Now.Year, ct);
         return Ok(result);
     }
 

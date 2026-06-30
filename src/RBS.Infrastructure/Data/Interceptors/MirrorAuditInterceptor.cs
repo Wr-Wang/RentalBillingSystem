@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using RBS.Core.Common;
@@ -7,6 +8,7 @@ namespace RBS.Infrastructure.Data.Interceptors;
 
 /// <summary>
 /// 镜像审计拦截器 — 每次 SaveChanges 时将变更写入 {TableName}_Audit 表
+/// 写前检查表是否存在，避免因缺失 _Audit 表导致事务破坏（修复：静默 catch 吞异常后事务被污染的问题）
 /// </summary>
 public class MirrorAuditInterceptor : SaveChangesInterceptor
 {
@@ -75,19 +77,25 @@ public class MirrorAuditInterceptor : SaveChangesInterceptor
 
         if (auditEntries.Count > 0)
         {
-            await WriteAuditEntriesAsync(context, auditEntries, cancellationToken);
+            await WriteAuditEntriesSafeAsync(context, auditEntries, cancellationToken);
         }
 
         return result;
     }
 
-    private async Task WriteAuditEntriesAsync(
+    /// <summary>
+    /// 安全写入审计表：先 IF EXISTS 检查表是否存在，不存在则跳过。
+    /// 避免因缺失 _Audit 表导致 SQL 错误进而破坏当前事务。
+    /// </summary>
+    private async Task WriteAuditEntriesSafeAsync(
         DbContext context,
         List<AuditEntry> entries,
         CancellationToken ct)
     {
         foreach (var entry in entries)
         {
+            var auditTableName = $"{entry.TableName}_Audit";
+
             var columns = new List<string>
             {
                 "Id", "AuditAction", "AuditVersionNo", "AuditChangedAt", "AuditChangedBy"
@@ -109,16 +117,30 @@ public class MirrorAuditInterceptor : SaveChangesInterceptor
             }
 
             var paramNames = values.Select((_, i) => $"@p{i}");
-            var sql = $"INSERT INTO [{entry.TableName}_Audit] ({string.Join(", ", columns)}) " +
-                      $"VALUES ({string.Join(", ", paramNames)})";
+
+            // 单条 SQL：先检查表是否存在，存在才 INSERT
+            // 避免了在拦截器中执行 INSERT 到不存在的表导致事务被破坏
+            var parameters = new List<SqlParameter>
+            {
+                new SqlParameter("@tableName", auditTableName)
+            };
+            for (int i = 0; i < values.Count; i++)
+            {
+                parameters.Add(new SqlParameter($"@p{i}", values[i] ?? DBNull.Value));
+            }
+
+            var fullSql = $@"
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = @tableName)
+    INSERT INTO [{auditTableName}] ({string.Join(", ", columns)})
+    VALUES ({string.Join(", ", paramNames)})";
 
             try
             {
-                await context.Database.ExecuteSqlRawAsync(sql, values.ToArray()!, ct);
+                await context.Database.ExecuteSqlRawAsync(fullSql, parameters, ct);
             }
             catch
             {
-                // 审计写入失败不应阻塞主操作
+                // 安全网：即便 IF EXISTS 检查后仍有失败（极少见），也不应阻塞主操作
             }
         }
     }

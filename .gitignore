@@ -3,6 +3,7 @@
 # .NET build artifacts
 **/bin/
 **/obj/
+/tmp_build/
 *.user
 *.suo
 

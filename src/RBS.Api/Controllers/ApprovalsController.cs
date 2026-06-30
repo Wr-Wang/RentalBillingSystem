@@ -26,7 +26,7 @@ public class ApprovalsController : ControllerBase
     }
 
     /// <summary>获取我提交的请求</summary>
-    [HttpGet("my-requests")]
+    [HttpGet("myrequests")]
     public async Task<IActionResult> GetMyRequests(CancellationToken ct)
     {
         var result = await _approvalService.GetMyRequestsAsync(ct);
@@ -57,6 +57,22 @@ public class ApprovalsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>撤回审批（仅提交人可操作）</summary>
+    [HttpPost("{id}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelRequest? body, CancellationToken ct)
+    {
+        var result = await _approvalService.CancelAsync(id, body?.Reason, ct);
+        return Ok(result);
+    }
+
+    /// <summary>获取审批历史（分页）</summary>
+    [HttpGet("history")]
+    public async Task<IActionResult> GetHistory([FromQuery] ApprovalHistoryQuery query, CancellationToken ct)
+    {
+        var result = await _approvalService.GetHistoryAsync(query, ct);
+        return Ok(result);
+    }
+
     /// <summary>获取审批详情</summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
@@ -76,6 +92,6 @@ public class ApprovalsController : ControllerBase
     }
 
     /// <summary>重试审批完成回调（预留）</summary>
-    [HttpPost("{id}/retry-callback")]
+    [HttpPost("{id}/retrycallback")]
     public IActionResult RetryCallback(Guid id) => Ok(new { });
 }

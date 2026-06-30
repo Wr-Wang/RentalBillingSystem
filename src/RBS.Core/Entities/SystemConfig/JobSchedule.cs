@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.SystemConfig;
+using RBS.Core.Common;
 using RBS.Core.Entities.Base;
 
 public class JobSchedule : AuditableEntity, IHasCompany
@@ -42,7 +43,7 @@ public class JobSchedule : AuditableEntity, IHasCompany
     public void SetTemplateCode(string? code) => TemplateCode = code;
     public void RecordRun(string status)
     {
-        LastRunAt = DateTime.UtcNow;
+        LastRunAt = ChinaTime.Now;
         LastRunStatus = status;
     }
 

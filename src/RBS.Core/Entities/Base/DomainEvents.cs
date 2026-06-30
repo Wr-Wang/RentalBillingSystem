@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.Base;
+using RBS.Core.Common;
 
 // ===== 合同领域事件 =====
 
@@ -15,7 +16,7 @@ public sealed record ContractActivatedEvent : IDomainEvent
         ContractId = contractId;
         RoomId = roomId;
         CompanyId = companyId;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -32,7 +33,7 @@ public sealed record ContractTerminatedEvent : IDomainEvent
         ContractId = contractId;
         RoomId = roomId;
         Reason = reason;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -45,7 +46,7 @@ public sealed record ContractSuspendedEvent : IDomainEvent
     public ContractSuspendedEvent(Guid contractId)
     {
         ContractId = contractId;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -64,7 +65,7 @@ public sealed record PaymentConfirmedEvent : IDomainEvent
         ReceiptId = receiptId;
         ContractId = contractId;
         Amount = amount;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -79,7 +80,7 @@ public sealed record PaymentRejectedEvent : IDomainEvent
     {
         ReceiptId = receiptId;
         Reason = reason;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -102,7 +103,7 @@ public sealed record ReceivableOverdueEvent : IDomainEvent
         Period = period;
         Amount = amount;
         DaysOverdue = daysOverdue;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -117,7 +118,7 @@ public sealed record ReceivableSettledEvent : IDomainEvent
     {
         PlanId = planId;
         ContractId = contractId;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -138,7 +139,7 @@ public sealed record ApprovalCompletedEvent : IDomainEvent
         TargetEntityId = targetEntityId;
         TargetEntityType = targetEntityType;
         Action = action;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }
 
@@ -161,6 +162,6 @@ public sealed record MeterReadingConfirmedEvent : IDomainEvent
         Year = year;
         Month = month;
         Usage = usage;
-        OccurredAt = DateTime.Now;
+        OccurredAt = ChinaTime.Now;
     }
 }

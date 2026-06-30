@@ -45,12 +45,45 @@ public class ApprovalRequestRepository : BaseRepository<ApprovalRequest>, IAppro
         return results.Distinct().OrderByDescending(a => a.CreatedAt).ToList();
     }
 
-    /// <summary>根据 ApproverId 查询用户参与过的所有审批请求</summary>
+    /// <summary>获取审批历史（分页）—— 我作为审批人操作过的记录</summary>
+    public async Task<PagedResult<ApprovalRequest>> GetHistoryAsync(
+        Guid userId, string? keyword, string? status,
+        int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = _dbSet
+            .Include(a => a.Records)
+            .Where(a => a.Records.Any(r => r.ApproverId == userId
+                && (r.Action == "Approved" || r.Action == "Rejected")));
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+            query = query.Where(a => a.Title.Contains(keyword));
+
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(a => a.Status == status);
+
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResult<ApprovalRequest>
+        {
+            Items = items,
+            Total = total,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling(total / (double)pageSize)
+        };
+    }
+
+    /// <summary>查询用户参与过的所有审批请求</summary>
     public async Task<List<ApprovalRequest>> GetByApproverAsync(Guid userId, CancellationToken ct = default)
     {
         return await _dbSet
             .Include(a => a.Records)
-            .Where(a => a.Records.Any(r => r.ApproverId == userId))
+            .Where(a => a.Records.Any(r => r.ApproverId == userId && r.Action == "Submitted"))
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync(ct);
     }

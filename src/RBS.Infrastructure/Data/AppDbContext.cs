@@ -9,7 +9,7 @@ using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.SystemConfig;
-using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Entities.Import;
 using RBS.Core.Interfaces.Services;
 using RBS.Infrastructure.Data.Extensions;
 using RBS.Infrastructure.Data.Interceptors;
@@ -92,6 +92,10 @@ public class AppDbContext : DbContext
     public DbSet<HolidayCalendar> HolidayCalendars => Set<HolidayCalendar>();
     public DbSet<TaxRateConfig> TaxRateConfigs => Set<TaxRateConfig>();
     public DbSet<LateFeeConfig> LateFeeConfigs => Set<LateFeeConfig>();
+
+    // ===== 导入 =====
+    public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+    public DbSet<ImportBatchItem> ImportBatchItems => Set<ImportBatchItem>();
 
     // ===== 调度 =====
     public DbSet<ScheduledTaskLog> ScheduledTaskLogs => Set<ScheduledTaskLog>();

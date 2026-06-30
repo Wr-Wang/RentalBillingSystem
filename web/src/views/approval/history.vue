@@ -2,14 +2,18 @@
   <div>
     <div class="page-header">
       <h2>审批历史</h2>
-      <el-button @click="$router.back()">返回</el-button>
+      <div class="table-actions">
+        <el-button @click="$router.push('/approvals')">返回审批中心</el-button>
+      </div>
     </div>
 
     <div class="search-bar">
-      <el-input v-model="search.keyword" placeholder="搜索标题" clearable style="width: 200px;" />
-      <el-select v-model="search.status" placeholder="审批结果" clearable style="width: 140px;">
+      <el-input v-model="search.keyword" placeholder="搜索标题" clearable style="width: 200px;" @clear="fetchHistory" @keyup.enter="fetchHistory" />
+      <el-select v-model="search.status" placeholder="审批结果" clearable style="width: 140px;" @change="fetchHistory">
+        <el-option label="待审批" value="Pending" />
         <el-option label="已通过" value="Approved" />
         <el-option label="已驳回" value="Rejected" />
+        <el-option label="已撤回" value="Cancelled" />
       </el-select>
       <el-button type="primary" @click="fetchHistory">查询</el-button>
       <el-button @click="resetSearch">重置</el-button>
@@ -24,8 +28,8 @@
       <el-table-column prop="title" label="业务摘要" min-width="200" />
       <el-table-column prop="status" label="最终结果" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'Approved' ? 'success' : 'danger'" size="small">
-            {{ row.status === 'Approved' ? '已通过' : '已驳回' }}
+          <el-tag :type="statusTagType(row.status)" size="small">
+            {{ statusLabel(row.status) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -53,44 +57,23 @@
       />
     </div>
 
-    <!-- Detail Dialog -->
-    <el-dialog v-model="showDetail" :title="'审批详情 - ' + (detail.title || '')" width="600px">
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="审批类型">{{ detail.approvalTypeName }}</el-descriptions-item>
-        <el-descriptions-item label="申请人">{{ detail.submitterName }}</el-descriptions-item>
-        <el-descriptions-item label="审批级别">共{{ detail.maxLevel }}级</el-descriptions-item>
-        <el-descriptions-item label="最终结果">
-          <el-tag :type="detail.status === 'Approved' ? 'success' : 'danger'" size="small">
-            {{ detail.status === 'Approved' ? '已通过' : '已驳回' }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="申请原因" :span="2">{{ detail.description || '无' }}</el-descriptions-item>
-      </el-descriptions>
-
-      <h4 style="margin: 16px 0 8px;">审批记录</h4>
-      <el-timeline v-if="detail.records && detail.records.length > 0">
-        <el-timeline-item
-          v-for="(record, index) in detail.records"
-          :key="index"
-          :timestamp="formatTime(record.createdAt)"
-          :type="record.action === 'Approved' ? 'success' : record.action === 'Rejected' ? 'danger' : 'primary'"
-        >
-          <p>{{ record.approverName }} - {{ record.action === 'Approved' ? '通过' : record.action === 'Rejected' ? '驳回' : record.action }}</p>
-          <p v-if="record.comment" style="color: #909399; font-size: 12px;">备注: {{ record.comment }}</p>
-        </el-timeline-item>
-      </el-timeline>
-      <el-empty v-else description="暂无审批记录" />
-    </el-dialog>
+    <ApprovalDetailDialog
+      v-model="showDetail"
+      :approval-id="currentId"
+      @approved="fetchHistory"
+      @rejected="fetchHistory"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { getMyApprovalRequests } from '../../api/index'
+import { getApprovalHistoryList } from '../../api/index'
+import ApprovalDetailDialog from './ApprovalDetailDialog.vue'
 
 const loading = ref(false)
 const showDetail = ref(false)
-const detail = ref({})
+const currentId = ref('')
 const search = reactive({ keyword: '', status: '' })
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 const historyList = ref([])
@@ -102,17 +85,29 @@ function formatTime(t) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function statusLabel(status) {
+  const map = { Pending: '待审批', Approved: '已通过', Rejected: '已驳回', Cancelled: '已撤回' }
+  return map[status] || status
+}
+
+function statusTagType(status) {
+  const map = { Pending: 'warning', Approved: 'success', Rejected: 'danger', Cancelled: 'info' }
+  return map[status] || 'info'
+}
+
 async function fetchHistory() {
   loading.value = true
   try {
-    const res = await getMyApprovalRequests()
-    let list = Array.isArray(res) ? res : []
-    // 过滤已完成的审批
-    list = list.filter(r => r.status === 'Approved' || r.status === 'Rejected')
-    if (search.status) list = list.filter(r => r.status === search.status)
-    if (search.keyword) list = list.filter(r => (r.title || '').includes(search.keyword))
-    historyList.value = list
-    pagination.total = list.length
+    const params = {
+      page: pagination.page,
+      pageSize: pagination.pageSize
+    }
+    if (search.keyword) params.keyword = search.keyword
+    if (search.status) params.status = search.status
+
+    const res = await getApprovalHistoryList(params)
+    historyList.value = res?.items || []
+    pagination.total = res?.total || 0
   } catch (e) {
     historyList.value = []
     pagination.total = 0
@@ -120,10 +115,15 @@ async function fetchHistory() {
   loading.value = false
 }
 
-function resetSearch() { search.keyword = ''; search.status = ''; fetchHistory() }
+function resetSearch() {
+  search.keyword = ''
+  search.status = ''
+  pagination.page = 1
+  fetchHistory()
+}
 
 function viewDetail(row) {
-  detail.value = row
+  currentId.value = row.id
   showDetail.value = true
 }
 

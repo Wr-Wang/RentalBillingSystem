@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.Approval;
+using RBS.Core.Common;
 
 using RBS.Core.Entities.Base;
 
@@ -74,7 +75,7 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     public void AddRecord(Guid approverId, string action, string? comment)
     {
         var record = new ApprovalRecord(Id, CurrentLevel, approverId, action, comment);
-        record.SetCreated(approverId, DateTime.Now);
+        record.SetCreated(approverId, ChinaTime.Now);
         _records.Add(record);
     }
 

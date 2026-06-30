@@ -17,6 +17,8 @@ public class ApprovalRequestDto
     public DateTime CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public List<ApprovalRecordDto> Records { get; set; } = new();
+    /// <summary>审批链：每级审批角色及当前状态</summary>
+    public List<ApprovalLevelStatusDto> LevelChain { get; set; } = new();
 }
 
 public class ApprovalRecordDto
@@ -25,6 +27,8 @@ public class ApprovalRecordDto
     public int Level { get; set; }
     public Guid ApproverId { get; set; }
     public string ApproverName { get; set; } = string.Empty;
+    /// <summary>审批人登录账号</summary>
+    public string ApproverAccount { get; set; } = string.Empty;
     public string Action { get; set; } = string.Empty;
     public string? Comment { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -38,4 +42,22 @@ public class ApproveRequest
 public class RejectRequest
 {
     public string Comment { get; set; } = string.Empty;
+}
+
+/// <summary>审批链节点状态</summary>
+public class ApprovalLevelStatusDto
+{
+    public int Level { get; set; }
+    public string RoleName { get; set; } = "";
+    /// <summary>completed | current | pending | skipped</summary>
+    public string Status { get; set; } = "pending";
+    /// <summary>该级审批人姓名（已审批时有值）</summary>
+    public string? ApproverName { get; set; }
+    /// <summary>该级审批人账号（已审批时有值）</summary>
+    public string? ApproverAccount { get; set; }
+}
+
+public class CancelRequest
+{
+    public string? Reason { get; set; }
 }

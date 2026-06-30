@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.Billing;
+using RBS.Core.Common;
 
 using RBS.Core.Entities.Base;
 
@@ -62,7 +63,7 @@ public class Receipt : AggregateRoot, IHasCompany
             throw new InvalidOperationException($"状态为 {Status} 的收款不能确认");
 
         Status = "Confirmed";
-        ConfirmedAt = DateTime.Now;
+        ConfirmedAt = ChinaTime.Now;
         ConfirmedBy = userId;
 
         AddDomainEvent(new PaymentConfirmedEvent(

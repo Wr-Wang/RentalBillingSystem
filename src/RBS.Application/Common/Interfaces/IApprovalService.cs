@@ -1,4 +1,5 @@
 using RBS.Application.DTOs.Approval;
+using RBS.Core.Interfaces.Repositories;
 
 namespace RBS.Application.Common.Interfaces;
 
@@ -24,4 +25,10 @@ public interface IApprovalService
 
     /// <summary>获取审批详情</summary>
     Task<ApprovalRequestDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>撤回审批（仅提交人可操作）</summary>
+    Task<ApprovalRequestDto> CancelAsync(Guid id, string? reason = null, CancellationToken ct = default);
+
+    /// <summary>获取审批历史（分页）</summary>
+    Task<PagedResult<ApprovalRequestDto>> GetHistoryAsync(ApprovalHistoryQuery query, CancellationToken ct = default);
 }

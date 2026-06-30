@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.Billing;
+using RBS.Core.Common;
 
 using RBS.Core.Entities.Base;
 
@@ -89,7 +90,7 @@ public class ReceivablePlan : AggregateRoot
         if (Status != "Pending" && Status != "Partial")
             throw new InvalidOperationException($"状态为 {Status} 的应收不能标记为逾期");
 
-        var daysOverdue = DateOnly.FromDateTime(DateTime.Now).DayNumber - DueDate.DayNumber;
+        var daysOverdue = DateOnly.FromDateTime(ChinaTime.Now).DayNumber - DueDate.DayNumber;
 
         Status = "Overdue";
         AddDomainEvent(new ReceivableOverdueEvent(Id, ContractId, Period, Balance, Math.Max(0, daysOverdue)));
@@ -105,7 +106,7 @@ public class ReceivablePlan : AggregateRoot
 
     /// <summary>判断是否逾期</summary>
     public bool IsOverdue => Status is "Pending" or "Partial"
-        && DueDate < DateOnly.FromDateTime(DateTime.Now);
+        && DueDate < DateOnly.FromDateTime(ChinaTime.Now);
 
     /// <summary>获取逾期天数</summary>
     public int DaysOverdue
@@ -113,7 +114,7 @@ public class ReceivablePlan : AggregateRoot
         get
         {
             if (!IsOverdue) return 0;
-            return DateOnly.FromDateTime(DateTime.Now).DayNumber - DueDate.DayNumber;
+            return DateOnly.FromDateTime(ChinaTime.Now).DayNumber - DueDate.DayNumber;
         }
     }
 

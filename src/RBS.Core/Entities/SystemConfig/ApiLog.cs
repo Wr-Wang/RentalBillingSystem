@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.SystemConfig;
+using RBS.Core.Common;
 
 /// <summary>
 /// API 调用日志 — 记录每次请求的完整上下文
@@ -49,7 +50,7 @@ public class ApiLog
         UserAgent = Truncate(userAgent, 500);
         UserId = userId;
         UserDisplayName = Truncate(userDisplayName, 100);
-        CreatedAt = DateTime.UtcNow;
+        CreatedAt = ChinaTime.Now;
     }
 
     private static string? Truncate(string? value, int maxLength) =>

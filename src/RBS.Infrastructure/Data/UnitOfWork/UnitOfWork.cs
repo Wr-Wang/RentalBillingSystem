@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RBS.Core.Entities.Approval;
-using RBS.Core.Entities.Property;
-using RBS.Core.Entities.SystemConfig;
-using RBS.Core.Entities.Accounting;
+using RBS.Core.Entities.Import;
 using RBS.Core.Entities.Property;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Entities.Accounting;
@@ -41,6 +39,8 @@ public class UnitOfWork : IUnitOfWork
     private IRepository<JobSchedule>? _jobSchedules;
     private IRepository<JobTemplate>? _jobTemplates;
     private IRepository<JobScheduleExecution>? _jobScheduleExecutions;
+    private IRepository<ImportBatch>? _importBatches;
+    private IRepository<ImportBatchItem>? _importBatchItems;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -72,6 +72,14 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new BaseRepository<JobSchedule>(_context);
     public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new BaseRepository<JobTemplate>(_context);
     public IRepository<JobScheduleExecution> JobScheduleExecutions => _jobScheduleExecutions ??= new BaseRepository<JobScheduleExecution>(_context);
+    public IRepository<ImportBatch> ImportBatches => _importBatches ??= new BaseRepository<ImportBatch>(_context);
+    public IRepository<ImportBatchItem> ImportBatchItems => _importBatchItems ??= new BaseRepository<ImportBatchItem>(_context);
+
+    public async Task<ImportBatch?> GetImportBatchWithItemsAsync(Guid id, CancellationToken ct = default)
+        => await _context.Set<ImportBatch>().Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == id, ct);
+
+    public async Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default)
+        => await _context.Set<ApprovalType>().IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Code == code, ct);
 
     public async Task<int> CommitAsync(CancellationToken ct = default)
     {
@@ -82,6 +90,16 @@ public class UnitOfWork : IUnitOfWork
     {
         var efTransaction = await _context.Database.BeginTransactionAsync(ct);
         return new EfTransaction(efTransaction);
+    }
+
+    public async Task<int> ExecuteSqlRawAsync(string sql, IEnumerable<object> parameters, CancellationToken ct = default)
+    {
+        return await _context.Database.ExecuteSqlRawAsync(sql, parameters, ct);
+    }
+
+    public async Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class
+    {
+        await _context.Entry(entity).ReloadAsync(ct);
     }
 
     public async Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default)

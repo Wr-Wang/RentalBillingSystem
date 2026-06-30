@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.SystemConfig;
+using RBS.Core.Common;
 
 /// <summary>
 /// 系统异常日志
@@ -35,6 +36,6 @@ public class SystemLog
         UserAgent = userAgent;
         UserId = userId;
         UserDisplayName = userDisplayName;
-        CreatedAt = DateTime.UtcNow;
+        CreatedAt = ChinaTime.Now;
     }
 }

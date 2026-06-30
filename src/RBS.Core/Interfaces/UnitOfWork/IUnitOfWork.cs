@@ -1,6 +1,7 @@
 namespace RBS.Core.Interfaces.UnitOfWork;
 
 using RBS.Core.Entities.Approval;
+using RBS.Core.Entities.Import;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.Property;
@@ -52,11 +53,25 @@ public interface IUnitOfWork : IDisposable
     IRepository<JobTemplate> JobTemplates { get; }
     IRepository<JobScheduleExecution> JobScheduleExecutions { get; }
 
+    /// <summary>按 Code 查找审批类型（忽略公司过滤器，系统级查找）</summary>
+    Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default);
+
+    // ===== 导入 =====
+    IRepository<ImportBatch> ImportBatches { get; }
+    IRepository<ImportBatchItem> ImportBatchItems { get; }
+    Task<ImportBatch?> GetImportBatchWithItemsAsync(Guid id, CancellationToken ct = default);
+
     /// <summary>提交所有变更（自动事务）</summary>
     Task<int> CommitAsync(CancellationToken ct = default);
 
+    /// <summary>从数据库重新加载实体的所有属性（覆盖追踪中的值）</summary>
+    Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class;
+
     /// <summary>显式开启数据库事务</summary>
     Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default);
+
+    /// <summary>执行原始 SQL 命令（绕过 SaveChanges 管道，不触发拦截器）</summary>
+    Task<int> ExecuteSqlRawAsync(string sql, IEnumerable<object> parameters, CancellationToken ct = default);
 
     /// <summary>乐观锁失败时自动重试</summary>
     Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default);

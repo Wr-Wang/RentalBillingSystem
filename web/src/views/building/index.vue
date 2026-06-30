@@ -87,7 +87,7 @@
           <template #header>
             <span>房源列表</span>
           </template>
-          <el-table :data="roomList" stripe v-loading="roomLoading" style="width: 100%">
+          <el-table :data="paginatedList" stripe v-loading="roomLoading" style="width: 100%">
             <el-table-column type="index" label="#" width="50" />
             <el-table-column prop="fullCode" label="房源编号" width="130" />
             <el-table-column prop="buildingName" label="座楼" width="80" />
@@ -135,7 +135,7 @@
               :page-sizes="[10, 20, 50]"
               :total="pagination.total"
               layout="total, sizes, prev, pager, next"
-              @change="fetchRooms"
+              @change="fetchUnits"
             />
           </div>
         </el-card>
@@ -302,7 +302,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -334,6 +334,10 @@ const statusMap = {
 
 const search = reactive({ keyword: '', status: '', buildingName: '' })
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
+const paginatedList = computed(() => {
+  const start = (pagination.page - 1) * pagination.pageSize
+  return roomList.value.slice(start, start + pagination.pageSize)
+})
 const showAddUnit = ref(false)
 const showEditUnit = ref(false)
 const addFormRef = ref(null)

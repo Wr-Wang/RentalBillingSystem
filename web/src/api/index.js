@@ -44,6 +44,12 @@ export function deleteHousingUnit(id) { return request({ url: `/housingunits/${i
 export function getHousingUnitTree() { return request({ url: '/housingunits/tree', method: 'get' }) }
 export function getBuildingList() { return request({ url: '/housingunits/buildinglist', method: 'get' }) }
 export function getHousingUnitStats() { return request({ url: '/housingunits/stats', method: 'get' }) }
+export function importHousingUnits(data) { return request({ url: '/housingunits/import', method: 'post', data }) }
+
+// ===== 通用导入 =====
+export function submitImport(data) { return request({ url: '/imports/submit', method: 'post', data }) }
+export function getImportBatch(id) { return request({ url: `/imports/${id}`, method: 'get' }) }
+export function getImportBatches(params) { return request({ url: '/imports', method: 'get', params }) }
 
 // Tenants
 export function getTenants(params) { return request({ url: '/tenants', method: 'get', params }) }
@@ -109,11 +115,14 @@ export function manualCollection(data) { return request({ url: '/collectionrecor
 // Approvals
 export function submitApproval(data) { return request({ url: '/approvals/submit', method: 'post', data }) }
 export function getPendingApprovals() { return request({ url: '/approvals/pending', method: 'get' }) }
-export function getMyApprovalRequests() { return request({ url: '/approvals/my-requests', method: 'get' }) }
+export function getMyApprovalRequests() { return request({ url: '/approvals/myrequests', method: 'get' }) }
 export function approveApproval(id, data) { return request({ url: `/approvals/${id}/approve`, method: 'post', data }) }
 export function rejectApproval(id, data) { return request({ url: `/approvals/${id}/reject`, method: 'post', data }) }
+export function getApprovalDetail(id) { return request({ url: `/approvals/${id}`, method: 'get' }) }
+export function getApprovalHistoryList(params) { return request({ url: '/approvals/history', method: 'get', params }) }
 export function getApprovalHistory(id) { return request({ url: `/approvals/${id}/history`, method: 'get' }) }
-export function retryApprovalCallback(id) { return request({ url: `/approvals/${id}/retry-callback`, method: 'post' }) }
+export function cancelApproval(id, data) { return request({ url: `/approvals/${id}/cancel`, method: 'post', data }) }
+export function retryApprovalCallback(id) { return request({ url: `/approvals/${id}/retrycallback`, method: 'post' }) }
 export function getApprovalTypes() { return request({ url: '/approvaltypes', method: 'get' }) }
 export function createApprovalType(data) { return request({ url: '/approvaltypes', method: 'post', data }) }
 export function updateApprovalType(id, data) { return request({ url: `/approvaltypes/${id}`, method: 'put', data }) }

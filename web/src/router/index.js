@@ -159,6 +159,12 @@ const routes = [
         component: () => import('../views/approval/history.vue'),
         meta: { title: '审批历史', icon: 'Timer', hidden: true }
       },
+      {
+        path: 'approvals/importbatch/:id',
+        name: 'ImportBatchDetail',
+        component: () => import('../views/approval/ImportBatchDetail.vue'),
+        meta: { title: '导入批次详情', hidden: true }
+      },
       // 会计管理
       {
         path: 'accounting',
@@ -319,6 +325,7 @@ const routes = [
       { path: 'confirm', redirect: '/receipts/confirm', meta: { hidden: true } },
       { path: 'config', redirect: '/collection/config', meta: { hidden: true } },
       { path: 'records', redirect: '/collection/records', meta: { hidden: true } },
+      { path: 'my-requests', redirect: '/approvals/myrequests', meta: { hidden: true } },
       { path: 'history', redirect: '/approvals/history', meta: { hidden: true } },
       { path: 'subjects', redirect: '/accounting/subjects', meta: { hidden: true } },
       { path: 'journal', redirect: '/accounting/journal', meta: { hidden: true } },

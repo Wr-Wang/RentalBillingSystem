@@ -3,7 +3,7 @@
     <div class="page-header">
       <h2>审批中心</h2>
       <div class="table-actions">
-        <el-button @click="$router.push('/approvals/my-requests')">
+        <el-button @click="$router.push('/approvals/myrequests')">
           <el-icon><EditPen /></el-icon>我提交的审批
         </el-button>
         <el-button @click="$router.push('/approvals/history')">
@@ -44,65 +44,36 @@
         <el-table-column label="提交时间" width="150">
           <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
             <el-button text size="small" type="primary" @click="viewDetail(row)">详情</el-button>
-            <el-button type="success" size="small" @click="viewDetail(row)">通过</el-button>
-            <el-button type="danger" size="small" @click="viewDetail(row)">驳回</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <!-- Approval Detail Dialog -->
-    <el-dialog v-model="showDetail" :title="'审批详情 - ' + (detail.title || '')" width="600px">
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="审批类型">{{ detail.approvalTypeName }}</el-descriptions-item>
-        <el-descriptions-item label="申请人">{{ detail.submitterName }}</el-descriptions-item>
-        <el-descriptions-item label="当前级别">第{{ detail.currentLevel }}级/共{{ detail.maxLevel }}级</el-descriptions-item>
-        <el-descriptions-item label="审批角色">{{ detail.currentLevelName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="提交时间" :span="2">{{ formatTime(detail.createdAt) }}</el-descriptions-item>
-        <el-descriptions-item label="申请原因" :span="2">{{ detail.description || '无' }}</el-descriptions-item>
-      </el-descriptions>
-
-      <h4 style="margin: 16px 0 8px;">审批记录</h4>
-      <el-timeline v-if="detail.records && detail.records.length > 0">
-        <el-timeline-item
-          v-for="(record, index) in detail.records"
-          :key="index"
-          :timestamp="formatTime(record.createdAt)"
-          :type="record.action === 'Approved' ? 'success' : record.action === 'Rejected' ? 'danger' : 'primary'"
-        >
-          <p>{{ record.approverName }} - {{ record.action === 'Approved' ? '通过' : record.action === 'Rejected' ? '驳回' : record.action }}</p>
-          <p v-if="record.comment" style="color: #909399; font-size: 12px;">备注: {{ record.comment }}</p>
-        </el-timeline-item>
-        <el-timeline-item v-if="detail.status === 'Pending'" timestamp="待处理" type="primary">
-          <p>等待 {{ detail.currentLevelName || '下一级' }} 审批</p>
-        </el-timeline-item>
-      </el-timeline>
-      <el-empty v-else description="暂无审批记录" />
-
-      <template #footer>
-        <el-input v-model="approvalComment" placeholder="审批意见（可选）" style="margin-bottom: 12px;" />
-        <el-button type="success" @click="submitApproval('approve')" :loading="submitting">通过</el-button>
-        <el-button type="danger" @click="submitApproval('reject')" :loading="submitting">驳回</el-button>
-      </template>
-    </el-dialog>
+    <!-- 审批详情对话框 -->
+    <ApprovalDetailDialog
+      v-model="showDetail"
+      :approval-id="currentId"
+      :show-actions="true"
+      @approved="fetchPending"
+      @rejected="fetchPending"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { getPendingApprovals, approveApproval, rejectApproval } from '../../api/index'
+import { ElMessage } from 'element-plus'
+import { getPendingApprovals } from '../../api/index'
+import ApprovalDetailDialog from './ApprovalDetailDialog.vue'
 
 const loading = ref(false)
-const submitting = ref(false)
 const pendingList = ref([])
 const approvedThisMonth = ref(0)
 const showDetail = ref(false)
-const approvalComment = ref('')
-const detail = ref({})
+const currentId = ref('')
 
 function formatTime(t) {
   if (!t) return ''
@@ -116,7 +87,7 @@ async function fetchPending() {
   try {
     const res = await getPendingApprovals()
     pendingList.value = Array.isArray(res) ? res : []
-    approvedThisMonth.value = pendingList.value.length
+    approvedThisMonth.value = pendingList.value.filter(r => r.status === 'Approved').length
   } catch (e) {
     pendingList.value = []
     approvedThisMonth.value = 0
@@ -124,32 +95,17 @@ async function fetchPending() {
   loading.value = false
 }
 
-async function submitApproval(action) {
-  if (!detail.value.id) return
-  submitting.value = true
-  try {
-    if (action === 'approve') {
-      await approveApproval(detail.value.id, { comment: approvalComment.value || null })
-      ElMessage.success('审批通过')
-    } else {
-      await rejectApproval(detail.value.id, { comment: approvalComment.value || '驳回' })
-      ElMessage.success('已驳回')
-    }
-    showDetail.value = false
-    approvalComment.value = ''
-    await fetchPending()
-  } catch (e) {
-    ElMessage.error('操作失败')
-  }
-  submitting.value = false
-}
-
-// 行按钮：仅打开详情对话框，在对话框中执行审批操作
 function viewDetail(row) {
-  detail.value = row
-  approvalComment.value = ''
+  currentId.value = row.id
   showDetail.value = true
 }
 
 onMounted(() => { fetchPending() })
 </script>
+
+<style scoped>
+.stat-cards { display: flex; gap: 16px; margin-bottom: 16px; }
+.stat-card { flex: 1; background: #fff; padding: 16px 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.stat-card .label { font-size: 13px; color: #909399; }
+.stat-card .value { font-size: 28px; font-weight: bold; margin-top: 4px; }
+</style>

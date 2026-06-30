@@ -1,8 +1,13 @@
 using RBS.Application.Common.Interfaces;
+using RBS.Core.Common;
 using RBS.Application.DTOs.SystemConfig;
+using RBS.Core.Common;
 using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.Services;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Core.Common;
 
 namespace RBS.Application.Services.SystemConfig;
 
@@ -27,7 +32,7 @@ public class LateFeeConfigService : ILateFeeConfigService
         return active != null ? Map(active) : new LateFeeConfigDto
         {
             DailyRate = 0.0005m, GraceDays = 3, MaxRate = 100, MinAmount = 1,
-            EffectiveDate = DateOnly.FromDateTime(DateTime.Today), IsActive = true
+            EffectiveDate = DateOnly.FromDateTime(ChinaTime.Now), IsActive = true
         };
     }
 

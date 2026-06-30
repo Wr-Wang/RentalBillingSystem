@@ -1,7 +1,11 @@
 using RBS.Application.Common.Interfaces;
+using RBS.Core.Common;
 using RBS.Application.DTOs.SystemConfig;
+using RBS.Core.Common;
 using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Core.Common;
 
 namespace RBS.Application.Services.SystemConfig;
 
@@ -83,7 +87,7 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
 
         // 删除该任务下所有未来排期
         var existing = (await _uow.JobScheduleExecutions.GetAllAsync(ct))
-            .Where(e => e.JobScheduleId == jobScheduleId && e.TargetDate > DateTime.UtcNow)
+            .Where(e => e.JobScheduleId == jobScheduleId && e.TargetDate > ChinaTime.Now)
             .ToList();
 
         foreach (var e in existing)
@@ -91,7 +95,7 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
 
         // 生成未来 N 个月排期
         var created = new List<JobScheduleExecution>();
-        var now = DateTime.UtcNow;
+        var now = ChinaTime.Now;
 
         for (int i = 1; i <= 6; i++)
         {

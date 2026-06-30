@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using RBS.Core.Common;
 using RBS.Core.Entities.Billing;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Core.Common;
 
 namespace RBS.Infrastructure.Data.Repositories;
 
@@ -26,7 +29,7 @@ public class ReceivablePlanRepository : BaseRepository<ReceivablePlan>, IReceiva
     public async Task<List<ReceivablePlan>> GetOverdueAsync(Guid companyId, CancellationToken ct = default)
     {
         return await _dbSet
-            .Where(rp => rp.Status == "Pending" && rp.DueDate < DateOnly.FromDateTime(DateTime.Now))
+            .Where(rp => rp.Status == "Pending" && rp.DueDate < DateOnly.FromDateTime(ChinaTime.Now))
             .ToListAsync(ct);
     }
 }

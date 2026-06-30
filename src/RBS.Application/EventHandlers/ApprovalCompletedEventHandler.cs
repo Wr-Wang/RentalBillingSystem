@@ -1,5 +1,7 @@
+using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
 using RBS.Core.Entities.Base;
+using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.EventHandlers;
 
@@ -8,10 +10,39 @@ namespace RBS.Application.EventHandlers;
 /// </summary>
 public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEvent>
 {
+    private readonly IImportService _importService;
+    private readonly IUnitOfWork _uow;
+
+    public ApprovalCompletedEventHandler(IImportService importService, IUnitOfWork uow)
+    {
+        _importService = importService;
+        _uow = uow;
+    }
+
     public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
-        // 根据 TargetEntityType 分发到不同业务处理
-        // 目前为预留 — 具体业务对接可在后续扩展
-        await Task.CompletedTask;
+        switch (@event.TargetEntityType)
+        {
+            case "Import":
+                if (@event.Action == "Approved")
+                {
+                    await _importService.ExecuteApprovedImportAsync(@event.TargetEntityId, ct);
+                }
+                else if (@event.Action == "Rejected")
+                {
+                    // 审批驳回 → 更新批次状态为 Rejected
+                    var batch = await _uow.ImportBatches.GetByIdAsync(@event.TargetEntityId, ct);
+                    if (batch != null && batch.Status == "PendingApproval")
+                    {
+                        batch.Status = "Rejected";
+                        await _uow.CommitAsync(ct);
+                    }
+                }
+                break;
+
+            default:
+                await Task.CompletedTask;
+                break;
+        }
     }
 }

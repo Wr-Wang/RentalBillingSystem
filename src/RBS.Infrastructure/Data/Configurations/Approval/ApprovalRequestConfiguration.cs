@@ -18,10 +18,10 @@ public class ApprovalRequestConfiguration : IEntityTypeConfiguration<ApprovalReq
         builder.Property(e => e.TargetEntityType).IsRequired().HasMaxLength(50).HasComment("目标业务实体类型");
         builder.Property(e => e.CurrentLevel).HasDefaultValue(1).HasComment("当前审批级别");
         builder.Property(e => e.MaxLevel).HasDefaultValue(1).HasComment("最大审批级别");
-        builder.Property(e => e.Status).IsRequired().HasMaxLength(20).HasDefaultValue("Pending").HasComment("审批状态（Pending/Approved/Rejected/Cancelled）");
+        builder.Property(e => e.Status).IsRequired().HasMaxLength(20).HasDefaultValue("Pending").IsConcurrencyToken().HasComment("审批状态（Pending/Approved/Rejected/Cancelled）");
         builder.Property(e => e.CompanyId).IsRequired().HasComment("所属公司ID");
         builder.HasIndex(e => new { e.CompanyId, e.Status });
-        builder.Property(e => e.RowVersion).IsRowVersion().HasComment("乐观锁版本号");
+        builder.Property(e => e.RowVersion).IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion").HasComment("乐观锁版本号").IsConcurrencyToken(false);
         builder.HasMany(e => e.Records).WithOne().HasForeignKey(e => e.ApprovalRequestId);
         builder.ConfigureAuditFields();
     }

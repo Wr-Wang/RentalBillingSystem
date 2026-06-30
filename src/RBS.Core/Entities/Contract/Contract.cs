@@ -1,4 +1,5 @@
 namespace RBS.Core.Entities.Contract;
+using RBS.Core.Common;
 
 using RBS.Core.Entities.Base;
 
@@ -151,7 +152,7 @@ public class Contract : AggregateRoot, IHasCompany
     {
         AssertValidTransition("Suspended");
         StatusCode = "Suspended";
-        SuspendedAt = DateTime.Now;
+        SuspendedAt = ChinaTime.Now;
         AddDomainEvent(new ContractSuspendedEvent(Id));
     }
 
@@ -160,7 +161,7 @@ public class Contract : AggregateRoot, IHasCompany
         if (StatusCode != "Suspended")
             throw new InvalidOperationException("只有已暂停的合同可以恢复");
         StatusCode = "Active";
-        ResumedAt = DateTime.Now;
+        ResumedAt = ChinaTime.Now;
     }
 
     public void Terminate(string reason)
@@ -169,7 +170,7 @@ public class Contract : AggregateRoot, IHasCompany
         if (string.IsNullOrWhiteSpace(reason))
             throw new ArgumentException("终止原因不能为空");
         StatusCode = "Terminated";
-        TerminatedAt = DateTime.Now;
+        TerminatedAt = ChinaTime.Now;
         TerminationReason = reason;
         AddDomainEvent(new ContractTerminatedEvent(Id, RoomId, reason));
     }
@@ -203,14 +204,14 @@ public class Contract : AggregateRoot, IHasCompany
     /// <summary>获取已过天数</summary>
     public int ElapsedDaysSinceStart()
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = DateOnly.FromDateTime(ChinaTime.Now);
         return today.DayNumber - StartDate.DayNumber;
     }
 
     /// <summary>获取剩余天数</summary>
     public int RemainingDays()
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = DateOnly.FromDateTime(ChinaTime.Now);
         return EndDate.DayNumber - today.DayNumber;
     }
 
