@@ -1,8 +1,8 @@
+using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RBS.Core.Entities.SystemConfig;
-using RBS.Infrastructure.Data;
+using RBS.Core.Interfaces.Persistence;
+using System.Data;
 
 namespace RBS.Api.Controllers;
 
@@ -11,56 +11,45 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class SystemLogsController : ControllerBase
 {
-    private readonly AppDbContext _db;
-
-    public SystemLogsController(AppDbContext db) => _db = db;
+    private readonly IDbConnectionFactory _db;
+    public SystemLogsController(IDbConnectionFactory db) => _db = db;
 
     private bool IsSuperAdmin => User.FindFirst("IsSuperAdmin")?.Value == "True";
+    private IActionResult? RequireSuperAdmin() => IsSuperAdmin ? null : Forbid();
 
-    private IActionResult? RequireSuperAdmin()
-    {
-        if (!IsSuperAdmin) return Forbid();
-        return null;
-    }
+    private static readonly string Columns = @"
+        Id AS id, Level AS level, Message AS message, Exception AS exception, Source AS source, Path AS path, Method AS method,
+        IpAddress AS ipAddress, UserAgent AS userAgent,
+        UserId AS userId, UserDisplayName AS userDisplayName,
+        CreatedAt AS createdAt";
 
     [HttpGet]
     public async Task<IActionResult> GetList(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
         [FromQuery] string? level = null,
-        [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null,
+        [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null,
         CancellationToken ct = default)
     {
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        var query = _db.SystemLogs.AsNoTracking();
-        if (!string.IsNullOrEmpty(level))
-            query = query.Where(l => l.Level == level);
-        if (startDate.HasValue)
-            query = query.Where(l => l.CreatedAt >= startDate.Value);
-        if (endDate.HasValue)
-            query = query.Where(l => l.CreatedAt <= endDate.Value);
+        using var conn = _db.CreateConnection(); conn.Open();
 
-        var total = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(l => l.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var where = new List<string>();
+        var parms = new DynamicParameters();
+        if (!string.IsNullOrEmpty(level)) { where.Add("Level = @Level"); parms.Add("@Level", level); }
+        if (startDate.HasValue) { where.Add("CreatedAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
+        if (endDate.HasValue) { where.Add("CreatedAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
 
-        return Ok(new
-        {
-            items = items.Select(l => new
-            {
-                l.Id, l.Level, l.Message, l.Source, l.Path, l.Method,
-                l.IpAddress, l.UserId, l.UserDisplayName, l.CreatedAt
-            }),
-            total,
-            page,
-            pageSize
-        });
+        var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
+        var offset = (page - 1) * pageSize;
+        parms.Add("@Offset", offset);
+        parms.Add("@PageSize", pageSize);
+
+        var total = await conn.QuerySingleAsync<int>($"SELECT COUNT(*) FROM SystemLogs {w}", parms);
+        var items = await conn.QueryAsync($"SELECT {Columns} FROM SystemLogs {w} ORDER BY CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
+
+        return Ok(new { items, total, page, pageSize });
     }
 
     [HttpGet("{id}")]
@@ -69,7 +58,8 @@ public class SystemLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        var log = await _db.SystemLogs.AsNoTracking().FirstOrDefaultAsync(l => l.Id == id, ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        var log = await conn.QuerySingleOrDefaultAsync($"SELECT {Columns} FROM SystemLogs WHERE Id = @Id", new { Id = id });
         if (log == null) return NotFound();
         return Ok(log);
     }
@@ -80,10 +70,8 @@ public class SystemLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        var log = await _db.SystemLogs.FindAsync(new object[] { id }, ct);
-        if (log == null) return NotFound();
-        _db.SystemLogs.Remove(log);
-        await _db.SaveChangesAsync(ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync("DELETE FROM SystemLogs WHERE Id = @Id", new { Id = id });
         return NoContent();
     }
 
@@ -93,8 +81,8 @@ public class SystemLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        _db.SystemLogs.RemoveRange(await _db.SystemLogs.ToListAsync(ct));
-        await _db.SaveChangesAsync(ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync("DELETE FROM SystemLogs");
         return NoContent();
     }
 }

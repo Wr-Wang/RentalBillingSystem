@@ -1,21 +1,23 @@
 using System.Security.Claims;
+using RBS.Core.Common;
 using System.Text.Json;
-using RBS.Core.Entities.SystemConfig;
+using Dapper;
+using Microsoft.Extensions.Logging;
+using RBS.Core.Interfaces.Persistence;
 
 namespace RBS.Api.Middleware;
 
-/// <summary>
-/// 全局异常捕获中间件 — 自动记录未处理异常到 SystemLogs 表
-/// </summary>
 public class ExceptionLoggingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<ExceptionLoggingMiddleware> _logger;
 
-    public ExceptionLoggingMiddleware(RequestDelegate next, IServiceProvider serviceProvider)
+    public ExceptionLoggingMiddleware(RequestDelegate next, IServiceProvider serviceProvider, ILogger<ExceptionLoggingMiddleware> logger)
     {
         _next = next;
         _serviceProvider = serviceProvider;
+        _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -26,14 +28,14 @@ public class ExceptionLoggingMiddleware
         }
         catch (OperationCanceledException)
         {
-            // 请求被取消（用户刷新/关闭页面等），不属于服务端错误
             if (!context.Response.HasStarted)
                 context.Response.StatusCode = 499;
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "HTTP {Method} {Path} 产生未处理异常", context.Request?.Method, context.Request?.Path);
             await LogExceptionAsync(context, ex);
-            // 返回统一错误响应
+
             context.Response.StatusCode = 500;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -49,28 +51,27 @@ public class ExceptionLoggingMiddleware
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<Infrastructure.Data.AppDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+            using var conn = db.CreateConnection();
+            conn.Open();
 
             var userIdStr = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             Guid? userId = userIdStr != null && Guid.TryParse(userIdStr, out var uid) ? uid : null;
-
             var displayName = context.User?.FindFirst("DisplayName")?.Value;
 
-        var log = new SystemLog(
-                level: "Error",
-                message: ex.Message,
-                exception: ex.ToString(),
-                source: ex.Source,
-                path: context.Request.Path,
-                method: context.Request.Method,
-                ip: context.Connection.RemoteIpAddress?.ToString(),
-                userAgent: context.Request.Headers["User-Agent"],
-                userId: userId,
-                userDisplayName: displayName
-            );
-
-            db.SystemLogs.Add(log);
-            await db.SaveChangesAsync();
+            await conn.ExecuteAsync(@"
+                INSERT INTO SystemLogs (Id, Level, Message, Exception, Source, Path, Method, IpAddress, UserAgent, UserId, UserDisplayName, CreatedAt)
+                VALUES (@Id, @Level, @Message, @Exception, @Source, @Path, @Method, @IpAddress, @UserAgent, @UserId, @UserDisplayName, @CreatedAt)",
+                new
+                {
+                    Id = Guid.NewGuid(), Level = "Error", Message = ex.Message,
+                    Exception = ex.ToString(), Source = ex.Source,
+                    Path = context.Request.Path.Value, Method = context.Request.Method,
+                    IpAddress = context.Connection.RemoteIpAddress?.ToString(),
+                    UserAgent = context.Request.Headers["User-Agent"].ToString(),
+                    UserId = userId, UserDisplayName = displayName,
+                    CreatedAt = ChinaTime.Now
+                });
         }
         catch
         {

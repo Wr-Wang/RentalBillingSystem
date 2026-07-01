@@ -1,7 +1,8 @@
 using System.Threading.Channels;
-using RBS.Api.Middleware;
 using RBS.Core.Entities.SystemConfig;
-using RBS.Infrastructure.Data;
+using Dapper;
+using RBS.Api.Middleware;
+using RBS.Core.Interfaces.Persistence;
 
 namespace RBS.Api.Services;
 
@@ -29,11 +30,9 @@ public class ApiLogWriterService : BackgroundService
 
             try
             {
-                // 等待第一条数据
                 var first = await _channel.Reader.ReadAsync(stoppingToken);
                 buffer.Add(first);
 
-                // 2 秒内尽可能收满 50 条
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                 cts.CancelAfter(TimeSpan.FromSeconds(2));
                 try
@@ -44,29 +43,19 @@ public class ApiLogWriterService : BackgroundService
                         buffer.Add(item);
                     }
                 }
-                catch (OperationCanceledException)
-                {
-                    // 超时或取消，用当前积累的条数写入
-                }
+                catch (OperationCanceledException) { }
 
-                // 批量写入数据库
                 await FlushAsync(buffer, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                // 应用关闭，把剩余日志写完
                 while (_channel.Reader.TryRead(out var remaining))
-                {
                     buffer.Add(remaining);
-                }
                 if (buffer.Count > 0)
                     await FlushAsync(buffer, stoppingToken);
                 break;
             }
-            catch
-            {
-                // 单次写入失败不中断循环
-            }
+            catch { }
         }
     }
 
@@ -77,13 +66,23 @@ public class ApiLogWriterService : BackgroundService
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.ApiLogs.AddRange(buffer);
-            await db.SaveChangesAsync(ct);
+            var db = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+            using var conn = db.CreateConnection();
+            conn.Open();
+
+            foreach (var log in buffer)
+            {
+                await conn.ExecuteAsync(@"
+                    INSERT INTO ApiLogs (Id, UserId, UserDisplayName, HttpMethod, Path, QueryString, RequestBody, StatusCode, ResponseBody, DurationMs, IpAddress, UserAgent, CreatedAt)
+                    VALUES (@Id, @UserId, @UserDisplayName, @HttpMethod, @Path, @QueryString, @RequestBody, @StatusCode, @ResponseBody, @DurationMs, @IpAddress, @UserAgent, @CreatedAt)",
+                    new
+                    {
+                        log.Id, log.UserId, log.UserDisplayName, log.HttpMethod, log.Path,
+                        log.QueryString, log.RequestBody, log.StatusCode, log.ResponseBody,
+                        log.DurationMs, log.IpAddress, log.UserAgent, log.CreatedAt
+                    });
+            }
         }
-        catch
-        {
-            // 日志写入失败不应影响应用程序
-        }
+        catch { }
     }
 }

@@ -1,32 +1,43 @@
+using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Organization;
 using RBS.Core.Entities.Organization;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Core.Interfaces.Services;
+using RBS.Core.Common;
+using System.Data;
 
 namespace RBS.Application.Services.Organization;
 
-/// <summary>
-/// 用户管理应用服务实现
-/// </summary>
 public class UserService : IUserService
 {
+    private readonly IDbConnectionFactory _db;
     private readonly IUnitOfWork _uow;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UserService(IUnitOfWork uow) => _uow = uow;
+    public UserService(IDbConnectionFactory db, ICurrentUserService currentUserService, IUnitOfWork uow)
+    {
+        _db = db;
+        _currentUserService = currentUserService;
+        _uow = uow;
+    }
 
     public async Task<List<UserDto>> GetListAsync(CancellationToken ct = default)
     {
-        var users = await _uow.Users.GetAllWithRolesAsync(ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        var users = (await conn.QueryAsync<User>("SELECT * FROM Users ORDER BY CreatedAt DESC")).ToList();
         var dtos = new List<UserDto>();
         foreach (var user in users)
-            dtos.Add(await MapToDtoAsync(user, ct));
+            dtos.Add(await MapToDtoAsync(user, conn, ct));
         return dtos;
     }
 
     public async Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var user = await _uow.Users.GetByIdWithRolesAsync(id, ct);
-        return user == null ? null : await MapToDtoAsync(user, ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        var user = await conn.QuerySingleOrDefaultAsync<User>("SELECT * FROM Users WHERE Id=@Id", new { Id = id });
+        return user == null ? null : await MapToDtoAsync(user, conn, ct);
     }
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
@@ -38,101 +49,92 @@ public class UserService : IUserService
         if (request.IsSuperAdmin) user.GrantSuperAdmin();
         if (request.HomeCompanyId.HasValue) user.SetHomeCompany(request.HomeCompanyId.Value);
 
-        await _uow.Users.AddAsync(user, ct);
-
-        if (request.RoleIds?.Any() == true)
+        using var conn = _db.CreateConnection(); conn.Open();
+        using var tx = conn.BeginTransaction();
+        try
         {
-            foreach (var roleId in request.RoleIds)
-                user.AssignRole(roleId);
-        }
+            await conn.ExecuteAsync(@"
+                INSERT INTO Users (Id, Username, PasswordHash, DisplayName, IsActive, HomeCompanyId, IsSuperAdmin, CreatedBy, CreatedAt)
+                VALUES (@Id, @Username, @PasswordHash, @DisplayName, @IsActive, @HomeCompanyId, @IsSuperAdmin, @CreatedBy, @CreatedAt)",
+                new { user.Id, user.Username, user.PasswordHash, user.DisplayName, user.IsActive, user.HomeCompanyId, user.IsSuperAdmin, CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now });
 
-        await _uow.CommitAsync(ct);
-        return await GetByIdAsync(user.Id, ct) ?? throw new InvalidOperationException("创建失败");
+            if (request.RoleIds?.Any() == true)
+            {
+                foreach (var roleId in request.RoleIds)
+                    await conn.ExecuteAsync("INSERT INTO UserRoles (Id, UserId, RoleId, CreatedBy, CreatedAt) VALUES (@Id, @UserId, @RoleId, @CreatedBy, @CreatedAt)",
+                        new { Id = Guid.NewGuid(), UserId = user.Id, RoleId = roleId, CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now }, tx);
+            }
+            tx.Commit();
+        }
+        catch { tx.Rollback(); throw; }
+
+        return (await GetByIdAsync(user.Id, ct))!;
     }
 
     public async Task UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
-        var user = await _uow.Users.GetByIdWithRolesAsync(id, ct);
-        if (user == null) throw new KeyNotFoundException("用户不存在");
+        using var conn = _db.CreateConnection(); conn.Open();
+        var user = await conn.QuerySingleOrDefaultAsync<User>("SELECT * FROM Users WHERE Id=@Id", new { Id = id })
+            ?? throw new KeyNotFoundException("用户不存在");
 
         if (request.DisplayName != null || request.Phone != null || request.Email != null)
             user.UpdateProfile(request.DisplayName ?? user.DisplayName, request.Phone, request.Email);
+        if (!string.IsNullOrEmpty(request.Password)) user.ChangePassword(request.Password);
+        if (request.IsActive.HasValue) { if (request.IsActive.Value) user.Activate(); else user.Deactivate(); }
+        if (request.HomeCompanyId.HasValue && request.HomeCompanyId.Value != user.HomeCompanyId) user.SetHomeCompany(request.HomeCompanyId.Value);
+        if (request.IsSuperAdmin.HasValue && request.IsSuperAdmin.Value != user.IsSuperAdmin) { if (request.IsSuperAdmin.Value) user.GrantSuperAdmin(); else user.RevokeSuperAdmin(); }
 
-        if (!string.IsNullOrEmpty(request.Password))
-            user.ChangePassword(request.Password);
-
-        if (request.IsActive.HasValue)
+        using var tx = conn.BeginTransaction();
+        try
         {
-            if (request.IsActive.Value) user.Activate();
-            else user.Deactivate();
+            await conn.ExecuteAsync("UPDATE Users SET DisplayName=@DisplayName,PasswordHash=@PasswordHash,Phone=@Phone,Email=@Email,IsActive=@IsActive,HomeCompanyId=@HomeCompanyId,IsSuperAdmin=@IsSuperAdmin,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id",
+                new { user.DisplayName, user.PasswordHash, Phone = (string?)null, Email = (string?)null, user.IsActive, user.HomeCompanyId, user.IsSuperAdmin, UpdatedBy = _currentUserService.UserId, UpdatedAt = ChinaTime.Now, Id = id }, tx);
+
+            if (request.RoleIds != null)
+            {
+                await conn.ExecuteAsync("DELETE FROM UserRoles WHERE UserId=@UserId", new { UserId = id }, tx);
+                foreach (var roleId in request.RoleIds)
+                    await conn.ExecuteAsync("INSERT INTO UserRoles (Id, UserId, RoleId, CreatedBy, CreatedAt) VALUES (@Id, @UserId, @RoleId, @CreatedBy, @CreatedAt)",
+                        new { Id = Guid.NewGuid(), UserId = id, RoleId = roleId, CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now }, tx);
+            }
+            tx.Commit();
         }
-
-        if (request.HomeCompanyId.HasValue && request.HomeCompanyId.Value != user.HomeCompanyId)
-            user.SetHomeCompany(request.HomeCompanyId.Value);
-
-        if (request.IsSuperAdmin.HasValue && request.IsSuperAdmin.Value != user.IsSuperAdmin)
-        {
-            if (request.IsSuperAdmin.Value) user.GrantSuperAdmin();
-            else user.RevokeSuperAdmin();
-        }
-
-        if (request.RoleIds != null)
-        {
-            var currentRoleIds = user.Roles.Select(r => r.RoleId).ToHashSet();
-            var newRoleIds = request.RoleIds.ToHashSet();
-            foreach (var roleId in currentRoleIds.Except(newRoleIds))
-                user.RemoveRole(roleId);
-            foreach (var roleId in newRoleIds.Except(currentRoleIds))
-                user.AssignRole(roleId);
-        }
-
-        await _uow.CommitAsync(ct);
+        catch { tx.Rollback(); throw; }
     }
 
     public async Task SetDefaultCompanyAsync(Guid userId, Guid? companyId, CancellationToken ct = default)
     {
-        var user = await _uow.Users.GetByIdAsync(userId, ct)
-            ?? throw new KeyNotFoundException("用户不存在");
-        user.SetDefaultCompany(companyId);
-        await _uow.CommitAsync(ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync("UPDATE Users SET DefaultCompanyId = @CompanyId WHERE Id = @Id", new { Id = userId, CompanyId = companyId });
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) throw new KeyNotFoundException("用户不存在");
-        user.Deactivate();
-        await _uow.CommitAsync(ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync("UPDATE Users SET IsActive = 0 WHERE Id = @Id", new { Id = id });
     }
 
-    private async Task<UserDto> MapToDtoAsync(User user, CancellationToken ct)
+    private async Task<UserDto> MapToDtoAsync(User user, IDbConnection conn, CancellationToken ct)
     {
         var dto = new UserDto
         {
-            Id = user.Id,
-            Username = user.Username,
-            DisplayName = user.DisplayName,
-            Phone = user.Phone,
-            Email = user.Email,
-            IsActive = user.IsActive,
-            HomeCompanyId = user.HomeCompanyId,
-            IsSuperAdmin = user.IsSuperAdmin,
-            CreatedAt = user.CreatedAt,
-            RoleIds = user.Roles.Select(r => r.RoleId).ToList()
+            Id = user.Id, Username = user.Username, DisplayName = user.DisplayName,
+            Phone = user.Phone, Email = user.Email, IsActive = user.IsActive,
+            HomeCompanyId = user.HomeCompanyId, IsSuperAdmin = user.IsSuperAdmin,
+            CreatedAt = user.CreatedAt, RoleIds = new List<Guid>(), RoleNames = new List<string>()
         };
 
-        // 获取角色名称
-        foreach (var ur in user.Roles)
+        var roles = (await conn.QueryAsync("SELECT ur.RoleId, r.Name FROM UserRoles ur LEFT JOIN Roles r ON r.Id = ur.RoleId WHERE ur.UserId = @UserId", new { UserId = user.Id })).ToList();
+        foreach (var row in roles)
         {
-            var role = await _uow.Roles.GetByIdAsync(ur.RoleId, ct);
-            if (role != null) dto.RoleNames.Add(role.Name);
+            dto.RoleIds.Add((Guid)row.RoleId);
+            if (!string.IsNullOrEmpty(row.Name))
+                dto.RoleNames.Add((string)row.Name);
         }
 
-        // 获取公司名称
         if (user.HomeCompanyId.HasValue)
         {
-            var company = await _uow.Companies.GetByIdAsync(user.HomeCompanyId.Value, ct);
-            if (company != null) dto.HomeCompanyName = company.Name;
+            dto.HomeCompanyName = await conn.QuerySingleOrDefaultAsync<string>("SELECT Name FROM Companies WHERE Id = @Id", new { Id = user.HomeCompanyId.Value });
         }
 
         return dto;
