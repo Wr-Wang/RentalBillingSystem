@@ -13,23 +13,36 @@ public class ContractDto
     public string PaymentCycle { get; set; } = "Monthly";
     public string Status { get; set; } = "Draft";
     public Guid CompanyId { get; set; }
+    public Guid? PreviousContractId { get; set; }
+    public int RenewalCount { get; set; }
+    public Guid? OriginalContractId { get; set; }
+    public decimal? MarketPriceAtRenewal { get; set; }
+    public bool HasRenewalContract { get; set; }  // 是否存在其他合同 PreviousContractId 指向本合同
+    public bool AutoRenew { get; set; } = true;
     public List<ContractTenantDto> Tenants { get; set; } = new();
     public List<ContractFeeConfigDto> FeeConfigs { get; set; } = new();
 }
 
 public class ContractTenantDto
 {
+    public Guid ContractId { get; set; }
     public Guid TenantId { get; set; }
     public string? TenantName { get; set; }
+    public string? TenantPhone { get; set; }
     public bool IsPrimary { get; set; }
 }
 
 public class ContractFeeConfigDto
 {
+    public Guid Id { get; set; }
+    public Guid ContractId { get; set; }
     public Guid FeeCodeId { get; set; }
     public string? FeeCodeName { get; set; }
     public decimal Amount { get; set; }
     public string BillingMode { get; set; } = "FixedAmount";
+    public string? Unit { get; set; }
+    public decimal? UnitPrice { get; set; }
+    public bool IsActive { get; set; }
 }
 
 public class CreateContractRequest

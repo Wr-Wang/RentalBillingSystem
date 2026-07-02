@@ -27,6 +27,7 @@ public interface IUnitOfWork : IDisposable
     // 合同
     IContractRepository Contracts { get; }
     ITenantRepository Tenants { get; }
+    IRenewalRequestRepository RenewalRequests { get; }
 
     // 费用/应收
     IFeeCodeRepository FeeCodes { get; }

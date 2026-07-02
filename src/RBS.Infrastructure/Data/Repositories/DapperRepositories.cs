@@ -4,6 +4,8 @@ using RBS.Core.Common;
 using RBS.Core.Entities.Organization;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Billing;
+using RBS.Core.Entities.Contract;
+using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
@@ -182,6 +184,7 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
 
     public async Task<ApprovalRequest> AddAsync(ApprovalRequest entity, CancellationToken ct = default)
     {
+        if (entity.CreatedAt == default) entity.SetCreated(Guid.NewGuid(), RBS.Core.Common.ChinaTime.Now, null, null);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(@"
             INSERT INTO ApprovalRequests (Id, ApprovalTypeId, Title, Description, TargetEntityId, TargetEntityType,
@@ -317,4 +320,71 @@ public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<HolidayCalendar>("SELECT * FROM HolidayCalendars WHERE YEAR(HolidayDate)=@Year ORDER BY HolidayDate", new { Year = year })).ToList(); }
     public async Task<HolidayCalendar?> GetByDateAsync(Guid companyId, DateOnly date, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<HolidayCalendar>("SELECT * FROM HolidayCalendars WHERE HolidayDate=@Date", new { Date = date }); }
+}
+
+public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepository
+{
+    public DapperTenantRepository(IDbConnectionFactory db) : base(db) { }
+    public async Task<Tenant?> GetByPhoneAsync(string phone, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Tenant>("SELECT * FROM Tenants WHERE Phone=@Phone", new { Phone = phone }); }
+    public async Task<List<Tenant>> SearchAsync(string keyword, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Tenant>("SELECT * FROM Tenants WHERE Name LIKE @K OR Phone LIKE @K", new { K = $"%{keyword}%" })).ToList(); }
+}
+
+public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptRepository
+{
+    public DapperReceiptRepository(IDbConnectionFactory db) : base(db) { }
+    public async Task<List<Receipt>> GetPendingConfirmAsync(Guid companyId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Receipt>("SELECT * FROM Receipts WHERE CompanyId=@Id AND Status='Pending' ORDER BY CreatedAt DESC", new { Id = companyId })).ToList(); }
+    public async Task<decimal> GetTotalConfirmedAsync(Guid contractId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<decimal>("SELECT ISNULL(SUM(Amount),0) FROM Receipts WHERE ContractId=@Id AND Status='Confirmed'", new { Id = contractId }); }
+}
+
+public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, IReceivablePlanRepository
+{
+    public DapperReceivablePlanRepository(IDbConnectionFactory db) : base(db) { }
+    public async Task<List<ReceivablePlan>> GetByContractIdAsync(Guid contractId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>("SELECT * FROM ReceivablePlans WHERE ContractId=@Id ORDER BY Period", new { Id = contractId })).ToList(); }
+    public async Task<ReceivablePlan?> GetByContractPeriodFeeAsync(Guid contractId, string period, Guid feeCodeId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<ReceivablePlan>("SELECT * FROM ReceivablePlans WHERE ContractId=@Id AND Period=@P AND FeeCodeId=@F", new { Id = contractId, P = period, F = feeCodeId }); }
+    public async Task<List<ReceivablePlan>> GetOverdueAsync(Guid companyId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>("SELECT * FROM ReceivablePlans WHERE Status='Pending' AND DueDate < CAST(GETDATE() AS DATE)")).ToList(); }
+}
+
+public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMeterReadingRepository
+{
+    public DapperMeterReadingRepository(IDbConnectionFactory db) : base(db) { }
+    public async Task<MeterReading?> GetLatestReadingAsync(Guid contractFeeConfigId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<MeterReading>("SELECT TOP 1 * FROM MeterReadings WHERE ContractFeeConfigId=@Id ORDER BY Year DESC, Month DESC", new { Id = contractFeeConfigId }); }
+    public async Task<List<MeterReading>> GetHistoryAsync(Guid contractFeeConfigId, int year, int month, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<MeterReading>("SELECT * FROM MeterReadings WHERE ContractFeeConfigId=@Id AND (Year<@Y OR (Year=@Y AND Month<=@M)) ORDER BY Year DESC, Month DESC", new { Id = contractFeeConfigId, Y = year, M = month })).ToList(); }
+    public async Task<bool> ReadingExistsAsync(Guid contractFeeConfigId, int year, int month, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM MeterReadings WHERE ContractFeeConfigId=@Id AND Year=@Y AND Month=@M", new { Id = contractFeeConfigId, Y = year, M = month }) > 0; }
+}
+
+public class DapperContractRepository : DapperRepository<Contract>, IContractRepository
+{
+    public DapperContractRepository(IDbConnectionFactory db) : base(db) { }
+    public async Task<Contract?> GetByContractNoAsync(string contractNo, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Contract>("SELECT * FROM Contracts WHERE ContractNo=@No", new { No = contractNo }); }
+    public async Task<List<Contract>> GetActiveContractsAsync(Guid companyId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>("SELECT * FROM Contracts WHERE CompanyId=@Id AND StatusCode='Active'", new { Id = companyId })).ToList(); }
+    public async Task<List<Contract>> GetContractsExpiringAsync(DateOnly date, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>("SELECT * FROM Contracts WHERE EndDate=@Date", new { Date = date })).ToList(); }
+    public async Task<bool> HasActiveForHousingUnitAsync(Guid housingUnitId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Contracts WHERE RoomId=@Id AND StatusCode='Active'", new { Id = housingUnitId }) > 0; }
+}
+
+public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, IRenewalRequestRepository
+{
+    public DapperRenewalRequestRepository(IDbConnectionFactory db) : base(db) { }
+
+    public async Task<List<RenewalRequest>> GetByOldContractIdAsync(Guid oldContractId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<RenewalRequest>("SELECT * FROM RenewalRequests WHERE OldContractId=@Id ORDER BY CreatedAt DESC", new { Id = oldContractId })).ToList(); }
+
+    public async Task<RenewalRequest?> GetPendingByContractIdAsync(Guid contractId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<RenewalRequest>("SELECT * FROM RenewalRequests WHERE OldContractId=@Id AND Status IN ('PendingApproval','Approved')", new { Id = contractId }); }
+
+    public async Task<bool> HasPendingForContractAsync(Guid contractId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM RenewalRequests WHERE OldContractId=@Id AND Status IN ('PendingApproval','Approved')", new { Id = contractId }) > 0; }
 }

@@ -11,7 +11,11 @@ namespace RBS.Infrastructure.Data;
 public class DbConnectionFactory : IDbConnectionFactory
 {
     private readonly string _connectionString;
-        static DbConnectionFactory() { SqlMapper.AddTypeHandler(new DapperDateOnlyHandler()); }
+        static DbConnectionFactory()
+        {
+            SqlMapper.AddTypeHandler(new DapperDateOnlyHandler());
+            SqlMapper.AddTypeHandler(new DapperRoomStatusHandler());
+        }
 
     public DbConnectionFactory(string connectionString)
     {

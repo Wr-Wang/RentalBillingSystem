@@ -25,6 +25,10 @@ IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'DISCOUNT')
 INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
 VALUES ('F1111111-1111-1111-1111-111111111005',N'应收减免','DISCOUNT',N'应收费用减免需要审批',1,@Cid,@SysUserId,@Now);
 
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_MODIFY')
+INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+VALUES ('F1111111-1111-1111-1111-111111111006',N'修改合同租金','CONTRACT_MODIFY',N'修改合同租金需要审批，金额越大审批级别越高。',1,@Cid,@SysUserId,@Now);
+
 -- ==================== 审批级别数据 ====================
 -- 动态获取角色 ID
 DECLARE @R_OpsSup uniqueidentifier = (SELECT [Id] FROM [Roles] WHERE [Code] = 'OpsSupervisor');
@@ -75,6 +79,14 @@ VALUES ('F2111111-1111-1111-1111-111111111010','F1111111-1111-1111-1111-11111111
 IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1111111-1111-1111-1111-111111111005' AND [Level] = 3)
 INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
 VALUES ('F2111111-1111-1111-1111-111111111011','F1111111-1111-1111-1111-111111111005',3,@R_GenMgr,50000,99999999,@Cid,@SysUserId,@Now);
+
+-- 修改合同租金：2级（运营主管≤5k → 部门经理≥5k）
+IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1111111-1111-1111-1111-111111111006' AND [Level] = 1)
+INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+VALUES ('F2111111-1111-1111-1111-111111111012','F1111111-1111-1111-1111-111111111006',1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
+IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1111111-1111-1111-1111-111111111006' AND [Level] = 2)
+INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+VALUES ('F2111111-1111-1111-1111-111111111013','F1111111-1111-1111-1111-111111111006',2,@R_DeptMgr,5000,99999999,@Cid,@SysUserId,@Now);
 
 PRINT N'审批类型及级别数据初始化完成！';
 GO

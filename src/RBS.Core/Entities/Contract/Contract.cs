@@ -20,6 +20,15 @@ public class Contract : AggregateRoot, IHasCompany
     public Guid CompanyId { get; private set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
+    // ===== 续签链字段 =====
+    public Guid? PreviousContractId { get; private set; }
+    public int RenewalCount { get; private set; }
+    public Guid? OriginalContractId { get; private set; }
+    public decimal? MarketPriceAtRenewal { get; private set; }
+
+    // ===== 自动续签 =====
+    public bool AutoRenew { get; private set; } = true;
+
     /// <summary>兼容旧代码</summary>
     [Obsolete("Use StatusCode instead")]
     public string Status => StatusCode;
@@ -91,6 +100,8 @@ public class Contract : AggregateRoot, IHasCompany
 
     /// <summary>供内部/ORM 使用</summary>
     public void SetStatus(string status) => StatusCode = status;
+    public void SetRenewalCount(int count) => RenewalCount = count;
+    public void SetAutoRenew(bool autoRenew) => AutoRenew = autoRenew;
 
     // ===== 租客管理 =====
 
@@ -185,6 +196,15 @@ public class Contract : AggregateRoot, IHasCompany
     {
         AssertValidTransition("Renewed");
         StatusCode = "Renewed";
+    }
+
+    /// <summary>设置续签链信息（创建新合同时调用）</summary>
+    public void SetRenewalChain(Guid previousContractId, int renewalCount, Guid? originalContractId, decimal? marketPrice)
+    {
+        PreviousContractId = previousContractId;
+        RenewalCount = renewalCount;
+        OriginalContractId = originalContractId ?? previousContractId;
+        MarketPriceAtRenewal = marketPrice;
     }
 
     // ===== 查询方法 =====

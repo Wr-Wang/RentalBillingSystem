@@ -57,6 +57,7 @@ public class AuthController : ControllerBase
                 user.Phone,
                 user.Email,
                 user.HomeCompanyId,
+                DefaultCompanyId = user.DefaultCompanyId ?? user.HomeCompanyId,
                 user.IsSuperAdmin
             },
             Roles = roles.Select(r => new { r.Id, r.Name, r.Code }),

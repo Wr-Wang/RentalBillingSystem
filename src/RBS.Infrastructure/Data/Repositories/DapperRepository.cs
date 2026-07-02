@@ -31,10 +31,15 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
 
     public async Task<T> AddAsync(T entity, CancellationToken ct = default)
     {
+        var now = RBS.Core.Common.ChinaTime.Now;
+        var bp = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        if (typeof(T).IsSubclassOf(typeof(RBS.Core.Entities.Base.AuditableEntity)) || typeof(T) == typeof(RBS.Core.Entities.Base.AuditableEntity))
+        {
+            (entity as RBS.Core.Entities.Base.AuditableEntity)?.SetCreated(Guid.NewGuid(), now, null, null);
+        }
+
         using var conn = _db.CreateConnection(); conn.Open();
-        var props = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-            .Where(p => p.CanRead && !IsNavProp(p))
-            .Select(p => p.Name).ToList();
+        var props = bp.Where(p => p.CanRead && !IsNavProp(p)).Select(p => p.Name).ToList();
         var cols = string.Join(",", props);
         var vals = string.Join(",", props.Select(p => "@" + p));
         await conn.ExecuteAsync($"INSERT INTO [{_tableName}] ({cols}) VALUES ({vals})", entity);
@@ -81,7 +86,7 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
     {
         var name = typeof(T).Name;
         if (name.EndsWith("y")) return name.Substring(0, name.Length - 1) + "ies";
-        if (name.EndsWith("s")) return name + "es";
+        if (name.EndsWith("s") || name.EndsWith("ch") || name.EndsWith("sh") || name.EndsWith("x")) return name + "es";
         return name + "s";
     }
 }

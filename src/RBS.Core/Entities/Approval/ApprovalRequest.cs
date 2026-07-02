@@ -18,6 +18,7 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     public string Status { get; private set; }
     public Guid CompanyId { get; private set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public Guid? ContractId { get; private set; }  // 合同关联（统一并发控制用）
 
     // ===== 审批跟踪 =====
     private readonly List<ApprovalRecord> _records = new();
@@ -70,6 +71,9 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
             Status = "Pending";
         }
     }
+
+    /// <summary>设置合同关联ID（用于统一并发控制）</summary>
+    public void SetContractId(Guid contractId) => ContractId = contractId;
 
     /// <summary>记录审批操作</summary>
     public void AddRecord(Guid approverId, string action, string? comment)

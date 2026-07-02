@@ -6,6 +6,7 @@ using RBS.Core.Common;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Base;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
@@ -22,16 +23,18 @@ public class ApprovalService : IApprovalService
     private readonly IUnitOfWork _uow;
     private readonly ITenantService _tenantService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IDbConnectionFactory _connectionFactory;
     private readonly IServiceProvider _serviceProvider;
 
     public ApprovalService(
         IUnitOfWork uow,
         ITenantService tenantService,
         ICurrentUserService currentUserService,
-        IServiceProvider serviceProvider)
+        IDbConnectionFactory connectionFactory, IServiceProvider serviceProvider)
     {
         _uow = uow;
         _tenantService = tenantService;
+        _connectionFactory = connectionFactory;
         _currentUserService = currentUserService;
         _serviceProvider = serviceProvider;
     }
@@ -60,7 +63,19 @@ public class ApprovalService : IApprovalService
         // 提交（Draft → Pending，若0级则自动 Approved）
         entity.Submit();
 
-        await _uow.CommitAsync(ct);
+        var record = entity.Records.First();
+        using (var updateConn = _connectionFactory.CreateConnection())
+        {
+            updateConn.Open();
+            // 插入审批记录（Submitted），与状态更新共用同一连接
+            await Dapper.SqlMapper.ExecuteAsync(updateConn,
+                @"INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
+                  VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)",
+                new { record.Id, ApprovalRequestId = entity.Id, record.Level, record.ApproverId, record.Action, Comment = record.Comment ?? "", record.CreatedBy, record.CreatedAt });
+
+            await Dapper.SqlMapper.ExecuteAsync(updateConn, "UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id", new { entity.Status, entity.Id });
+        }
+
         return await MapToDtoAsync(entity, ct);
     }
 

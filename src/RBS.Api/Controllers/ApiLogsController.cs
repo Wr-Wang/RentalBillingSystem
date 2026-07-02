@@ -70,7 +70,24 @@ public class ApiLogsController : ControllerBase
         using var conn = _db.CreateConnection(); conn.Open();
         var log = await conn.QuerySingleOrDefaultAsync("SELECT * FROM ApiLogs WHERE Id = @Id", new { Id = id });
         if (log == null) return NotFound();
-        return Ok(log);
+
+        dynamic d = log;
+        return Ok(new
+        {
+            id = (Guid)d.Id,
+            userId = (Guid?)d.UserId,
+            userDisplayName = (string?)d.UserDisplayName,
+            httpMethod = (string)d.HttpMethod,
+            path = (string)d.Path,
+            queryString = (string?)d.QueryString,
+            requestBody = (string?)d.RequestBody,
+            statusCode = (int)d.StatusCode,
+            responseBody = (string?)d.ResponseBody,
+            durationMs = (long)d.DurationMs,
+            ipAddress = (string?)d.IpAddress,
+            userAgent = (string?)d.UserAgent,
+            createdAt = (DateTime)d.CreatedAt
+        });
     }
 
     [HttpDelete("{id}")]

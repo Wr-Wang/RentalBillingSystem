@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IRoomTypeService, RoomTypeService>();
         services.AddScoped<IContractService, ContractAppService>();
+        services.AddScoped<IRenewalService, RenewalService>();
         services.AddScoped<IBillingService, BillingAppService>();
         services.AddScoped<IApprovalTypeService, ApprovalTypeService>();
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();

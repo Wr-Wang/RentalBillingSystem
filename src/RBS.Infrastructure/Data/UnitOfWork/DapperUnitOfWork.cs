@@ -42,11 +42,12 @@ public class DapperUnitOfWork : IUnitOfWork
     public IRepository<ImportBatch> ImportBatches => _importBatches ??= new DapperRepository<ImportBatch>(_db);
     public IRepository<ImportBatchItem> ImportBatchItems => _importBatchItems ??= new DapperRepository<ImportBatchItem>(_db);
     public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new DapperRepository<RoomPricingStandard>(_db);
-    public ITenantRepository Tenants => throw new NotImplementedException();
-    public IReceivablePlanRepository ReceivablePlans => throw new NotImplementedException();
-    public IReceiptRepository Receipts => throw new NotImplementedException();
-    public IMeterReadingRepository MeterReadings => throw new NotImplementedException();
-    public IContractRepository Contracts => throw new NotImplementedException();
+    public ITenantRepository Tenants => _tenants ??= new DapperTenantRepository(_db);
+    public IReceivablePlanRepository ReceivablePlans => _receivablePlans ??= new DapperReceivablePlanRepository(_db);
+    public IReceiptRepository Receipts => _receipts ??= new DapperReceiptRepository(_db);
+    public IMeterReadingRepository MeterReadings => _meterReadings ??= new DapperMeterReadingRepository(_db);
+    public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db);
+    public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db);
 
     private IUserRepository? _users;
     private IRoleRepository? _roles;
@@ -70,6 +71,12 @@ public class DapperUnitOfWork : IUnitOfWork
     private IRepository<ImportBatch>? _importBatches;
     private IRepository<ImportBatchItem>? _importBatchItems;
     private IRepository<RoomPricingStandard>? _roomPricingStandards;
+    private ITenantRepository? _tenants;
+    private IReceivablePlanRepository? _receivablePlans;
+    private IReceiptRepository? _receipts;
+    private IMeterReadingRepository? _meterReadings;
+    private IContractRepository? _contracts;
+    private IRenewalRequestRepository? _renewalRequests;
 
     public async Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default)
     {
@@ -93,10 +100,14 @@ public class DapperUnitOfWork : IUnitOfWork
     public Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class => Task.CompletedTask;
     public Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default) => throw new NotSupportedException();
     public Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default) => Task.FromResult(0);
-    public Task<int> ExecuteSqlRawAsync(string sql, IEnumerable<object> parameters, CancellationToken ct = default)
+    public async Task<int> ExecuteSqlRawAsync(string sql, IEnumerable<object> parameters, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return conn.ExecuteAsync(sql, parameters.ToArray());
+        var args = parameters.ToArray();
+        var dp = new DynamicParameters();
+        for (int i = 0; i < args.Length; i++)
+            dp.Add($"p{i}", args[i]);
+        return await conn.ExecuteAsync(sql, dp);
     }
     public void Dispose() { }
 }

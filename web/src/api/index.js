@@ -65,6 +65,11 @@ export function createContract(data) { return request({ url: '/contracts', metho
 export function updateContract(id, data) { return request({ url: `/contracts/${id}`, method: 'put', data }) }
 export function terminateContract(id, data) { return request({ url: `/contracts/${id}/terminate`, method: 'post', data }) }
 export function renewContract(id, data) { return request({ url: `/contracts/${id}/renew`, method: 'post', data }) }
+export function previewRenewal(id) { return request({ url: `/contracts/${id}/renewal/preview`, method: 'get' }) }
+export function submitRenewal(id, data) { return request({ url: `/contracts/${id}/renewal/submit`, method: 'post', data }) }
+export function getRenewalHistory(id) { return request({ url: `/contracts/${id}/renewal/history`, method: 'get' }) }
+export function getRenewalChain(id) { return request({ url: `/contracts/${id}/renewal/chain`, method: 'get' }) }
+export function getAllowedOperations(id) { return request({ url: `/contracts/${id}/allowed-operations`, method: 'get' }) }
 export function suspendContract(id) { return request({ url: `/contracts/${id}/suspend`, method: 'post' }) }
 export function resumeContract(id) { return request({ url: `/contracts/${id}/resume`, method: 'post' }) }
 export function getContractTimeline(id) { return request({ url: `/contracts/${id}/timeline`, method: 'get' }) }
@@ -77,7 +82,11 @@ export function deleteFeeCode(id) { return request({ url: `/feecodes/${id}`, met
 
 // Contract Fee Configs
 export function getContractFeeConfigs(contractId) { return request({ url: `/contractfeeconfigs?contractId=${contractId}`, method: 'get' }) }
+export function createContractFeeConfig(data) { return request({ url: '/contractfeeconfigs', method: 'post', data }) }
 export function updateContractFeeConfig(id, data) { return request({ url: `/contractfeeconfigs/${id}`, method: 'put', data }) }
+export function deleteContractFeeConfig(id) { return request({ url: `/contractfeeconfigs/${id}`, method: 'delete' }) }
+export function adjustContractFeeConfig(data) { return request({ url: '/contractfeeconfigs/adjust', method: 'post', data }) }
+export function getContractFeeConfigHistory(contractId, feeCodeId) { return request({ url: `/contractfeeconfigs/history?contractId=${contractId}&feeCodeId=${feeCodeId}`, method: 'get' }) }
 
 // Meter Readings
 export function getMeterReadings(params) { return request({ url: '/meterreadings', method: 'get', params }) }
