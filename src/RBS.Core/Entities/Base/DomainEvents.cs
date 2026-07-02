@@ -124,6 +124,43 @@ public sealed record ReceivableSettledEvent : IDomainEvent
 
 // ===== 审批领域事件 =====
 
+/// <summary>审批已提交</summary>
+public sealed record ApprovalSubmittedEvent : IDomainEvent
+{
+    public Guid ApprovalRequestId { get; }
+    public Guid ApprovalTypeId { get; }
+    public Guid TargetEntityId { get; }
+    public string TargetEntityType { get; }
+    public string Title { get; }
+    public DateTime OccurredAt { get; }
+
+    public ApprovalSubmittedEvent(Guid approvalRequestId, Guid approvalTypeId,
+        Guid targetEntityId, string targetEntityType, string title)
+    {
+        ApprovalRequestId = approvalRequestId;
+        ApprovalTypeId = approvalTypeId;
+        TargetEntityId = targetEntityId;
+        TargetEntityType = targetEntityType;
+        Title = title;
+        OccurredAt = ChinaTime.Now;
+    }
+}
+
+/// <summary>审批已推进到下一级（非终审通过）</summary>
+public sealed record ApprovalLevelAdvancedEvent : IDomainEvent
+{
+    public Guid ApprovalRequestId { get; }
+    public int NextLevel { get; }
+    public DateTime OccurredAt { get; }
+
+    public ApprovalLevelAdvancedEvent(Guid approvalRequestId, int nextLevel)
+    {
+        ApprovalRequestId = approvalRequestId;
+        NextLevel = nextLevel;
+        OccurredAt = ChinaTime.Now;
+    }
+}
+
 /// <summary>审批已通过（全部级别完成）</summary>
 public sealed record ApprovalCompletedEvent : IDomainEvent
 {

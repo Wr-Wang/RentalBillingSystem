@@ -214,6 +214,12 @@ export function getSystemLog(id) { return request({ url: `/systemlogs/${id}`, me
 export function deleteSystemLog(id) { return request({ url: `/systemlogs/${id}`, method: 'delete' }) }
 export function clearSystemLogs() { return request({ url: '/systemlogs', method: 'delete' }) }
 
+// Notifications
+export function getNotifications(params) { return request({ url: '/notifications', method: 'get', params }) }
+export function getUnreadCounts() { return request({ url: '/notifications/unread-counts', method: 'get' }) }
+export function markNotificationRead(id) { return request({ url: `/notifications/${id}/read`, method: 'put' }) }
+export function markAllNotificationsRead() { return request({ url: '/notifications/read-all', method: 'put' }) }
+
 // Api Logs
 export function getApiLogs(params) { return request({ url: '/apilogs', method: 'get', params }) }
 export function getApiLog(id) { return request({ url: `/apilogs/${id}`, method: 'get' }) }

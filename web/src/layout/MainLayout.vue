@@ -30,6 +30,13 @@
           <el-tag size="small" type="info">{{ userStore.currentCompanyName }}</el-tag>
         </span>
 
+        <!-- 通知铃铛 -->
+        <el-badge :value="notifStore.unreadCounts.Total" :max="99" :hidden="notifStore.unreadCounts.Total === 0">
+          <el-button circle size="small" @click="goToNotifications" style="border: none; color: #fff; background: transparent;">
+            <el-icon :size="20"><Bell /></el-icon>
+          </el-button>
+        </el-badge>
+
         <el-dropdown trigger="click">
           <span class="user-info">
             <el-avatar :size="32" icon="UserFilled" />
@@ -131,17 +138,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../store/user'
 import { useAppStore } from '../store/app'
 import { useMenuStore } from '../store/menu'
+import { useNotificationStore } from '../store/notification'
 import router from '../router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Bell } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const appStore = useAppStore()
 const menuStore = useMenuStore()
+const notifStore = useNotificationStore()
 const route = useRoute()
 
 const showProfile = ref(false)
@@ -182,10 +192,21 @@ async function handleCompanySwitch(command) {
   })
 }
 
+function goToNotifications() {
+  router.push('/notifications')
+}
+
 onMounted(() => {
   menuStore.initFromRoutes(router.options.routes.find(r => r.path === '/')?.children || [])
   // 恢复上次的视角状态（超管切换公司）
   userStore.restoreView()
+  // 启动通知轮询
+  notifStore.fetchUnreadCounts()
+  notifStore.startPolling()
+})
+
+onUnmounted(() => {
+  notifStore.stopPolling()
 })
 
 function handleLogout() {

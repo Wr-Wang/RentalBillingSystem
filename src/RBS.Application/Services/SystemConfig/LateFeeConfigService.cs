@@ -1,13 +1,9 @@
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
 using RBS.Application.DTOs.SystemConfig;
-using RBS.Core.Common;
 using RBS.Core.Entities.SystemConfig;
-using RBS.Core.Common;
 using RBS.Core.Interfaces.Services;
-using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
-using RBS.Core.Common;
 
 namespace RBS.Application.Services.SystemConfig;
 

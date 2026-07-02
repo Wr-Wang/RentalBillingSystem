@@ -7,7 +7,7 @@ using RBS.Core.Interfaces.UnitOfWork;
 namespace RBS.Application.EventHandlers;
 
 /// <summary>
-/// 审批完成事件处理器 — 审批通过/驳回后执行业务回调
+/// 审批完成事件处理器 — 审批通过/驳回后执行业务回调 + 通知相关人员
 /// </summary>
 public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEvent>
 {
@@ -15,16 +15,32 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly IContractService _contractService;
     private readonly IRenewalService _renewalService;
     private readonly IUnitOfWork _uow;
+    private readonly INotificationService _notificationService;
 
-    public ApprovalCompletedEventHandler(IImportService importService, IContractService contractService, IRenewalService renewalService, IUnitOfWork uow)
+    public ApprovalCompletedEventHandler(
+        IImportService importService,
+        IContractService contractService,
+        IRenewalService renewalService,
+        IUnitOfWork uow,
+        INotificationService notificationService)
     {
         _importService = importService;
         _contractService = contractService;
         _renewalService = renewalService;
         _uow = uow;
+        _notificationService = notificationService;
     }
 
     public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+    {
+        // 1. 业务回调
+        await ExecuteBusinessCallbacksAsync(@event, ct);
+
+        // 2. 通知相关人员
+        await SendNotificationsAsync(@event, ct);
+    }
+
+    private async Task ExecuteBusinessCallbacksAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         switch (@event.TargetEntityType)
         {
@@ -35,7 +51,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 }
                 else if (@event.Action == "Rejected")
                 {
-                    // 审批驳回 → 更新批次状态为 Rejected
                     var batch = await _uow.ImportBatches.GetByIdAsync(@event.TargetEntityId, ct);
                     if (batch != null && batch.Status == "PendingApproval")
                     {
@@ -51,7 +66,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
                     if (request?.Description != null)
                     {
-                        // Description 格式: "月租金 ¥5,200 → ¥6,000，差额：+¥800，..."
                         var match = Regex.Match(request.Description, @"→\s*¥([\d,]+)");
                         if (match.Success && decimal.TryParse(match.Groups[1].Value.Replace(",", ""), out var newAmount))
                         {
@@ -64,27 +78,48 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             case "ContractRenewal":
                 if (@event.Action == "Approved")
                 {
-                    // 续签审批通过 → 执行续签
                     await _renewalService.ExecuteRenewalAsync(@event.TargetEntityId, ct);
                 }
                 else if (@event.Action == "Rejected")
                 {
-                    // 续签驳回 → 更新状态
                     var renewal = await _uow.RenewalRequests.GetByIdAsync(@event.TargetEntityId, ct);
                     if (renewal != null)
                     {
-                        // 使用反射调用私有方法 — 因为 RenewalRequest.Reject() 有校验
-                        // 直接用仓储加载后通过 UpdateAsync 更新
                         await _uow.ExecuteSqlRawAsync(
                             "UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = GETUTCDATE() WHERE Id = @Id AND Status = 'PendingApproval'",
                             new object[] { renewal.Id }, ct);
                     }
                 }
                 break;
+        }
+    }
 
-            default:
-                await Task.CompletedTask;
-                break;
+    private async Task SendNotificationsAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+    {
+        var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
+        if (request == null) return;
+
+        if (@event.Action == "Approved")
+        {
+            // 通知提交人
+            await _notificationService.NotifySubmitterAsync(
+                @event.ApprovalRequestId, $"{request.Title} 已通过", null, ct);
+
+            // 通知全部审批参与人
+            await _notificationService.NotifyAllParticipantsAsync(
+                @event.ApprovalRequestId, $"{request.Title} 已通过", null, ct);
+        }
+        else if (@event.Action == "Rejected")
+        {
+            // 找驳回记录中的审批意见
+            var records = (await _uow.ApprovalRequests.GetByIdWithRecordsAsync(@event.ApprovalRequestId, ct))?.Records;
+            var rejectRecord = records?.FirstOrDefault(r => r.Action == "Rejected");
+            var reason = rejectRecord?.Comment;
+            var content = reason != null ? $"原因：{reason}" : null;
+
+            // 通知提交人
+            await _notificationService.NotifySubmitterAsync(
+                @event.ApprovalRequestId, $"{request.Title} 已驳回", content, ct);
         }
     }
 }

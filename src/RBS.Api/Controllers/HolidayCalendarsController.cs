@@ -1,11 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using RBS.Core.Common;
 using Microsoft.AspNetCore.Mvc;
-using RBS.Core.Common;
 using RBS.Application.Common.Interfaces;
-using RBS.Core.Common;
 using RBS.Application.DTOs.SystemConfig;
-using RBS.Core.Common;
 
 namespace RBS.Api.Controllers;
 

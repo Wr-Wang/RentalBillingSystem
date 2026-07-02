@@ -13,9 +13,9 @@ public class DapperRoomStatusHandler : SqlMapper.TypeHandler<RoomStatus>
         return RoomStatus.FromCode(value?.ToString() ?? "Vacant");
     }
 
-    public override void SetValue(IDbDataParameter parameter, RoomStatus value)
+    public override void SetValue(IDbDataParameter parameter, RoomStatus? value)
     {
         parameter.DbType = DbType.String;
-        parameter.Value = value.Code;
+        parameter.Value = value?.Code ?? "Vacant";
     }
 }

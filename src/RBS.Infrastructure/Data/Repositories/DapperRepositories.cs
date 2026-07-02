@@ -5,7 +5,6 @@ using RBS.Core.Entities.Organization;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Contract;
-using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;

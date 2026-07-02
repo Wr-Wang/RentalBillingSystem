@@ -76,6 +76,18 @@ public class ApprovalService : IApprovalService
             await Dapper.SqlMapper.ExecuteAsync(updateConn, "UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id", new { entity.Status, entity.Id });
         }
 
+        // [事件] 提交后通知第一级审批人
+        if (entity.Status == "Pending")
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var handler = scope.ServiceProvider
+                .GetRequiredService<IEventHandler<ApprovalSubmittedEvent>>();
+            await handler.HandleAsync(
+                new ApprovalSubmittedEvent(entity.Id, entity.ApprovalTypeId,
+                    entity.TargetEntityId, entity.TargetEntityType, entity.Title),
+                ct);
+        }
+
         return await MapToDtoAsync(entity, ct);
     }
 
@@ -145,6 +157,16 @@ public class ApprovalService : IApprovalService
                 .GetRequiredService<IEventHandler<ApprovalCompletedEvent>>();
             await handler.HandleAsync(
                 new ApprovalCompletedEvent(id, entity.TargetEntityId, entity.TargetEntityType, "Approved"),
+                ct);
+        }
+        else
+        {
+            // 非终审：通知下一级审批人
+            using var scope = _serviceProvider.CreateScope();
+            var handler = scope.ServiceProvider
+                .GetRequiredService<IEventHandler<ApprovalLevelAdvancedEvent>>();
+            await handler.HandleAsync(
+                new ApprovalLevelAdvancedEvent(id, entity.CurrentLevel + 1),
                 ct);
         }
 

@@ -11,7 +11,6 @@ using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
 using RBS.Infrastructure.Data.Repositories;
-using RBS.Infrastructure.Data.Repositories;
 
 namespace RBS.Infrastructure.Data.UnitOfWork;
 

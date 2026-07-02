@@ -7,6 +7,7 @@ public class Notification
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
+    public Guid? CompanyId { get; private set; }
     public string Category { get; private set; } = string.Empty;  // Approval / Renewal / Collection / System
     public string Title { get; private set; } = string.Empty;
     public string? Content { get; private set; }
@@ -18,10 +19,11 @@ public class Notification
     private Notification() { }
 
     public Notification(Guid userId, string category, string title, string? content,
-        string? referenceType = null, Guid? referenceId = null)
+        string? referenceType = null, Guid? referenceId = null, Guid? companyId = null)
     {
         Id = Guid.NewGuid();
         UserId = userId;
+        CompanyId = companyId;
         Category = category;
         Title = title;
         Content = content;

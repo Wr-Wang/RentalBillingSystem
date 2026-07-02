@@ -174,7 +174,8 @@ public class ContractAppService : IContractService
 
     public async Task<ContractDto> CreateAsync(CreateContractRequest request, CancellationToken ct = default)
     {
-        var contract = new ContractEntity(request.ContractNo, request.RoomId, request.CompanyId);
+        var contractNo = request.ContractNo ?? throw new ArgumentException("合同编号不能为空");
+        var contract = new ContractEntity(contractNo, request.RoomId, request.CompanyId);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync("INSERT INTO Contracts (Id,ContractNo,RoomId,RentAmount,DepositAmount,StartDate,EndDate,PaymentCycle,Status,CompanyId,CreatedBy,CreatedAt) VALUES(@Id,@ContractNo,@RoomId,@RentAmount,@DepositAmount,@StartDate,@EndDate,@PaymentCycle,@Status,@CompanyId,@CreatedBy,@CreatedAt)", contract);
         return (await GetByIdAsync(contract.Id, ct))!;

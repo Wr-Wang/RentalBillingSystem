@@ -1331,6 +1331,21 @@ CREATE TABLE [Rooms] (
     CONSTRAINT [PK_Rooms] PRIMARY KEY ([Id]),
     CONSTRAINT [FK_Rooms_Floors_FloorId] FOREIGN KEY ([FloorId]) REFERENCES [Floors] ([Id])
 );
+
+-- ===== 通知中心 =====
+CREATE TABLE [Notifications] (
+    [Id]             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWSEQUENTIALID(),
+    [UserId]         UNIQUEIDENTIFIER NOT NULL,
+    [CompanyId]      UNIQUEIDENTIFIER NULL,
+    [Category]       NVARCHAR(20) NOT NULL,
+    [Title]          NVARCHAR(200) NOT NULL,
+    [Content]        NVARCHAR(500) NULL,
+    [ReferenceType]  NVARCHAR(50) NULL,
+    [ReferenceId]    UNIQUEIDENTIFIER NULL,
+    [IsRead]         BIT NOT NULL DEFAULT 0,
+    [CreatedAt]      DATETIME2 NOT NULL DEFAULT (GETUTCDATE())
+);
+
 DECLARE @defaultSchema43 AS sysname;
 SET @defaultSchema43 = SCHEMA_NAME();
 DECLARE @description43 AS sql_variant;
@@ -1472,6 +1487,9 @@ CREATE INDEX [IX_Rooms_CreatedAt] ON [Rooms] ([CreatedAt]);
 CREATE INDEX [IX_Rooms_FloorId] ON [Rooms] ([FloorId]);
 
 CREATE INDEX [IX_Rooms_FullCode] ON [Rooms] ([FullCode]);
+
+CREATE INDEX [IX_Notifications_UserId] ON [Notifications] ([UserId]);
+CREATE INDEX [IX_Notifications_UserId_Category] ON [Notifications] ([UserId], [Category]);
 
 CREATE INDEX [IX_RoomTypes_CreatedAt] ON [RoomTypes] ([CreatedAt]);
 

@@ -9,6 +9,7 @@ using RBS.Infrastructure.Data.Repositories;
 using RBS.Core.DomainServices;
 using RBS.Infrastructure.Data.Services;
 using RBS.Application.EventHandlers;
+using RBS.Application.Services.SystemConfig;
 using RBS.Core.Common;
 using RBS.Core.Entities.Base;
 using RBS.Core.Entities.Property;
@@ -72,8 +73,13 @@ public static class DependencyInjection
 
         // 领域事件处理器
         services.AddScoped<IEventHandler<ApprovalCompletedEvent>, ApprovalCompletedEventHandler>();
+        services.AddScoped<IEventHandler<ApprovalSubmittedEvent>, ApprovalSubmittedEventHandler>();
+        services.AddScoped<IEventHandler<ApprovalLevelAdvancedEvent>, ApprovalLevelAdvancedEventHandler>();
         services.AddScoped<IBillingDomainService, BillingDomainService>();
         services.AddScoped<IApprovalDomainService, ApprovalDomainService>();
+
+        // 通知服务
+        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }
