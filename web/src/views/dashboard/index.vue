@@ -2,10 +2,9 @@
   <div>
     <div class="page-header">
       <h2>仪表盘</h2>
-      <el-date-picker v-model="currentDate" type="month" placeholder="选择月份" />
+      <el-date-picker v-model="currentDate" type="month" placeholder="选择月份" @change="loadData" />
     </div>
 
-    <!-- Stat Cards -->
     <div class="stat-cards">
       <div class="stat-card" style="border-left: 4px solid #409eff;">
         <div class="label">今日收款</div>
@@ -30,24 +29,17 @@
     </div>
 
     <el-row :gutter="16">
-      <!-- Collection Rate Chart -->
       <el-col :span="12">
         <el-card>
-          <template #header>
-            <span>收租率</span>
-          </template>
+          <template #header><span>收租率</span></template>
           <div style="height: 300px;">
             <v-chart :option="collectionRateOption" autoresize />
           </div>
         </el-card>
       </el-col>
-
-      <!-- Recent 7 Days Trend -->
       <el-col :span="12">
         <el-card>
-          <template #header>
-            <span>近7日收款趋势</span>
-          </template>
+          <template #header><span>近7日收款趋势</span></template>
           <div style="height: 300px;">
             <v-chart :option="trendOption" autoresize />
           </div>
@@ -56,36 +48,27 @@
     </el-row>
 
     <el-row :gutter="16" style="margin-top: 16px;">
-      <!-- Todo List -->
       <el-col :span="12">
         <el-card>
-          <template #header>
-            <span>待办事项</span>
-          </template>
-          <el-table :data="todoList" style="width: 100%">
+          <template #header><span>待办事项</span></template>
+          <el-table :data="todoList" style="width: 100%" v-loading="todoLoading">
             <el-table-column prop="type" label="类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.tagType" size="small">{{ row.type }}</el-tag>
-              </template>
+              <template #default="{ row }"><el-tag :type="row.tagType" size="small">{{ row.type }}</el-tag></template>
             </el-table-column>
             <el-table-column prop="content" label="内容" />
             <el-table-column prop="date" label="日期" width="120" />
             <el-table-column label="操作" width="80">
-              <template #default>
-                <el-button text size="small" type="primary">去处理</el-button>
+              <template #default="{ row }">
+                <el-button text size="small" type="primary" @click="handleAction(row)">去处理</el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-card>
       </el-col>
-
-      <!-- Recent Receipts -->
       <el-col :span="12">
         <el-card>
-          <template #header>
-            <span>最近收款</span>
-          </template>
-          <el-table :data="recentReceipts" style="width: 100%">
+          <template #header><span>最近收款</span></template>
+          <el-table :data="recentReceipts" style="width: 100%" v-loading="receiptLoading">
             <el-table-column prop="receiptNo" label="收据号" width="140" />
             <el-table-column prop="contractNo" label="合同号" width="120" />
             <el-table-column prop="amount" label="金额" width="100">
@@ -93,7 +76,7 @@
             </el-table-column>
             <el-table-column prop="status" label="状态" width="90">
               <template #default="{ row }">
-                <el-tag :type="row.status === '已确认' ? 'success' : 'warning'" size="small">{{ row.status }}</el-tag>
+                <el-tag :type="row.status === 'Confirmed' ? 'success' : 'warning'" size="small">{{ {Confirmed:'已确认',Pending:'待确认',Rejected:'已驳回'}[row.status] || row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="receivedDate" label="收款日期" width="100" />
@@ -105,85 +88,81 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { PieChart, BarChart, LineChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
+import { getReceipts, getContracts, getCollectionRate, getDailyReceipt, getMonthlyReceipt, getOverdueDetail } from '@/api'
 
-use([
-  CanvasRenderer, PieChart, BarChart, LineChart,
-  TitleComponent, TooltipComponent, LegendComponent, GridComponent
-])
+use([CanvasRenderer, PieChart, BarChart, LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
 const currentDate = ref(new Date())
+const todayStats = ref({ received: 0, count: 0 })
+const monthStats = ref({ receivable: 0, received: 0, overdue: 0, collectionRate: 0 })
+const overdueContracts = ref(0)
+const pendingCollection = ref(0)
+const recentReceipts = ref([])
+const todoList = ref([])
+const todoLoading = ref(false)
+const receiptLoading = ref(false)
 
-function formatMoney(val) {
-  return (val || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function formatMoney(val) { return (val || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }
+
+async function loadData() {
+  const p = currentDate.value ? `${currentDate.value.getFullYear()}-${String(currentDate.value.getMonth() + 1).padStart(2, '0')}` : undefined
+  const today = new Date().toISOString().slice(0, 10)
+
+  // 今日收款
+  try { const dr = await getDailyReceipt({ date: today }); const details = dr.details || dr || []; const totalReceived = details.reduce((s, r) => s + (r.total || 0), 0); const totalCount = details.reduce((s, r) => s + (r.cnt || 0), 0); todayStats.value = { received: totalReceived, count: totalCount } } catch {}
+  // 本月报
+  try { const mr = await getMonthlyReceipt({ period: p }); const d = mr.plans || mr; const ta = d.totalAmount || 0; const tr = d.totalReceived || 0; monthStats.value = { receivable: ta, received: tr, overdue: ta - tr, collectionRate: ta > 0 ? ((tr / ta) * 100).toFixed(1) : 0 } } catch {}
+  // 逾期明细 → 逾期合同数
+  try { const od = await getOverdueDetail(); overdueContracts.value = od.length; pendingCollection.value = od.filter(p => p.daysOverdue > 7).length } catch {}
+  // 最近收款
+  receiptLoading.value = true
+  try { const r = await getReceipts({}); recentReceipts.value = (r || []).slice(0, 5) } catch {}
+  finally { receiptLoading.value = false }
+  // 待办事项
+  todoLoading.value = true
+  try {
+    const items = []
+    const pendingReceipts = await getReceipts({ status: 'Pending' })
+    if (pendingReceipts?.length > 0) items.push({ type: '收款确认', tagType: 'warning', content: `${pendingReceipts.length} 笔收款待确认`, date: today })
+    const expiring = await getContracts({ pageSize: 1 })
+    const allContracts = await getContracts({ pageSize: 100 })
+    const actives = allContracts.items?.filter(c => c.status === 'Active') || []
+    const expiringSoon = actives.filter(c => c.endDate && new Date(c.endDate) < new Date(Date.now() + 14 * 86400000))
+    if (expiringSoon.length > 0) items.push({ type: '续签', tagType: 'primary', content: `${expiringSoon.length} 份合同即将到期`, date: today })
+    const overduePlans = await getOverdueDetail()
+    if (overduePlans.length > 0) items.push({ type: '催缴', tagType: 'danger', content: `${overduePlans.length} 户逾期欠费`, date: today })
+    todoList.value = items.length > 0 ? items : [{ type: '提示', tagType: 'info', content: '暂无待办事项', date: today }]
+  } catch {}
+  finally { todoLoading.value = false }
 }
 
-// Mock data
-const todayStats = { received: 85600, count: 12 }
-const monthStats = { receivable: 1280000, received: 1058000, overdue: 222000, collectionRate: 82.7 }
-const overdueContracts = 23
-const pendingCollection = 15
+function handleAction(row) {
+  if (row.type === '收款确认') window.location.hash = '#/receipts/confirm'
+  else if (row.type === '续签') window.location.hash = '#/renewal-dashboard'
+  else if (row.type === '催缴') window.location.hash = '#/collection/overview'
+}
 
-const todoList = [
-  { type: '收款确认', tagType: 'warning', content: 'B栋-301 房租收款 ¥5,000 待确认', date: '2026-06-27' },
-  { type: '审批', tagType: 'primary', content: 'C栋-502 提前解约申请（押金¥8,000）', date: '2026-06-26' },
-  { type: '催缴', tagType: 'danger', content: 'A栋-203 逾期15天 欠费¥12,500', date: '2026-06-25' },
-  { type: '抄表', tagType: 'info', content: 'B栋 6月水电气抄表待录入（12户）', date: '2026-06-24' }
-]
-
-const recentReceipts = [
-  { receiptNo: 'SJ-20260627-001', contractNo: 'HT-2026-012', amount: 5600, status: '已确认', receivedDate: '2026-06-27' },
-  { receiptNo: 'SJ-20260626-003', contractNo: 'HT-2026-008', amount: 8200, status: '已确认', receivedDate: '2026-06-26' },
-  { receiptNo: 'SJ-20260626-002', contractNo: 'HT-2026-015', amount: 4300, status: '待确认', receivedDate: '2026-06-26' },
-  { receiptNo: 'SJ-20260625-005', contractNo: 'HT-2026-003', amount: 12000, status: '已确认', receivedDate: '2026-06-25' }
-]
-
-// Collection Rate Pie Chart
 const collectionRateOption = computed(() => ({
   tooltip: { trigger: 'item' },
   legend: { bottom: '0%' },
-  series: [
-    {
-      type: 'pie',
-      radius: ['40%', '70%'],
-      center: ['50%', '45%'],
-      avoidLabelOverlap: false,
-      itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-      label: { show: true, formatter: '{b}: {d}%' },
-      emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
-      data: [
-        { value: monthStats.received, name: '已收款', itemStyle: { color: '#67c23a' } },
-        { value: monthStats.overdue, name: '欠费', itemStyle: { color: '#e6a23c' } }
-      ]
-    }
-  ]
+  series: [{ type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'], avoidLabelOverlap: false, itemStyle: { borderRadius: 10 }, label: { show: true, formatter: '{b}: {d}%' }, data: [{ value: monthStats.value.received, name: '已收款', itemStyle: { color: '#67c23a' } }, { value: Math.max(monthStats.value.overdue, 1), name: '欠费', itemStyle: { color: '#e6a23c' } }] }]
 }))
 
-// 7-day Trend
 const trendOption = computed(() => ({
   tooltip: { trigger: 'axis' },
-  xAxis: { type: 'category', data: ['06-21', '06-22', '06-23', '06-24', '06-25', '06-26', '06-27'] },
+  xAxis: { type: 'category', data: trendLabels.value },
   yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
-  series: [
-    {
-      name: '收款金额',
-      type: 'bar',
-      data: [35000, 42000, 28000, 56000, 48000, 72000, 85600],
-      itemStyle: { color: '#409eff', borderRadius: [4, 4, 0, 0] }
-    },
-    {
-      name: '笔数',
-      type: 'line',
-      data: [5, 8, 4, 9, 7, 11, 12],
-      yAxisIndex: 0,
-      itemStyle: { color: '#67c23a' }
-    }
-  ],
+  series: [{ name: '收款金额', type: 'bar', data: trendData.value, itemStyle: { color: '#409eff', borderRadius: [4, 4, 0, 0] }, barMaxWidth: 30 }],
   grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true }
 }))
+const trendLabels = computed(() => { const d = []; for (let i = 6; i >= 0; i--) { const dt = new Date(); dt.setDate(dt.getDate() - i); d.push(`${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`) }; return d })
+const trendData = computed(() => [0, 0, 0, 0, 0, 0, 0])
+
+onMounted(loadData)
 </script>

@@ -11,8 +11,8 @@ namespace RBS.Api.Controllers;
 public class ApiLogsController : ControllerBase
 {
     private readonly IDbConnectionFactory _db;
-
-    public ApiLogsController(IDbConnectionFactory db) => _db = db;
+    private readonly ISqlLoader _sql;
+    public ApiLogsController(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
 
     private bool IsSuperAdmin => User.FindFirst("IsSuperAdmin")?.Value == "True";
     private IActionResult? RequireSuperAdmin() => IsSuperAdmin ? null : Forbid();
@@ -97,7 +97,7 @@ public class ApiLogsController : ControllerBase
         if (auth != null) return auth;
 
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("DELETE FROM ApiLogs WHERE Id = @Id", new { Id = id });
+        await conn.ExecuteAsync(_sql.Get("Common.Delete.ApiLog.ById"), new { Id = id });
         return NoContent();
     }
 
@@ -110,7 +110,6 @@ public class ApiLogsController : ControllerBase
         if (auth != null) return auth;
 
         using var conn = _db.CreateConnection(); conn.Open();
-
         var where = new List<string>();
         var parms = new DynamicParameters();
         if (startDate.HasValue) { where.Add("CreatedAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }

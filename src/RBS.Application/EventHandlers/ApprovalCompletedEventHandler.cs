@@ -64,8 +64,21 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 if (@event.Action == "Approved")
                 {
                     var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
-                    if (request?.Description != null)
+                    if (request?.Description == null) break;
+
+                    // 合同终止
+                    if (request.Title.StartsWith("[合同终止]"))
                     {
+                        var contract = await _uow.Contracts.GetByIdAsync(@event.TargetEntityId, ct);
+                        if (contract != null && contract.StatusCode != "Terminated")
+                        {
+                            contract.Terminate(request.Description);
+                            await _uow.CommitAsync(ct);
+                        }
+                    }
+                    else
+                    {
+                        // 租金调整（现有逻辑）
                         var match = Regex.Match(request.Description, @"→\s*¥([\d,]+)");
                         if (match.Success && decimal.TryParse(match.Groups[1].Value.Replace(",", ""), out var newAmount))
                         {

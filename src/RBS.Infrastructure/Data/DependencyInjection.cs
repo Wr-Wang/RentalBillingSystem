@@ -17,6 +17,9 @@ using RBS.Core.Entities.Base;
 using RBS.Core.Entities.Property;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.SystemConfig;
+using RBS.Infrastructure.Data.TypeHandlers;
+using RBS.Infrastructure.PdfGeneration;
+using RBS.Infrastructure.Scheduling;
 using DapperUnitOfWork = RBS.Infrastructure.Data.UnitOfWork.DapperUnitOfWork;
 
 namespace RBS.Infrastructure.Data;
@@ -28,6 +31,9 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")!;
+
+        // Dapper 类型处理器（值对象自动转换）
+        ValueObjectHandlers.Register();
 
         // Dapper 连接工厂
         services.AddSingleton<IDbConnectionFactory>(new DbConnectionFactory(connectionString));
@@ -80,6 +86,12 @@ public static class DependencyInjection
 
         // 通知服务
         services.AddScoped<INotificationService, NotificationService>();
+
+        // PDF 生成
+        services.AddScoped<IBillPdfGenerator, BillPdfGenerator>();
+
+        // 调度引擎
+        services.AddHostedService<SchedulingHostedService>();
 
         return services;
     }

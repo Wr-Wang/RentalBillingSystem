@@ -3,88 +3,42 @@
     <div class="page-header">
       <h2>收款管理</h2>
       <div class="table-actions">
-        <el-button type="primary" @click="$router.push('/receipts/register')">
-          <el-icon><Plus /></el-icon>收款登记
-        </el-button>
-        <el-button @click="$router.push('/receipts/confirm')">
-          <el-icon><Select /></el-icon>待确认({{ pendingCount }})
-        </el-button>
+        <el-button type="primary" @click="drawerVisible = true"><el-icon><Plus /></el-icon>收款登记</el-button>
+        <el-button @click="$router.push('/receipts/confirm')"><el-icon><Select /></el-icon>待确认({{ pendingCount }})</el-button>
       </div>
     </div>
 
-    <!-- Tabs -->
+    <el-drawer v-model="drawerVisible" title="收款登记" direction="rtl" size="400px">
+      <el-form :model="form" label-position="top">
+        <el-form-item label="收款金额"><el-input-number v-model="form.amount" :min="0.01" :precision="2" style="width:100%;" /></el-form-item>
+        <el-form-item label="收款日期"><el-date-picker v-model="form.receivedDate" type="date" style="width:100%;" /></el-form-item>
+        <el-form-item label="关联合同 ID"><el-input v-model="form.contractId" placeholder="选填" /></el-form-item>
+        <el-form-item label="收款单号"><el-input v-model="form.receiptNo" placeholder="自动生成" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="drawerVisible = false">取消</el-button>
+        <el-button type="primary" @click="submit" :loading="submitting">登记</el-button>
+      </template>
+    </el-drawer>
+
     <el-tabs v-model="activeTab">
-      <el-tab-pane label="应收账单" name="receivables">
-        <div class="search-bar">
-          <el-input v-model="search.keyword" placeholder="合同号/租客" clearable style="width: 200px;" />
-          <el-select v-model="search.status" placeholder="状态" clearable style="width: 140px;">
-            <el-option label="待收款" value="Pending" />
-            <el-option label="部分已收" value="Partial" />
-            <el-option label="已付清" value="Paid" />
-          </el-select>
-          <el-date-picker v-model="search.month" type="month" placeholder="账期" style="width: 140px;" />
-          <el-button type="primary">查询</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-          <el-button @click="generateAll">手动生成应收</el-button>
-        </div>
-
-        <el-table :data="receivableList" stripe default-expand-all row-key="id">
-          <el-table-column type="selection" width="50" />
-          <el-table-column prop="contractNo" label="合同号" width="130" />
-          <el-table-column prop="tenantName" label="租客" width="100" />
-          <el-table-column prop="period" label="账期" width="80" />
-          <el-table-column prop="dueDate" label="到期日" width="90" />
-          <el-table-column prop="totalAmount" label="应收总额" width="110">
-            <template #default="{ row }">¥{{ row.totalAmount?.toLocaleString() }}</template>
-          </el-table-column>
-          <el-table-column prop="totalReceived" label="已收" width="100">
-            <template #default="{ row }">¥{{ row.totalReceived?.toLocaleString() }}</template>
-          </el-table-column>
-          <el-table-column prop="status" label="状态" width="90">
-            <template #default="{ row }">
-              <el-tag :type="row.status === 'Paid' ? 'success' : row.status === 'Partial' ? 'warning' : 'danger'" size="small">
-                {{ row.status === 'Paid' ? '已付清' : row.status === 'Partial' ? '部分' : '待收款' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column type="expand" width="50">
-            <template #default="{ row }">
-              <el-table :data="row.details" size="small">
-                <el-table-column prop="feeName" label="费用项目" width="120" />
-                <el-table-column prop="amount" label="金额" width="100">
-                  <template #default="{ row: d }">¥{{ d.amount?.toLocaleString() }}</template>
-                </el-table-column>
-                <el-table-column prop="received" label="已收" width="100">
-                  <template #default="{ row: d }">¥{{ d.received?.toLocaleString() }}</template>
-                </el-table-column>
-                <el-table-column prop="description" label="说明" min-width="200" />
-              </el-table>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-
       <el-tab-pane label="收款记录" name="receipts">
-        <el-table :data="receiptList" stripe>
-          <el-table-column prop="receiptNo" label="收据号" width="160" />
-          <el-table-column prop="contractNo" label="合同号" width="120" />
-          <el-table-column prop="amount" label="金额" width="110">
-            <template #default="{ row }">¥{{ row.amount?.toLocaleString() }}</template>
+        <el-table :data="receiptList" stripe v-loading="loading" style="width:100%;">
+          <el-table-column prop="receiptNo" label="收据号" min-width="160" />
+          <el-table-column prop="amount" label="金额" width="130" align="right">
+            <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
           </el-table-column>
-          <el-table-column prop="channelName" label="支付通道" width="100" />
-          <el-table-column prop="remitterName" label="付款人" width="100" />
+          <el-table-column prop="receivedDate" label="收款日期" width="110" />
           <el-table-column prop="status" label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'Confirmed' ? 'success' : row.status === 'PendingConfirm' ? 'warning' : 'danger'" size="small">
-                {{ row.status === 'Confirmed' ? '已确认' : row.status === 'PendingConfirm' ? '待确认' : row.status === 'Reversed' ? '已冲销' : '已退款' }}
+              <el-tag :type="row.status === 'Confirmed' ? 'success' : row.status === 'Pending' ? 'warning' : 'danger'" size="small" style="width:64px;text-align:center;">
+                {{ {Confirmed:'已确认',Pending:'待确认',Rejected:'已驳回',Cancelled:'已取消'}[row.status] || row.status }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="receivedDate" label="收款日期" width="100" />
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <el-button text size="small" type="primary" @click="viewReceipt(row)">查看</el-button>
-              <el-button text size="small" type="success" v-if="row.status === 'PendingConfirm'" @click="confirmReceipt(row)">确认</el-button>
+              <el-button text size="small" type="success" v-if="row.status === 'Pending'" @click="confirmReceipt(row)">确认</el-button>
               <el-button text size="small" type="danger" v-if="row.status === 'Confirmed'" @click="reverseReceipt(row)">冲销</el-button>
             </template>
           </el-table-column>
@@ -92,21 +46,19 @@
       </el-tab-pane>
 
       <el-tab-pane label="押金管理" name="deposits">
-        <el-table :data="depositList" stripe>
-          <el-table-column prop="contractNo" label="合同号" width="120" />
-          <el-table-column prop="tenantName" label="租客" width="100" />
-          <el-table-column prop="depositAmount" label="押金金额" width="120">
-            <template #default="{ row }">¥{{ row.depositAmount?.toLocaleString() }}</template>
+        <el-table :data="depositList" stripe v-loading="depositLoading" style="width:100%;">
+          <el-table-column prop="contractId" label="合同 ID" min-width="200" />
+          <el-table-column prop="action" label="类型" width="90">
+            <template #default="{ row }">{{ {Create:'创建',Return:'退还',Deduct:'扣款'}[row.action] || row.action }}</template>
           </el-table-column>
-          <el-table-column prop="currentBalance" label="当前余额" width="120">
-            <template #default="{ row }">¥{{ row.currentBalance?.toLocaleString() }}</template>
+          <el-table-column prop="amount" label="变动金额" width="120" align="right">
+            <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="180">
-            <template #default="{ row }">
-              <el-button text size="small" type="primary" @click="refundDeposit(row)">退还</el-button>
-              <el-button text size="small" type="warning" @click="deductDeposit(row)">扣款</el-button>
-            </template>
+          <el-table-column prop="balance" label="余额" width="120" align="right">
+            <template #default="{ row }">¥{{ (row.balance || 0).toLocaleString() }}</template>
           </el-table-column>
+          <el-table-column prop="createdAt" label="时间" width="170" />
+          <el-table-column prop="remark" label="备注" min-width="150" />
         </el-table>
       </el-tab-pane>
     </el-tabs>
@@ -114,63 +66,60 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { getReceipts, getDeposits, createReceipt, confirmReceipt as apiConfirm, reverseReceipt as apiReverse } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-const activeTab = ref('receivables')
-const pendingCount = ref(5)
+const activeTab = ref('receipts')
+const loading = ref(false)
+const depositLoading = ref(false)
+const receiptList = ref([])
+const depositList = ref([])
+const pendingCount = computed(() => receiptList.value.filter(r => r.status === 'Pending').length)
 
-const search = reactive({ keyword: '', status: '', month: null })
+// Drawer
+const drawerVisible = ref(false)
+const form = reactive({ receiptNo: '', amount: 0, receivedDate: '', contractId: '' })
+const submitting = ref(false)
+async function submit() {
+  if (form.amount <= 0) { ElMessage.warning('请输入金额'); return }
+  submitting.value = true
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    await createReceipt({ receiptNo: form.receiptNo || `RC-${Date.now()}`, amount: form.amount, receivedDate: form.receivedDate || new Date().toISOString().slice(0, 10), companyId: user.defaultCompanyId, contractId: form.contractId || undefined })
+    ElMessage.success('登记成功')
+    drawerVisible.value = false
+    form.amount = 0; form.receiptNo = ''; form.receivedDate = ''; form.contractId = ''
+    await loadReceipts()
+  } catch (e) { ElMessage.error(e?.response?.data?.message || '登记失败') }
+  finally { submitting.value = false }
+}
 
-// Receivable list with expandable details
-const receivableList = ref([
-  { id: 'r1', contractNo: 'HT-2026-001', tenantName: '张三', period: '2026-06', dueDate: '2026-06-05', totalAmount: 5460, totalReceived: 0, status: 'Pending', details: [
-    { feeName: '房租费', amount: 5200, received: 0, description: '月租金' },
-    { feeName: '卫生费', amount: 30, received: 0, description: '月固定' },
-    { feeName: '管理费', amount: 150, received: 0, description: '月固定' },
-    { feeName: '网费', amount: 80, received: 0, description: '月固定' }
-  ]},
-  { id: 'r2', contractNo: 'HT-2026-002', tenantName: '李四', period: '2026-06', dueDate: '2026-06-05', totalAmount: 4030, totalReceived: 4000, status: 'Partial', details: [
-    { feeName: '房租费', amount: 3800, received: 3800, description: '月租金' },
-    { feeName: '卫生费', amount: 30, received: 200, description: '月固定' },
-    { feeName: '管理费', amount: 150, received: 0, description: '月固定' },
-    { feeName: '网费', amount: 80, received: 0, description: '月固定' }
-  ]},
-  { id: 'r3', contractNo: 'HT-2026-003', tenantName: '王五', period: '2026-06', dueDate: '2026-06-05', totalAmount: 7030, totalReceived: 7030, status: 'Paid', details: [
-    { feeName: '房租费', amount: 6800, received: 6800, description: '月租金' },
-    { feeName: '水费', amount: 100, received: 100, description: '15吨×6元/吨' },
-    { feeName: '电费', amount: 80, received: 80, description: '100度×0.8元/度' },
-    { feeName: '管理费', amount: 150, received: 150, description: '月固定' },
-  ]}
-])
-
-const receiptList = ref([
-  { id: 'rc1', receiptNo: 'SJ-20260627-001', contractNo: 'HT-2026-001', amount: 5460, channelName: '银行转账', remitterName: '张三', status: 'Confirmed', receivedDate: '2026-06-27' },
-  { id: 'rc2', receiptNo: 'SJ-20260626-002', contractNo: 'HT-2026-002', amount: 4000, channelName: '支付宝', remitterName: '李四', status: 'PendingConfirm', receivedDate: '2026-06-26' },
-  { id: 'rc3', receiptNo: 'SJ-20260625-003', contractNo: 'HT-2026-003', amount: 7030, channelName: '银行转账', remitterName: '王五', status: 'Confirmed', receivedDate: '2026-06-25' }
-])
-
-const depositList = ref([
-  { contractNo: 'HT-2026-001', tenantName: '张三', depositAmount: 10400, currentBalance: 10400 },
-  { contractNo: 'HT-2026-002', tenantName: '李四', depositAmount: 7600, currentBalance: 7600 },
-  { contractNo: 'HT-2026-003', tenantName: '王五', depositAmount: 13600, currentBalance: 13600 }
-])
-
-function resetSearch() { search.keyword = ''; search.status = ''; search.month = null }
-function generateAll() { ElMessage.success('应收已全部生成') }
-
-function viewReceipt(row) { ElMessage.info('查看收据详情') }
-function confirmReceipt(row) {
-  ElMessageBox.confirm(`确认收款 ${row.receiptNo} 金额 ¥${row.amount?.toLocaleString()} 到账？`, '确认').then(() => {
-    row.status = 'Confirmed'
+async function loadReceipts() {
+  loading.value = true
+  try { receiptList.value = await getReceipts({}) || [] } catch {}
+  finally { loading.value = false }
+}
+async function loadDeposits() {
+  depositLoading.value = true
+  try { depositList.value = await getDeposits({}) || [] } catch {}
+  finally { depositLoading.value = false }
+}
+async function confirmReceipt(row) {
+  try {
+    await ElMessageBox.confirm(`确认收款 ${row.receiptNo} 金额 ¥${(row.amount || 0).toLocaleString()} 到账？`, '确认')
+    await apiConfirm(row.id)
     ElMessage.success('收款已确认')
-  }).catch(() => {})
+    await loadReceipts()
+  } catch (e) { if (e !== 'cancel') ElMessage.error(e?.response?.data?.message || '确认失败') }
 }
-function reverseReceipt(row) {
-  ElMessageBox.confirm(`确定冲销收据 ${row.receiptNo} 吗？此操作需要审批。`, '提示').then(() => {
-    ElMessage.success('冲销申请已提交审批')
-  }).catch(() => {})
+async function reverseReceipt(row) {
+  try {
+    await ElMessageBox.confirm(`确定冲销收据 ${row.receiptNo} 吗？`, '提示')
+    await apiReverse(row.id, { reason: '手动冲销' })
+    ElMessage.success('冲销成功')
+    await loadReceipts()
+  } catch (e) { if (e !== 'cancel') ElMessage.error(e?.response?.data?.message || '冲销失败') }
 }
-function refundDeposit(row) { ElMessage.info('退还押金功能待实现') }
-function deductDeposit(row) { ElMessage.info('押金扣款功能待实现') }
+onMounted(() => { loadReceipts(); loadDeposits() })
 </script>

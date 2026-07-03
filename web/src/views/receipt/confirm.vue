@@ -2,67 +2,53 @@
   <div>
     <div class="page-header">
       <h2>收款确认</h2>
-      <el-button @click="$router.back()">返回</el-button>
+      <el-button @click="$router.push('/receipts')">返回列表</el-button>
     </div>
-
-    <div class="stat-cards">
-      <div class="stat-card" style="border-left: 4px solid #e6a23c;">
-        <div class="label">待确认收款</div>
-        <div class="value" style="color: #e6a23c;">{{ pendingList.length }} 笔</div>
-        <div class="sub">合计 ¥{{ pendingTotal.toLocaleString() }}</div>
-      </div>
-    </div>
-
-    <el-card>
-      <template #header>待确认列表</template>
-      <el-table :data="pendingList" stripe>
-        <el-table-column type="selection" width="50" />
-        <el-table-column prop="receiptNo" label="收据号" width="160" />
-        <el-table-column prop="contractNo" label="合同号" width="120" />
-        <el-table-column prop="remitterName" label="付款人" width="100" />
-        <el-table-column prop="amount" label="金额" width="110">
-          <template #default="{ row }">¥{{ row.amount?.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="channelName" label="支付通道" width="100" />
-        <el-table-column prop="transactionRef" label="交易号" width="150" />
-        <el-table-column prop="receivedDate" label="收款日期" width="100" />
-      </el-table>
-      <div style="margin-top: 16px; text-align: center;">
-        <el-button type="success" size="large" @click="batchConfirm">
-          <el-icon><Select /></el-icon>确认到账
-        </el-button>
-        <el-button type="danger" size="large" @click="batchReject">
-          <el-icon><Close /></el-icon>驳回
-        </el-button>
-      </div>
-    </el-card>
+    <el-table :data="receipts" stripe v-loading="loading" style="width:100%;">
+      <el-table-column prop="receiptNo" label="收款单号" min-width="180" />
+      <el-table-column prop="amount" label="金额" width="130" align="right">
+        <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+      </el-table-column>
+      <el-table-column prop="receivedDate" label="收款日期" width="110" />
+      <el-table-column prop="referenceNo" label="参考号" min-width="150" />
+      <el-table-column prop="status" label="状态" width="100">
+        <template #default="{ row }">
+          <el-tag :type="row.status === 'Confirmed' ? 'success' : row.status === 'Rejected' ? 'danger' : 'warning'" size="small" style="width:64px;text-align:center;">
+            {{ {Pending:'待确认',Confirmed:'已确认',Rejected:'已驳回'}[row.status] || row.status }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="170" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" type="primary" :disabled="row.status !== 'Pending'" @click="confirm(row.id)">确认到账</el-button>
+          <el-button size="small" type="danger" :disabled="row.status !== 'Pending'" @click="reject(row.id)">驳回</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
   </div>
 </template>
-
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-
-const router = useRouter()
-
-const pendingList = ref([
-  { id: 'rc1', receiptNo: 'SJ-20260627-001', contractNo: 'HT-2026-001', remitterName: '张三', amount: 5460, channelName: '银行转账', transactionRef: 'BANK20260627001', receivedDate: '2026-06-27' },
-  { id: 'rc2', receiptNo: 'SJ-20260627-002', contractNo: 'HT-2026-005', remitterName: '孙七', amount: 4500, channelName: '支付宝', transactionRef: 'ALI20260627002', receivedDate: '2026-06-27' },
-  { id: 'rc3', receiptNo: 'SJ-20260626-003', contractNo: 'HT-2026-008', remitterName: '周八', amount: 8200, channelName: '银行转账', transactionRef: 'BANK20260626003', receivedDate: '2026-06-26' }
-])
-
-const pendingTotal = computed(() => pendingList.value.reduce((s, r) => s + r.amount, 0))
-
-function batchConfirm() {
-  ElMessageBox.confirm('确认所选收款已到账？', '确认').then(() => {
-    ElMessage.success('收款已确认，会计凭证已自动生成')
-  }).catch(() => {})
+import { ref, onMounted } from 'vue'
+import { getReceipts, confirmReceipt as apiConfirm, rejectReceipt as apiReject } from '@/api'
+import { ElMessage } from 'element-plus'
+const loading = ref(false)
+const receipts = ref([])
+async function loadData() {
+  loading.value = true
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const res = await getReceipts({ companyId: user.defaultCompanyId })
+    receipts.value = res
+  } catch (e) { console.error(e) }
+  finally { loading.value = false }
 }
-
-function batchReject() {
-  ElMessageBox.confirm('确定驳回所选收款？', '提示').then(() => {
-    ElMessage.success('已驳回')
-  }).catch(() => {})
+async function confirm(id) {
+  try { await apiConfirm(id); ElMessage.success('已确认'); await loadData() }
+  catch (e) { ElMessage.error(e?.response?.data?.message || '确认失败') }
 }
+async function reject(id) {
+  try { await apiReject(id, { reason: '驳回' }); ElMessage.success('已驳回'); await loadData() }
+  catch (e) { ElMessage.error(e?.response?.data?.message || '驳回失败') }
+}
+onMounted(loadData)
 </script>

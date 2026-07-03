@@ -17,7 +17,7 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     public int MaxLevel { get; private set; }
     public string Status { get; private set; }
     public Guid CompanyId { get; private set; }
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
     public Guid? ContractId { get; private set; }  // 合同关联（统一并发控制用）
 
     // ===== 审批跟踪 =====

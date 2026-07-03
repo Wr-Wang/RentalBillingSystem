@@ -4,6 +4,9 @@ using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Import;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Entities.Accounting;
+using RBS.Core.Entities.Banking;
+using RBS.Core.Entities.Billing;
+using RBS.Core.Entities.Contract;
 using RBS.Core.Entities.Property;
 using RBS.Core.Interfaces.Repositories;
 
@@ -28,14 +31,32 @@ public interface IUnitOfWork : IDisposable
     IContractRepository Contracts { get; }
     ITenantRepository Tenants { get; }
     IRenewalRequestRepository RenewalRequests { get; }
+    IRepository<ChangeRequest> ChangeRequests { get; }
 
     // 费用/应收
     IFeeCodeRepository FeeCodes { get; }
+    IRepository<FeeCodeTemplate> FeeCodeTemplates { get; }
     IReceivablePlanRepository ReceivablePlans { get; }
 
     // 收款
     IReceiptRepository Receipts { get; }
     IPaymentChannelRepository PaymentChannels { get; }
+
+    // 押金
+    IRepository<DepositLog> DepositLogs { get; }
+
+    // 银行对账
+    IRepository<BankStatement> BankStatements { get; }
+    IRepository<BankReconciliation> BankReconciliations { get; }
+    IRepository<BankMatch> BankMatches { get; }
+
+    // 催缴
+    IRepository<CollectionStage> CollectionStages { get; }
+    IRepository<CollectionRecord> CollectionRecords { get; }
+
+    // 账单
+    IRepository<DebitNote> DebitNotes { get; }
+    Task<List<DebitNoteItem>> GetDebitNoteItemsAsync(Guid debitNoteId, CancellationToken ct = default);
 
     // 抄表
     IMeterReadingRepository MeterReadings { get; }
@@ -44,6 +65,9 @@ public interface IUnitOfWork : IDisposable
     IApprovalRequestRepository ApprovalRequests { get; }
     IRepository<ApprovalType> ApprovalTypes { get; }
     IRepository<ApprovalLevelConfig> ApprovalLevelConfigs { get; }
+
+    // 会计
+    IRepository<Voucher> Vouchers { get; }
 
     // 系统配置
     IHolidayCalendarRepository HolidayCalendars { get; }

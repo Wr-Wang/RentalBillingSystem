@@ -8,5 +8,8 @@ public class DebitNoteItem : AssociationEntity
     public decimal Amount { get; private set; }
     private DebitNoteItem() { }
     public DebitNoteItem(Guid debitNoteId, Guid feeCodeId, decimal amount)
-    { DebitNoteId = debitNoteId; FeeCodeId = feeCodeId; Amount = amount; }
+    {
+        if (amount <= 0) throw new ArgumentException("金额必须大于0", nameof(amount));
+        DebitNoteId = debitNoteId; FeeCodeId = feeCodeId; Amount = amount;
+    }
 }

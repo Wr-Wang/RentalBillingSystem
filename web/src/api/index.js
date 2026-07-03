@@ -153,6 +153,16 @@ export function postVoucher(id) { return request({ url: `/vouchers/${id}/post`, 
 export function reverseVoucher(id, data) { return request({ url: `/vouchers/${id}/reverse`, method: 'post', data }) }
 export function getTrialBalance(params) { return request({ url: '/trialbalance', method: 'get', params }) }
 
+// Banking
+export function getBankStatements(params) { return request({ url: '/banking/statements', method: 'get', params }) }
+export function importBankStatements(data) { return request({ url: '/banking/statements/import', method: 'post', data }) }
+export function getBankReconciliations(params) { return request({ url: '/banking/reconciliations', method: 'get', params }) }
+export function createBankReconciliation(data) { return request({ url: '/banking/reconciliations', method: 'post', data }) }
+export function autoMatchBank(id) { return request({ url: `/banking/reconciliations/${id}/auto-match`, method: 'post' }) }
+export function completeReconciliation(id) { return request({ url: `/banking/reconciliations/${id}/complete`, method: 'post' }) }
+export function manualMatchBank(data) { return request({ url: '/banking/matches', method: 'post', data }) }
+export function getBankMatches(params) { return request({ url: '/banking/matches', method: 'get', params }) }
+
 // Reports
 export function getCollectionRate(params) { return request({ url: '/reports/collectionrate', method: 'get', params }) }
 export function getOverdueDetail(params) { return request({ url: '/reports/overduedetail', method: 'get', params }) }

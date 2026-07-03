@@ -37,8 +37,7 @@ public class RoleService : IRoleService
         if (request.MenuIds?.Count > 0)
         {
             var allowedIds = await FilterSystemMenusAsync(request.MenuIds, ct);
-            foreach (var menuId in allowedIds)
-                role.RoleMenus.Add(new RoleMenu(role.Id, menuId));
+            role.AssignMenus(allowedIds);
         }
 
         await _uow.Roles.AddAsync(role, ct);
@@ -58,9 +57,7 @@ public class RoleService : IRoleService
         if (request.MenuIds != null)
         {
             var allowedIds = await FilterSystemMenusAsync(request.MenuIds, ct);
-            role.RoleMenus.Clear();
-            foreach (var menuId in allowedIds)
-                role.RoleMenus.Add(new RoleMenu(role.Id, menuId));
+            role.AssignMenus(allowedIds);
         }
 
         await _uow.CommitAsync(ct);
@@ -86,9 +83,7 @@ public class RoleService : IRoleService
             ?? throw new KeyNotFoundException("角色不存在");
 
         var allowedIds = await FilterSystemMenusAsync(menuIds, ct);
-        role.RoleMenus.Clear();
-        foreach (var menuId in allowedIds)
-            role.RoleMenus.Add(new RoleMenu(role.Id, menuId));
+        role.AssignMenus(allowedIds);
 
         await _uow.CommitAsync(ct);
     }

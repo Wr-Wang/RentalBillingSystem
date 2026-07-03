@@ -13,18 +13,17 @@ namespace RBS.Application.Services.Organization;
 public class CompanyService : ICompanyService
 {
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
     private readonly IUnitOfWork _uow;
 
-    public CompanyService(IDbConnectionFactory db, IUnitOfWork uow)
+    public CompanyService(IDbConnectionFactory db, ISqlLoader sql, IUnitOfWork uow)
     {
-        _db = db;
-        _uow = uow;
+        _db = db; _sql = sql; _uow = uow;
     }
 
     public async Task<PagedResult<CompanyDto>> GetPagedAsync(CompanyQuery query, CancellationToken ct = default)
     {
-        using var conn = _db.CreateConnection();
-        conn.Open();
+        using var conn = _db.CreateConnection(); conn.Open();
 
         var where = new List<string>();
         var parms = new DynamicParameters();
@@ -55,16 +54,16 @@ public class CompanyService : ICompanyService
         return new PagedResult<CompanyDto>
         {
             Items = items.Select(MapToDto).ToList(),
-            Total = total,
-            Page = query.Page,
-            PageSize = query.PageSize,
+            Total = total, Page = query.Page, PageSize = query.PageSize,
             TotalPages = total > 0 ? (int)Math.Ceiling(total / (double)query.PageSize) : 0
         };
     }
 
     public async Task<CompanyDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var company = await _db.GetByIdAsync<Company>("Companies", id);
+        using var conn = _db.CreateConnection(); conn.Open();
+        var company = await conn.QuerySingleOrDefaultAsync<Company>(
+            _sql.Get("Organization.Select.Company.ById"), new { Id = id });
         return company == null ? null : MapToDto(company);
     }
 
@@ -72,13 +71,16 @@ public class CompanyService : ICompanyService
     {
         var company = new Company(request.Name);
         ApplyCompanyFields(company, request);
-        await _db.InsertAsync("Companies", company);
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync(_sql.Get("Organization.Insert.Company.Default"), company);
         return MapToDto(company);
     }
 
     public async Task UpdateAsync(Guid id, CreateCompanyRequest request, CancellationToken ct = default)
     {
-        var company = await _db.GetByIdAsync<Company>("Companies", id)
+        using var conn = _db.CreateConnection(); conn.Open();
+        var company = await conn.QuerySingleOrDefaultAsync<Company>(
+            _sql.Get("Organization.Select.Company.ById"), new { Id = id })
             ?? throw new KeyNotFoundException("公司不存在");
 
         company.Rename(request.Name);
@@ -95,30 +97,25 @@ public class CompanyService : ICompanyService
             if (request.IsActive.Value) company.Activate();
             else company.Deactivate();
         }
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(@"
-            UPDATE Companies SET Name=@Name,Code=@Code,ContactPerson=@ContactPerson,Phone=@Phone,
-                Address=@Address,IdType=@IdType,IdNumber=@IdNumber,
-                BankName=@BankName,BankAccount=@BankAccount,BankAccountName=@BankAccountName,
-                SettlementCycle=@SettlementCycle,SettlementDay=@SettlementDay,
-                CommissionRate=@CommissionRate,Remark=@Remark,IsActive=@IsActive,
-                UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt
-            WHERE Id=@Id", company);
+
+        await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Default"), company);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("UPDATE Companies SET IsActive=0 WHERE Id=@Id", new { Id = id });
+        await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Deactivate"), new { Id = id });
     }
 
     public async Task<CompanyStatsDto?> GetStatsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var company = await conn.QuerySingleOrDefaultAsync<Company>("SELECT * FROM Companies WHERE Id=@Id", new { Id = id });
+        var company = await conn.QuerySingleOrDefaultAsync<Company>(
+            _sql.Get("Organization.Select.Company.ById"), new { Id = id });
         if (company == null) return null;
 
-        var units = (await conn.QueryAsync<HousingUnit>("SELECT * FROM HousingUnits WHERE CompanyId=@Id", new { Id = id })).ToList();
+        var units = (await conn.QueryAsync<HousingUnit>(
+            "SELECT * FROM HousingUnits WHERE CompanyId=@Id", new { Id = id })).ToList();
         var totalRooms = units.Count;
         var rentedRooms = units.Count(u => u.IsRented);
 

@@ -46,10 +46,7 @@ public class VouchersController : ControllerBase
         if (voucher == null) return NotFound();
 
         var entries = (await multi.ReadAsync<JournalEntry>()).ToList();
-        var field = typeof(Voucher).GetField("_entries",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (field != null && field.GetValue(voucher) is List<JournalEntry> entryList)
-            entryList.AddRange(entries);
+        voucher.LoadEntries(entries);
 
         return Ok(voucher);
     }
@@ -66,10 +63,7 @@ public class VouchersController : ControllerBase
 
             var entries = (await conn.QueryAsync<JournalEntry>(
                 _sql.Get("Accounting.Select.Entry.ByVoucherId"), new { Id = id })).ToList();
-            var field = typeof(Voucher).GetField("_entries",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (field != null && field.GetValue(entity) is List<JournalEntry> entryList)
-                entryList.AddRange(entries);
+            entity.LoadEntries(entries);
 
             entity.Post();
 

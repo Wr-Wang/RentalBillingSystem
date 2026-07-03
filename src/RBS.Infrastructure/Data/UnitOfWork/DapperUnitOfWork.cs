@@ -2,6 +2,7 @@ using Dapper;
 using System.Data;
 using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.Approval;
+using RBS.Core.Entities.Banking;
 using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Contract;
 using RBS.Core.Entities.Import;
@@ -30,6 +31,7 @@ public class DapperUnitOfWork : IUnitOfWork
     public ICompanyRepository Companies => _companies ??= new DapperCompanyRepository(_db, _sql);
     public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new DapperApprovalRequestRepository(_db, _sql);
     public IFeeCodeRepository FeeCodes => _feeCodes ??= new DapperFeeCodeRepository(_db, _sql);
+    public IRepository<FeeCodeTemplate> FeeCodeTemplates => _feeCodeTemplates ??= new DapperRepository<FeeCodeTemplate>(_db);
     public IPaymentChannelRepository PaymentChannels => _paymentChannels ??= new DapperPaymentChannelRepository(_db, _sql);
     public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new DapperHolidayCalendarRepository(_db, _sql);
     public IRepository<HousingUnit> HousingUnits => _housingUnits ??= new DapperRepository<HousingUnit>(_db);
@@ -40,6 +42,7 @@ public class DapperUnitOfWork : IUnitOfWork
     public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new DapperRepository<TaxRateConfig>(_db);
     public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new DapperRepository<LateFeeConfig>(_db);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db);
+    public IRepository<Voucher> Vouchers => _vouchers ??= new DapperRepository<Voucher>(_db);
     public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new DapperRepository<JobSchedule>(_db);
     public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new DapperRepository<JobTemplate>(_db);
     public IRepository<JobScheduleExecution> JobScheduleExecutions => _jobScheduleExecutions ??= new DapperRepository<JobScheduleExecution>(_db);
@@ -49,9 +52,17 @@ public class DapperUnitOfWork : IUnitOfWork
     public ITenantRepository Tenants => _tenants ??= new DapperTenantRepository(_db, _sql);
     public IReceivablePlanRepository ReceivablePlans => _receivablePlans ??= new DapperReceivablePlanRepository(_db, _sql);
     public IReceiptRepository Receipts => _receipts ??= new DapperReceiptRepository(_db, _sql);
+    public IRepository<BankStatement> BankStatements => _bankStatements ??= new DapperRepository<BankStatement>(_db);
+    public IRepository<BankReconciliation> BankReconciliations => _bankReconciliations ??= new DapperRepository<BankReconciliation>(_db);
+    public IRepository<BankMatch> BankMatches => _bankMatches ??= new DapperRepository<BankMatch>(_db);
+    public IRepository<DepositLog> DepositLogs => _depositLogs ??= new DapperRepository<DepositLog>(_db);
+    public IRepository<CollectionStage> CollectionStages => _collectionStages ??= new DapperRepository<CollectionStage>(_db);
+    public IRepository<CollectionRecord> CollectionRecords => _collectionRecords ??= new DapperRepository<CollectionRecord>(_db);
+    public IRepository<DebitNote> DebitNotes => _debitNotes ??= new DapperRepository<DebitNote>(_db);
     public IMeterReadingRepository MeterReadings => _meterReadings ??= new DapperMeterReadingRepository(_db, _sql);
     public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db, _sql);
     public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db, _sql);
+    public IRepository<ChangeRequest> ChangeRequests => _changeRequests ??= new DapperRepository<ChangeRequest>(_db);
 
     private IUserRepository? _users;
     private IRoleRepository? _roles;
@@ -59,6 +70,7 @@ public class DapperUnitOfWork : IUnitOfWork
     private ICompanyRepository? _companies;
     private IApprovalRequestRepository? _approvalRequests;
     private IFeeCodeRepository? _feeCodes;
+    private IRepository<FeeCodeTemplate>? _feeCodeTemplates;
     private IPaymentChannelRepository? _paymentChannels;
     private IHolidayCalendarRepository? _holidayCalendars;
     private IRepository<HousingUnit>? _housingUnits;
@@ -69,6 +81,7 @@ public class DapperUnitOfWork : IUnitOfWork
     private IRepository<TaxRateConfig>? _taxRateConfigs;
     private IRepository<LateFeeConfig>? _lateFeeConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
+    private IRepository<Voucher>? _vouchers;
     private IRepository<JobSchedule>? _jobSchedules;
     private IRepository<JobTemplate>? _jobTemplates;
     private IRepository<JobScheduleExecution>? _jobScheduleExecutions;
@@ -78,9 +91,17 @@ public class DapperUnitOfWork : IUnitOfWork
     private ITenantRepository? _tenants;
     private IReceivablePlanRepository? _receivablePlans;
     private IReceiptRepository? _receipts;
+    private IRepository<BankStatement>? _bankStatements;
+    private IRepository<BankReconciliation>? _bankReconciliations;
+    private IRepository<BankMatch>? _bankMatches;
+    private IRepository<DepositLog>? _depositLogs;
+    private IRepository<CollectionStage>? _collectionStages;
+    private IRepository<CollectionRecord>? _collectionRecords;
+    private IRepository<DebitNote>? _debitNotes;
     private IMeterReadingRepository? _meterReadings;
     private IContractRepository? _contracts;
     private IRenewalRequestRepository? _renewalRequests;
+    private IRepository<ChangeRequest>? _changeRequests;
 
     public async Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default)
     {
@@ -102,6 +123,14 @@ public class DapperUnitOfWork : IUnitOfWork
     }
     public Task<int> CommitAsync(CancellationToken ct = default) => Task.FromResult(0);
     public Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class => Task.CompletedTask;
+
+    public async Task<List<DebitNoteItem>> GetDebitNoteItemsAsync(Guid debitNoteId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        return (await conn.QueryAsync<DebitNoteItem>(
+            "SELECT * FROM DebitNoteItems WHERE DebitNoteId=@Id ORDER BY CreatedAt",
+            new { Id = debitNoteId })).ToList();
+    }
 
     public async Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default)
     {

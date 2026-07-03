@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Application.Common.Interfaces;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
@@ -10,7 +11,13 @@ namespace RBS.Api.Controllers;
 public class ReceivablesController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
-    public ReceivablesController(IUnitOfWork uow) => _uow = uow;
+    private readonly IReceivableGenerationService _generationService;
+
+    public ReceivablesController(IUnitOfWork uow, IReceivableGenerationService generationService)
+    {
+        _uow = uow;
+        _generationService = generationService;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractId, CancellationToken ct)
@@ -29,8 +36,38 @@ public class ReceivablesController : ControllerBase
     }
 
     [HttpPost("generate")]
-    public async Task<IActionResult> Generate([FromBody] object dto, CancellationToken ct)
+    public async Task<IActionResult> Generate(
+        [FromBody] GenerateReceivablesRequest request,
+        CancellationToken ct)
     {
-        return Ok(new { message = "生成任务已提交" });
+        if (request.ContractId == Guid.Empty)
+            return BadRequest(new { message = "contractId 不能为空" });
+
+        try
+        {
+            var count = await _generationService.GenerateAsync(
+                request.ContractId,
+                request.PeriodFrom,
+                request.PeriodTo,
+                ct);
+
+            return Ok(new
+            {
+                message = $"应收已成功生成，共 {count} 条",
+                contractId = request.ContractId,
+                totalCreated = count
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
+}
+
+public class GenerateReceivablesRequest
+{
+    public Guid ContractId { get; set; }
+    public string? PeriodFrom { get; set; }
+    public string? PeriodTo { get; set; }
 }

@@ -17,7 +17,7 @@ public class ReceivablePlan : AggregateRoot
     public decimal Balance => Amount - Received;
     public DateOnly DueDate { get; private set; }
     public string Status { get; private set; }
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     private ReceivablePlan() : base()
     {

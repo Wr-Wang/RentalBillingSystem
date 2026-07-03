@@ -2,7 +2,6 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Core.Interfaces.Persistence;
-using System.Data;
 
 namespace RBS.Api.Controllers;
 
@@ -12,7 +11,8 @@ namespace RBS.Api.Controllers;
 public class SystemLogsController : ControllerBase
 {
     private readonly IDbConnectionFactory _db;
-    public SystemLogsController(IDbConnectionFactory db) => _db = db;
+    private readonly ISqlLoader _sql;
+    public SystemLogsController(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
 
     private bool IsSuperAdmin => User.FindFirst("IsSuperAdmin")?.Value == "True";
     private IActionResult? RequireSuperAdmin() => IsSuperAdmin ? null : Forbid();
@@ -71,7 +71,7 @@ public class SystemLogsController : ControllerBase
         if (auth != null) return auth;
 
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("DELETE FROM SystemLogs WHERE Id = @Id", new { Id = id });
+        await conn.ExecuteAsync(_sql.Get("Common.Delete.SystemLog.ById"), new { Id = id });
         return NoContent();
     }
 
@@ -82,7 +82,7 @@ public class SystemLogsController : ControllerBase
         if (auth != null) return auth;
 
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("DELETE FROM SystemLogs");
+        await conn.ExecuteAsync(_sql.Get("Common.Delete.SystemLog.All"));
         return NoContent();
     }
 }

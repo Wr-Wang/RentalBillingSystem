@@ -1,6 +1,5 @@
 namespace RBS.Core.Entities.Contract;
 using RBS.Core.Common;
-
 using RBS.Core.Entities.Base;
 
 /// <summary>
@@ -11,14 +10,14 @@ public class Contract : AggregateRoot, IHasCompany
     // ===== 基本属性 =====
     public string ContractNo { get; private set; }
     public Guid RoomId { get; private set; }
-    public decimal RentAmount { get; private set; }
-    public decimal DepositAmount { get; private set; }
+    public Money RentAmount { get; private set; } = Money.Zero;
+    public Money DepositAmount { get; private set; } = Money.Zero;
     public DateOnly StartDate { get; private set; }
     public DateOnly EndDate { get; private set; }
     public string PaymentCycle { get; private set; }
-    public string StatusCode { get; private set; }
+    public ContractStatus StatusCode { get; private set; } = ContractStatus.Draft;
     public Guid CompanyId { get; private set; }
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     // ===== 续签链字段 =====
     public Guid? PreviousContractId { get; private set; }
@@ -50,7 +49,7 @@ public class Contract : AggregateRoot, IHasCompany
     {
         ContractNo = string.Empty;
         PaymentCycle = "Monthly";
-        StatusCode = "Draft";
+        StatusCode = ContractStatus.Draft;
     }
 
     // ===== 领域构造函数 =====
@@ -99,7 +98,7 @@ public class Contract : AggregateRoot, IHasCompany
     }
 
     /// <summary>供内部/ORM 使用</summary>
-    public void SetStatus(string status) => StatusCode = status;
+    public void SetStatus(string status) => StatusCode = ContractStatus.FromCode(status);
     public void SetRenewalCount(int count) => RenewalCount = count;
     public void SetAutoRenew(bool autoRenew) => AutoRenew = autoRenew;
 
@@ -124,7 +123,8 @@ public class Contract : AggregateRoot, IHasCompany
     // ===== 费用管理 =====
 
     public void AddFeeConfig(Guid feeCodeId, decimal amount,
-        string billingMode = "FixedAmount", string? unit = null, decimal? unitPrice = null)
+        string billingMode = "FixedAmount", string? unit = null, decimal? unitPrice = null,
+        string? effectiveDate = null)
     {
         if (_feeConfigs.Any(fc => fc.FeeCodeId == feeCodeId && fc.IsActive))
             throw new InvalidOperationException("该费用项目已配置");
@@ -133,6 +133,23 @@ public class Contract : AggregateRoot, IHasCompany
         config.SetBillingMode(BillingMode.FromCode(billingMode));
         if (unit != null) config.SetUnit(unit);
         if (unitPrice.HasValue) config.SetUnitPrice(unitPrice.Value);
+        if (effectiveDate != null)
+            config.SetEffectivePeriod(effectiveDate, null);
+        _feeConfigs.Add(config);
+    }
+
+    public void AdjustFeeConfig(Guid feeCodeId, decimal newAmount, string effectiveDate)
+    {
+        var active = _feeConfigs.FirstOrDefault(f => f.FeeCodeId == feeCodeId && f.IsActive);
+        if (active != null)
+        {
+            var expiryDate = DateOnly.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
+            active.ExpireOn(expiryDate);
+        }
+
+        var config = new ContractFeeConfig(Id, feeCodeId, newAmount);
+        config.SetBillingMode(BillingMode.FixedAmount);
+        config.SetEffectivePeriod(effectiveDate, null);
         _feeConfigs.Add(config);
     }
 

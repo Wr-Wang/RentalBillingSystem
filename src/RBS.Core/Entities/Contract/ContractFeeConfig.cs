@@ -43,6 +43,11 @@ public class ContractFeeConfig : AuditableEntity
     /// </summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>生效日期（yyyy-MM-dd）</summary>
+    public string? EffectiveDate { get; private set; }
+    /// <summary>到期日期（yyyy-MM-dd），NULL 表示当前生效</summary>
+    public string? ExpiryDate { get; private set; }
+
     /// <summary>
     /// 仅用于 EF Core 反序列化，禁止直接调用
     /// </summary>
@@ -139,6 +144,22 @@ public class ContractFeeConfig : AuditableEntity
         if (!IsActive)
             throw new InvalidOperationException("费用配置已是停用状态");
 
+        IsActive = false;
+    }
+
+    /// <summary>设置生效期</summary>
+    public void SetEffectivePeriod(string? effectiveDate, string? expiryDate)
+    {
+        EffectiveDate = effectiveDate;
+        ExpiryDate = expiryDate;
+    }
+
+    /// <summary>到期停用（调价时调用）</summary>
+    public void ExpireOn(string expiryDate)
+    {
+        if (ExpiryDate != null)
+            throw new InvalidOperationException("该费用配置已到期");
+        ExpiryDate = expiryDate;
         IsActive = false;
     }
 

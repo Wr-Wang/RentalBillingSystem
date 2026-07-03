@@ -270,6 +270,13 @@ const routes = [
           }
         ]
       },
+      // 续签看板
+      {
+        path: 'renewal-dashboard',
+        name: 'RenewalDashboard',
+        component: () => import('../views/renewal/dashboard.vue'),
+        meta: { title: '待续签看板', icon: 'RefreshRight', roles: ['Admin', 'OpsSupervisor', 'DeptManager'] }
+      },
       // 通知中心
       {
         path: 'notifications',

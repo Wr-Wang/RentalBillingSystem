@@ -21,6 +21,8 @@ public sealed class Money : ValueObject
 
     public static Money Zero => new(0);
     public bool IsZero => Amount == 0;
+    public static implicit operator decimal(Money m) => m.Amount;
+    public static implicit operator Money(decimal amount) => new(amount);
 
     public Money Add(Money other)
     {
@@ -87,6 +89,9 @@ public sealed class Period : ValueObject
     /// <summary>格式化为 "2026-06"</summary>
     public override string ToString() => $"{Year:D4}-{Month:D2}";
 
+    public static implicit operator string(Period p) => p.ToString();
+    public static implicit operator Period(string s) => Parse(s);
+
     /// <summary>获取下一个月账期</summary>
     public Period Next() => Month == 12 ? new Period(Year + 1, 1) : new Period(Year, Month + 1);
 
@@ -130,6 +135,11 @@ public sealed class ContractStatus : ValueObject
         DisplayName = displayName;
     }
 
+    /// <summary>隐式转换使 Dapper 自动映射 + if (status == "Active") 兼容</summary>
+    public static implicit operator string(ContractStatus s) => s.Code;
+    public static implicit operator ContractStatus(string code) => FromCode(code);
+    public override string ToString() => Code;
+
     public bool CanTransitionTo(ContractStatus target) => (_validTransitions[this] ?? Array.Empty<ContractStatus>()).Contains(target);
 
     private static readonly Dictionary<ContractStatus, ContractStatus[]> _validTransitions = new()
@@ -168,6 +178,9 @@ public sealed class ReceiptStatus : ValueObject
     private ReceiptStatus(string code, string displayName) { Code = code; DisplayName = displayName; }
 
     public static ReceiptStatus FromCode(string code) => _all.FirstOrDefault(s => s.Code == code) ?? Pending;
+    public static implicit operator string(ReceiptStatus s) => s.Code;
+    public static implicit operator ReceiptStatus(string code) => FromCode(code);
+    public override string ToString() => Code;
     private static readonly ReceiptStatus[] _all = { Pending, Confirmed, Rejected, Cancelled };
 
     protected override IEnumerable<object> GetEqualityComponents() { yield return Code; }
@@ -191,6 +204,9 @@ public sealed class ReceivableStatus : ValueObject
     private ReceivableStatus(string code, string displayName) { Code = code; DisplayName = displayName; }
 
     public static ReceivableStatus FromCode(string code) => _all.FirstOrDefault(s => s.Code == code) ?? Pending;
+    public static implicit operator string(ReceivableStatus s) => s.Code;
+    public static implicit operator ReceivableStatus(string code) => FromCode(code);
+    public override string ToString() => Code;
     private static readonly ReceivableStatus[] _all = { Pending, Partial, Paid, Overdue, Cancelled };
 
     protected override IEnumerable<object> GetEqualityComponents() { yield return Code; }
@@ -254,6 +270,9 @@ public sealed class BillingMode : ValueObject
     private BillingMode(string code, string displayName) { Code = code; DisplayName = displayName; }
 
     public static BillingMode FromCode(string code) => _all.FirstOrDefault(s => s.Code == code) ?? FixedAmount;
+    public static implicit operator string(BillingMode b) => b.Code;
+    public static implicit operator BillingMode(string code) => FromCode(code);
+    public override string ToString() => Code;
     private static readonly BillingMode[] _all = { FixedAmount, MeterBased };
 
     protected override IEnumerable<object> GetEqualityComponents() { yield return Code; }

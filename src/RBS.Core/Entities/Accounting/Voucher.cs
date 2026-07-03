@@ -44,7 +44,7 @@ public class Voucher : AggregateRoot
     /// <summary>
     /// 乐观并发控制行版本号
     /// </summary>
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     /// <summary>
     /// 凭证分录集合（只读）
@@ -158,6 +158,13 @@ public class Voucher : AggregateRoot
             throw new InvalidOperationException($"凭证状态为「{Status.DisplayName}」，仅已过账状态可执行反过账操作");
 
         Status = VoucherStatus.Draft;
+    }
+
+    /// <summary>加载已有分录（Dapper 查询后调用，替代反射）</summary>
+    public void LoadEntries(IEnumerable<JournalEntry> entries)
+    {
+        _entries.Clear();
+        _entries.AddRange(entries);
     }
 
     /// <summary>

@@ -35,6 +35,17 @@ public class Role : AuditableEntity
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
 
-    public ICollection<RoleMenu> RoleMenus { get; private set; } = new List<RoleMenu>();
-    public ICollection<UserRole> UserRoles { get; private set; } = new List<UserRole>();
+    private readonly List<RoleMenu> _roleMenus = new();
+    private readonly List<UserRole> _userRoles = new();
+    public IReadOnlyCollection<RoleMenu> RoleMenus => _roleMenus.AsReadOnly();
+    public IReadOnlyCollection<UserRole> UserRoles => _userRoles.AsReadOnly();
+
+    public void AssignMenu(Guid menuId) => _roleMenus.Add(new RoleMenu(Id, menuId));
+    public void AssignMenus(IEnumerable<Guid> menuIds)
+    {
+        _roleMenus.Clear();
+        foreach (var id in menuIds) _roleMenus.Add(new RoleMenu(Id, id));
+    }
+    public void ClearMenus() => _roleMenus.Clear();
+    public void AssignRole(Guid userId) => _userRoles.Add(new UserRole(userId, Id));
 }

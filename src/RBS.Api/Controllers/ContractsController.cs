@@ -1,7 +1,8 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Approval;
+using RBS.Application.Services.Contract;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 
@@ -16,12 +17,18 @@ public class ContractsController : ControllerBase
     private readonly IRenewalService _renewalService;
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
-    public ContractsController(IContractService contractService, IRenewalService renewalService, IUnitOfWork uow, IDbConnectionFactory db)
+    private readonly IApprovalService _approvalService;
+    private readonly IContractTimelineService _timelineService;
+    public ContractsController(IContractService contractService, IRenewalService renewalService,
+        IUnitOfWork uow, IDbConnectionFactory db, IApprovalService approvalService,
+        IContractTimelineService timelineService)
     {
         _contractService = contractService;
         _renewalService = renewalService;
         _uow = uow;
         _db = db;
+        _approvalService = approvalService;
+        _timelineService = timelineService;
     }
 
     [HttpGet]
@@ -45,45 +52,87 @@ public class ContractsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] RBS.Core.Entities.Contract.Contract dto, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] RBS.Application.DTOs.Contract.CreateContractRequest request, CancellationToken ct)
     {
-        await _uow.Contracts.AddAsync(dto, ct);
-        await _uow.CommitAsync(ct);
+        var dto = await _contractService.CreateAsync(request, ct);
         return Ok(dto);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] RBS.Core.Entities.Contract.Contract dto, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] ContractUpdateRequest request, CancellationToken ct)
     {
         var entity = await _uow.Contracts.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
+
+        if (request.RentAmount.HasValue) entity.SetRentAmount(request.RentAmount.Value);
+        if (request.DepositAmount.HasValue) entity.SetDepositAmount(request.DepositAmount.Value);
+        if (request.StartDate.HasValue && request.EndDate.HasValue)
+            entity.SetPeriod(request.StartDate.Value, request.EndDate.Value);
+        if (!string.IsNullOrEmpty(request.PaymentCycle)) entity.SetPaymentCycle(request.PaymentCycle);
+        if (request.AutoRenew.HasValue) entity.SetAutoRenew(request.AutoRenew.Value);
+
         await _uow.CommitAsync(ct);
-        return NoContent();
+        return Ok(entity);
+    }
+
+    public class ContractUpdateRequest
+    {
+        public decimal? RentAmount { get; set; }
+        public decimal? DepositAmount { get; set; }
+        public DateOnly? StartDate { get; set; }
+        public DateOnly? EndDate { get; set; }
+        public string? PaymentCycle { get; set; }
+        public bool? AutoRenew { get; set; }
     }
 
     [HttpPost("{id}/terminate")]
     public async Task<IActionResult> Terminate(Guid id, [FromBody] Dictionary<string, string> body, CancellationToken ct)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
+        var entity = await _uow.Contracts.GetByIdAsync(id, ct);
+        if (entity == null) return NotFound();
+
         body.TryGetValue("reason", out var reason);
-        await conn.ExecuteAsync("UPDATE Contracts SET Status='Terminated',TerminationReason=@Reason WHERE Id=@Id", new { Id = id, Reason = reason ?? "手动终止" });
-        return Ok(new { id, status = "Terminated" });
+        entity.Terminate(reason ?? "手动终止");
+
+        // 提交终止审批
+        var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_TERMINATE", ct);
+        if (approvalType != null)
+        {
+            var result = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+            {
+                ApprovalTypeId = approvalType.Id,
+                Title = $"[合同终止] {entity.ContractNo}",
+                Description = reason ?? "手动终止",
+                TargetEntityId = entity.Id,
+                TargetEntityType = "Contract"
+            }, ct);
+
+            if (result != null)
+                entity.SetStatus("PendingApproval");
+        }
+
+        await _uow.CommitAsync(ct);
+        return Ok(new { id, status = entity.StatusCode });
     }
 
     [HttpPost("{id}/suspend")]
     public async Task<IActionResult> Suspend(Guid id, CancellationToken ct)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("UPDATE Contracts SET Status='Suspended' WHERE Id=@Id", new { Id = id });
-        return Ok(new { id, status = "Suspended" });
+        var entity = await _uow.Contracts.GetByIdAsync(id, ct);
+        if (entity == null) return NotFound();
+        entity.Suspend();
+        await _uow.CommitAsync(ct);
+        return Ok(new { id, status = entity.StatusCode });
     }
 
     [HttpPost("{id}/resume")]
     public async Task<IActionResult> Resume(Guid id, CancellationToken ct)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("UPDATE Contracts SET Status='Active' WHERE Id=@Id", new { Id = id });
-        return Ok(new { id, status = "Active" });
+        var entity = await _uow.Contracts.GetByIdAsync(id, ct);
+        if (entity == null) return NotFound();
+        entity.Resume();
+        await _uow.CommitAsync(ct);
+        return Ok(new { id, status = entity.StatusCode });
     }
 
     // ===== 续签相关 API（新审批流程） =====
@@ -164,5 +213,9 @@ public class ContractsController : ControllerBase
     }
 
     [HttpGet("{id}/timeline")]
-    public IActionResult GetTimeline(Guid id) => Ok(new List<object>());
+    public async Task<IActionResult> GetTimeline(Guid id, CancellationToken ct)
+    {
+        var events = await _timelineService.GetTimelineAsync(id, ct);
+        return Ok(events);
+    }
 }

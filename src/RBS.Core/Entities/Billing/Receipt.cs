@@ -17,7 +17,7 @@ public class Receipt : AggregateRoot, IHasCompany
     public string? ReferenceNo { get; private set; }
     public string Status { get; private set; }
     public Guid CompanyId { get; private set; }
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     // ===== 驳回信息 =====
     public string? RejectReason { get; private set; }
@@ -119,6 +119,24 @@ public class Receipt : AggregateRoot, IHasCompany
         if (Status == "Cancelled") return;
         if (Status == "Confirmed" && _allocations.Count > 0)
             throw new InvalidOperationException("已分配的收款不能取消，请先取消分配");
+        Status = "Cancelled";
+    }
+
+    /// <summary>反向冲销 — 反转所有分配，取消收款</summary>
+    /// <param name="allocations">外部传入的分配列表（Dapper 无延迟加载）</param>
+    /// <param name="planReverseFn">为每个分配反转应收的回调</param>
+    public void Reverse(IReadOnlyList<ReceiptAllocation> allocations,
+        Action<ReceiptAllocation> planReverseFn)
+    {
+        if (Status != "Confirmed")
+            throw new InvalidOperationException("只能冲销已确认的收款");
+
+        foreach (var alloc in allocations)
+        {
+            planReverseFn(alloc);
+            _allocations.Remove(alloc);
+        }
+
         Status = "Cancelled";
     }
 }

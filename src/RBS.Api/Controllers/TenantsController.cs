@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
@@ -33,18 +34,26 @@ public class TenantsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] RBS.Core.Entities.Contract.Tenant dto, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] TenantRequest request, CancellationToken ct)
     {
-        await _uow.Tenants.AddAsync(dto, ct);
+        if (request.CompanyId == Guid.Empty)
+            return BadRequest(new { message = "companyId 不能为空" });
+        var entity = new Tenant(request.Name, request.CompanyId);
+        if (!string.IsNullOrEmpty(request.Phone)) entity.SetPhone(request.Phone);
+        if (!string.IsNullOrEmpty(request.IdCard)) entity.SetIdCard(request.IdCard);
+        await _uow.Tenants.AddAsync(entity, ct);
         await _uow.CommitAsync(ct);
-        return Ok(dto);
+        return Ok(entity);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] RBS.Core.Entities.Contract.Tenant dto, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] TenantRequest request, CancellationToken ct)
     {
         var entity = await _uow.Tenants.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
+        if (request.Name != null) entity.Rename(request.Name);
+        if (request.Phone != null) entity.SetPhone(request.Phone);
+        if (request.IdCard != null) entity.SetIdCard(request.IdCard);
         await _uow.CommitAsync(ct);
         return NoContent();
     }
@@ -58,4 +67,12 @@ public class TenantsController : ControllerBase
         await _uow.CommitAsync(ct);
         return NoContent();
     }
+}
+
+public class TenantRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Phone { get; set; }
+    public string? IdCard { get; set; }
+    public Guid CompanyId { get; set; }
 }

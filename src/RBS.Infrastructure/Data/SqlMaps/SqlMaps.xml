@@ -38,9 +38,15 @@
       VALUES(@Id,@Username,@PasswordHash,@DisplayName,@Phone,@Email,@IsActive,@HomeCompanyId,@IsSuperAdmin,@CreatedBy,@CreatedAt)]]>
   </insert>
   <update id="Identity.Update.User.Default">
-    <![CDATA[UPDATE Users SET Username=@Username,DisplayName=@DisplayName,Phone=@Phone,Email=@Email,
+    <![CDATA[UPDATE Users SET DisplayName=@DisplayName,PasswordHash=@PasswordHash,Phone=@Phone,Email=@Email,
       IsActive=@IsActive,HomeCompanyId=@HomeCompanyId,IsSuperAdmin=@IsSuperAdmin,
       UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
+  </update>
+  <update id="Identity.Update.User.DefaultCompanyId">
+    <![CDATA[UPDATE Users SET DefaultCompanyId = @CompanyId WHERE Id = @Id]]>
+  </update>
+  <update id="Identity.Update.User.Deactivate">
+    <![CDATA[UPDATE Users SET IsActive = 0 WHERE Id = @Id]]>
   </update>
   <delete id="Identity.Delete.User.ById">
     <![CDATA[DELETE FROM Users WHERE Id=@Id]]>
@@ -142,6 +148,9 @@
   <delete id="Organization.Delete.Company.ById">
     <![CDATA[DELETE FROM Companies WHERE Id=@Id]]>
   </delete>
+  <update id="Organization.Update.Company.Deactivate">
+    <![CDATA[UPDATE Companies SET IsActive=0 WHERE Id=@Id]]>
+  </update>
 
   <!-- ================================================================
        模块：Approval（审批）
@@ -415,14 +424,89 @@
     <![CDATA[INSERT INTO Contracts (Id,ContractNo,RoomId,RentAmount,DepositAmount,StartDate,EndDate,PaymentCycle,Status,CompanyId,CreatedBy,CreatedAt)
       VALUES(@Id,@ContractNo,@RoomId,@RentAmount,@DepositAmount,@StartDate,@EndDate,@PaymentCycle,@Status,@CompanyId,@CreatedBy,@CreatedAt)]]>
   </insert>
+  <update id="Lease.Update.Contract.Status">
+    <![CDATA[UPDATE Contracts SET Status=@Status WHERE Id=@Id]]>
+  </update>
+  <update id="Lease.Update.Contract.Terminate">
+    <![CDATA[UPDATE Contracts SET Status='Terminated', TerminationReason=@Reason WHERE Id=@Id]]>
+  </update>
+  <update id="Lease.Update.Contract.RentAmount">
+    <![CDATA[UPDATE Contracts SET RentAmount=@NewAmount WHERE Id=@Id]]>
+  </update>
+  <delete id="Lease.Delete.ReceiptAllocation.ByReceiptId">
+    <![CDATA[DELETE FROM ReceiptAllocations WHERE ReceiptId=@Id]]>
+  </delete>
+
+  <!-- ================================================================
+       模块：ContractFeeConfig — 合同费用配置（Contract 子实体）
+       ================================================================ -->
+  <select id="Lease.Select.ContractFeeConfig.ByContractId">
+    <![CDATA[SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, fc.Code AS FeeCode,
+                   cf.BillingMode, cf.Amount, cf.Unit, cf.UnitPrice, cf.IsActive,
+                   cf.EffectiveDate, cf.ExpiryDate
+            FROM ContractFeeConfigs cf
+            LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
+            WHERE cf.ContractId = @ContractId
+            ORDER BY cf.FeeCodeId, cf.EffectiveDate DESC]]>
+  </select>
+  <insert id="Lease.Insert.ContractFeeConfig.Default">
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
+            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, NULL, @CreatedBy, @Now)]]>
+  </insert>
+  <update id="Lease.Update.ContractFeeConfig.Default">
+    <![CDATA[UPDATE ContractFeeConfigs SET Amount=@Amount, BillingMode=@BillingMode, Unit=@Unit, UnitPrice=@UnitPrice, IsActive=@IsActive
+            WHERE Id=@Id]]>
+  </update>
+  <select id="Lease.Select.ContractFeeConfig.CurrentByContractAndFee">
+    <![CDATA[SELECT Id FROM ContractFeeConfigs
+            WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
+              AND ExpiryDate IS NULL AND IsActive=1]]>
+  </select>
+  <update id="Lease.Update.ContractFeeConfig.ExpiryDate">
+    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate=@ExpiryDate WHERE Id=@Id]]>
+  </update>
+  <insert id="Lease.Insert.ContractFeeConfig.AfterAdjust">
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
+            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, NULL, NULL, 1, @EffectiveDate, NULL, @CreatedBy, @Now)]]>
+  </insert>
+  <select id="Lease.Select.ContractFeeConfig.History">
+    <![CDATA[SELECT Id, Amount, EffectiveDate, ExpiryDate, IsActive, CreatedAt
+            FROM ContractFeeConfigs
+            WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
+            ORDER BY EffectiveDate DESC]]>
+  </select>
 
   <!-- ================================================================
        模块：Common（通用查询 — 各 Repository 公共查询）
        ================================================================ -->
+  <!-- 合同时间线 -->
+  <select id="Lease.Select.Contract.RenewalRequests">
+    <![CDATA[SELECT CreatedAt, Status, NewRent FROM RenewalRequests WHERE OldContractId=@Id ORDER BY CreatedAt]]>
+  </select>
+  <select id="Lease.Select.Contract.ApprovalRequests">
+    <![CDATA[SELECT CreatedAt, Title, Description FROM ApprovalRequests WHERE TargetEntityId=@Id ORDER BY CreatedAt]]>
+  </select>
+  <select id="Lease.Select.Contract.ReceivablePlans">
+    <![CDATA[SELECT Period, Amount, Status, DueDate FROM ReceivablePlans WHERE ContractId=@Id]]>
+  </select>
+
   <select id="Common.Select.ApprovalType.ByCode">
     <![CDATA[SELECT * FROM ApprovalTypes WHERE Code=@Code]]>
   </select>
   <select id="Common.Select.ImportBatch.ByIdWithItems">
     <![CDATA[SELECT * FROM ImportBatches WHERE Id=@Id; SELECT * FROM ImportBatchItems WHERE ImportBatchId=@Id ORDER BY RowIndex]]>
   </select>
+
+  <!-- 系统日志清理 -->
+  <delete id="Common.Delete.SystemLog.ById">
+    <![CDATA[DELETE FROM SystemLogs WHERE Id = @Id]]>
+  </delete>
+  <delete id="Common.Delete.SystemLog.All">
+    <![CDATA[DELETE FROM SystemLogs]]>
+  </delete>
+
+  <!-- API 日志清理 -->
+  <delete id="Common.Delete.ApiLog.ById">
+    <![CDATA[DELETE FROM ApiLogs WHERE Id = @Id]]>
+  </delete>
 </sqlMap>

@@ -1,11 +1,11 @@
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Organization;
+using RBS.Core.Common;
 using RBS.Core.Entities.Organization;
 using RBS.Core.Interfaces.Persistence;
-using RBS.Core.Interfaces.UnitOfWork;
 using RBS.Core.Interfaces.Services;
-using RBS.Core.Common;
+using RBS.Core.Interfaces.UnitOfWork;
 using System.Data;
 
 namespace RBS.Application.Services.Organization;
@@ -13,20 +13,19 @@ namespace RBS.Application.Services.Organization;
 public class UserService : IUserService
 {
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUserService _currentUserService;
 
-    public UserService(IDbConnectionFactory db, ICurrentUserService currentUserService, IUnitOfWork uow)
+    public UserService(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUserService, IUnitOfWork uow)
     {
-        _db = db;
-        _currentUserService = currentUserService;
-        _uow = uow;
+        _db = db; _sql = sql; _currentUserService = currentUserService; _uow = uow;
     }
 
     public async Task<List<UserDto>> GetListAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var users = (await conn.QueryAsync<User>("SELECT * FROM Users ORDER BY CreatedAt DESC")).ToList();
+        var users = (await conn.QueryAsync<User>(_sql.Get("Identity.Select.User.All"))).ToList();
         var dtos = new List<UserDto>();
         foreach (var user in users)
             dtos.Add(await MapToDtoAsync(user, conn, ct));
@@ -36,7 +35,7 @@ public class UserService : IUserService
     public async Task<UserDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var user = await conn.QuerySingleOrDefaultAsync<User>("SELECT * FROM Users WHERE Id=@Id", new { Id = id });
+        var user = await conn.QuerySingleOrDefaultAsync<User>(_sql.Get("Identity.Select.User.ById"), new { Id = id });
         return user == null ? null : await MapToDtoAsync(user, conn, ct);
     }
 
@@ -53,16 +52,17 @@ public class UserService : IUserService
         using var tx = conn.BeginTransaction();
         try
         {
-            await conn.ExecuteAsync(@"
-                INSERT INTO Users (Id, Username, PasswordHash, DisplayName, IsActive, HomeCompanyId, IsSuperAdmin, CreatedBy, CreatedAt)
-                VALUES (@Id, @Username, @PasswordHash, @DisplayName, @IsActive, @HomeCompanyId, @IsSuperAdmin, @CreatedBy, @CreatedAt)",
-                new { user.Id, user.Username, user.PasswordHash, user.DisplayName, user.IsActive, user.HomeCompanyId, user.IsSuperAdmin, CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now });
+            await conn.ExecuteAsync(_sql.Get("Identity.Insert.User.Default"),
+                new { user.Id, user.Username, user.PasswordHash, user.DisplayName,
+                    user.IsActive, user.HomeCompanyId, user.IsSuperAdmin,
+                    CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now });
 
             if (request.RoleIds?.Any() == true)
             {
                 foreach (var roleId in request.RoleIds)
-                    await conn.ExecuteAsync("INSERT INTO UserRoles (Id, UserId, RoleId, CreatedBy, CreatedAt) VALUES (@Id, @UserId, @RoleId, @CreatedBy, @CreatedAt)",
-                        new { Id = Guid.NewGuid(), UserId = user.Id, RoleId = roleId, CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now }, tx);
+                    await conn.ExecuteAsync(_sql.Get("Identity.Insert.UserRole.Default"),
+                        new { Id = Guid.NewGuid(), UserId = user.Id, RoleId = roleId,
+                            CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now }, tx);
             }
             tx.Commit();
         }
@@ -74,7 +74,7 @@ public class UserService : IUserService
     public async Task UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var user = await conn.QuerySingleOrDefaultAsync<User>("SELECT * FROM Users WHERE Id=@Id", new { Id = id })
+        var user = await conn.QuerySingleOrDefaultAsync<User>(_sql.Get("Identity.Select.User.ById"), new { Id = id })
             ?? throw new KeyNotFoundException("用户不存在");
 
         if (request.DisplayName != null || request.Phone != null || request.Email != null)
@@ -87,15 +87,18 @@ public class UserService : IUserService
         using var tx = conn.BeginTransaction();
         try
         {
-            await conn.ExecuteAsync("UPDATE Users SET DisplayName=@DisplayName,PasswordHash=@PasswordHash,Phone=@Phone,Email=@Email,IsActive=@IsActive,HomeCompanyId=@HomeCompanyId,IsSuperAdmin=@IsSuperAdmin,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id",
-                new { user.DisplayName, user.PasswordHash, Phone = (string?)null, Email = (string?)null, user.IsActive, user.HomeCompanyId, user.IsSuperAdmin, UpdatedBy = _currentUserService.UserId, UpdatedAt = ChinaTime.Now, Id = id }, tx);
+            await conn.ExecuteAsync(_sql.Get("Identity.Update.User.Default"),
+                new { user.DisplayName, user.PasswordHash, Phone = (string?)null, Email = (string?)null,
+                    user.IsActive, user.HomeCompanyId, user.IsSuperAdmin,
+                    UpdatedBy = _currentUserService.UserId, UpdatedAt = ChinaTime.Now, Id = id }, tx);
 
             if (request.RoleIds != null)
             {
-                await conn.ExecuteAsync("DELETE FROM UserRoles WHERE UserId=@UserId", new { UserId = id }, tx);
+                await conn.ExecuteAsync(_sql.Get("Identity.Delete.UserRoles.ByUserId"), new { UserId = id }, tx);
                 foreach (var roleId in request.RoleIds)
-                    await conn.ExecuteAsync("INSERT INTO UserRoles (Id, UserId, RoleId, CreatedBy, CreatedAt) VALUES (@Id, @UserId, @RoleId, @CreatedBy, @CreatedAt)",
-                        new { Id = Guid.NewGuid(), UserId = id, RoleId = roleId, CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now }, tx);
+                    await conn.ExecuteAsync(_sql.Get("Identity.Insert.UserRole.Default"),
+                        new { Id = Guid.NewGuid(), UserId = id, RoleId = roleId,
+                            CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now }, tx);
             }
             tx.Commit();
         }
@@ -105,13 +108,14 @@ public class UserService : IUserService
     public async Task SetDefaultCompanyAsync(Guid userId, Guid? companyId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("UPDATE Users SET DefaultCompanyId = @CompanyId WHERE Id = @Id", new { Id = userId, CompanyId = companyId });
+        await conn.ExecuteAsync(_sql.Get("Identity.Update.User.DefaultCompanyId"),
+            new { Id = userId, CompanyId = companyId });
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("UPDATE Users SET IsActive = 0 WHERE Id = @Id", new { Id = id });
+        await conn.ExecuteAsync(_sql.Get("Identity.Update.User.Deactivate"), new { Id = id });
     }
 
     private async Task<UserDto> MapToDtoAsync(User user, IDbConnection conn, CancellationToken ct)
@@ -124,7 +128,9 @@ public class UserService : IUserService
             CreatedAt = user.CreatedAt, RoleIds = new List<Guid>(), RoleNames = new List<string>()
         };
 
-        var roles = (await conn.QueryAsync("SELECT ur.RoleId, r.Name FROM UserRoles ur LEFT JOIN Roles r ON r.Id = ur.RoleId WHERE ur.UserId = @UserId", new { UserId = user.Id })).ToList();
+        var roles = (await conn.QueryAsync(
+            "SELECT ur.RoleId, r.Name FROM UserRoles ur LEFT JOIN Roles r ON r.Id = ur.RoleId WHERE ur.UserId = @UserId",
+            new { UserId = user.Id })).ToList();
         foreach (var row in roles)
         {
             dto.RoleIds.Add((Guid)row.RoleId);
@@ -134,7 +140,8 @@ public class UserService : IUserService
 
         if (user.HomeCompanyId.HasValue)
         {
-            dto.HomeCompanyName = await conn.QuerySingleOrDefaultAsync<string>("SELECT Name FROM Companies WHERE Id = @Id", new { Id = user.HomeCompanyId.Value });
+            dto.HomeCompanyName = await conn.QuerySingleOrDefaultAsync<string>(
+                "SELECT Name FROM Companies WHERE Id = @Id", new { Id = user.HomeCompanyId.Value });
         }
 
         return dto;

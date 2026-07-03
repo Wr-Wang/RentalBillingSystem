@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 
 namespace RBS.Api.Controllers;
 
@@ -11,152 +12,145 @@ namespace RBS.Api.Controllers;
 public class ContractFeeConfigsController : ControllerBase
 {
     private readonly IDbConnectionFactory _db;
-    public ContractFeeConfigsController(IDbConnectionFactory db) => _db = db;
+    private readonly ISqlLoader _sql;
+    private readonly ICurrentUserService _currentUser;
 
-    /// <summary>获取合同的所有费用版本（含历史），按生效日期排序</summary>
+    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _sql = sql;
+        _currentUser = currentUser;
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractId, CancellationToken ct)
     {
         if (contractId == null) return Ok(new List<object>());
+
         using var conn = _db.CreateConnection(); conn.Open();
-        var rows = await conn.QueryAsync(@"
-            SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, fc.Code AS FeeCode,
-                   cf.BillingMode, cf.Amount, cf.Unit, cf.UnitPrice, cf.IsActive,
-                   cf.EffectiveDate, cf.ExpiryDate
-            FROM ContractFeeConfigs cf
-            LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
-            WHERE cf.ContractId = @ContractId
-            ORDER BY cf.FeeCodeId, cf.EffectiveDate DESC", new { ContractId = contractId.Value });
-        var list = rows.Select(r => new
-        {
-            id = (Guid)((dynamic)r).Id,
-            contractId = (Guid)((dynamic)r).ContractId,
-            feeCodeId = (Guid)((dynamic)r).FeeCodeId,
-            feeCodeName = (string?)((dynamic)r).FeeCodeName,
-            feeCode = (string?)((dynamic)r).FeeCode,
-            billingMode = (string)((dynamic)r).BillingMode,
-            amount = (decimal)((dynamic)r).Amount,
-            unit = (string?)((dynamic)r).Unit,
-            unitPrice = (decimal?)((dynamic)r).UnitPrice,
-            isActive = (bool)((dynamic)r).IsActive,
-            effectiveDate = ((dynamic)r).EffectiveDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : null,
-            expiryDate = ((dynamic)r).ExpiryDate is DateTime xd ? xd.ToString("yyyy-MM-dd") : null
-        }).ToList();
+        var rows = await conn.QueryAsync(_sql.Get("Lease.Select.ContractFeeConfig.ByContractId"),
+            new { ContractId = contractId.Value });
+        var list = rows.Select(r => MapConfig(r)).ToList();
         return Ok(list);
     }
 
-    /// <summary>新增费用（首次）</summary>
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] System.Text.Json.JsonElement body, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateFeeConfigRequest request, CancellationToken ct)
     {
-        var contractId = body.GetProperty("contractId").GetGuid();
-        var feeCodeId = body.GetProperty("feeCodeId").GetGuid();
-        var amount = body.GetProperty("amount").GetDecimal();
-        var billingMode = body.TryGetProperty("billingMode", out var bm) ? bm.GetString() ?? "FixedAmount" : "FixedAmount";
-        var unit = body.TryGetProperty("unit", out var u) ? u.GetString() : null;
-        var unitPrice = body.TryGetProperty("unitPrice", out var up) && up.ValueKind == System.Text.Json.JsonValueKind.Number ? up.GetDecimal() : (decimal?)null;
-        var effectiveDate = body.TryGetProperty("effectiveDate", out var ed) ? ed.GetString() : null;
-        if (string.IsNullOrEmpty(effectiveDate)) effectiveDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-
         using var conn = _db.CreateConnection(); conn.Open();
         var id = Guid.NewGuid();
-        var userId = GetUserId();
-        await conn.ExecuteAsync(@"
-            INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
-            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, NULL, @CreatedBy, @Now)",
-            new { Id = id, ContractId = contractId, FeeCodeId = feeCodeId, BillingMode = billingMode,
-                  Amount = amount, Unit = unit, UnitPrice = unitPrice, EffectiveDate = effectiveDate,
-                  CreatedBy = userId, Now = DateTime.UtcNow });
+        await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
+            new
+            {
+                Id = id, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                BillingMode = request.BillingMode ?? "FixedAmount",
+                Amount = request.Amount, Unit = request.Unit, UnitPrice = request.UnitPrice,
+                EffectiveDate = request.EffectiveDate ?? DateTime.UtcNow.ToString("yyyy-MM-dd"),
+                CreatedBy = _currentUser.UserId, Now = DateTime.UtcNow
+            });
         return Ok(new { id });
     }
 
-    /// <summary>更新费用元数据（金额/计费方式/启用停用）</summary>
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] System.Text.Json.JsonElement body, CancellationToken ct)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFeeConfigRequest request, CancellationToken ct)
     {
-        var amount = body.GetProperty("amount").GetDecimal();
-        var billingMode = body.TryGetProperty("billingMode", out var bm) ? bm.GetString() ?? "FixedAmount" : "FixedAmount";
-        var unit = body.TryGetProperty("unit", out var u) ? u.GetString() : null;
-        var unitPrice = body.TryGetProperty("unitPrice", out var up) && up.ValueKind == System.Text.Json.JsonValueKind.Number ? up.GetDecimal() : (decimal?)null;
-        var isActive = body.TryGetProperty("isActive", out var ia) ? ia.GetBoolean() : true;
-
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(@"
-            UPDATE ContractFeeConfigs SET Amount=@Amount, BillingMode=@BillingMode, Unit=@Unit, UnitPrice=@UnitPrice, IsActive=@IsActive
-            WHERE Id=@Id",
-            new { Id = id, Amount = amount, BillingMode = billingMode, Unit = unit, UnitPrice = unitPrice, IsActive = isActive });
+        await conn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.Default"),
+            new { Id = id, request.Amount, request.BillingMode, request.Unit, request.UnitPrice, request.IsActive });
         return NoContent();
     }
 
-    /// <summary>调价专用接口：旧记录到期 + 创建新记录</summary>
     [HttpPost("adjust")]
-    public async Task<IActionResult> Adjust([FromBody] System.Text.Json.JsonElement body, CancellationToken ct)
+    public async Task<IActionResult> Adjust([FromBody] AdjustFeeConfigRequest request, CancellationToken ct)
     {
-        var contractId = body.GetProperty("contractId").GetGuid();
-        var feeCodeId = body.GetProperty("feeCodeId").GetGuid();
-        var newAmount = body.GetProperty("newAmount").GetDecimal();
-        var effectiveDate = body.GetProperty("effectiveDate").GetString()!;
-
         using var conn = _db.CreateConnection(); conn.Open();
-        var userId = GetUserId();
 
-        // 1. 查找当前生效的记录（ExpiryDate IS NULL 且 IsActive=1）
-        var current = await conn.QuerySingleOrDefaultAsync(@"
-            SELECT Id FROM ContractFeeConfigs
-            WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
-              AND ExpiryDate IS NULL AND IsActive=1",
-            new { ContractId = contractId, FeeCodeId = feeCodeId });
+        // 查找当前生效记录
+        var current = await conn.QuerySingleOrDefaultAsync(
+            _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
+            new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId });
 
-        // 2. 如果存在当前生效记录，设其到期日为生效日前一天
+        // 存在则设到期
         if (current != null)
         {
-            var expiryDate = DateTime.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
-            await conn.ExecuteAsync("UPDATE ContractFeeConfigs SET ExpiryDate=@ExpiryDate WHERE Id=@Id",
+            var expiryDate = DateTime.Parse(request.EffectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
+            await conn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
                 new { Id = (Guid)((dynamic)current).Id, ExpiryDate = expiryDate });
         }
 
-        // 3. 创建新记录
+        // 创建新记录
         var newId = Guid.NewGuid();
-        var billingMode = "FixedAmount";
-        await conn.ExecuteAsync(@"
-            INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
-            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, NULL, NULL, 1, @EffectiveDate, NULL, @CreatedBy, @Now)",
+        await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
             new
             {
-                Id = newId, ContractId = contractId, FeeCodeId = feeCodeId,
-                BillingMode = billingMode, Amount = newAmount,
-                EffectiveDate = effectiveDate, CreatedBy = userId, Now = DateTime.UtcNow
+                Id = newId, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                BillingMode = "FixedAmount", Amount = request.NewAmount,
+                EffectiveDate = request.EffectiveDate,
+                CreatedBy = _currentUser.UserId, Now = DateTime.UtcNow
             });
 
         return Ok(new { id = newId, message = "调价成功" });
     }
 
-    /// <summary>获取指定费用项的版本历史</summary>
     [HttpGet("history")]
     public async Task<IActionResult> GetHistory([FromQuery] Guid contractId, [FromQuery] Guid feeCodeId, CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var rows = await conn.QueryAsync(@"
-            SELECT Id, Amount, EffectiveDate, ExpiryDate, IsActive, CreatedAt
-            FROM ContractFeeConfigs
-            WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
-            ORDER BY EffectiveDate DESC",
+        var rows = await conn.QueryAsync(_sql.Get("Lease.Select.ContractFeeConfig.History"),
             new { ContractId = contractId, FeeCodeId = feeCodeId });
         var list = rows.Select(r => new
         {
             id = (Guid)((dynamic)r).Id,
             amount = (decimal)((dynamic)r).Amount,
-            effectiveDate = ((dynamic)r).EffectiveDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : null,
-            expiryDate = ((dynamic)r).ExpiryDate is DateTime xd ? xd.ToString("yyyy-MM-dd") : null,
+            effectiveDate = ((DateTime)((dynamic)r).EffectiveDate).ToString("yyyy-MM-dd"),
+            expiryDate = ((dynamic)r).ExpiryDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : null,
             isActive = (bool)((dynamic)r).IsActive,
             createdAt = ((DateTime)((dynamic)r).CreatedAt).ToString("yyyy-MM-dd HH:mm")
         }).ToList();
         return Ok(list);
     }
 
-    private Guid? GetUserId()
+    private static object MapConfig(dynamic r) => new
     {
-        var idStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        return idStr != null && Guid.TryParse(idStr, out var id) ? id : null;
-    }
+        id = (Guid)r.Id,
+        contractId = (Guid)r.ContractId,
+        feeCodeId = (Guid)r.FeeCodeId,
+        feeCodeName = (string?)r.FeeCodeName,
+        feeCode = (string?)r.FeeCode,
+        billingMode = (string)r.BillingMode,
+        amount = (decimal)r.Amount,
+        unit = (string?)r.Unit,
+        unitPrice = (decimal?)r.UnitPrice,
+        isActive = (bool)r.IsActive,
+        effectiveDate = r.EffectiveDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : null,
+        expiryDate = r.ExpiryDate is DateTime xd ? xd.ToString("yyyy-MM-dd") : null
+    };
+}
+
+public class CreateFeeConfigRequest
+{
+    public Guid ContractId { get; set; }
+    public Guid FeeCodeId { get; set; }
+    public decimal Amount { get; set; }
+    public string? BillingMode { get; set; }
+    public string? Unit { get; set; }
+    public decimal? UnitPrice { get; set; }
+    public string? EffectiveDate { get; set; }
+}
+
+public class UpdateFeeConfigRequest
+{
+    public decimal Amount { get; set; }
+    public string? BillingMode { get; set; }
+    public string? Unit { get; set; }
+    public decimal? UnitPrice { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public class AdjustFeeConfigRequest
+{
+    public Guid ContractId { get; set; }
+    public Guid FeeCodeId { get; set; }
+    public decimal NewAmount { get; set; }
+    public string EffectiveDate { get; set; } = "";
 }

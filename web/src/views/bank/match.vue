@@ -1,45 +1,42 @@
 <template>
   <div>
-    <div class="page-header">
-      <h2>自动匹配</h2>
-      <el-button type="primary" @click="autoMatch">自动匹配</el-button>
-    </div>
-
-    <el-table :data="unmatchedItems" stripe>
+    <div class="page-header"><h2>自动匹配</h2><el-button type="primary" @click="autoMatch">自动匹配</el-button></div>
+    <el-table :data="statements" stripe v-loading="loading">
       <el-table-column type="index" label="#" width="50" />
-      <el-table-column prop="transactionRef" label="交易号" width="180" />
-      <el-table-column prop="remitterName" label="付款人" width="120" />
+      <el-table-column prop="referenceNo" label="交易号" width="180" />
+      <el-table-column prop="counterparty" label="付款人" width="120" />
       <el-table-column prop="amount" label="金额" width="110">
         <template #default="{ row }">¥{{ row.amount?.toLocaleString() }}</template>
       </el-table-column>
-      <el-table-column prop="summary" label="银行摘要" min-width="200" />
-      <el-table-column label="建议匹配" width="200">
-        <template #default="{ row }">
-          <el-select v-model="row.suggestedMatch" filterable placeholder="选择应收" style="width: 100%">
-            <el-option label="HT-2026-001 6月 ¥5,460" value="r1" />
-            <el-option label="HT-2026-002 6月 ¥4,030" value="r2" />
-          </el-select>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="80">
-        <template #default>
-          <el-button text size="small" type="primary">匹配</el-button>
-        </template>
+      <el-table-column prop="description" label="摘要" min-width="200" />
+      <el-table-column prop="status" label="状态" width="100">
+        <template #default="{ row }"><el-tag :type="row.status === 'Matched' ? 'success' : 'info'" size="small">{{ row.status }}</el-tag></template>
       </el-table-column>
     </el-table>
   </div>
 </template>
-
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { getBankStatements, autoMatchBank } from '@/api'
 import { ElMessage } from 'element-plus'
-
-const unmatchedItems = ref([
-  { transactionRef: 'BANK20260627002', remitterName: '李四', amount: 4000, summary: '房租', suggestedMatch: '' },
-  { transactionRef: 'BANK20260625004', remitterName: '赵六', amount: 150, summary: '管理费', suggestedMatch: '' }
-])
-
-function autoMatch() {
-  ElMessage.success('自动匹配完成，共匹配 2 条')
+const loading = ref(false)
+const statements = ref([])
+async function loadData() {
+  loading.value = true
+  try {
+    const res = await getBankStatements({ status: 'Unmatched' })
+    statements.value = res
+  } catch (e) { console.error(e) }
+  finally { loading.value = false }
 }
+async function autoMatch() {
+  try {
+    const recons = await getBankStatements({})
+    if (recons.length === 0) { ElMessage.warning('请先在流水导入页面创建对账'); return }
+    const res = await autoMatchBank(recons[0].id)
+    ElMessage.success(`自动匹配完成，共匹配 ${res.matched || 0} 条`)
+    await loadData()
+  } catch (e) { ElMessage.error(e?.response?.data?.message || '匹配失败') }
+}
+onMounted(loadData)
 </script>
