@@ -441,6 +441,12 @@ const routes = [
             meta: { title: '滞纳金配置', icon: 'WarningFilled' }
           },
           {
+            path: 'autorenew',
+            name: 'SystemAutoRenew',
+            component: () => import('../views/system/autoRenewConfig.vue'),
+            meta: { title: '自动续签配置', icon: 'RefreshRight' }
+          },
+          {
             path: 'logs',
             name: 'SystemLogs',
             component: () => import('../views/system/log/index.vue'),

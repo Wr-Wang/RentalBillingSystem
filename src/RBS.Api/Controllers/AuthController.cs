@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using RBS.Core.Interfaces.Services;
 using UserEntity = RBS.Core.Entities.Organization.User;
 using RBS.Core.Interfaces.UnitOfWork;
+using BCrypt.Net;
 
 namespace RBS.Api.Controllers;
 
@@ -40,8 +41,8 @@ public class AuthController : ControllerBase
         if (user == null)
             return Unauthorized(new { Message = "用户名或密码错误" });
 
-        // TODO: 使用 BCrypt 验证密码 Hash
-        if (user.PasswordHash != request.Password)
+        // BCrypt 验证密码
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return Unauthorized(new { Message = "用户名或密码错误" });
 
         if (!user.IsActive)
@@ -121,11 +122,11 @@ public class AuthController : ControllerBase
         if (user == null)
             return NotFound(new { message = "用户不存在" });
 
-        // TODO: 使用 BCrypt 验证密码
-        if (user.PasswordHash != request.OldPassword)
+        // BCrypt 验证原密码
+        if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash))
             return BadRequest(new { message = "原密码不正确" });
 
-        user.ChangePassword(request.NewPassword);
+        user.ChangePassword(BCrypt.Net.BCrypt.HashPassword(request.NewPassword));
         await _uow.Users.UpdateAsync(user, ct);
         await _uow.CommitAsync(ct);
 

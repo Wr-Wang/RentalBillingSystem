@@ -262,6 +262,10 @@ export function getActiveLateFeeConfig() { return request({ url: '/latefeeconfig
 export function saveLateFeeConfig(data) { return request({ url: '/latefeeconfig', method: 'post', data }) }
 export function deleteLateFeeConfig(id) { return request({ url: `/latefeeconfig/${id}`, method: 'delete' }) }
 
+// AutoRenew Config
+export function getAutoRenewConfig(companyId) { return request({ url: '/autorenewconfig', method: 'get', params: { companyId } }) }
+export function saveAutoRenewConfig(data) { return request({ url: '/autorenewconfig', method: 'post', data }) }
+
 // Change Requests
 export function getChangeRequests(params) { return request({ url: '/changerequests', method: 'get', params }) }
 export function getChangeRequest(id) { return request({ url: `/changerequests/${id}`, method: 'get' }) }

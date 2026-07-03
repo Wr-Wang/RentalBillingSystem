@@ -41,6 +41,7 @@ public class DapperUnitOfWork : IUnitOfWork
     public IRepository<FloorLevelBand> FloorLevelBands => _floorLevelBands ??= new DapperRepository<FloorLevelBand>(_db);
     public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new DapperRepository<TaxRateConfig>(_db);
     public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new DapperRepository<LateFeeConfig>(_db);
+    public IRepository<AutoRenewConfig> AutoRenewConfigs => _autoRenewConfigs ??= new DapperRepository<AutoRenewConfig>(_db);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db);
     public IRepository<Voucher> Vouchers => _vouchers ??= new DapperRepository<Voucher>(_db);
     public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new DapperRepository<JobSchedule>(_db);
@@ -80,6 +81,7 @@ public class DapperUnitOfWork : IUnitOfWork
     private IRepository<FloorLevelBand>? _floorLevelBands;
     private IRepository<TaxRateConfig>? _taxRateConfigs;
     private IRepository<LateFeeConfig>? _lateFeeConfigs;
+    private IRepository<AutoRenewConfig>? _autoRenewConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
     private IRepository<Voucher>? _vouchers;
     private IRepository<JobSchedule>? _jobSchedules;

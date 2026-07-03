@@ -156,7 +156,7 @@ DECLARE @R_GenMgr UNIQUEIDENTIFIER = (SELECT [Id] FROM [Roles] WHERE [Code] = 'G
 -- 1级：运营主管（月租≤5000）
 IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1111111-1111-1111-1111-111111111007' AND [Level] = 1)
 INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-VALUES ('F2111111-1111-1111-1111-111111111014','F1111111-1111-1111-1111-111111111007',1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
+VALUES ('F2111111-1111-1111-1111-111111111017','F1111111-1111-1111-1111-111111111007',1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
 
 -- 2级：部门经理（月租5000~50000）
 IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1111111-1111-1111-1111-111111111007' AND [Level] = 2)
@@ -215,10 +215,24 @@ CREATE TABLE [AutoRenewConfig] (
     [TermRule] NVARCHAR(20) NOT NULL DEFAULT 'Same',       -- Same / FixedMonths
     [TermMonths] INT NULL,
     [OverdueAction] NVARCHAR(20) NOT NULL DEFAULT 'Block', -- Block / WarnAndContinue / Skip
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
-    [UpdatedAt] DATETIME2 NULL
+    [UpdatedBy] UNIQUEIDENTIFIER NULL,
+    [UpdatedAt] DATETIME2 NULL,
+    [CreatedIp] NVARCHAR(50) NULL,
+    [CreatedHostname] NVARCHAR(100) NULL,
+    [UpdatedIp] NVARCHAR(50) NULL,
+    [UpdatedHostname] NVARCHAR(100) NULL
 );
 GO
+
+-- ===================================================================
+-- 10. AutoRenewConfig 种子数据
+-- ===================================================================
+DECLARE @DefaultConfigId uniqueidentifier = 'C1111111-1111-1111-1111-111111111001';
+IF NOT EXISTS (SELECT 1 FROM [AutoRenewConfig] WHERE [CompanyId] = @Cid)
+INSERT INTO [AutoRenewConfig] ([Id],[CompanyId],[AdvanceDays],[RentRule],[RentIncreasePercent],[TermRule],[TermMonths],[OverdueAction],[CreatedBy],[CreatedAt])
+VALUES (@DefaultConfigId, @Cid, 7, 'Same', NULL, 'Same', NULL, 'Block', @SysUserId, GETUTCDATE());
 
 PRINT N'合同续签功能数据库变更完成！';
 GO

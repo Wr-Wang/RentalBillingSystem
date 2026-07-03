@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentChannelService, PaymentChannelService>();
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
         services.AddScoped<ILateFeeConfigService, LateFeeConfigService>();
+        services.AddScoped<IAutoRenewConfigService, AutoRenewConfigService>();
         services.AddScoped<IHousingUnitService, HousingUnitService>();
         services.AddScoped<IApprovalService, ApprovalService>();
         services.AddScoped<IImportService, ImportService>();

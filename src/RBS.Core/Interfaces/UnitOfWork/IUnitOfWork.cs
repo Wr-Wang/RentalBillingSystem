@@ -79,6 +79,7 @@ public interface IUnitOfWork : IDisposable
     IRepository<JobSchedule> JobSchedules { get; }
     IRepository<JobTemplate> JobTemplates { get; }
     IRepository<JobScheduleExecution> JobScheduleExecutions { get; }
+    IRepository<AutoRenewConfig> AutoRenewConfigs { get; }
 
     /// <summary>按 Code 查找审批类型（忽略公司过滤器，系统级查找）</summary>
     Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default);
