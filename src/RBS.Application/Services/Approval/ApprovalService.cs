@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Approval;
@@ -14,9 +13,8 @@ namespace RBS.Application.Services.Approval;
 
 /// <summary>
 /// 审批应用服务实现
-/// 写操作（Approve/Reject/Cancel）使用原始 SQL + 显式事务，完全绕过 EF Core SaveChanges 管道，
-/// 避免 MirrorAuditInterceptor / DomainEventDispatcher / SqlServerRetryExecutionStrategy 的交互问题。
-/// 读操作保持 EF Core 不变。
+/// 写操作（Approve/Reject/Cancel）使用原始 SQL + 显式事务，
+/// 读操作使用 Dapper 仓储。
 /// </summary>
 public class ApprovalService : IApprovalService
 {
@@ -25,18 +23,22 @@ public class ApprovalService : IApprovalService
     private readonly ICurrentUserService _currentUserService;
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ISqlLoader _sql;
 
     public ApprovalService(
         IUnitOfWork uow,
         ITenantService tenantService,
         ICurrentUserService currentUserService,
-        IDbConnectionFactory connectionFactory, IServiceProvider serviceProvider)
+        IDbConnectionFactory connectionFactory,
+        IServiceProvider serviceProvider,
+        ISqlLoader sql)
     {
         _uow = uow;
         _tenantService = tenantService;
         _connectionFactory = connectionFactory;
         _currentUserService = currentUserService;
         _serviceProvider = serviceProvider;
+        _sql = sql;
     }
 
     // =====================================================================
@@ -69,11 +71,12 @@ public class ApprovalService : IApprovalService
             updateConn.Open();
             // 插入审批记录（Submitted），与状态更新共用同一连接
             await Dapper.SqlMapper.ExecuteAsync(updateConn,
-                @"INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
-                  VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)",
+                _sql.Get("Approval.Insert.Record.Default"),
                 new { record.Id, ApprovalRequestId = entity.Id, record.Level, record.ApproverId, record.Action, Comment = record.Comment ?? "", record.CreatedBy, record.CreatedAt });
 
-            await Dapper.SqlMapper.ExecuteAsync(updateConn, "UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id", new { entity.Status, entity.Id });
+            await Dapper.SqlMapper.ExecuteAsync(updateConn,
+                _sql.Get("Approval.Update.Request.SetStatus"),
+                new { entity.Status, Id = entity.Id });
         }
 
         // [事件] 提交后通知第一级审批人
@@ -116,15 +119,11 @@ public class ApprovalService : IApprovalService
             string updateSql;
             if (isFinalLevel)
             {
-                updateSql = @"UPDATE ApprovalRequests SET Status = 'Approved',
-                              UpdatedBy = @p0, UpdatedAt = @p1
-                              WHERE Id = @p2 AND Status = 'Pending'";
+                updateSql = _sql.Get("Approval.Update.Request.ToApproved");
             }
             else
             {
-                updateSql = @"UPDATE ApprovalRequests SET CurrentLevel = CurrentLevel + 1,
-                              UpdatedBy = @p0, UpdatedAt = @p1
-                              WHERE Id = @p2 AND Status = 'Pending'";
+                updateSql = _sql.Get("Approval.Update.Request.AdvanceLevel");
             }
 
             var rows = await _uow.ExecuteSqlRawAsync(updateSql,
@@ -135,8 +134,7 @@ public class ApprovalService : IApprovalService
             // 插入审批记录
             var recordId = Guid.NewGuid();
             await _uow.ExecuteSqlRawAsync(
-                @"INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
-                  VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)",
+                _sql.Get("Approval.Insert.Record.Default"),
                 new object[] { recordId, id, entity.CurrentLevel, userId, "Approved",
                     comment ?? "", userId, now }, ct);
 
@@ -191,17 +189,14 @@ public class ApprovalService : IApprovalService
         try
         {
             var rows = await _uow.ExecuteSqlRawAsync(
-                @"UPDATE ApprovalRequests SET Status = 'Rejected',
-                  UpdatedBy = @p0, UpdatedAt = @p1
-                  WHERE Id = @p2 AND Status = 'Pending'",
+                _sql.Get("Approval.Update.Request.ToRejected"),
                 new object[] { userId, now, id }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
             var recordId = Guid.NewGuid();
             await _uow.ExecuteSqlRawAsync(
-                @"INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
-                  VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)",
+                _sql.Get("Approval.Insert.Record.Default"),
                 new object[] { recordId, id, entity.CurrentLevel, userId, "Rejected",
                     comment, userId, now }, ct);
 
@@ -249,9 +244,7 @@ public class ApprovalService : IApprovalService
         {
             // 更新审批状态
             var rows = await _uow.ExecuteSqlRawAsync(
-                @"UPDATE ApprovalRequests SET Status = 'Cancelled',
-                  UpdatedBy = @p0, UpdatedAt = @p1
-                  WHERE Id = @p2 AND Status = 'Pending'",
+                _sql.Get("Approval.Update.Request.ToCancelled"),
                 new object[] { userId, now, id }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
@@ -259,8 +252,7 @@ public class ApprovalService : IApprovalService
             // 插入"撤回"记录
             var recordId = Guid.NewGuid();
             await _uow.ExecuteSqlRawAsync(
-                @"INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
-                  VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)",
+                _sql.Get("Approval.Insert.Record.Default"),
                 new object[] { recordId, id, entity.CurrentLevel, userId, "Cancelled",
                     reason ?? "提交人撤回", userId, now }, ct);
 
@@ -268,9 +260,7 @@ public class ApprovalService : IApprovalService
             if (entity.TargetEntityType == "Import")
             {
                 await _uow.ExecuteSqlRawAsync(
-                    @"UPDATE ImportBatches SET Status = 'Cancelled',
-                      UpdatedBy = @p0, UpdatedAt = @p1
-                      WHERE Id = @p2 AND Status = 'PendingApproval'",
+                    _sql.Get("Approval.Update.ImportBatch.Cancelled"),
                     new object[] { userId, now, entity.TargetEntityId }, ct);
             }
 

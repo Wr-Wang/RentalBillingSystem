@@ -6,7 +6,9 @@ using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 using RBS.Infrastructure.Data.Repositories;
+using RBS.Infrastructure.Data.SqlMaps;
 using RBS.Core.DomainServices;
+using RBS.Core.Entities.Accounting;
 using RBS.Infrastructure.Data.Services;
 using RBS.Application.EventHandlers;
 using RBS.Application.Services.SystemConfig;
@@ -14,10 +16,8 @@ using RBS.Core.Common;
 using RBS.Core.Entities.Base;
 using RBS.Core.Entities.Property;
 using RBS.Core.Entities.Approval;
-using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.SystemConfig;
 using DapperUnitOfWork = RBS.Infrastructure.Data.UnitOfWork.DapperUnitOfWork;
-using Microsoft.EntityFrameworkCore;
 
 namespace RBS.Infrastructure.Data;
 
@@ -31,6 +31,15 @@ public static class DependencyInjection
 
         // Dapper 连接工厂
         services.AddSingleton<IDbConnectionFactory>(new DbConnectionFactory(connectionString));
+
+        // SQL 映射加载器
+        services.AddSingleton<ISqlLoader>(sp =>
+        {
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, "Data", "SqlMaps", "SqlMaps.xml");
+            if (!File.Exists(xmlPath))
+                xmlPath = Path.Combine(Directory.GetCurrentDirectory(), "Data", "SqlMaps", "SqlMaps.xml");
+            return new SqlLoader(xmlPath);
+        });
 
         // ===== Dapper 仓储 =====
         services.AddScoped<IUserRepository, DapperUserRepository>();
@@ -50,15 +59,6 @@ public static class DependencyInjection
 
         // IUnitOfWork（Dapper 实现）
         services.AddScoped<IUnitOfWork, DapperUnitOfWork>();
-        services.AddDbContext<AppDbContext>((sp, options) =>
-        {
-            options.UseSqlServer(connectionString, sqlOptions =>
-            {
-                sqlOptions.EnableRetryOnFailure(3);
-                sqlOptions.CommandTimeout(60);
-            });
-        });
-
 
         // 多租户
         services.AddScoped<ITenantService, TenantService>();

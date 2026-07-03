@@ -645,7 +645,6 @@ CREATE TABLE [ApprovalRecords] (
     [CreatedBy] uniqueidentifier NOT NULL,
     [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
     CONSTRAINT [PK_ApprovalRecords] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_ApprovalRecords_ApprovalRequests_ApprovalRequestId] FOREIGN KEY ([ApprovalRequestId]) REFERENCES [ApprovalRequests] ([Id])
 );
 
 CREATE TABLE [Floors] (
@@ -662,7 +661,6 @@ CREATE TABLE [Floors] (
     [UpdatedIp] nvarchar(50) NULL,
     [UpdatedHostname] nvarchar(100) NULL,
     CONSTRAINT [PK_Floors] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_Floors_Buildings_BuildingId] FOREIGN KEY ([BuildingId]) REFERENCES [Buildings] ([Id])
 );
 
 CREATE TABLE [ContractFeeConfigs] (
@@ -683,7 +681,6 @@ CREATE TABLE [ContractFeeConfigs] (
     [UpdatedIp] nvarchar(50) NULL,
     [UpdatedHostname] nvarchar(100) NULL,
     CONSTRAINT [PK_ContractFeeConfigs] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_ContractFeeConfigs_Contracts_ContractId] FOREIGN KEY ([ContractId]) REFERENCES [Contracts] ([Id])
 );
 
 CREATE TABLE [ContractTenants] (
@@ -694,7 +691,6 @@ CREATE TABLE [ContractTenants] (
     [CreatedBy] uniqueidentifier NOT NULL,
     [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
     CONSTRAINT [PK_ContractTenants] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_ContractTenants_Contracts_ContractId] FOREIGN KEY ([ContractId]) REFERENCES [Contracts] ([Id])
 );
 
 CREATE TABLE [DebitNoteItems] (
@@ -705,7 +701,6 @@ CREATE TABLE [DebitNoteItems] (
     [CreatedBy] uniqueidentifier NOT NULL,
     [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
     CONSTRAINT [PK_DebitNoteItems] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_DebitNoteItems_DebitNotes_DebitNoteId] FOREIGN KEY ([DebitNoteId]) REFERENCES [DebitNotes] ([Id])
 );
 
 CREATE TABLE [ReceiptAllocations] (
@@ -716,7 +711,6 @@ CREATE TABLE [ReceiptAllocations] (
     [CreatedBy] uniqueidentifier NOT NULL,
     [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
     CONSTRAINT [PK_ReceiptAllocations] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_ReceiptAllocations_Receipts_ReceiptId] FOREIGN KEY ([ReceiptId]) REFERENCES [Receipts] ([Id])
 );
 
 CREATE TABLE [RoleMenus] (
@@ -726,8 +720,6 @@ CREATE TABLE [RoleMenus] (
     [CreatedBy] uniqueidentifier NOT NULL,
     [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
     CONSTRAINT [PK_RoleMenus] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_RoleMenus_Menus_MenuId] FOREIGN KEY ([MenuId]) REFERENCES [Menus] ([Id]),
-    CONSTRAINT [FK_RoleMenus_Roles_RoleId] FOREIGN KEY ([RoleId]) REFERENCES [Roles] ([Id])
 );
 
 CREATE TABLE [UserRoles] (
@@ -737,8 +729,6 @@ CREATE TABLE [UserRoles] (
     [CreatedBy] uniqueidentifier NOT NULL,
     [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
     CONSTRAINT [PK_UserRoles] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_UserRoles_Roles_RoleId] FOREIGN KEY ([RoleId]) REFERENCES [Roles] ([Id]),
-    CONSTRAINT [FK_UserRoles_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [Users] ([Id])
 );
 
 CREATE TABLE [JournalEntries] (
@@ -757,7 +747,6 @@ CREATE TABLE [JournalEntries] (
     [UpdatedIp] nvarchar(50) NULL,
     [UpdatedHostname] nvarchar(100) NULL,
     CONSTRAINT [PK_JournalEntries] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_JournalEntries_Vouchers_VoucherId] FOREIGN KEY ([VoucherId]) REFERENCES [Vouchers] ([Id])
 );
 
 CREATE TABLE [Rooms] (
@@ -778,7 +767,6 @@ CREATE TABLE [Rooms] (
     [UpdatedIp] nvarchar(50) NULL,
     [UpdatedHostname] nvarchar(100) NULL,
     CONSTRAINT [PK_Rooms] PRIMARY KEY ([Id]),
-    CONSTRAINT [FK_Rooms_Floors_FloorId] FOREIGN KEY ([FloorId]) REFERENCES [Floors] ([Id])
 );
 
 CREATE UNIQUE INDEX [IX_AccountingSubjects_Code_LandlordId] ON [AccountingSubjects] ([Code], [LandlordId]);

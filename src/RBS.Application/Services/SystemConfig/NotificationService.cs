@@ -20,12 +20,15 @@ public class NotificationService : INotificationService
     private readonly IDbConnectionFactory _db;
     private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _uow;
+    private readonly ISqlLoader _sql;
 
-    public NotificationService(IDbConnectionFactory db, ICurrentUserService currentUser, IUnitOfWork uow)
+    public NotificationService(IDbConnectionFactory db, ICurrentUserService currentUser,
+        IUnitOfWork uow, ISqlLoader sql)
     {
         _db = db;
         _currentUser = currentUser;
         _uow = uow;
+        _sql = sql;
     }
 
     // =====================================================================
@@ -101,10 +104,7 @@ public class NotificationService : INotificationService
         using var conn = _db.CreateConnection();
 
         var rows = await conn.QueryAsync<(string Category, int Count)>(
-            @"SELECT [Category], COUNT(*) AS [Count]
-              FROM [Notifications]
-              WHERE [UserId] = @UserId AND [IsRead] = 0
-              GROUP BY [Category]",
+            _sql.Get("Notification.Select.Notification.UnreadCounts"),
             new { UserId = userId });
 
         var result = new UnreadCountsDto();
@@ -130,8 +130,7 @@ public class NotificationService : INotificationService
     {
         var userId = _currentUser.UserId;
         using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            "UPDATE [Notifications] SET [IsRead] = 1 WHERE [Id] = @Id AND [UserId] = @UserId",
+        await conn.ExecuteAsync(_sql.Get("Notification.Update.Notification.MarkRead"),
             new { Id = id, UserId = userId });
     }
 
@@ -139,8 +138,7 @@ public class NotificationService : INotificationService
     {
         var userId = _currentUser.UserId;
         using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            "UPDATE [Notifications] SET [IsRead] = 1 WHERE [UserId] = @UserId AND [IsRead] = 0",
+        await conn.ExecuteAsync(_sql.Get("Notification.Update.Notification.MarkAllRead"),
             new { UserId = userId });
     }
 
@@ -151,11 +149,7 @@ public class NotificationService : INotificationService
     public async Task CreateAsync(Notification notification, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection();
-        await conn.ExecuteAsync(
-            @"INSERT INTO [Notifications] ([Id], [UserId], [CompanyId], [Category], [Title], [Content],
-                   [ReferenceType], [ReferenceId], [IsRead], [CreatedAt])
-              VALUES (@Id, @UserId, @CompanyId, @Category, @Title, @Content,
-                  @ReferenceType, @ReferenceId, @IsRead, @CreatedAt)",
+        await conn.ExecuteAsync(_sql.Get("Notification.Insert.Notification.Default"),
             new
             {
                 notification.Id,
@@ -179,9 +173,7 @@ public class NotificationService : INotificationService
 
         // 去重：同用户 + 同分类 + 同天
         var exists = await conn.ExecuteScalarAsync<int>(
-            @"SELECT COUNT(1) FROM [Notifications]
-              WHERE [UserId] = @UserId AND [Category] = @Category
-                AND CAST([CreatedAt] AS DATE) = CAST(GETUTCDATE() AS DATE)",
+            _sql.Get("Notification.Select.Notification.DedupCheck"),
             new { UserId = userId, Category = category });
 
         if (exists > 0) return;

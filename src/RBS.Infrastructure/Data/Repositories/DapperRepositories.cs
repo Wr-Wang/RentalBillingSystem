@@ -18,81 +18,83 @@ namespace RBS.Infrastructure.Data.Repositories;
 public class DapperUserRepository : IUserRepository
 {
     protected readonly IDbConnectionFactory _db;
-    public DapperUserRepository(IDbConnectionFactory db) => _db = db;
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) => Task.FromResult(0);
+    private readonly ISqlLoader _sql;
+
+    public DapperUserRepository(IDbConnectionFactory db, ISqlLoader sql)
+    {
+        _db = db;
+        _sql = sql;
+    }
 
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleOrDefaultAsync<User>("SELECT * FROM Users WHERE Id=@Id", new { Id = id });
+        return await conn.QuerySingleOrDefaultAsync<User>(_sql.Get("Identity.Select.User.ById"), new { Id = id });
     }
     public async Task<List<User>> GetAllAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return (await conn.QueryAsync<User>("SELECT * FROM Users")).ToList();
+        return (await conn.QueryAsync<User>(_sql.Get("Identity.Select.User.All"))).ToList();
     }
     public async Task<User> AddAsync(User entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("INSERT INTO Users (Id,Username,PasswordHash,DisplayName,Phone,Email,IsActive,HomeCompanyId,IsSuperAdmin,CreatedBy,CreatedAt) VALUES(@Id,@Username,@PasswordHash,@DisplayName,@Phone,@Email,@IsActive,@HomeCompanyId,@IsSuperAdmin,@CreatedBy,@CreatedAt)", entity);
+        await conn.ExecuteAsync(_sql.Get("Identity.Insert.User.Default"), entity);
         return entity;
     }
     public async Task UpdateAsync(User entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("UPDATE Users SET Username=@Username,DisplayName=@DisplayName,Phone=@Phone,Email=@Email,IsActive=@IsActive,HomeCompanyId=@HomeCompanyId,IsSuperAdmin=@IsSuperAdmin,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id", entity);
+        await conn.ExecuteAsync(_sql.Get("Identity.Update.User.Default"), entity);
     }
     public async Task DeleteAsync(User entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("DELETE FROM Users WHERE Id=@Id", new { entity.Id });
+        await conn.ExecuteAsync(_sql.Get("Identity.Delete.User.ById"), new { entity.Id });
     }
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Users WHERE Id=@Id", new { Id = id }) > 0;
+        return await conn.QuerySingleAsync<int>(_sql.Get("Identity.Select.User.Exists"), new { Id = id }) > 0;
     }
     public async Task<User?> GetByUsernameAsync(string username, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleOrDefaultAsync<User>("SELECT * FROM Users WHERE Username=@Username", new { Username = username });
+        return await conn.QuerySingleOrDefaultAsync<User>(_sql.Get("Identity.Select.User.ByUsername"), new { Username = username });
     }
     public async Task<User?> GetByIdWithRolesAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleOrDefaultAsync<User>("SELECT * FROM Users WHERE Id=@Id", new { Id = id });
+        return await conn.QuerySingleOrDefaultAsync<User>(_sql.Get("Identity.Select.User.ById"), new { Id = id });
     }
     public async Task<List<User>> GetAllWithRolesAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return (await conn.QueryAsync<User>("SELECT * FROM Users")).ToList();
+        return (await conn.QueryAsync<User>(_sql.Get("Identity.Select.User.All"))).ToList();
     }
     public async Task<List<string>> GetUserPermissionsAsync(Guid userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return (await conn.QueryAsync<string>(@"SELECT DISTINCT m.PermissionCode FROM RoleMenus rm
-            INNER JOIN Menus m ON m.Id = rm.MenuId
-            INNER JOIN UserRoles ur ON ur.RoleId = rm.RoleId
-            WHERE ur.UserId = @UserId AND m.PermissionCode IS NOT NULL", new { UserId = userId })).ToList();
+        return (await conn.QueryAsync<string>(_sql.Get("Identity.Select.Permission.ByUserId"), new { UserId = userId })).ToList();
     }
     public async Task<bool> IsUsernameUniqueAsync(string username, Guid? excludeId = null, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         if (excludeId.HasValue)
-            return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Users WHERE Username=@Username AND Id!=@Id", new { Username = username, Id = excludeId }) == 0;
-        return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Users WHERE Username=@Username", new { Username = username }) == 0;
+            return await conn.QuerySingleAsync<int>(_sql.Get("Identity.Select.User.UsernameUniqueExclude"), new { Username = username, Id = excludeId }) == 0;
+        return await conn.QuerySingleAsync<int>(_sql.Get("Identity.Select.User.UsernameUnique"), new { Username = username }) == 0;
     }
     public async Task ReplaceRolesAsync(Guid userId, List<Guid> newRoleIds, Guid changedBy, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         using var tx = conn.BeginTransaction();
-        await conn.ExecuteAsync("DELETE FROM UserRoles WHERE UserId=@UserId", new { UserId = userId }, tx);
+        await conn.ExecuteAsync(_sql.Get("Identity.Delete.UserRoles.ByUserId"), new { UserId = userId }, tx);
         foreach (var roleId in newRoleIds)
-            await conn.ExecuteAsync("INSERT INTO UserRoles (Id,UserId,RoleId,CreatedBy,CreatedAt) VALUES(@Id,@UserId,@RoleId,@CreatedBy,@CreatedAt)",
+            await conn.ExecuteAsync(_sql.Get("Identity.Insert.UserRole.Default"),
                 new { Id = Guid.NewGuid(), UserId = userId, RoleId = roleId, CreatedBy = changedBy, CreatedAt = ChinaTime.Now }, tx);
         tx.Commit();
     }
-    public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, System.Linq.Expressions.Expression<Func<User, bool>>? predicate = null, Func<IQueryable<User>, IOrderedQueryable<User>>? orderBy = null, CancellationToken ct = default)
+    public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, Expression<Func<User, bool>>? predicate = null, Func<IQueryable<User>, IOrderedQueryable<User>>? orderBy = null, CancellationToken ct = default)
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
 }
 
@@ -103,19 +105,19 @@ public class DapperUserRepository : IUserRepository
 public class DapperRoleRepository : IRoleRepository
 {
     protected readonly IDbConnectionFactory _db;
-    public DapperRoleRepository(IDbConnectionFactory db) => _db = db;
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) => Task.FromResult(0);
+    private readonly ISqlLoader _sql;
+    public DapperRoleRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
 
-    public async Task<Role?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>("SELECT * FROM Roles WHERE Id=@Id", new { Id = id }); }
-    public async Task<List<Role>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>("SELECT * FROM Roles")).ToList(); }
-    public async Task<Role> AddAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("INSERT INTO Roles (Id,Name,Code,Description,IsActive,CreatedBy,CreatedAt) VALUES(@Id,@Name,@Code,@Description,@IsActive,@CreatedBy,@CreatedAt)", entity); return entity; }
-    public async Task UpdateAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("UPDATE Roles SET Name=@Name,Code=@Code,Description=@Description,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id", entity); }
-    public async Task DeleteAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("DELETE FROM Roles WHERE Id=@Id", new { entity.Id }); }
-    public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Roles WHERE Id=@Id", new { Id = id }) > 0; }
-    public async Task<Role?> GetByCodeAsync(string code, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>("SELECT * FROM Roles WHERE Code=@Code", new { Code = code }); }
-    public async Task<List<Role>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>("SELECT r.* FROM Roles r INNER JOIN UserRoles ur ON ur.RoleId=r.Id WHERE ur.UserId=@UserId", new { UserId = userId })).ToList(); }
-    public async Task<Role?> GetByIdWithRoleMenusAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>("SELECT * FROM Roles WHERE Id=@Id", new { Id = id }); }
-    public Task<PagedResult<Role>> GetPagedAsync(int page, int pageSize, System.Linq.Expressions.Expression<Func<Role, bool>>? predicate = null, Func<IQueryable<Role>, IOrderedQueryable<Role>>? orderBy = null, CancellationToken ct = default)
+    public async Task<Role?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ById"), new { Id = id }); }
+    public async Task<List<Role>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>(_sql.Get("Authorization.Select.Role.All"))).ToList(); }
+    public async Task<Role> AddAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Insert.Role.Default"), entity); return entity; }
+    public async Task UpdateAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Update.Role.Default"), entity); }
+    public async Task DeleteAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Delete.Role.ById"), new { entity.Id }); }
+    public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Authorization.Select.Role.Exists"), new { Id = id }) > 0; }
+    public async Task<Role?> GetByCodeAsync(string code, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ByCode"), new { Code = code }); }
+    public async Task<List<Role>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>(_sql.Get("Authorization.Select.Role.ByUserId"), new { UserId = userId })).ToList(); }
+    public async Task<Role?> GetByIdWithRoleMenusAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ById"), new { Id = id }); }
+    public Task<PagedResult<Role>> GetPagedAsync(int page, int pageSize, Expression<Func<Role, bool>>? predicate = null, Func<IQueryable<Role>, IOrderedQueryable<Role>>? orderBy = null, CancellationToken ct = default)
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
 }
 
@@ -126,18 +128,18 @@ public class DapperRoleRepository : IRoleRepository
 public class DapperMenuRepository : IMenuRepository
 {
     protected readonly IDbConnectionFactory _db;
-    public DapperMenuRepository(IDbConnectionFactory db) => _db = db;
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) => Task.FromResult(0);
+    private readonly ISqlLoader _sql;
+    public DapperMenuRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
 
-    public async Task<Menu?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Menu>("SELECT * FROM Menus WHERE Id=@Id", new { Id = id }); }
-    public async Task<List<Menu>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>("SELECT * FROM Menus ORDER BY SortOrder")).ToList(); }
-    public async Task<Menu> AddAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("INSERT INTO Menus (Id,Name,PermissionCode,Path,Icon,ParentId,SortOrder,IsActive,Scope,CreatedBy,CreatedAt) VALUES(@Id,@Name,@PermissionCode,@Path,@Icon,@ParentId,@SortOrder,@IsActive,@Scope,@CreatedBy,@CreatedAt)", entity); return entity; }
-    public async Task UpdateAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("UPDATE Menus SET Name=@Name,Path=@Path,Icon=@Icon,SortOrder=@SortOrder,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id", entity); }
-    public async Task DeleteAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("DELETE FROM Menus WHERE Id=@Id", new { entity.Id }); }
-    public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Menus WHERE Id=@Id", new { Id = id }) > 0; }
-    public async Task<List<Menu>> GetByRoleIdsAsync(List<Guid> roleIds, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>("SELECT DISTINCT m.* FROM Menus m INNER JOIN RoleMenu rm ON rm.MenuId=m.Id WHERE rm.RoleId IN @Ids ORDER BY m.SortOrder", new { Ids = roleIds })).ToList(); }
-    public async Task<List<Menu>> GetTreeAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>("SELECT * FROM Menus ORDER BY SortOrder")).ToList(); }
-    public Task<PagedResult<Menu>> GetPagedAsync(int page, int pageSize, System.Linq.Expressions.Expression<Func<Menu, bool>>? predicate = null, Func<IQueryable<Menu>, IOrderedQueryable<Menu>>? orderBy = null, CancellationToken ct = default)
+    public async Task<Menu?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Menu>(_sql.Get("Authorization.Select.Menu.ById"), new { Id = id }); }
+    public async Task<List<Menu>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>(_sql.Get("Authorization.Select.Menu.All"))).ToList(); }
+    public async Task<Menu> AddAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Insert.Menu.Default"), entity); return entity; }
+    public async Task UpdateAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Update.Menu.Default"), entity); }
+    public async Task DeleteAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Delete.Menu.ById"), new { entity.Id }); }
+    public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Authorization.Select.Menu.Exists"), new { Id = id }) > 0; }
+    public async Task<List<Menu>> GetByRoleIdsAsync(List<Guid> roleIds, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>(_sql.Get("Authorization.Select.Menu.ByRoleIds"), new { Ids = roleIds })).ToList(); }
+    public async Task<List<Menu>> GetTreeAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>(_sql.Get("Authorization.Select.Menu.All"))).ToList(); }
+    public Task<PagedResult<Menu>> GetPagedAsync(int page, int pageSize, Expression<Func<Menu, bool>>? predicate = null, Func<IQueryable<Menu>, IOrderedQueryable<Menu>>? orderBy = null, CancellationToken ct = default)
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
 }
 
@@ -148,90 +150,85 @@ public class DapperMenuRepository : IMenuRepository
 public class DapperCompanyRepository : ICompanyRepository
 {
     protected readonly IDbConnectionFactory _db;
-    public DapperCompanyRepository(IDbConnectionFactory db) => _db = db;
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) => Task.FromResult(0);
+    private readonly ISqlLoader _sql;
+    public DapperCompanyRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
 
-    public async Task<Company?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Company>("SELECT * FROM Companies WHERE Id=@Id", new { Id = id }); }
-    public async Task<List<Company>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Company>("SELECT * FROM Companies")).ToList(); }
-    public async Task<Company> AddAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("INSERT INTO Companies (Id,Name,Code,ContactPerson,Phone,Address,IdType,IdNumber,BankName,BankAccount,BankAccountName,SettlementCycle,SettlementDay,CommissionRate,Remark,IsActive,CreatedBy,CreatedAt) VALUES(@Id,@Name,@Code,@ContactPerson,@Phone,@Address,@IdType,@IdNumber,@BankName,@BankAccount,@BankAccountName,@SettlementCycle,@SettlementDay,@CommissionRate,@Remark,@IsActive,@CreatedBy,@CreatedAt)", entity); return entity; }
-    public async Task UpdateAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("UPDATE Companies SET Name=@Name,Code=@Code,ContactPerson=@ContactPerson,Phone=@Phone,Address=@Address,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id", entity); }
-    public async Task DeleteAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync("DELETE FROM Companies WHERE Id=@Id", new { entity.Id }); }
-    public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Companies WHERE Id=@Id", new { Id = id }) > 0; }
-    public async Task<Company?> GetByNameAsync(string name, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Company>("SELECT * FROM Companies WHERE Name=@Name", new { Name = name }); }
-    public async Task<List<Company>> GetActiveAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Company>("SELECT * FROM Companies WHERE IsActive=1")).ToList(); }
-    public Task<PagedResult<Company>> GetPagedAsync(int page, int pageSize, System.Linq.Expressions.Expression<Func<Company, bool>>? predicate = null, Func<IQueryable<Company>, IOrderedQueryable<Company>>? orderBy = null, CancellationToken ct = default)
+    public async Task<Company?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Company>(_sql.Get("Organization.Select.Company.ById"), new { Id = id }); }
+    public async Task<List<Company>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Company>(_sql.Get("Organization.Select.Company.All"))).ToList(); }
+    public async Task<Company> AddAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Insert.Company.Default"), entity); return entity; }
+    public async Task UpdateAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Default"), entity); }
+    public async Task DeleteAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Delete.Company.ById"), new { entity.Id }); }
+    public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Organization.Select.Company.Exists"), new { Id = id }) > 0; }
+    public async Task<Company?> GetByNameAsync(string name, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Company>(_sql.Get("Organization.Select.Company.ByName"), new { Name = name }); }
+    public async Task<List<Company>> GetActiveAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Company>(_sql.Get("Organization.Select.Company.Active"))).ToList(); }
+    public Task<PagedResult<Company>> GetPagedAsync(int page, int pageSize, Expression<Func<Company, bool>>? predicate = null, Func<IQueryable<Company>, IOrderedQueryable<Company>>? orderBy = null, CancellationToken ct = default)
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
 }
 
 public class DapperApprovalRequestRepository : IApprovalRequestRepository
 {
     private readonly IDbConnectionFactory _db;
-    public DapperApprovalRequestRepository(IDbConnectionFactory db) => _db = db;
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) => Task.FromResult(0);
+    private readonly ISqlLoader _sql;
+    public DapperApprovalRequestRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
 
     public async Task<ApprovalRequest?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleOrDefaultAsync<ApprovalRequest>("SELECT * FROM ApprovalRequests WHERE Id=@Id", new { Id = id });
+        return await conn.QuerySingleOrDefaultAsync<ApprovalRequest>(_sql.Get("Approval.Select.Request.ById"), new { Id = id });
     }
 
     public async Task<List<ApprovalRequest>> GetAllAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return (await conn.QueryAsync<ApprovalRequest>("SELECT * FROM ApprovalRequests ORDER BY CreatedAt DESC")).ToList();
+        return (await conn.QueryAsync<ApprovalRequest>(_sql.Get("Approval.Select.Request.All"))).ToList();
     }
 
     public async Task<ApprovalRequest> AddAsync(ApprovalRequest entity, CancellationToken ct = default)
     {
-        if (entity.CreatedAt == default) entity.SetCreated(Guid.NewGuid(), RBS.Core.Common.ChinaTime.Now, null, null);
+        if (entity.CreatedAt == default) entity.SetCreated(Guid.NewGuid(), ChinaTime.Now, null, null);
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(@"
-            INSERT INTO ApprovalRequests (Id, ApprovalTypeId, Title, Description, TargetEntityId, TargetEntityType,
-                CurrentLevel, MaxLevel, Status, CompanyId, CreatedBy, CreatedAt)
-            VALUES (@Id, @ApprovalTypeId, @Title, @Description, @TargetEntityId, @TargetEntityType,
-                @CurrentLevel, @MaxLevel, @Status, @CompanyId, @CreatedBy, @CreatedAt)", entity);
+        await conn.ExecuteAsync(_sql.Get("Approval.Insert.Request.Default"), entity);
         return entity;
     }
 
     public async Task UpdateAsync(ApprovalRequest entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(@"UPDATE ApprovalRequests SET Status=@Status,CurrentLevel=@CurrentLevel,
-            UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id", entity);
+        await conn.ExecuteAsync(_sql.Get("Approval.Update.Request.Default"), entity);
     }
 
     public async Task DeleteAsync(ApprovalRequest entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("DELETE FROM ApprovalRequests WHERE Id=@Id", new { entity.Id });
+        await conn.ExecuteAsync(_sql.Get("Approval.Delete.Request.ById"), new { entity.Id });
     }
 
     public Task<PagedResult<ApprovalRequest>> GetPagedAsync(int page, int pageSize,
-        System.Linq.Expressions.Expression<Func<ApprovalRequest, bool>>? predicate = null,
+        Expression<Func<ApprovalRequest, bool>>? predicate = null,
         Func<IQueryable<ApprovalRequest>, IOrderedQueryable<ApprovalRequest>>? orderBy = null,
         CancellationToken ct = default) => throw new NotSupportedException();
 
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM ApprovalRequests WHERE Id=@Id", new { Id = id }) > 0;
+        return await conn.QuerySingleAsync<int>(_sql.Get("Approval.Select.Request.Exists"), new { Id = id }) > 0;
     }
 
     public async Task<List<ApprovalRequest>> GetPendingByApproverAsync(Guid userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var roleIds = (await conn.QueryAsync<Guid>("SELECT RoleId FROM UserRoles WHERE UserId=@UserId", new { UserId = userId })).ToList();
+        var roleIds = (await conn.QueryAsync<Guid>(_sql.Get("Identity.Select.RoleIds.ByUserId"), new { UserId = userId })).ToList();
         if (roleIds.Count == 0) return new();
 
-        var configs = await conn.QueryAsync("SELECT DISTINCT ApprovalTypeId, [Level] FROM ApprovalLevelConfigs WHERE RoleId IN @Ids",
+        var configs = await conn.QueryAsync(_sql.Get("Approval.Select.LevelConfigs.ByApprovalType"),
             new { Ids = roleIds });
 
         var results = new List<ApprovalRequest>();
         foreach (var c in configs)
         {
-            var items = (await conn.QueryAsync<ApprovalRequest>(@"
-                SELECT * FROM ApprovalRequests WHERE Status='Pending' AND ApprovalTypeId=@TypeId AND CurrentLevel=@Level
-                ORDER BY CreatedAt DESC", new { TypeId = (Guid)c.ApprovalTypeId, Level = (int)c.Level })).ToList();
+            var items = (await conn.QueryAsync<ApprovalRequest>(
+                _sql.Get("Approval.Select.Request.PendingByTypeLevel"),
+                new { TypeId = (Guid)c.ApprovalTypeId, Level = (int)c.Level })).ToList();
             results.AddRange(items);
         }
         return results.Distinct().OrderByDescending(a => a.CreatedAt).ToList();
@@ -241,30 +238,28 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
     {
         using var conn = _db.CreateConnection(); conn.Open();
         return (await conn.QueryAsync<ApprovalRequest>(
-            "SELECT * FROM ApprovalRequests WHERE TargetEntityId=@Id AND TargetEntityType=@Type ORDER BY CreatedAt DESC",
+            _sql.Get("Approval.Select.Request.ByTarget"),
             new { Id = targetEntityId, Type = targetEntityType })).ToList();
     }
 
     public async Task<List<ApprovalRequest>> GetByApproverAsync(Guid userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return (await conn.QueryAsync<ApprovalRequest>(@"
-            SELECT a.* FROM ApprovalRequests a
-            WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.ApprovalRequestId=a.Id AND r.ApproverId=@UserId AND r.Action='Submitted')
-            ORDER BY a.CreatedAt DESC", new { UserId = userId })).ToList();
+        return (await conn.QueryAsync<ApprovalRequest>(
+            _sql.Get("Approval.Select.Request.ByApprover"), new { UserId = userId })).ToList();
     }
 
     public async Task<ApprovalRequest?> GetByIdWithRecordsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         using var multi = await conn.QueryMultipleAsync(
-            "SELECT * FROM ApprovalRequests WHERE Id=@Id; SELECT * FROM ApprovalRecords WHERE ApprovalRequestId=@Id ORDER BY CreatedAt",
-            new { Id = id });
+            _sql.Get("Approval.Select.Request.ByIdWithRecords"), new { Id = id });
         var entity = await multi.ReadSingleOrDefaultAsync<ApprovalRequest>();
         if (entity != null)
         {
             var records = (await multi.ReadAsync<ApprovalRecord>()).ToList();
-            var field = typeof(ApprovalRequest).GetField("_records", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var field = typeof(ApprovalRequest).GetField("_records",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             if (field != null) field.SetValue(entity, records);
         }
         return entity;
@@ -274,19 +269,18 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
         int page, int pageSize, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var sql = @"SELECT * FROM ApprovalRequests a
-            WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.ApprovalRequestId=a.Id AND r.ApproverId=@UserId
-                AND (r.Action='Approved' OR r.Action='Rejected'))";
 
-        if (!string.IsNullOrWhiteSpace(keyword)) sql += " AND a.Title LIKE @Keyword";
-        if (!string.IsNullOrWhiteSpace(status)) sql += " AND a.Status = @Status";
+        var conditions = new List<string>();
+        if (!string.IsNullOrWhiteSpace(keyword)) conditions.Add("AND a.Title LIKE @Keyword");
+        if (!string.IsNullOrWhiteSpace(status)) conditions.Add("AND a.Status = @Status");
+        var condSql = conditions.Count > 0 ? " " + string.Join(" ", conditions) : "";
 
-        var total = await conn.QuerySingleAsync<int>(sql.Replace("SELECT *", "SELECT COUNT(*)"),
+        var countSql = string.Format(_sql.Get("Approval.Select.History.CountByUserId"), condSql);
+        var total = await conn.QuerySingleAsync<int>(countSql,
             new { UserId = userId, Keyword = $"%{keyword}%", Status = status });
 
-        sql += " ORDER BY a.CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
-
-        var items = await conn.QueryAsync<ApprovalRequest>(sql,
+        var dataSql = string.Format(_sql.Get("Approval.Select.History.ByUserId"), condSql);
+        var items = await conn.QueryAsync<ApprovalRequest>(dataSql,
             new { UserId = userId, Keyword = $"%{keyword}%", Status = status, Offset = (page - 1) * pageSize, PageSize = pageSize });
 
         return new PagedResult<ApprovalRequest> { Items = items.ToList(), Total = total, Page = page, PageSize = pageSize };
@@ -296,94 +290,130 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
 // ===== Dapper 仓储 — IFeeCodeRepository =====
 public class DapperFeeCodeRepository : DapperRepository<FeeCode>, IFeeCodeRepository
 {
-    public DapperFeeCodeRepository(IDbConnectionFactory db) : base(db, "FeeCodes") { }
+    private readonly ISqlLoader _sql;
+    public DapperFeeCodeRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db, "FeeCodes")
+    {
+        _sql = sql;
+    }
     public async Task<FeeCode?> GetByCodeAsync(string code, Guid companyId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<FeeCode>("SELECT * FROM FeeCodes WHERE Code=@Code", new { Code = code }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<FeeCode>(_sql.Get("FeeCode.Select.FeeCode.ByCode"), new { Code = code }); }
     public async Task<List<FeeCode>> GetByCategoryAsync(string category, Guid companyId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<FeeCode>("SELECT * FROM FeeCodes WHERE Category=@Category", new { Category = category })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<FeeCode>(_sql.Get("FeeCode.Select.FeeCode.ByCategory"), new { Category = category })).ToList(); }
 }
 
 // ===== Dapper 仓储 — IPaymentChannelRepository =====
 public class DapperPaymentChannelRepository : DapperRepository<PaymentChannel>, IPaymentChannelRepository
 {
-    public DapperPaymentChannelRepository(IDbConnectionFactory db) : base(db, "PaymentChannels") { }
+    private readonly ISqlLoader _sql;
+    public DapperPaymentChannelRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db, "PaymentChannels")
+    {
+        _sql = sql;
+    }
     public async Task<List<PaymentChannel>> GetActiveByCompanyAsync(Guid companyId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<PaymentChannel>("SELECT * FROM PaymentChannels WHERE IsActive=1")).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<PaymentChannel>(_sql.Get("PaymentChannel.Select.PaymentChannel.Active"))).ToList(); }
 }
 
 // ===== Dapper 仓储 — IHolidayCalendarRepository =====
 public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>, IHolidayCalendarRepository
 {
-    public DapperHolidayCalendarRepository(IDbConnectionFactory db) : base(db, "HolidayCalendars") { }
+    private readonly ISqlLoader _sql;
+    public DapperHolidayCalendarRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db, "HolidayCalendars")
+    {
+        _sql = sql;
+    }
     public async Task<List<HolidayCalendar>> GetByYearAsync(Guid companyId, int year, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<HolidayCalendar>("SELECT * FROM HolidayCalendars WHERE YEAR(HolidayDate)=@Year ORDER BY HolidayDate", new { Year = year })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<HolidayCalendar>(_sql.Get("Calendar.Select.Holiday.ByYear"), new { Year = year })).ToList(); }
     public async Task<HolidayCalendar?> GetByDateAsync(Guid companyId, DateOnly date, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<HolidayCalendar>("SELECT * FROM HolidayCalendars WHERE HolidayDate=@Date", new { Date = date }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<HolidayCalendar>(_sql.Get("Calendar.Select.Holiday.ByDate"), new { Date = date }); }
 }
 
 public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepository
 {
-    public DapperTenantRepository(IDbConnectionFactory db) : base(db) { }
+    private readonly ISqlLoader _sql;
+    public DapperTenantRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    {
+        _sql = sql;
+    }
     public async Task<Tenant?> GetByPhoneAsync(string phone, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Tenant>("SELECT * FROM Tenants WHERE Phone=@Phone", new { Phone = phone }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Tenant>(_sql.Get("Rental.Select.Tenant.ByPhone"), new { Phone = phone }); }
     public async Task<List<Tenant>> SearchAsync(string keyword, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Tenant>("SELECT * FROM Tenants WHERE Name LIKE @K OR Phone LIKE @K", new { K = $"%{keyword}%" })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Tenant>(_sql.Get("Rental.Select.Tenant.Search"), new { K = $"%{keyword}%" })).ToList(); }
 }
 
 public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptRepository
 {
-    public DapperReceiptRepository(IDbConnectionFactory db) : base(db) { }
+    private readonly ISqlLoader _sql;
+    public DapperReceiptRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    {
+        _sql = sql;
+    }
     public async Task<List<Receipt>> GetPendingConfirmAsync(Guid companyId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Receipt>("SELECT * FROM Receipts WHERE CompanyId=@Id AND Status='Pending' ORDER BY CreatedAt DESC", new { Id = companyId })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Receipt>(_sql.Get("Collection.Select.Receipt.PendingConfirm"), new { Id = companyId })).ToList(); }
     public async Task<decimal> GetTotalConfirmedAsync(Guid contractId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<decimal>("SELECT ISNULL(SUM(Amount),0) FROM Receipts WHERE ContractId=@Id AND Status='Confirmed'", new { Id = contractId }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<decimal>(_sql.Get("Collection.Select.Receipt.TotalConfirmed"), new { Id = contractId }); }
 }
 
 public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, IReceivablePlanRepository
 {
-    public DapperReceivablePlanRepository(IDbConnectionFactory db) : base(db) { }
+    private readonly ISqlLoader _sql;
+    public DapperReceivablePlanRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    {
+        _sql = sql;
+    }
     public async Task<List<ReceivablePlan>> GetByContractIdAsync(Guid contractId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>("SELECT * FROM ReceivablePlans WHERE ContractId=@Id ORDER BY Period", new { Id = contractId })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>(_sql.Get("Receivable.Select.Plan.ByContractId"), new { Id = contractId })).ToList(); }
     public async Task<ReceivablePlan?> GetByContractPeriodFeeAsync(Guid contractId, string period, Guid feeCodeId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<ReceivablePlan>("SELECT * FROM ReceivablePlans WHERE ContractId=@Id AND Period=@P AND FeeCodeId=@F", new { Id = contractId, P = period, F = feeCodeId }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<ReceivablePlan>(_sql.Get("Receivable.Select.Plan.ByContractPeriodFee"), new { Id = contractId, P = period, F = feeCodeId }); }
     public async Task<List<ReceivablePlan>> GetOverdueAsync(Guid companyId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>("SELECT * FROM ReceivablePlans WHERE Status='Pending' AND DueDate < CAST(GETDATE() AS DATE)")).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>(_sql.Get("Receivable.Select.Plan.Overdue"))).ToList(); }
 }
 
 public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMeterReadingRepository
 {
-    public DapperMeterReadingRepository(IDbConnectionFactory db) : base(db) { }
+    private readonly ISqlLoader _sql;
+    public DapperMeterReadingRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    {
+        _sql = sql;
+    }
     public async Task<MeterReading?> GetLatestReadingAsync(Guid contractFeeConfigId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<MeterReading>("SELECT TOP 1 * FROM MeterReadings WHERE ContractFeeConfigId=@Id ORDER BY Year DESC, Month DESC", new { Id = contractFeeConfigId }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<MeterReading>(_sql.Get("Utility.Select.MeterReading.Latest"), new { Id = contractFeeConfigId }); }
     public async Task<List<MeterReading>> GetHistoryAsync(Guid contractFeeConfigId, int year, int month, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<MeterReading>("SELECT * FROM MeterReadings WHERE ContractFeeConfigId=@Id AND (Year<@Y OR (Year=@Y AND Month<=@M)) ORDER BY Year DESC, Month DESC", new { Id = contractFeeConfigId, Y = year, M = month })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<MeterReading>(_sql.Get("Utility.Select.MeterReading.History"), new { Id = contractFeeConfigId, Y = year, M = month })).ToList(); }
     public async Task<bool> ReadingExistsAsync(Guid contractFeeConfigId, int year, int month, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM MeterReadings WHERE ContractFeeConfigId=@Id AND Year=@Y AND Month=@M", new { Id = contractFeeConfigId, Y = year, M = month }) > 0; }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Utility.Select.MeterReading.Exists"), new { Id = contractFeeConfigId, Y = year, M = month }) > 0; }
 }
 
 public class DapperContractRepository : DapperRepository<Contract>, IContractRepository
 {
-    public DapperContractRepository(IDbConnectionFactory db) : base(db) { }
+    private readonly ISqlLoader _sql;
+    public DapperContractRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    {
+        _sql = sql;
+    }
     public async Task<Contract?> GetByContractNoAsync(string contractNo, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Contract>("SELECT * FROM Contracts WHERE ContractNo=@No", new { No = contractNo }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Contract>(_sql.Get("Lease.Select.Contract.ByContractNo"), new { No = contractNo }); }
     public async Task<List<Contract>> GetActiveContractsAsync(Guid companyId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>("SELECT * FROM Contracts WHERE CompanyId=@Id AND StatusCode='Active'", new { Id = companyId })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>(_sql.Get("Lease.Select.Contract.Active"), new { Id = companyId })).ToList(); }
     public async Task<List<Contract>> GetContractsExpiringAsync(DateOnly date, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>("SELECT * FROM Contracts WHERE EndDate=@Date", new { Date = date })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>(_sql.Get("Lease.Select.Contract.Expiring"), new { Date = date })).ToList(); }
     public async Task<bool> HasActiveForHousingUnitAsync(Guid housingUnitId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM Contracts WHERE RoomId=@Id AND StatusCode='Active'", new { Id = housingUnitId }) > 0; }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Lease.Select.Contract.HasActiveForHousingUnit"), new { Id = housingUnitId }) > 0; }
 }
 
 public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, IRenewalRequestRepository
 {
-    public DapperRenewalRequestRepository(IDbConnectionFactory db) : base(db) { }
+    private readonly ISqlLoader _sql;
+    public DapperRenewalRequestRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    {
+        _sql = sql;
+    }
 
     public async Task<List<RenewalRequest>> GetByOldContractIdAsync(Guid oldContractId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<RenewalRequest>("SELECT * FROM RenewalRequests WHERE OldContractId=@Id ORDER BY CreatedAt DESC", new { Id = oldContractId })).ToList(); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<RenewalRequest>(_sql.Get("Lease.Select.RenewalRequest.ByOldContractId"), new { Id = oldContractId })).ToList(); }
 
     public async Task<RenewalRequest?> GetPendingByContractIdAsync(Guid contractId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<RenewalRequest>("SELECT * FROM RenewalRequests WHERE OldContractId=@Id AND Status IN ('PendingApproval','Approved')", new { Id = contractId }); }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<RenewalRequest>(_sql.Get("Lease.Select.RenewalRequest.PendingByContractId"), new { Id = contractId }); }
 
     public async Task<bool> HasPendingForContractAsync(Guid contractId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>("SELECT COUNT(1) FROM RenewalRequests WHERE OldContractId=@Id AND Status IN ('PendingApproval','Approved')", new { Id = contractId }) > 0; }
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Lease.Select.RenewalRequest.HasPendingForContract"), new { Id = contractId }) > 0; }
 }

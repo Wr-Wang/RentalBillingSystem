@@ -111,7 +111,7 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
             created.Add(execution);
         }
 
-        // EF Core SaveChanges 自动在事务内执行 Delete + Insert
+        // DapperUnitOfWork.CommitAsync 提交事务（当前为 no-op，仓储立即写入）
         await _uow.CommitAsync(ct);
         return created.OrderBy(e => e.TargetDate).Select(Map).ToList();
     }

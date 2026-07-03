@@ -8,11 +8,8 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.79" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -20,5 +17,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Data\SqlMaps\SqlMaps.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
 </Project>

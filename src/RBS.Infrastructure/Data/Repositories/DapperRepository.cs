@@ -15,8 +15,6 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
         _tableName = tableName ?? InferTableName();
     }
 
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) => Task.FromResult(0);
-
     public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();

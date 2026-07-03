@@ -23,7 +23,7 @@ public abstract class AuditableEntity
     }
 
     /// <summary>
-    /// 由 SaveChangesInterceptor 在 Added 状态时调用
+    /// 由 DapperRepository.AddAsync / 领域工厂方法在创建实体时调用
     /// </summary>
     public void SetCreated(Guid userId, DateTime utcNow, string? ip, string? hostname)
     {
@@ -34,7 +34,7 @@ public abstract class AuditableEntity
     }
 
     /// <summary>
-    /// 由 SaveChangesInterceptor 在 Modified 状态时调用
+    /// 由 DapperRepository.UpdateAsync / 上层服务在更新实体时调用
     /// </summary>
     public void SetUpdated(Guid userId, DateTime utcNow, string? ip, string? hostname)
     {

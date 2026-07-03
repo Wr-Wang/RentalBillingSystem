@@ -1,4 +1,5 @@
 using Dapper;
+using System.Data;
 using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Billing;
@@ -17,16 +18,20 @@ namespace RBS.Infrastructure.Data.UnitOfWork;
 public class DapperUnitOfWork : IUnitOfWork
 {
     private readonly IDbConnectionFactory _db;
-    public DapperUnitOfWork(IDbConnectionFactory db) => _db = db;
+    private readonly ISqlLoader _sql;
+    private IDbConnection? _sharedConnection;
+    private IDbTransaction? _sharedTransaction;
 
-    public IUserRepository Users => _users ??= new DapperUserRepository(_db);
-    public IRoleRepository Roles => _roles ??= new DapperRoleRepository(_db);
-    public IMenuRepository Menus => _menus ??= new DapperMenuRepository(_db);
-    public ICompanyRepository Companies => _companies ??= new DapperCompanyRepository(_db);
-    public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new DapperApprovalRequestRepository(_db);
-    public IFeeCodeRepository FeeCodes => _feeCodes ??= new DapperFeeCodeRepository(_db);
-    public IPaymentChannelRepository PaymentChannels => _paymentChannels ??= new DapperPaymentChannelRepository(_db);
-    public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new DapperHolidayCalendarRepository(_db);
+    public DapperUnitOfWork(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
+
+    public IUserRepository Users => _users ??= new DapperUserRepository(_db, _sql);
+    public IRoleRepository Roles => _roles ??= new DapperRoleRepository(_db, _sql);
+    public IMenuRepository Menus => _menus ??= new DapperMenuRepository(_db, _sql);
+    public ICompanyRepository Companies => _companies ??= new DapperCompanyRepository(_db, _sql);
+    public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new DapperApprovalRequestRepository(_db, _sql);
+    public IFeeCodeRepository FeeCodes => _feeCodes ??= new DapperFeeCodeRepository(_db, _sql);
+    public IPaymentChannelRepository PaymentChannels => _paymentChannels ??= new DapperPaymentChannelRepository(_db, _sql);
+    public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new DapperHolidayCalendarRepository(_db, _sql);
     public IRepository<HousingUnit> HousingUnits => _housingUnits ??= new DapperRepository<HousingUnit>(_db);
     public IRepository<RoomType> RoomTypes => _roomTypes ??= new DapperRepository<RoomType>(_db);
     public IRepository<ApprovalType> ApprovalTypes => _approvalTypes ??= new DapperRepository<ApprovalType>(_db);
@@ -41,12 +46,12 @@ public class DapperUnitOfWork : IUnitOfWork
     public IRepository<ImportBatch> ImportBatches => _importBatches ??= new DapperRepository<ImportBatch>(_db);
     public IRepository<ImportBatchItem> ImportBatchItems => _importBatchItems ??= new DapperRepository<ImportBatchItem>(_db);
     public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new DapperRepository<RoomPricingStandard>(_db);
-    public ITenantRepository Tenants => _tenants ??= new DapperTenantRepository(_db);
-    public IReceivablePlanRepository ReceivablePlans => _receivablePlans ??= new DapperReceivablePlanRepository(_db);
-    public IReceiptRepository Receipts => _receipts ??= new DapperReceiptRepository(_db);
-    public IMeterReadingRepository MeterReadings => _meterReadings ??= new DapperMeterReadingRepository(_db);
-    public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db);
-    public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db);
+    public ITenantRepository Tenants => _tenants ??= new DapperTenantRepository(_db, _sql);
+    public IReceivablePlanRepository ReceivablePlans => _receivablePlans ??= new DapperReceivablePlanRepository(_db, _sql);
+    public IReceiptRepository Receipts => _receipts ??= new DapperReceiptRepository(_db, _sql);
+    public IMeterReadingRepository MeterReadings => _meterReadings ??= new DapperMeterReadingRepository(_db, _sql);
+    public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db, _sql);
+    public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db, _sql);
 
     private IUserRepository? _users;
     private IRoleRepository? _roles;
@@ -80,13 +85,13 @@ public class DapperUnitOfWork : IUnitOfWork
     public async Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleOrDefaultAsync<ApprovalType>("SELECT * FROM ApprovalTypes WHERE Code=@Code", new { Code = code });
+        return await conn.QuerySingleOrDefaultAsync<ApprovalType>(_sql.Get("Common.Select.ApprovalType.ByCode"), new { Code = code });
     }
     public async Task<ImportBatch?> GetImportBatchWithItemsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         using var multi = await conn.QueryMultipleAsync(
-            "SELECT * FROM ImportBatches WHERE Id=@Id; SELECT * FROM ImportBatchItems WHERE ImportBatchId=@Id ORDER BY RowIndex",
+            _sql.Get("Common.Select.ImportBatch.ByIdWithItems"),
             new { Id = id });
         var batch = await multi.ReadSingleOrDefaultAsync<ImportBatch>();
         if (batch != null)
@@ -97,16 +102,40 @@ public class DapperUnitOfWork : IUnitOfWork
     }
     public Task<int> CommitAsync(CancellationToken ct = default) => Task.FromResult(0);
     public Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class => Task.CompletedTask;
-    public Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default) => throw new NotSupportedException();
+
+    public async Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default)
+    {
+        _sharedConnection = _db.CreateConnection();
+        _sharedConnection.Open();
+        _sharedTransaction = _sharedConnection.BeginTransaction();
+        return new DapperTransaction(_sharedTransaction);
+    }
+
     public Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default) => Task.FromResult(0);
+
     public async Task<int> ExecuteSqlRawAsync(string sql, IEnumerable<object> parameters, CancellationToken ct = default)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
         var args = parameters.ToArray();
         var dp = new DynamicParameters();
         for (int i = 0; i < args.Length; i++)
             dp.Add($"p{i}", args[i]);
+
+        if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open)
+        {
+            // 有活跃事务时复用连接和事务
+            return await _sharedConnection.ExecuteAsync(sql, dp, _sharedTransaction);
+        }
+
+        using var conn = _db.CreateConnection();
+        conn.Open();
         return await conn.ExecuteAsync(sql, dp);
     }
-    public void Dispose() { }
+
+    public void Dispose()
+    {
+        _sharedTransaction?.Dispose();
+        _sharedConnection?.Dispose();
+        _sharedTransaction = null;
+        _sharedConnection = null;
+    }
 }

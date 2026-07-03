@@ -1,7 +1,9 @@
+using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RBS.Infrastructure.Data;
+using RBS.Core.Entities.Accounting;
+using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 
 namespace RBS.Api.Controllers;
 
@@ -10,40 +12,77 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class VouchersController : ControllerBase
 {
-    private readonly AppDbContext _db;
-    public VouchersController(AppDbContext db) => _db = db;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
+    private readonly ICurrentUserService _currentUser;
+
+    public VouchersController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _sql = sql;
+        _currentUser = currentUser;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] DateOnly? startDate, [FromQuery] DateOnly? endDate, CancellationToken ct)
     {
-        var query = _db.Set<RBS.Core.Entities.Accounting.Voucher>().AsNoTracking();
-        if (startDate.HasValue) query = query.Where(v => v.VoucherDate >= startDate);
-        if (endDate.HasValue) query = query.Where(v => v.VoucherDate <= endDate);
-        return Ok(await query.ToListAsync(ct));
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var vouchers = await conn.QueryAsync<Voucher>(_sql.Get("Accounting.Select.Voucher.List"),
+            new { StartDate = startDate, EndDate = endDate });
+        return Ok(vouchers);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        var entity = await _db.Set<RBS.Core.Entities.Accounting.Voucher>()
-            .Include(v => v.Entries)
-            .FirstOrDefaultAsync(v => v.Id == id, ct);
-        if (entity == null) return NotFound();
-        return Ok(entity);
+        using var conn = _db.CreateConnection();
+        conn.Open();
+
+        using var multi = await conn.QueryMultipleAsync(
+            _sql.Get("Accounting.Select.Voucher.ByIdWithEntries"), new { Id = id });
+
+        var voucher = await multi.ReadSingleOrDefaultAsync<Voucher>();
+        if (voucher == null) return NotFound();
+
+        var entries = (await multi.ReadAsync<JournalEntry>()).ToList();
+        var field = typeof(Voucher).GetField("_entries",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (field != null && field.GetValue(voucher) is List<JournalEntry> entryList)
+            entryList.AddRange(entries);
+
+        return Ok(voucher);
     }
 
     [HttpPut("{id}/post")]
     public async Task<IActionResult> Post(Guid id, CancellationToken ct)
     {
-        var entity = await _db.FindAsync<RBS.Core.Entities.Accounting.Voucher>(id, ct);
-        if (entity == null) return NotFound();
-        entity.Post();
-        await _db.SaveChangesAsync(ct);
-        return Ok(entity);
+        using (var conn = _db.CreateConnection())
+        {
+            conn.Open();
+            var entity = await conn.QuerySingleOrDefaultAsync<Voucher>(
+                _sql.Get("Accounting.Select.Voucher.ById"), new { Id = id });
+            if (entity == null) return NotFound();
+
+            var entries = (await conn.QueryAsync<JournalEntry>(
+                _sql.Get("Accounting.Select.Entry.ByVoucherId"), new { Id = id })).ToList();
+            var field = typeof(Voucher).GetField("_entries",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null && field.GetValue(entity) is List<JournalEntry> entryList)
+                entryList.AddRange(entries);
+
+            entity.Post();
+
+            var now = DateTime.UtcNow;
+            var userId = _currentUser.UserId;
+            await conn.ExecuteAsync(_sql.Get("Accounting.Update.Voucher.Post"),
+                new { Status = entity.Status.Code, UpdatedBy = userId, UpdatedAt = now, Id = id });
+        }
+        return await Get(id, ct);
     }
 
     [HttpPost("{id}/reverse")]
-    public async Task<IActionResult> Reverse(Guid id, [FromBody] object dto, CancellationToken ct)
+    public IActionResult Reverse(Guid id, [FromBody] object dto, CancellationToken ct)
     {
         return Ok(new { message = "已冲销" });
     }

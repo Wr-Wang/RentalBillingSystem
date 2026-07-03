@@ -66,7 +66,6 @@ CREATE TABLE [RenewalRequests] (
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
     [UpdatedBy] UNIQUEIDENTIFIER NULL,
     [UpdatedAt] DATETIME2 NULL,
-    CONSTRAINT [FK_RenewalRequests_OldContract] FOREIGN KEY ([OldContractId]) REFERENCES [Contracts]([Id])
 );
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_RenewalRequests_OldContractId')
@@ -94,7 +93,6 @@ CREATE TABLE [ChangeRequests] (
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
     [UpdatedBy] UNIQUEIDENTIFIER NULL,
     [UpdatedAt] DATETIME2 NULL,
-    CONSTRAINT [FK_ChangeRequests_Contract] FOREIGN KEY ([ContractId]) REFERENCES [Contracts]([Id])
 );
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequests_ContractId')
@@ -118,7 +116,6 @@ CREATE TABLE [ChangeRequestItems] (
     [NewValue] NVARCHAR(100) NOT NULL,
     [OldValueDecimal] DECIMAL(18,2) NULL,
     [NewValueDecimal] DECIMAL(18,2) NULL,
-    CONSTRAINT [FK_ChangeRequestItems_ChangeRequest] FOREIGN KEY ([ChangeRequestId]) REFERENCES [ChangeRequests]([Id])
 );
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequestItems_ChangeRequestId')
