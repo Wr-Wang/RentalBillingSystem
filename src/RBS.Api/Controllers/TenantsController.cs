@@ -14,15 +14,27 @@ public class TenantsController : ControllerBase
     public TenantsController(IUnitOfWork uow) => _uow = uow;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? keyword, CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? keyword = null, CancellationToken ct = default)
     {
+        // 有 keyword 则搜索（不分页）
         if (!string.IsNullOrEmpty(keyword))
         {
             var result = await _uow.Tenants.SearchAsync(keyword, ct);
-            return Ok(result);
+            return Ok(new { items = result, total = result.Count });
         }
-        var list = await _uow.Tenants.GetAllAsync(ct);
-        return Ok(list);
+
+        // 按公司分页查询
+        if (companyId != null)
+        {
+            var all = await _uow.Tenants.GetAllAsync(ct);
+            var filtered = all.Where(t => t.CompanyId == companyId).ToList();
+            var total = filtered.Count;
+            var items = filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Ok(new { items, total, page, pageSize });
+        }
+
+        // 无公司 ID 返回空
+        return Ok(new { items = new List<object>(), total = 0, page, pageSize });
     }
 
     [HttpGet("{id}")]
@@ -41,6 +53,7 @@ public class TenantsController : ControllerBase
         var entity = new Tenant(request.Name, request.CompanyId);
         if (!string.IsNullOrEmpty(request.Phone)) entity.SetPhone(request.Phone);
         if (!string.IsNullOrEmpty(request.IdCard)) entity.SetIdCard(request.IdCard);
+        if (!string.IsNullOrEmpty(request.Email)) entity.SetEmail(request.Email);
         await _uow.Tenants.AddAsync(entity, ct);
         await _uow.CommitAsync(ct);
         return Ok(entity);
@@ -54,6 +67,7 @@ public class TenantsController : ControllerBase
         if (request.Name != null) entity.Rename(request.Name);
         if (request.Phone != null) entity.SetPhone(request.Phone);
         if (request.IdCard != null) entity.SetIdCard(request.IdCard);
+        if (request.Email != null) entity.SetEmail(request.Email);
         await _uow.CommitAsync(ct);
         return NoContent();
     }
@@ -74,5 +88,6 @@ public class TenantRequest
     public string Name { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public string? IdCard { get; set; }
+    public string? Email { get; set; }
     public Guid CompanyId { get; set; }
 }

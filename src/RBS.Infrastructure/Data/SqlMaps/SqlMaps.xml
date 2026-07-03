@@ -265,8 +265,37 @@
   <select id="Collection.Select.Receipt.PendingConfirm">
     <![CDATA[SELECT * FROM Receipts WHERE CompanyId=@Id AND Status='Pending' ORDER BY CreatedAt DESC]]>
   </select>
+  <select id="Collection.Select.Receipt.All">
+    <![CDATA[SELECT r.* FROM Receipts r WHERE r.CompanyId=@Id ORDER BY r.CreatedAt DESC]]>
+  </select>
   <select id="Collection.Select.Receipt.TotalConfirmed">
     <![CDATA[SELECT ISNULL(SUM(Amount),0) FROM Receipts WHERE ContractId=@Id AND Status='Confirmed']]>
+  </select>
+
+  <!-- ================================================================
+       模块：DebitNote（账单）
+       ================================================================ -->
+  <select id="Billing.Select.DebitNote.ByCompany">
+    <![CDATA[SELECT dn.*, c.ContractNo
+      FROM DebitNotes dn
+      JOIN Contracts c ON c.Id = dn.ContractId
+      WHERE c.CompanyId = @CompanyId
+      ORDER BY dn.CreatedAt DESC]]>
+  </select>
+  <select id="Billing.Select.DebitNote.ByPeriodCompany">
+    <![CDATA[SELECT dn.*, c.ContractNo
+      FROM DebitNotes dn
+      JOIN Contracts c ON c.Id = dn.ContractId
+      WHERE c.CompanyId = @CompanyId AND dn.Period = @Period
+      ORDER BY dn.CreatedAt DESC]]>
+  </select>
+  <select id="Billing.Select.DebitNote.ByTenantId">
+    <![CDATA[SELECT dn.*, c.ContractNo
+      FROM DebitNotes dn
+      JOIN Contracts c ON c.Id = dn.ContractId
+      JOIN ContractTenants ct ON ct.ContractId = c.Id
+      WHERE ct.TenantId = @TenantId
+      ORDER BY dn.CreatedAt DESC]]>
   </select>
 
   <!-- ================================================================
@@ -281,6 +310,16 @@
   <select id="Receivable.Select.Plan.Overdue">
     <![CDATA[SELECT * FROM ReceivablePlans WHERE Status='Pending' AND DueDate < CAST(GETDATE() AS DATE)]]>
   </select>
+  <select id="Receivable.Select.Plan.OverdueDetail">
+    <![CDATA[SELECT p.*, c.ContractNo, t.Name AS TenantName, h.FullCode AS RoomFullCode
+      FROM ReceivablePlans p
+      JOIN Contracts c ON c.Id = p.ContractId
+      LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
+      LEFT JOIN Tenants t ON t.Id = ct.TenantId
+      LEFT JOIN HousingUnits h ON h.Id = c.RoomId
+      WHERE p.Status IN ('Pending','Partial') AND p.DueDate < CAST(GETDATE() AS DATE)
+      ORDER BY p.DueDate]]>
+  </select>
 
   <!-- ================================================================
        模块：MeterReading（抄表）
@@ -293,6 +332,16 @@
   </select>
   <select id="Utility.Select.MeterReading.Exists">
     <![CDATA[SELECT COUNT(1) FROM MeterReadings WHERE ContractFeeConfigId=@Id AND Year=@Y AND Month=@M]]>
+  </select>
+  <select id="Utility.Select.MeterReading.ByCompanyMonth">
+    <![CDATA[SELECT mr.*, cfc.FeeCodeId, fc.Name AS FeeName, c.ContractNo, h.FullCode AS RoomName
+      FROM MeterReadings mr
+      JOIN ContractFeeConfigs cfc ON cfc.Id = mr.ContractFeeConfigId
+      JOIN Contracts c ON c.Id = cfc.ContractId
+      JOIN HousingUnits h ON h.Id = c.RoomId
+      JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId
+      WHERE c.CompanyId = @CompanyId AND mr.Year = @Year AND mr.Month = @Month
+      ORDER BY h.FullCode, fc.Name]]>
   </select>
 
   <!-- ================================================================
@@ -332,7 +381,11 @@
       AND (@EndDate IS NULL OR [VoucherDate] <= @EndDate) ORDER BY [VoucherDate] DESC]]>
   </select>
   <select id="Accounting.Select.Voucher.ByIdWithEntries">
-    <![CDATA[SELECT * FROM [Vouchers] WHERE [Id] = @Id; SELECT * FROM [JournalEntries] WHERE [VoucherId] = @Id]]>
+    <![CDATA[SELECT * FROM [Vouchers] WHERE [Id] = @Id;
+    SELECT je.*, s.Code AS SubjectCode, s.Name AS SubjectName
+      FROM [JournalEntries] je
+      LEFT JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
+      WHERE je.[VoucherId] = @Id ORDER BY je.[CreatedAt]]]>
   </select>
   <select id="Accounting.Select.Voucher.ById">
     <![CDATA[SELECT * FROM [Vouchers] WHERE [Id] = @Id]]>
@@ -348,7 +401,11 @@
        模块：JournalEntry（分录）
        ================================================================ -->
   <select id="Accounting.Select.JournalEntry.List">
-    <![CDATA[SELECT * FROM [JournalEntries] ORDER BY [CreatedAt] DESC]]>
+    <![CDATA[SELECT je.*, v.VoucherNo, s.Name AS AccountingSubjectName
+      FROM [JournalEntries] je
+      JOIN [Vouchers] v ON v.Id = je.VoucherId
+      JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
+      ORDER BY je.[CreatedAt] DESC]]>
   </select>
 
   <!-- ================================================================

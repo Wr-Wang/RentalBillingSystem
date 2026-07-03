@@ -42,7 +42,7 @@ public class ApprovalService : IApprovalService
     }
 
     // =====================================================================
-    // 写操作：SubmitAsync 保持使用 EF Core（无并发冲突风险）
+    // 写操作：SubmitAsync
     // =====================================================================
 
     public async Task<ApprovalRequestDto> SubmitAsync(SubmitApprovalRequest request, CancellationToken ct = default)
@@ -100,7 +100,7 @@ public class ApprovalService : IApprovalService
 
     public async Task<ApprovalRequestDto> ApproveAsync(Guid id, string? comment, CancellationToken ct = default)
     {
-        // [读] 用 EF Core 加载实体，验证状态
+        // [读] 加载实体，验证状态
         var entity = await _uow.ApprovalRequests.GetByIdAsync(id, ct)
             ?? throw new KeyNotFoundException("审批请求不存在");
 
@@ -224,7 +224,7 @@ public class ApprovalService : IApprovalService
 
     public async Task<ApprovalRequestDto> CancelAsync(Guid id, string? reason = null, CancellationToken ct = default)
     {
-        // [读] 用 EF Core 加载实体（含 Records，需校验提交人）
+        // [读] 加载实体（含 Records，需校验提交人）
         var entity = await _uow.ApprovalRequests.GetByIdWithRecordsAsync(id, ct)
             ?? throw new KeyNotFoundException("审批请求不存在");
 
@@ -279,7 +279,7 @@ public class ApprovalService : IApprovalService
     }
 
     // =====================================================================
-    // 读操作：保持 EF Core
+    // 读操作
     // =====================================================================
 
     public async Task<List<ApprovalRequestDto>> GetPendingAsync(CancellationToken ct = default)

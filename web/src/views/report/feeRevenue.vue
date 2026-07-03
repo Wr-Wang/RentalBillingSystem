@@ -2,6 +2,11 @@
   <div>
     <div class="page-header">
       <h2>费用收入统计</h2>
+      <el-button @click="loadData"><el-icon><Refresh /></el-icon>刷新</el-button>
+    </div>
+    <div class="search-bar">
+      <el-date-picker v-model="searchPeriod" type="month" placeholder="选择账期" @change="loadData" />
+      <el-button type="primary" @click="loadData">查询</el-button>
     </div>
 
     <el-card>
@@ -39,24 +44,50 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getFeeRevenue } from '../../api/index'
 
-const feeStats = [
-  { name: '房租费', receivable: 500000, received: 480000, overdue: 20000, rate: 96.0 },
-  { name: '水费', receivable: 12000, received: 10500, overdue: 1500, rate: 87.5 },
-  { name: '电费', receivable: 25000, received: 22000, overdue: 3000, rate: 88.0 },
-  { name: '卫生费', receivable: 3000, received: 2800, overdue: 200, rate: 93.3 },
-  { name: '管理费', receivable: 15000, received: 14000, overdue: 1000, rate: 93.3 },
-  { name: '燃气费', receivable: 8000, received: 6000, overdue: 2000, rate: 75.0 },
-  { name: '网费', receivable: 8000, received: 7500, overdue: 500, rate: 93.8 }
-]
+const searchPeriod = ref(null)
+const feeStats = ref([])
+const loading = ref(false)
 
 const total = computed(() => {
-  const receivable = feeStats.reduce((s, r) => s + r.receivable, 0)
-  const received = feeStats.reduce((s, r) => s + r.received, 0)
+  const list = feeStats.value
+  const receivable = list.reduce((s, r) => s + (r.receivable || 0), 0)
+  const received = list.reduce((s, r) => s + (r.received || 0), 0)
   const overdue = receivable - received
-  return { receivable, received, overdue, rate: Math.round(received / receivable * 100 * 10) / 10 }
+  return { receivable, received, overdue, rate: receivable > 0 ? Math.round(received / receivable * 100 * 10) / 10 : 0 }
 })
+
+async function loadData() {
+  loading.value = true
+  try {
+    let period
+    if (searchPeriod.value) {
+      const d = new Date(searchPeriod.value)
+      period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    }
+    const res = await getFeeRevenue({ period })
+    const items = Array.isArray(res) ? res : (res.items || res.data || res || [])
+    if (Array.isArray(items)) {
+      feeStats.value = items.map(item => ({
+        name: item.feeName || item.name || '未知',
+        receivable: item.totalAmount || item.receivable || 0,
+        received: item.totalReceived || item.received || 0,
+        overdue: (item.totalAmount || 0) - (item.totalReceived || 0),
+        rate: (item.totalAmount || 0) > 0
+          ? Math.round((item.totalReceived || 0) / (item.totalAmount || 1) * 100 * 10) / 10
+          : 0
+      }))
+    }
+  } catch {
+    ElMessage.error('加载费用收入统计失败')
+  }
+  loading.value = false
+}
+
+onMounted(loadData)
 </script>
 
 <style scoped>

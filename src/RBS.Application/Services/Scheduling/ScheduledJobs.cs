@@ -1,4 +1,6 @@
+using Dapper;
 using RBS.Application.Common.Interfaces;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
 using RBS.Core.Entities.Billing;
@@ -52,11 +54,13 @@ public class LateFeeCalcJob : IScheduledJob
     public string JobName => "LateFeeCalc";
     private readonly IUnitOfWork _uow;
     private readonly IBillingDomainService _billingDomain;
+    private readonly IDbConnectionFactory _db;
 
-    public LateFeeCalcJob(IUnitOfWork uow, IBillingDomainService billingDomain)
+    public LateFeeCalcJob(IUnitOfWork uow, IBillingDomainService billingDomain, IDbConnectionFactory db)
     {
         _uow = uow;
         _billingDomain = billingDomain;
+        _db = db;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
@@ -76,7 +80,11 @@ public class LateFeeCalcJob : IScheduledJob
             var fee = _billingDomain.CalculateLateFee(plan, config, asOfDate);
             if (fee > 0)
             {
-                // 此处可将滞纳金写入表格或标记 — 当前实现仅为计算演示
+                plan.SetLateFee(fee);
+                using var conn = _db.CreateConnection(); conn.Open();
+                await conn.ExecuteAsync(
+                    "UPDATE ReceivablePlans SET LateFee = @Fee WHERE Id = @Id",
+                    new { Fee = fee, Id = plan.Id });
                 count++;
             }
         }

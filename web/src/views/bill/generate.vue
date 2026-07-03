@@ -53,7 +53,7 @@
         </el-col>
         <el-col :span="8">
           <div class="summary-item">
-            <div class="summary-label">已生成合同（仅可导出）</div>
+            <div class="summary-label">已生成合同</div>
             <div class="summary-value" style="color: #909399;">{{ generatedContracts.length }}</div>
           </div>
         </el-col>
@@ -94,6 +94,7 @@
       <el-table
         ref="pendingTableRef"
         :data="pendingContracts"
+        v-loading="loading"
         stripe
         @selection-change="onSelectionChange"
       >
@@ -102,7 +103,7 @@
         <el-table-column prop="tenantName" label="租客" width="90" />
         <el-table-column prop="roomName" label="房屋" width="120" />
         <el-table-column label="应收金额" width="120">
-          <template #default="{ row }">¥{{ row.estimatedAmount?.toLocaleString() }}</template>
+          <template #default="{ row }">¥{{ (row.estimatedAmount || 0).toLocaleString() }}</template>
         </el-table-column>
         <el-table-column prop="contractStatus" label="合同状态" width="90">
           <template #default="{ row }">
@@ -127,41 +128,35 @@
         </el-table-column>
       </el-table>
 
-      <div v-if="pendingContracts.length === 0" style="text-align: center; padding: 40px 0; color: #909399;">
+      <div v-if="!loading && pendingContracts.length === 0" style="text-align: center; padding: 40px 0; color: #909399;">
         <el-icon :size="32"><CircleCheckFilled /></el-icon>
         <p style="margin-top: 8px;">当前筛选条件下所有合同均已生成账单</p>
       </div>
     </el-card>
 
-    <!-- ====== Generated Contracts (read-only, can only export) ====== -->
+    <!-- ====== Generated Contracts (read-only) ====== -->
     <el-card>
       <template #header>
         <span><el-icon style="vertical-align: middle;"><Finished /></el-icon> 已生成（仅可查看/导出）</span>
       </template>
 
       <el-alert
-        title="以下合同在当前账期已生成过账单，不可重复生成。可查看账单详情或导出PDF（已生成账单的PDF将标注「历史账单」标记）。"
+        title="以下合同在当前账期已生成过账单，不可重复生成。"
         type="warning"
         show-icon
         :closable="false"
         style="margin-bottom: 16px;"
       />
 
-      <el-table :data="generatedContracts" stripe>
+      <el-table :data="generatedContracts" v-loading="loading" stripe>
         <el-table-column prop="contractNo" label="合同号" width="130" />
         <el-table-column prop="tenantName" label="租客" width="90" />
         <el-table-column prop="roomName" label="房屋" width="120" />
         <el-table-column prop="billNo" label="账单编号" width="170" />
         <el-table-column label="应收金额" width="120">
-          <template #default="{ row }">¥{{ row.estimatedAmount?.toLocaleString() }}</template>
+          <template #default="{ row }">¥{{ (row.estimatedAmount || 0).toLocaleString() }}</template>
         </el-table-column>
         <el-table-column prop="generatedAt" label="生成时间" width="160" />
-        <el-table-column label="历史标记" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.isHistorical" type="warning" size="small">历史</el-tag>
-            <el-tag v-else type="success" size="small">当前</el-tag>
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button text size="small" type="primary" @click="previewBill(row)">
@@ -174,7 +169,7 @@
         </el-table-column>
       </el-table>
 
-      <div v-if="generatedContracts.length === 0" style="text-align: center; padding: 40px 0; color: #c0c4cc;">
+      <div v-if="!loading && generatedContracts.length === 0" style="text-align: center; padding: 40px 0; color: #c0c4cc;">
         当前筛选条件下没有已生成账单的合同
       </div>
     </el-card>
@@ -203,12 +198,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/store/user'
+import { getContracts, getBuildingList, getHousingUnits, generateDebitNotes, getDebitNotes, exportDebitNotePdf } from '@/api'
 
 const router = useRouter()
+const userStore = useUserStore()
 const pendingTableRef = ref(null)
+const loading = ref(false)
 
 // ==================== Filters ====================
 const filters = reactive({
@@ -218,19 +217,8 @@ const filters = reactive({
   contractStatus: ''
 })
 
-const buildings = ref([
-  { id: 'bld1', name: 'A栋' },
-  { id: 'bld2', name: 'B栋' },
-  { id: 'bld3', name: 'C栋' }
-])
-
-const rooms = ref([
-  { id: 'r1', name: '101', buildingId: 'bld1' },
-  { id: 'r2', name: '102', buildingId: 'bld1' },
-  { id: 'r3', name: '201', buildingId: 'bld2' },
-  { id: 'r4', name: '202', buildingId: 'bld2' },
-  { id: 'r5', name: '301', buildingId: 'bld3' }
-])
+const buildings = ref([])
+const rooms = ref([])
 
 const filteredRooms = computed(() => {
   if (!filters.buildingId) return rooms.value
@@ -238,50 +226,7 @@ const filteredRooms = computed(() => {
 })
 
 // ==================== Contract Data ====================
-const allContracts = ref([
-  {
-    id: 'c1', contractNo: 'HT-2026-001', tenantName: '张三', roomName: 'A栋-101',
-    buildingId: 'bld1', roomId: 'r1', estimatedAmount: 5460, contractStatus: 'Active',
-    hasExistingBill: true, billNo: 'ZD-202606-00001', generatedAt: '2026-06-25 08:00:30',
-    isHistorical: false, periodLabel: '2026-06'
-  },
-  {
-    id: 'c2', contractNo: 'HT-2026-002', tenantName: '李四', roomName: 'A栋-102',
-    buildingId: 'bld1', roomId: 'r2', estimatedAmount: 4030, contractStatus: 'Active',
-    hasExistingBill: true, billNo: 'ZD-202606-00002', generatedAt: '2026-06-25 08:00:30',
-    isHistorical: false, periodLabel: '2026-06'
-  },
-  {
-    id: 'c3', contractNo: 'HT-2026-003', tenantName: '王五', roomName: 'B栋-201',
-    buildingId: 'bld2', roomId: 'r3', estimatedAmount: 7030, contractStatus: 'Active',
-    hasExistingBill: true, billNo: 'ZD-202606-00003', generatedAt: '2026-06-25 08:00:30',
-    isHistorical: false, periodLabel: '2026-06'
-  },
-  {
-    id: 'c4', contractNo: 'HT-2026-004', tenantName: '赵六', roomName: 'B栋-202',
-    buildingId: 'bld2', roomId: 'r4', estimatedAmount: 6200, contractStatus: 'Active',
-    hasExistingBill: true, billNo: 'ZD-202606-00004', generatedAt: '2026-06-27 09:15:00',
-    isHistorical: true, periodLabel: '2026-06'
-  },
-  {
-    id: 'c5', contractNo: 'HT-2026-005', tenantName: '孙七', roomName: 'C栋-301',
-    buildingId: 'bld3', roomId: 'r5', estimatedAmount: 4500, contractStatus: 'Active',
-    hasExistingBill: false, billNo: null, generatedAt: null,
-    isHistorical: false, periodLabel: '2026-06'
-  },
-  {
-    id: 'c6', contractNo: 'HT-2026-006', tenantName: '周八', roomName: 'A栋-103',
-    buildingId: 'bld1', roomId: null, estimatedAmount: 5200, contractStatus: 'Active',
-    hasExistingBill: false, billNo: null, generatedAt: null,
-    isHistorical: false, periodLabel: '2026-06'
-  },
-  {
-    id: 'c7', contractNo: 'HT-2026-007', tenantName: '吴九', roomName: 'B栋-203',
-    buildingId: 'bld2', roomId: null, estimatedAmount: 3800, contractStatus: 'Suspended',
-    hasExistingBill: false, billNo: null, generatedAt: null,
-    isHistorical: false, periodLabel: '2026-06'
-  }
-])
+const allContracts = ref([])
 
 function getPeriodLabel(d) {
   if (!d) { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}` }
@@ -290,7 +235,7 @@ function getPeriodLabel(d) {
 
 const matchedContracts = computed(() => {
   const periodLabel = getPeriodLabel(filters.period)
-  let list = allContracts.value.filter(c => c.periodLabel === periodLabel)
+  let list = allContracts.value.filter(c => c.periodLabel === periodLabel || c.periodLabel === undefined)
   if (filters.buildingId) list = list.filter(c => c.buildingId === filters.buildingId)
   if (filters.roomId) list = list.filter(c => c.roomId === filters.roomId)
   if (filters.contractStatus) list = list.filter(c => c.contractStatus === filters.contractStatus)
@@ -304,12 +249,74 @@ const generatedContracts = computed(() =>
   matchedContracts.value.filter(c => c.hasExistingBill)
 )
 
-// ==================== Selection (pending only) ====================
+// ==================== Selection ====================
 const selectedIds = ref([])
 const batchLoading = ref(false)
 
 function onSelectionChange(rows) {
   selectedIds.value = rows.map(r => r.id)
+}
+
+// ==================== Data Loading ====================
+
+function getEffectiveCompanyId() {
+  return userStore.effectiveCompanyId || userStore.homeCompanyId
+}
+
+async function loadBuildings() {
+  try {
+    const res = await getBuildingList()
+    const items = Array.isArray(res) ? res : (res.items || res.data || res || [])
+    buildings.value = items.map(b => ({ id: b.id, name: b.name || b.buildingName || '' }))
+  } catch { /* 静默 */ }
+}
+
+async function loadRooms() {
+  try {
+    const res = await getHousingUnits({ pageSize: 500 })
+    const items = res.items || res.data || res || []
+    rooms.value = items
+      .filter(u => u.unitType === 'Room')
+      .map(u => ({ id: u.id, name: u.fullCode || u.name || '', buildingId: u.buildingId || u.parentId || '' }))
+  } catch { /* 静默 */ }
+}
+
+async function loadContracts() {
+  loading.value = true
+  try {
+    const periodLabel = getPeriodLabel(filters.period)
+    const res = await getContracts({ pageSize: 200, status: filters.contractStatus || undefined })
+    const items = res.items || res.data || []
+
+    // 获取已生成账单的合同 ID 集合
+    let generatedContractIds = new Set()
+    try {
+      const debitNotes = await getDebitNotes({})
+      // 后端返回所有 debit notes，过滤当前账期
+      const dnItems = Array.isArray(debitNotes) ? debitNotes : (debitNotes.items || debitNotes.data || [])
+      dnItems.filter(d => d.period === periodLabel).forEach(d => generatedContractIds.add(d.contractId))
+    } catch { /* 静默 */ }
+
+    allContracts.value = items.map(c => ({
+      id: c.id,
+      contractNo: c.contractNo,
+      tenantName: c.tenants?.length > 0 ? c.tenants[0].tenantName : '',
+      roomName: c.roomFullCode || '',
+      buildingId: c.buildingId || '',
+      roomId: c.roomId || '',
+      estimatedAmount: c.rentAmount || 0,
+      contractStatus: c.status || 'Active',
+      hasExistingBill: generatedContractIds.has(c.id),
+      billNo: '',
+      generatedAt: '',
+      isHistorical: false,
+      periodLabel,
+      _generating: false
+    }))
+  } catch {
+    ElMessage.error('加载合同数据失败')
+  }
+  loading.value = false
 }
 
 // ==================== Generate ====================
@@ -318,14 +325,12 @@ const generateResults = ref([])
 
 async function generateSingle(row) {
   row._generating = true
-  const success = await doGenerate(row)
+  const result = await doGenerate(row)
   row._generating = false
-  if (success) {
+  if (result.success) {
     row.hasExistingBill = true
-    row.isHistorical = false
-    row.billNo = `ZD-${getPeriodLabel(filters.period).replace('-', '')}-${String(row.contractNo.slice(-5)).padStart(5, '0')}`
-    row.generatedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
-    ElMessage.success(`${row.contractNo} 账单已生成`)
+    row.billNo = result.billNo
+    row.generatedAt = result.generatedAt
   }
 }
 
@@ -344,13 +349,12 @@ async function batchGenerate() {
 
   for (const row of selected) {
     row._generating = true
-    const success = await doGenerate(row)
+    const result = await doGenerate(row)
     row._generating = false
-    if (success) {
+    if (result.success) {
       row.hasExistingBill = true
-      row.isHistorical = false
-      row.billNo = `ZD-${getPeriodLabel(filters.period).replace('-', '')}-${String(row.contractNo.slice(-5)).padStart(5, '0')}`
-      row.generatedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+      row.billNo = result.billNo
+      row.generatedAt = result.generatedAt
     }
   }
 
@@ -359,16 +363,30 @@ async function batchGenerate() {
 }
 
 async function doGenerate(row) {
-  await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 400))
-  const success = Math.random() > 0.05
-  generateResults.value.push({
-    contractNo: row.contractNo,
-    tenantName: row.tenantName,
-    success,
-    billNo: success ? row.billNo || `ZD-${getPeriodLabel(filters.period).replace('-', '')}-${String(row.contractNo.slice(-5)).padStart(5, '0')}` : '-',
-    message: success ? '首次生成' : '生成失败，请重试'
-  })
-  return success
+  const period = getPeriodLabel(filters.period)
+  try {
+    const res = await generateDebitNotes({ contractId: row.id, period })
+    const result = {
+      contractNo: row.contractNo,
+      tenantName: row.tenantName,
+      success: true,
+      billNo: res.noteNo || res.id || '-',
+      message: res.message || '生成成功'
+    }
+    generateResults.value.push(result)
+    return { ...result, generatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19) }
+  } catch (e) {
+    const msg = e?.response?.data?.message || e.message || '生成失败'
+    const result = {
+      contractNo: row.contractNo,
+      tenantName: row.tenantName,
+      success: false,
+      billNo: '-',
+      message: msg
+    }
+    generateResults.value.push(result)
+    return result
+  }
 }
 
 // ==================== Actions ====================
@@ -376,12 +394,23 @@ function previewBill(row) {
   router.push(`/bills/preview/${row.id}`)
 }
 
-function exportPdf(row) {
-  ElMessage.success(`账单 ${row.billNo} 的 PDF 已加入导出队列（${row.isHistorical ? '历史账单' : '当前账单'}）`)
+async function exportPdf(row) {
+  try {
+    const blob = await exportDebitNotePdf(row.id)
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${row.billNo || 'bill'}.pdf`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success(`账单 ${row.billNo} PDF 已下载`)
+  } catch {
+    ElMessage.error('导出PDF失败')
+  }
 }
 
 function searchContracts() {
-  // Filters are reactive, computed will re-evaluate
+  loadContracts()
 }
 
 function resetFilters() {
@@ -389,7 +418,14 @@ function resetFilters() {
   filters.buildingId = ''
   filters.roomId = ''
   filters.contractStatus = ''
+  loadContracts()
 }
+
+onMounted(() => {
+  loadBuildings()
+  loadRooms()
+  loadContracts()
+})
 </script>
 
 <style scoped>

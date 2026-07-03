@@ -14,6 +14,7 @@ public class ReceivablePlan : AggregateRoot
     public string Period { get; private set; }
     public decimal Amount { get; private set; }
     public decimal Received { get; private set; }
+    public decimal LateFee { get; private set; }
     public decimal Balance => Amount - Received;
     public DateOnly DueDate { get; private set; }
     public string Status { get; private set; }
@@ -85,6 +86,8 @@ public class ReceivablePlan : AggregateRoot
     }
 
     /// <summary>标记为逾期</summary>
+    public void SetLateFee(decimal fee) { LateFee = fee; }
+
     public void MarkAsOverdue()
     {
         if (Status != "Pending" && Status != "Partial")

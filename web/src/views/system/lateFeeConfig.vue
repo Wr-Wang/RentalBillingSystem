@@ -46,7 +46,7 @@
           <template #default="{ row }">{{ row.maxRate ?? '无' }}%</template>
         </el-table-column>
         <el-table-column prop="effectiveDate" label="生效日期" width="120" />
-        <el-table-column prop="isActive" label="状态" width="70">
+        <el-table-column label="状态" width="70">
           <template #default="{ row }">
             <el-tag :type="row.isActive ? 'success' : 'info'" size="small">{{ row.isActive ? '生效' : '历史' }}</el-tag>
           </template>
@@ -59,6 +59,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { getActiveLateFeeConfig, getLateFeeConfigs, saveLateFeeConfig } from '../../api/index'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -71,18 +72,17 @@ const config = reactive({
 async function fetchConfig() {
   loading.value = true
   try {
-    const res = await fetch('/api/latefeeconfig/active', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
-    if (res.ok) {
-      const data = await res.json()
+    const data = await getActiveLateFeeConfig()
+    if (data && data.id) {
       config.dailyRate = data.dailyRate ?? 0.0005
       config.graceDays = data.graceDays ?? 3
       config.maxRate = data.maxRate ?? 100
       config.minAmount = data.minAmount ?? 1
       config.effectiveDate = data.effectiveDate || ''
     }
-    const historyRes = await fetch('/api/latefeeconfig', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
-    if (historyRes.ok) historyList.value = await historyRes.json()
-  } catch (e) { /* ignore */ }
+    const history = await getLateFeeConfigs()
+    historyList.value = Array.isArray(history) ? history : (history.items || history.data || [])
+  } catch { /* ignore */ }
   loading.value = false
 }
 
@@ -90,20 +90,17 @@ async function save() {
   if (!config.effectiveDate) { ElMessage.warning('请选择生效日期'); return }
   saving.value = true
   try {
-    const res = await fetch('/api/latefeeconfig', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-      body: JSON.stringify(config)
+    await saveLateFeeConfig({
+      dailyRate: config.dailyRate,
+      graceDays: config.graceDays,
+      maxRate: config.maxRate,
+      minAmount: config.minAmount,
+      effectiveDate: config.effectiveDate
     })
-    if (res.ok) {
-      ElMessage.success('滞纳金配置已保存')
-      await fetchConfig()
-    } else {
-      const err = await res.json()
-      ElMessage.error(err?.message || '保存失败')
-    }
+    ElMessage.success('滞纳金配置已保存')
+    await fetchConfig()
   } catch (e) {
-    ElMessage.error('保存失败')
+    ElMessage.error(e?.response?.data?.message || '保存失败')
   }
   saving.value = false
 }

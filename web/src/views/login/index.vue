@@ -83,7 +83,6 @@ async function handleLogin() {
 
   loading.value = true
   try {
-    // 调用 store 的 login 方法（内部已包含 API 调用和状态同步）
     await userStore.login({
       username: loginForm.username,
       password: loginForm.password
@@ -92,56 +91,10 @@ async function handleLogin() {
     ElMessage.success('登录成功')
     router.push('/dashboard')
   } catch (error) {
-    // API 不可用时使用 mock 登录（开发调试）
-    if (!navigator.onLine || error.message?.includes('Network Error')) {
-      ElMessage.warning('后端服务未启动，使用离线模式')
-      await mockLogin()
-    } else {
-      ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
-    }
+    ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
   } finally {
     loading.value = false
   }
-}
-
-// Mock 登录（后端未启动时的降级方案）
-async function mockLogin() {
-  const isAdmin = loginForm.username === 'admin'
-  const mockUser = {
-    id: '1',
-    username: loginForm.username,
-    displayName: isAdmin ? '系统管理员' : '张三',
-    role: 'Admin',
-    phone: '13800138000',
-    email: 'admin@rental.com',
-    homeCompanyId: isAdmin ? null : 'ld1',
-    isSuperAdmin: isAdmin,
-    companyList: [
-      { id: 'ld1', name: '张建国' },
-      { id: 'ld2', name: '李春华' },
-      { id: 'ld3', name: '王芳投资有限公司' },
-      { id: 'ld4', name: '赵德明' }
-    ]
-  }
-  const token = 'mock-token-' + Date.now()
-  const permissions = ['*']
-
-  userStore.token = token
-  userStore.user = mockUser
-  userStore.permissions = permissions
-  userStore.homeCompanyId = mockUser.homeCompanyId
-  userStore.isSuperAdmin = mockUser.isSuperAdmin
-  userStore.companyList = mockUser.companyList
-  userStore.currentCompanyId = null
-
-  localStorage.setItem('token', token)
-  localStorage.setItem('user', JSON.stringify(mockUser))
-  localStorage.setItem('permissions', JSON.stringify(permissions))
-  localStorage.removeItem('currentCompanyId')
-
-  if (userStore.isSuperAdmin) userStore.restoreView()
-  ElMessage.success('离线模式登录成功')
-  router.push('/dashboard')
 }
 </script>
 

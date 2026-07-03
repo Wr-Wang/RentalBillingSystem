@@ -9,6 +9,7 @@ namespace RBS.Application.Common.Interfaces;
 public interface IContractService
 {
     Task<List<ContractDto>> GetListAsync(Guid companyId, CancellationToken ct = default);
+    Task<List<ContractDto>> GetByTenantIdAsync(Guid tenantId, CancellationToken ct = default);
     Task<PagedResult<ContractDto>> GetPagedListAsync(Guid companyId, int page = 1, int pageSize = 10, string? keyword = null, string? status = null, CancellationToken ct = default);
     Task<ContractDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<ContractDto> CreateAsync(CreateContractRequest request, CancellationToken ct = default);

@@ -29,14 +29,9 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
 
     public async Task<T> AddAsync(T entity, CancellationToken ct = default)
     {
-        var now = RBS.Core.Common.ChinaTime.Now;
-        var bp = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-        if (typeof(T).IsSubclassOf(typeof(RBS.Core.Entities.Base.AuditableEntity)) || typeof(T) == typeof(RBS.Core.Entities.Base.AuditableEntity))
-        {
-            (entity as RBS.Core.Entities.Base.AuditableEntity)?.SetCreated(Guid.NewGuid(), now, null, null);
-        }
-
+        // CreatedBy 由应用层在调用前设置（DDD：基础设施层不控制领域审计信息）
         using var conn = _db.CreateConnection(); conn.Open();
+        var bp = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
         var props = bp.Where(p => p.CanRead && !IsNavProp(p)).Select(p => p.Name).ToList();
         var cols = string.Join(",", props);
         var vals = string.Join(",", props.Select(p => "@" + p));

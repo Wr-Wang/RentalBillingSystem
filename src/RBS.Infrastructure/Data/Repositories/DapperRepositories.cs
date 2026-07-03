@@ -349,6 +349,8 @@ public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptReposi
     }
     public async Task<List<Receipt>> GetPendingConfirmAsync(Guid companyId, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Receipt>(_sql.Get("Collection.Select.Receipt.PendingConfirm"), new { Id = companyId })).ToList(); }
+    public async Task<List<Receipt>> GetAllByCompanyAsync(Guid companyId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Receipt>(_sql.Get("Collection.Select.Receipt.All"), new { Id = companyId })).ToList(); }
     public async Task<decimal> GetTotalConfirmedAsync(Guid contractId, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<decimal>(_sql.Get("Collection.Select.Receipt.TotalConfirmed"), new { Id = contractId }); }
 }

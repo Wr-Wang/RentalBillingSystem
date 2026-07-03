@@ -9,78 +9,110 @@
       <template #header>基本信息</template>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="姓名">{{ tenant.name }}</el-descriptions-item>
-        <el-descriptions-item label="证件类型">{{ tenant.identityType === 'PRC_ID' ? '身份证' : '护照' }}</el-descriptions-item>
-        <el-descriptions-item label="证件号">{{ tenant.identityNo }}</el-descriptions-item>
-        <el-descriptions-item label="电话">{{ tenant.phone }}</el-descriptions-item>
+        <el-descriptions-item label="证件号码">{{ tenant.idCard || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="电话">{{ tenant.phone || '-' }}</el-descriptions-item>
         <el-descriptions-item label="邮箱">{{ tenant.email || '-' }}</el-descriptions-item>
       </el-descriptions>
     </el-card>
 
     <el-card style="margin-bottom: 16px;">
-      <template #header>当前合同</template>
-      <el-table :data="currentContracts" stripe>
+      <template #header>关联合同</template>
+      <el-table :data="currentContracts" v-loading="contractsLoading" stripe>
         <el-table-column prop="contractNo" label="合同号" width="150" />
-        <el-table-column prop="roomName" label="房屋" width="120" />
+        <el-table-column prop="roomFullCode" label="房屋" width="120" />
         <el-table-column prop="startDate" label="起租" width="110" />
         <el-table-column prop="endDate" label="到期" width="110" />
         <el-table-column prop="rentAmount" label="月租金">
-          <template #default="{ row }">¥{{ row.rentAmount?.toLocaleString() }}</template>
+          <template #default="{ row }">¥{{ (row.rentAmount || 0).toLocaleString() }}</template>
         </el-table-column>
         <el-table-column prop="status" label="状态">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'Active' ? 'success' : 'info'" size="small">{{ row.status }}</el-tag>
+            <el-tag :type="row.status === 'Active' ? 'success' : 'info'" size="small">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-card>
-      <template #header>账单历史</template>
-      <el-table :data="billHistory" stripe>
-        <el-table-column prop="period" label="账期" width="90" />
-        <el-table-column prop="totalAmount" label="应收" width="110">
-          <template #default="{ row }">¥{{ row.totalAmount?.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="paidAmount" label="实收" width="110">
-          <template #default="{ row }">¥{{ row.paidAmount?.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="dueDate" label="到期日" width="100" />
-        <el-table-column prop="paidDate" label="付款日" width="100" />
-        <el-table-column prop="status" label="状态" width="90">
+        <el-table-column label="操作" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'Paid' ? 'success' : row.status === 'Overdue' ? 'danger' : 'warning'" size="small">
-              {{ row.status === 'Paid' ? '已付清' : row.status === 'Overdue' ? '逾期' : '待收款' }}
-            </el-tag>
+            <el-button text size="small" type="primary" @click="$router.push('/contracts/' + row.id)">查看</el-button>
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="!contractsLoading && currentContracts.length === 0" style="padding:20px;text-align:center;color:#909399;">
+        暂无关联合同
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { getTenant, getContracts, getDebitNotes } from '../../api/index'
 
 const route = useRoute()
 
 const tenant = ref({
-  id: route.params.id,
-  name: '张三',
-  identityType: 'PRC_ID',
-  identityNo: '110101199001011234',
-  phone: '13800138001',
-  email: 'zhangsan@email.com'
+  name: '', idCard: '', phone: '', email: ''
 })
+const currentContracts = ref([])
+const contractsLoading = ref(false)
 
-const currentContracts = ref([
-  { contractNo: 'HT-2026-001', roomName: 'A栋-101', startDate: '2026-01-01', endDate: '2027-12-31', rentAmount: 5200, status: 'Active' }
-])
+const statusLabelMap = {
+  Draft: '草稿', PendingApproval: '待审批', Active: '活跃',
+  Suspended: '已暂停', Expired: '已到期', Terminated: '已终止', Renewed: '已续签'
+}
 
-const billHistory = ref([
-  { period: '2026-06', totalAmount: 5460, paidAmount: 5460, dueDate: '2026-06-05', paidDate: '2026-06-03', status: 'Paid' },
-  { period: '2026-05', totalAmount: 5460, paidAmount: 5460, dueDate: '2026-05-05', paidDate: '2026-05-04', status: 'Paid' },
-  { period: '2026-04', totalAmount: 5460, paidAmount: 5460, dueDate: '2026-04-05', paidDate: '2026-04-02', status: 'Paid' },
-  { period: '2026-03', totalAmount: 5460, paidAmount: 5460, dueDate: '2026-03-05', paidDate: '2026-03-03', status: 'Paid' }
-])
+function statusLabel(status) {
+  return statusLabelMap[status] || status
+}
+
+onMounted(async () => {
+  const id = route.params.id
+  try {
+    const res = await getTenant(id)
+    tenant.value = {
+      name: res.name || '',
+      idCard: res.idCard || '',
+      phone: res.phone || '',
+      email: res.email || ''
+    }
+
+    // 加载关联合同（通过 tenantId 过滤）
+    contractsLoading.value = true
+    try {
+      const contractRes = await getContracts({ tenantId: id, pageSize: 50 })
+      const items = contractRes.items || contractRes.data || []
+      currentContracts.value = items.map(c => ({
+        id: c.id,
+        contractNo: c.contractNo,
+        roomFullCode: c.roomFullCode || '',
+        startDate: c.startDate || '',
+        endDate: c.endDate || '',
+        rentAmount: c.rentAmount || 0,
+        status: c.status || 'Unknown'
+      }))
+    } catch {
+      // 静默
+    }
+    contractsLoading.value = false
+
+    // 加载账单历史
+    try {
+      const billRes = await getDebitNotes({ tenantId: id, pageSize: 50 })
+      const bills = billRes.items || billRes.data || billRes || []
+      billHistory.value = Array.isArray(bills) ? bills.map(d => ({
+        period: d.period || '',
+        totalAmount: d.totalAmount || 0,
+        paidAmount: d.totalReceived || 0,
+        dueDate: d.dueDate || '',
+        paidDate: '',
+        status: d.status === 'Paid' ? 'Paid' : d.status === 'Pending' ? 'Pending' : 'Overdue'
+      })) : []
+    } catch {
+      // 静默
+    }
+  } catch {
+    ElMessage.error('加载租客详情失败')
+  }
+})
 </script>

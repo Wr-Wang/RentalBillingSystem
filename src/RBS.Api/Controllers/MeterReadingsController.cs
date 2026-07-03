@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Billing;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -14,7 +15,8 @@ public class MeterReadingsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
-    public MeterReadingsController(IUnitOfWork uow, IDbConnectionFactory db) { _uow = uow; _db = db; }
+    private readonly ISqlLoader _sql;
+    public MeterReadingsController(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql) { _uow = uow; _db = db; _sql = sql; }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractFeeConfigId, CancellationToken ct)
@@ -38,8 +40,10 @@ public class MeterReadingsController : ControllerBase
     {
         var entity = await _uow.MeterReadings.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
-        await _uow.CommitAsync(ct);
-        return NoContent();
+        await _db.CreateConnection().ExecuteAsync(
+            "UPDATE MeterReadings SET CurrentReading=@Current, Status='Confirmed' WHERE Id=@Id AND Status='Draft'",
+            new { Current = dto.CurrentReading, Id = id });
+        return Ok(new { id, status = "Confirmed" });
     }
 
     [HttpPost("{id}/confirm")]
@@ -54,6 +58,18 @@ public class MeterReadingsController : ControllerBase
                 "UPDATE MeterReadings SET Status='Confirmed' WHERE Id=@Id AND Status='Draft'", new { Id = id });
         }
         return Ok(new { id, status = "Confirmed" });
+    }
+
+    [HttpGet("by-month")]
+    public async Task<IActionResult> GetByMonth([FromQuery] Guid? companyId, [FromQuery] int? year, [FromQuery] int? month, CancellationToken ct)
+    {
+        if (companyId == null) return Ok(new List<object>());
+        var y = year ?? RBS.Core.Common.ChinaTime.Now.Year;
+        var m = month ?? RBS.Core.Common.ChinaTime.Now.Month;
+        using var conn = _db.CreateConnection(); conn.Open();
+        var rows = await conn.QueryAsync(_sql.Get("Utility.Select.MeterReading.ByCompanyMonth"),
+            new { CompanyId = companyId.Value, Year = y, Month = m });
+        return Ok(rows);
     }
 
     [HttpPost("import")]

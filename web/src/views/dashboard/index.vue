@@ -144,7 +144,7 @@ async function loadData() {
 
 function handleAction(row) {
   if (row.type === '收款确认') window.location.hash = '#/receipts/confirm'
-  else if (row.type === '续签') window.location.hash = '#/renewal-dashboard'
+  else if (row.type === '续签') window.location.hash = '#/renewaldashboard'
   else if (row.type === '催缴') window.location.hash = '#/collection/overview'
 }
 

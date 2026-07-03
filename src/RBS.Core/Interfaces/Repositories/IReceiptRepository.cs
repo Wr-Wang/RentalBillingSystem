@@ -4,5 +4,6 @@ using RBS.Core.Entities.Billing;
 public interface IReceiptRepository : IRepository<Receipt>
 {
     Task<List<Receipt>> GetPendingConfirmAsync(Guid companyId, CancellationToken ct = default);
+    Task<List<Receipt>> GetAllByCompanyAsync(Guid companyId, CancellationToken ct = default);
     Task<decimal> GetTotalConfirmedAsync(Guid contractId, CancellationToken ct = default);
 }

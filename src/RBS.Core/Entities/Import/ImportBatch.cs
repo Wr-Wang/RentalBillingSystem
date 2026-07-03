@@ -5,21 +5,17 @@ namespace RBS.Core.Entities.Import;
 /// <summary>导入批次 — 每次批量导入生成一个批次，审批通过后执行创建</summary>
 public class ImportBatch : AggregateRoot, IHasCompany
 {
-    public Guid CompanyId { get; set; }
-    /// <summary>导入类型标识，如 "HousingUnit"</summary>
-    public string ImportType { get; set; } = string.Empty;
-    /// <summary>原始文件名</summary>
-    public string FileName { get; set; } = string.Empty;
-    public int TotalRows { get; set; }
-    public int ValidRows { get; set; }
-    public int FailedRows { get; set; }
-    /// <summary>PendingApproval | Approved | Rejected</summary>
-    public string Status { get; set; } = "PendingApproval";
-    /// <summary>关联的审批请求 ID</summary>
-    public Guid? ApprovalRequestId { get; set; }
+    public Guid CompanyId { get; private set; }
+    public string ImportType { get; private set; } = string.Empty;
+    public string FileName { get; private set; } = string.Empty;
+    public int TotalRows { get; private set; }
+    public int ValidRows { get; private set; }
+    public int FailedRows { get; private set; }
+    public string Status { get; private set; } = "PendingApproval";
+    public Guid? ApprovalRequestId { get; private set; }
 
-    /// <summary>导入行明细</summary>
-    public List<ImportBatchItem> Items { get; set; } = new();
+    private readonly List<ImportBatchItem> _items = new();
+    public IReadOnlyCollection<ImportBatchItem> Items => _items.AsReadOnly();
 
     private ImportBatch() : base() { }
 
@@ -29,5 +25,37 @@ public class ImportBatch : AggregateRoot, IHasCompany
         ImportType = importType;
         FileName = fileName;
         Status = "PendingApproval";
+    }
+
+    public void AddItem(ImportBatchItem item)
+    {
+        _items.Add(item);
+        TotalRows = _items.Count;
+    }
+
+    public void SetRowCounts(int valid, int failed)
+    {
+        ValidRows = valid;
+        FailedRows = failed;
+    }
+
+    public void Approve()
+    {
+        if (Status != "PendingApproval")
+            throw new InvalidOperationException($"状态为 {Status} 的批次不能审批");
+        Status = "Approved";
+    }
+
+    public void Reject()
+    {
+        if (Status != "PendingApproval")
+            throw new InvalidOperationException($"状态为 {Status} 的批次不能驳回");
+        Status = "Rejected";
+    }
+
+    public void LoadItems(IEnumerable<ImportBatchItem> items) { _items.Clear(); _items.AddRange(items); }
+    public void SetApprovalRequest(Guid? approvalRequestId)
+    {
+        ApprovalRequestId = approvalRequestId;
     }
 }

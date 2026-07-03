@@ -427,7 +427,7 @@ async function submitModifyRent() {
 // === Modify Fee ===
 function showModifyFee(row) {
   modifyFeeTarget.value = row
-  // Mock fee configs for the target contract
+  // 构造调价表单初始数据
   modifyFeeForm.items = [
     { feeName: '房租费', chargeMethod: '固定金额', oldPrice: '¥' + row.rentAmount.toLocaleString(), oldPriceVal: row.rentAmount, newPrice: row.rentAmount },
     { feeName: '水费', chargeMethod: '按表计量', oldPrice: '6.00 元/吨', oldPriceVal: 6.00, newPrice: 6.00 },

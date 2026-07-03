@@ -160,6 +160,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getDebitNote, exportDebitNotePdf } from '../../api/index'
 
 const route = useRoute()
 const router = useRouter()
@@ -169,61 +170,6 @@ const showExportProgress = ref(false)
 const exportProgress = ref(0)
 
 const bill = ref(null)
-
-const defaultItems = [
-  { id: 'i1', feeName: '房租费', amount: 5200, received: 0, description: '月租金 ¥5,200' },
-  { id: 'i2', feeName: '水费', amount: 66, received: 0, description: '11吨 × ¥6/吨' },
-  { id: 'i3', feeName: '电费', amount: 80, received: 0, description: '100度 × ¥0.8/度' },
-  { id: 'i4', feeName: '卫生费', amount: 30, received: 0, description: '月固定 ¥30' },
-  { id: 'i5', feeName: '管理费', amount: 150, received: 0, description: '月固定 ¥150' },
-  { id: 'i6', feeName: '网费', amount: 80, received: 0, description: '月固定 ¥80' }
-]
-
-// Mock bill detail data — b4 is historical, others are current
-const mockBillData = {
-  'b1': {
-    id: 'b1', billNo: 'ZD-202606-00001', contractNo: 'HT-2026-001',
-    tenantName: '张三', roomName: 'A栋-101', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 5460, totalReceived: 5460, status: 'Paid',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false,
-    items: [
-      { id: 'i1', feeName: '房租费', amount: 5000, received: 5000, description: '月租金 ¥5,000' },
-      { id: 'i2', feeName: '水费', amount: 100, received: 100, description: '15吨 × ¥6/吨（读数:1245-1234=11吨，估读补4吨）' },
-      { id: 'i3', feeName: '电费', amount: 200, received: 200, description: '250度 × ¥0.8/度（读数:5678-5500=178度，估读补72度）' },
-      { id: 'i4', feeName: '卫生费', amount: 30, received: 30, description: '月固定 ¥30' },
-      { id: 'i5', feeName: '管理费', amount: 150, received: 150, description: '月固定 ¥150' },
-      { id: 'i6', feeName: '网费', amount: 80, received: 80, description: '月固定 ¥80' }
-    ]
-  },
-  'b2': {
-    id: 'b2', billNo: 'ZD-202606-00002', contractNo: 'HT-2026-002',
-    tenantName: '李四', roomName: 'A栋-102', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 4030, totalReceived: 4000, status: 'Partial',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false,
-    items: [
-      { id: 'i1', feeName: '房租费', amount: 3800, received: 3800, description: '月租金 ¥3,800' },
-      { id: 'i2', feeName: '水费', amount: 80, received: 80, description: '12吨 × ¥6/吨（读数:5234-5222=12吨）' },
-      { id: 'i3', feeName: '电费', amount: 120, received: 120, description: '150度 × ¥0.8/度（读数:3456-3306=150度）' },
-      { id: 'i4', feeName: '卫生费', amount: 30, received: 0, description: '月固定 ¥30' },
-      { id: 'i5', feeName: '管理费', amount: 150, received: 0, description: '月固定 ¥150' },
-      { id: 'i6', feeName: '网费', amount: 80, received: 0, description: '月固定 ¥80' }
-    ]
-  },
-  'b4': {
-    id: 'b4', billNo: 'ZD-202606-00004', contractNo: 'HT-2026-004',
-    tenantName: '赵六', roomName: 'B栋-202', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 6200, totalReceived: 0, status: 'Pending',
-    generatedAt: '2026-06-27 09:15:00', isHistorical: true,
-    items: [
-      { id: 'i1', feeName: '房租费', amount: 5800, received: 0, description: '月租金 ¥5,800（自2026-06-01调价生效）' },
-      { id: 'i2', feeName: '水费', amount: 90, received: 0, description: '15吨 × ¥6/吨（读数:2345-2330=15吨）' },
-      { id: 'i3', feeName: '电费', amount: 160, received: 0, description: '200度 × ¥0.8/度（读数:7890-7690=200度）' },
-      { id: 'i4', feeName: '卫生费', amount: 30, received: 0, description: '月固定 ¥30' },
-      { id: 'i5', feeName: '管理费', amount: 150, received: 0, description: '月固定 ¥150' },
-      { id: 'i6', feeName: '网费', amount: 80, received: 0, description: '月固定 ¥80' }
-    ]
-  }
-}
 
 const amountChinese = computed(() => {
   if (!bill.value) return ''
@@ -260,34 +206,55 @@ function numToChinese(num) {
   return result
 }
 
-onMounted(() => {
+onMounted(async () => {
   const id = route.params.id
-  bill.value = mockBillData[id]
-  if (!bill.value) {
-    // Fallback for unregistered IDs
+  try {
+    const res = await getDebitNote(id)
+    // 映射后端 DebitNote 实体到前端模板格式
     bill.value = {
-      id, billNo: `ZD-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-XXXXX`,
-      contractNo: 'HT-XXXX-XXX', tenantName: '未知', roomName: '未知',
-      period: '2026-06', dueDate: '2026-06-05',
-      totalAmount: defaultItems.reduce((s, i) => s + i.amount, 0),
-      totalReceived: 0, status: 'Pending',
-      generatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      isHistorical: false,
-      items: defaultItems.map((item, idx) => ({ ...item, id: `i${idx + 1}`, received: 0 }))
+      id: res.id,
+      billNo: res.noteNo || res.billNo || '',
+      contractNo: res.contractNo || '',
+      tenantName: res.tenantName || res.tenant?.name || '',
+      roomName: res.roomFullCode || res.roomName || '',
+      period: res.period || '',
+      dueDate: res.dueDate || '',
+      totalAmount: res.totalAmount || 0,
+      totalReceived: res.totalReceived || 0,
+      status: res.status || 'Pending',
+      generatedAt: res.createdAt || '',
+      isHistorical: res.isHistorical || false,
+      items: (res.items || []).map((item, idx) => ({
+        id: item.id || `i${idx + 1}`,
+        feeName: item.feeName || item.feeCodeName || `费用项${idx + 1}`,
+        amount: item.amount || 0,
+        received: item.received || 0,
+        description: item.description || ''
+      }))
     }
+  } catch {
+    ElMessage.error('加载账单详情失败')
   }
 })
 
-function exportPdf() {
+async function exportPdf() {
+  const id = route.params.id
   showExportProgress.value = true
   exportProgress.value = 0
-  const interval = setInterval(() => {
-    exportProgress.value += Math.floor(Math.random() * 25) + 5
-    if (exportProgress.value >= 100) {
-      exportProgress.value = 100
-      clearInterval(interval)
-    }
-  }, 300)
+
+  try {
+    const blob = await exportDebitNotePdf(id)
+    exportProgress.value = 100
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${bill.value?.billNo || 'bill'}.pdf`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error('导出PDF失败')
+    showExportProgress.value = false
+  }
 }
 
 function downloadPdf() {

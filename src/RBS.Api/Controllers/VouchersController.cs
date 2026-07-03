@@ -76,8 +76,28 @@ public class VouchersController : ControllerBase
     }
 
     [HttpPost("{id}/reverse")]
-    public IActionResult Reverse(Guid id, [FromBody] object dto, CancellationToken ct)
+    public async Task<IActionResult> Reverse(Guid id, [FromBody] object dto, CancellationToken ct)
     {
-        return Ok(new { message = "已冲销" });
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var entity = await conn.QuerySingleOrDefaultAsync<Voucher>(
+            _sql.Get("Accounting.Select.Voucher.ById"), new { Id = id });
+        if (entity == null) return NotFound();
+
+        var entries = (await conn.QueryAsync<JournalEntry>(
+            _sql.Get("Accounting.Select.Entry.ByVoucherId"), new { Id = id })).ToList();
+        entity.LoadEntries(entries);
+
+        if (entity.Status.Code != "Posted")
+            return BadRequest(new { message = "只能冲销已过账凭证" });
+
+        entity.Unpost();
+        var now = DateTime.UtcNow;
+        var userId = _currentUser.UserId;
+        await conn.ExecuteAsync(_sql.Get("Accounting.Update.Voucher.Post"),
+            new { Status = entity.Status.Code, UpdatedBy = userId, UpdatedAt = now, Id = id });
+
+        return Ok(new { message = "已冲销（反过账）", id });
+
     }
 }

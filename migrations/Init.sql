@@ -451,6 +451,7 @@ CREATE TABLE [ReceivablePlans] (
     [Received] decimal(18,2) NOT NULL DEFAULT 0.0,
     [DueDate] date NOT NULL,
     [Status] nvarchar(20) NOT NULL DEFAULT N'Pending',
+    [LateFee] decimal(18,2) NOT NULL DEFAULT 0.0,
     [RowVersion] rowversion NOT NULL,
     [CreatedBy] uniqueidentifier NOT NULL,
     [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
@@ -461,6 +462,64 @@ CREATE TABLE [ReceivablePlans] (
     [UpdatedIp] nvarchar(50) NULL,
     [UpdatedHostname] nvarchar(100) NULL,
     CONSTRAINT [PK_ReceivablePlans] PRIMARY KEY ([Id])
+);
+
+CREATE TABLE [BankStatements] (
+    [Id] uniqueidentifier NOT NULL,
+    [CompanyId] uniqueidentifier NOT NULL,
+    [TransactionDate] date NOT NULL,
+    [Amount] decimal(18,2) NOT NULL,
+    [Balance] decimal(18,2) NOT NULL DEFAULT 0.0,
+    [Description] nvarchar(max) NULL,
+    [ReferenceNo] nvarchar(100) NULL,
+    [Counterparty] nvarchar(200) NULL,
+    [Status] nvarchar(20) NOT NULL DEFAULT N'Unmatched',
+    [ImportBatchId] uniqueidentifier NULL,
+    [CreatedBy] uniqueidentifier NOT NULL,
+    [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
+    [CreatedIp] nvarchar(50) NULL,
+    [CreatedHostname] nvarchar(100) NULL,
+    [UpdatedBy] uniqueidentifier NULL,
+    [UpdatedAt] datetime2 NULL,
+    [UpdatedIp] nvarchar(50) NULL,
+    [UpdatedHostname] nvarchar(100) NULL,
+    CONSTRAINT [PK_BankStatements] PRIMARY KEY ([Id])
+);
+
+CREATE TABLE [BankReconciliations] (
+    [Id] uniqueidentifier NOT NULL,
+    [CompanyId] uniqueidentifier NOT NULL,
+    [StartDate] date NOT NULL,
+    [EndDate] date NOT NULL,
+    [Status] nvarchar(20) NOT NULL DEFAULT N'InProgress',
+    [OpeningBalance] decimal(18,2) NOT NULL DEFAULT 0.0,
+    [ClosingBalance] decimal(18,2) NOT NULL DEFAULT 0.0,
+    [StatementTotal] decimal(18,2) NOT NULL DEFAULT 0.0,
+    [SystemTotal] decimal(18,2) NOT NULL DEFAULT 0.0,
+    [CompletedAt] datetime2 NULL,
+    [CreatedBy] uniqueidentifier NOT NULL,
+    [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
+    [CreatedIp] nvarchar(50) NULL,
+    [CreatedHostname] nvarchar(100) NULL,
+    [UpdatedBy] uniqueidentifier NULL,
+    [UpdatedAt] datetime2 NULL,
+    [UpdatedIp] nvarchar(50) NULL,
+    [UpdatedHostname] nvarchar(100) NULL,
+    CONSTRAINT [PK_BankReconciliations] PRIMARY KEY ([Id])
+);
+
+CREATE TABLE [BankMatches] (
+    [Id] uniqueidentifier NOT NULL,
+    [BankStatementId] uniqueidentifier NOT NULL,
+    [InternalDocumentId] uniqueidentifier NOT NULL,
+    [DocumentType] nvarchar(20) NOT NULL DEFAULT N'Receipt',
+    [MatchedAmount] decimal(18,2) NOT NULL DEFAULT 0.0,
+    [MatchMethod] nvarchar(20) NOT NULL DEFAULT N'Manual',
+    [CreatedBy] uniqueidentifier NOT NULL,
+    [CreatedAt] datetime2 NOT NULL DEFAULT (GETUTCDATE()),
+    [CreatedIp] nvarchar(50) NULL,
+    [CreatedHostname] nvarchar(100) NULL,
+    CONSTRAINT [PK_BankMatches] PRIMARY KEY ([Id])
 );
 
 CREATE TABLE [Roles] (

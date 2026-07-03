@@ -18,6 +18,11 @@ public class DebitNoteService : IDebitNoteService
         _pdfGenerator = pdfGenerator;
     }
 
+    public async Task<List<DebitNote>> GetByCompanyAsync(Guid companyId, string? period = null, CancellationToken ct = default)
+    {
+        return await _uow.GetDebitNotesByCompanyAsync(companyId, period, ct);
+    }
+
     public async Task<List<DebitNote>> GetByContractAsync(Guid contractId, CancellationToken ct)
     {
         var all = await _uow.DebitNotes.GetAllAsync(ct);
@@ -48,20 +53,16 @@ public class DebitNoteService : IDebitNoteService
         if (periodPlans.Count == 0)
             throw new InvalidOperationException($"账期 {period} 无应收记录");
 
-        // 2. 查费用名称
-        var feeCodes = await _uow.FeeCodes.GetAllAsync(ct);
-        var feeDict = feeCodes.ToDictionary(f => f.Id, f => f.Name);
 
         // 3. 创建账单
         var noteNo = $"DN-{contract.ContractNo}-{period}";
         var note = new DebitNote(noteNo, contractId, period);
         await _uow.DebitNotes.AddAsync(note, ct);
 
-        decimal total = periodPlans.Sum(p => p.Amount);
+        var total = periodPlans.Sum(p => p.Amount);
+        note.SetTotalAmount(total);
 
         // 4. 使用反射设置 TotalAmount
-        typeof(DebitNote).GetProperty(nameof(DebitNote.TotalAmount))
-            ?.SetValue(note, total);
 
         // 写入 DebitNoteItems
         foreach (var plan in periodPlans)

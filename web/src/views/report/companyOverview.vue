@@ -175,6 +175,7 @@ import { use } from 'echarts/core'
 import { BarChart, LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { getCompanies, getCompanyStats } from '../../api/index'
 
 use([BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer])
 
@@ -198,30 +199,58 @@ function formatMoney(val) {
   return '¥' + Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// 模拟数据
-function getMockData() {
-  return {
-    summary: {
-      companyTotal: 4,
-      buildingTotal: 28,
-      roomTotal: 675,
-      avgOccupancyRate: 85,
-      monthlyReceivable: 1332000,
-      avgCollectionRate: 91
-    },
-    companyStats: [
-      { id: 'ld1', name: '张建国', buildingCount: 8, roomCount: 180, rentedCount: 158, occupancyRate: 88, monthlyReceivable: 520000, monthlyReceived: 479600, collectionRate: 92, overdueAmount: 42000, isActive: true },
-      { id: 'ld2', name: '李春华', buildingCount: 5, roomCount: 120, rentedCount: 98, occupancyRate: 82, monthlyReceivable: 312000, monthlyReceived: 273000, collectionRate: 88, overdueAmount: 58000, isActive: true },
-      { id: 'ld3', name: '王芳投资有限公司', buildingCount: 12, roomCount: 310, rentedCount: 288, occupancyRate: 93, monthlyReceivable: 448000, monthlyReceived: 426000, collectionRate: 95, overdueAmount: 15000, isActive: true },
-      { id: 'ld4', name: '赵德明', buildingCount: 3, roomCount: 65, rentedCount: 51, occupancyRate: 78, monthlyReceivable: 52000, monthlyReceived: 39000, collectionRate: 75, overdueAmount: 8200, isActive: false }
-    ]
-  }
-}
 
-function fetchData() {
-  const data = getMockData()
-  summary.value = data.summary
-  companyStats.value = data.companyStats
+async function fetchData() {
+  try {
+    const res = await getCompanies({ pageSize: 100, isActive: undefined })
+    const companies = res.items || res.data || []
+    let totalBuildingCount = 0
+    let totalRoomCount = 0
+    let totalOccupancyRate = 0
+    let activeCount = 0
+    const statsList = []
+
+    for (const c of companies) {
+      let stats = { buildingCount: 0, roomCount: 0, occupancyRate: 0, collectionRate: 0 }
+      try {
+        stats = await getCompanyStats(c.id)
+      } catch { /* use defaults */ }
+
+      const entry = {
+        id: c.id,
+        name: c.name,
+        buildingCount: stats.buildingCount || c.buildingCount || 0,
+        roomCount: stats.roomCount || c.roomCount || 0,
+        rentedCount: Math.round((stats.roomCount || 0) * (stats.occupancyRate || 0) / 100),
+        occupancyRate: stats.occupancyRate || 0,
+        monthlyReceivable: 0,
+        monthlyReceived: 0,
+        collectionRate: 0,
+        overdueAmount: 0,
+        isActive: c.isActive !== false
+      }
+      statsList.push(entry)
+
+      if (entry.isActive) {
+        totalBuildingCount += entry.buildingCount
+        totalRoomCount += entry.roomCount
+        totalOccupancyRate += entry.occupancyRate
+        activeCount++
+      }
+    }
+
+    companyStats.value = statsList
+    summary.value = {
+      companyTotal: companies.length,
+      buildingTotal: totalBuildingCount,
+      roomTotal: totalRoomCount,
+      avgOccupancyRate: activeCount > 0 ? Math.round(totalOccupancyRate / activeCount) : 0,
+      monthlyReceivable: 0,
+      avgCollectionRate: 0
+    }
+  } catch {
+    ElMessage.error('加载公司总览数据失败')
+  }
 }
 
 // 图表配置

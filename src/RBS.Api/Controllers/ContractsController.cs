@@ -35,12 +35,19 @@ public class ContractsController : ControllerBase
     public async Task<IActionResult> GetAll(
         CancellationToken ct,
         [FromQuery] Guid? companyId = null,
+        [FromQuery] Guid? tenantId = null,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 10,
         [FromQuery] string? keyword = null, [FromQuery] string? status = null)
     {
+        if (tenantId != null)
+        {
+            var result = await _contractService.GetByTenantIdAsync(tenantId.Value, ct);
+            return Ok(new { items = result, total = result.Count });
+        }
+
         if (companyId == null) return Ok(new { items = new List<object>(), total = 0, page = 1, pageSize = 10, totalPages = 0 });
-        var result = await _contractService.GetPagedListAsync(companyId.Value, page, pageSize, keyword, status, ct);
-        return Ok(result);
+        var result2 = await _contractService.GetPagedListAsync(companyId.Value, page, pageSize, keyword, status, ct);
+        return Ok(result2);
     }
 
     [HttpGet("{id}")]

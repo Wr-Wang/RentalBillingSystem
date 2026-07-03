@@ -56,6 +56,8 @@ public interface IUnitOfWork : IDisposable
 
     // 账单
     IRepository<DebitNote> DebitNotes { get; }
+    Task<List<DebitNote>> GetDebitNotesByCompanyAsync(Guid companyId, string? period = null, CancellationToken ct = default);
+    Task<List<DebitNote>> GetDebitNotesByTenantAsync(Guid tenantId, CancellationToken ct = default);
     Task<List<DebitNoteItem>> GetDebitNoteItemsAsync(Guid debitNoteId, CancellationToken ct = default);
 
     // 抄表

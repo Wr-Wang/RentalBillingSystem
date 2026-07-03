@@ -329,20 +329,9 @@ async function fetchList() {
     list.value = res.items || res.data || []
     total.value = res.total ?? list.value.length
   } catch (e) {
-    // 开发阶段使用 mock 数据
-    list.value = getMockCompanies()
-    total.value = list.value.length
+    ElMessage.error('加载公司列表失败：' + (e.response?.data?.message || e.message || '未知错误'))
   }
   loading.value = false
-}
-
-function getMockCompanies() {
-  return [
-    { id: 'ld1', code: 'LD001', name: '张建国', contactPerson: '张建国', contactPhone: '13912345678', buildingCount: 8, roomCount: 180, collectionRate: 92, occupancyRate: 88, isActive: true, idType: 'ID_CARD', idNumber: '310101198001011234', bankName: '中国银行上海分行', bankAccount: '6222001234567890', bankAccountName: '张建国', settlementCycle: 'MONTHLY', settlementDay: 5, commissionRate: 5, address: '上海市浦东新区陆家嘴金融中心A座', remark: '' },
-    { id: 'ld2', code: 'LD002', name: '李春华', contactPerson: '李春华', contactPhone: '13898765432', buildingCount: 5, roomCount: 120, collectionRate: 88, occupancyRate: 82, isActive: true, idType: 'ID_CARD', idNumber: '320102198505152345', bankName: '工商银行南京分行', bankAccount: '6222009876543210', bankAccountName: '李春华', settlementCycle: 'MONTHLY', settlementDay: 10, commissionRate: 8, address: '南京市鼓楼区新街口广场B座', remark: '' },
-    { id: 'ld3', code: 'LD003', name: '王芳投资有限公司', contactPerson: '王芳', contactPhone: '13655556666', buildingCount: 12, roomCount: 310, collectionRate: 96, occupancyRate: 93, isActive: true, idType: 'BUSINESS_LICENSE', idNumber: '91440101MA5XXXXXX', bankName: '建设银行深圳分行', bankAccount: '6222888888888888', bankAccountName: '王芳投资有限公司', settlementCycle: 'QUARTERLY', settlementDay: 15, commissionRate: 3, address: '深圳市南山区科技园C栋', remark: '' },
-    { id: 'ld4', code: 'LD004', name: '赵德明', contactPerson: '赵德明', contactPhone: '13777778888', buildingCount: 3, roomCount: 65, collectionRate: 75, occupancyRate: 78, isActive: false, idType: 'ID_CARD', idNumber: '440301197807081234', bankName: '农业银行广州分行', bankAccount: '6222999999999999', bankAccountName: '赵德明', settlementCycle: 'MONTHLY', settlementDay: 5, commissionRate: 6, address: '广州市天河区珠江新城D栋', remark: '暂停合作' }
-  ]
 }
 
 function openCreate() {
@@ -443,8 +432,7 @@ async function saveUser() {
     ElMessage.success(`登录账号「${userForm.username}」创建成功`)
     showUserDialog.value = false
   } catch (e) {
-    ElMessage.success(`登录账号「${userForm.username}」创建成功`)
-    showUserDialog.value = false
+    ElMessage.error(`创建登录账号失败：${e.response?.data?.message || e.message || '未知错误'}`)
   }
 }
 

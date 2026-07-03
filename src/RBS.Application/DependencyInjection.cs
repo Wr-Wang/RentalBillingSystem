@@ -9,6 +9,7 @@ using RBS.Application.Services.Property;
 using RBS.Application.Services.Approval;
 using RBS.Application.Services.SystemConfig;
 using RBS.Application.Services.Accounting;
+using RBS.Application.Services.Reporting;
 using RBS.Application.Services.Scheduling;
 
 namespace RBS.Application;
@@ -49,9 +50,11 @@ public static class DependencyInjection
         services.AddScoped<IReceivableGenerationService, ReceivableGenerationService>();
         services.AddScoped<IDepositService, DepositService>();
         services.AddScoped<IDebitNoteService, DebitNoteService>();
+        services.AddScoped<IReceiptService, ReceiptService>();
         services.AddScoped<IBankingService, BankingService>();
         services.AddScoped<IContractTimelineService, ContractTimelineService>();
         services.AddScoped<IAutoVoucherService, AutoVoucherService>();
+        services.AddScoped<IReportingService, ReportingService>();
 
         // 定时作业
         services.AddTransient<IScheduledJob, MonthlyFeeBillJob>();

@@ -187,3 +187,34 @@ body {
   font-weight: 600;
   font-size: 16px;
 }
+
+/* 所有表格宽度铺满 + 列自动拉伸填充 */
+.el-table {
+  width: 100% !important;
+}
+
+.el-table__body-wrapper,
+.el-table__header-wrapper {
+  width: 100% !important;
+}
+
+.el-table .cell {
+  white-space: nowrap;
+}
+
+.el-table--fit {
+  width: 100% !important;
+}
+
+/* 表格列自动分布剩余空间 */
+.el-table__body colgroup col:last-child,
+.el-table__header colgroup col:last-child {
+  width: auto !important;
+  min-width: unset !important;
+}
+
+/* 保证 el-table-column 没有 width 时也能拉伸 */
+.el-table__body colgroup col[min-width],
+.el-table__header colgroup col[min-width] {
+  min-width: unset !important;
+}

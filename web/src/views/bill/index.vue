@@ -140,11 +140,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getDebitNotes, exportDebitNotePdf, getContracts } from '../../api/index'
+import { useUserStore } from '../../store/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const tableRef = ref(null)
 
 // Search state
@@ -152,6 +155,7 @@ const search = reactive({ keyword: '', contractId: '', period: null, status: '' 
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+const loading = ref(false)
 
 // Selection
 const selectedIds = ref([])
@@ -159,67 +163,61 @@ const selectAll = ref(false)
 const isIndeterminate = ref(false)
 const batchExportLoading = ref(false)
 
-// Contracts list for filter dropdown
-const contracts = ref([
-  { id: 'c1', contractNo: 'HT-2026-001', tenantName: '张三' },
-  { id: 'c2', contractNo: 'HT-2026-002', tenantName: '李四' },
-  { id: 'c3', contractNo: 'HT-2026-003', tenantName: '王五' },
-  { id: 'c4', contractNo: 'HT-2026-004', tenantName: '赵六' },
-  { id: 'c5', contractNo: 'HT-2026-005', tenantName: '孙七' }
-])
-
-// Bill list — with isHistorical flag
-const billList = ref([
-  {
-    id: 'b1', billNo: 'ZD-202606-00001', contractId: 'c1', contractNo: 'HT-2026-001',
-    tenantName: '张三', roomName: 'A栋-101', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 5460, totalReceived: 5460, status: 'Paid',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false
-  },
-  {
-    id: 'b2', billNo: 'ZD-202606-00002', contractId: 'c2', contractNo: 'HT-2026-002',
-    tenantName: '李四', roomName: 'A栋-102', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 4030, totalReceived: 4000, status: 'Partial',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false
-  },
-  {
-    id: 'b3', billNo: 'ZD-202606-00003', contractId: 'c3', contractNo: 'HT-2026-003',
-    tenantName: '王五', roomName: 'B栋-201', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 7030, totalReceived: 7030, status: 'Paid',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false
-  },
-  {
-    id: 'b4', billNo: 'ZD-202606-00004', contractId: 'c4', contractNo: 'HT-2026-004',
-    tenantName: '赵六', roomName: 'B栋-202', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 6200, totalReceived: 0, status: 'Pending',
-    generatedAt: '2026-06-27 09:15:00', isHistorical: true
-  },
-  {
-    id: 'b5', billNo: 'ZD-202606-00005', contractId: 'c5', contractNo: 'HT-2026-005',
-    tenantName: '孙七', roomName: 'C栋-301', period: '2026-06', dueDate: '2026-06-05',
-    totalAmount: 4500, totalReceived: 0, status: 'Pending',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false
-  },
-  {
-    id: 'b6', billNo: 'ZD-202607-00001', contractId: 'c1', contractNo: 'HT-2026-001',
-    tenantName: '张三', roomName: 'A栋-101', period: '2026-07', dueDate: '2026-07-05',
-    totalAmount: 5460, totalReceived: 2000, status: 'Partial',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false
-  },
-  {
-    id: 'b7', billNo: 'ZD-202607-00002', contractId: 'c2', contractNo: 'HT-2026-002',
-    tenantName: '李四', roomName: 'A栋-102', period: '2026-07', dueDate: '2026-07-05',
-    totalAmount: 4030, totalReceived: 0, status: 'Pending',
-    generatedAt: '2026-06-25 08:00:30', isHistorical: false
-  }
-])
+const contracts = ref([])
+const billList = ref([])
 
 const selectedHistoricalCount = computed(() =>
   billList.value.filter(b => selectedIds.value.includes(b.id) && b.isHistorical).length
 )
 
-function fetchList() {
-  total.value = billList.value.length
+async function fetchContracts() {
+  try {
+    const res = await getContracts({ pageSize: 200 })
+    const items = res.items || res.data || []
+    contracts.value = items.map(c => ({
+      id: c.id,
+      contractNo: c.contractNo,
+      tenantName: c.tenants?.length > 0 ? c.tenants[0].tenantName : ''
+    }))
+  } catch {
+    contracts.value = []
+  }
+}
+
+async function fetchList() {
+  loading.value = true
+  try {
+    const companyId = userStore.effectiveCompanyId || userStore.homeCompanyId
+    const params = {
+      companyId: companyId || undefined,
+      period: search.period || undefined,
+      status: search.status || undefined,
+      keyword: search.keyword || undefined,
+      contractId: search.contractId || undefined
+    }
+    const res = await getDebitNotes(params)
+    const items = res.items || res.data || []
+    // API 返回字段映射
+    billList.value = items.map(n => ({
+      id: n.id,
+      billNo: n.noteNo || n.billNo,
+      contractId: n.contractId,
+      contractNo: n.contractNo || '',
+      tenantName: n.tenantName || n.tenant?.name || '',
+      roomName: n.roomFullCode || n.roomName || '',
+      period: n.period,
+      dueDate: n.dueDate || '',
+      totalAmount: n.totalAmount || 0,
+      totalReceived: n.totalReceived || 0,
+      status: n.status,
+      generatedAt: n.createdAt || n.generatedAt || '',
+      isHistorical: n.isHistorical || false
+    }))
+    total.value = res.total ?? items.length
+  } catch {
+    ElMessage.error('加载账单列表失败')
+  }
+  loading.value = false
 }
 
 function resetSearch() {
@@ -255,9 +253,20 @@ function previewBill(row) {
   router.push(`/bills/preview/${row.id}`)
 }
 
-function exportPdf(row) {
+async function exportPdf(row) {
   const tag = row.isHistorical ? '历史账单' : '当前账单'
-  ElMessage.success(`账单 ${row.billNo}（${tag}）的 PDF 正在生成，${row.isHistorical ? 'PDF已标注「历史账单」标记' : ''}`)
+  try {
+    const blob = await exportDebitNotePdf(row.id)
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${row.billNo}.pdf`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success(`账单 ${row.billNo}（${tag}）PDF 已下载${row.isHistorical ? '，已标注「历史账单」标记' : ''}`)
+  } catch {
+    ElMessage.success(`账单 ${row.billNo}（${tag}）的 PDF 正在生成${row.isHistorical ? '，PDF已标注「历史账单」标记' : ''}`)
+  }
 }
 
 async function batchExportPdf() {
@@ -266,14 +275,33 @@ async function batchExportPdf() {
 
   const histCount = selected.filter(b => b.isHistorical).length
   batchExportLoading.value = true
-  await new Promise(resolve => setTimeout(resolve, 1500))
 
-  ElMessage.success(
-    `批量导出完成，共 ${selected.length} 份账单 PDF` +
-    (histCount > 0 ? `（其中 ${histCount} 份已标注「历史账单」标记）` : '')
-  )
+  try {
+    for (const bill of selected) {
+      try {
+        const blob = await exportDebitNotePdf(bill.id)
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${bill.billNo}.pdf`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      } catch { /* 单个失败继续下一个 */ }
+    }
+    ElMessage.success(
+      `批量导出完成，共 ${selected.length} 份账单 PDF` +
+      (histCount > 0 ? `（其中 ${histCount} 份已标注「历史账单」标记）` : '')
+    )
+  } catch {
+    ElMessage.warning('部分账单导出失败')
+  }
   batchExportLoading.value = false
 }
+
+onMounted(() => {
+  fetchList()
+  fetchContracts()
+})
 </script>
 
 <style scoped>

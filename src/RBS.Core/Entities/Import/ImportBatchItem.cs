@@ -5,22 +5,13 @@ namespace RBS.Core.Entities.Import;
 /// <summary>导入行明细基础实体 — 所有导入类型共用的字段</summary>
 public class ImportBatchItem : AuditableEntity
 {
-    public Guid ImportBatchId { get; set; }
-    /// <summary>鉴别器列，如 "HousingUnit"</summary>
-    public string ImportType { get; set; } = string.Empty;
-    /// <summary>Excel 行号</summary>
-    public int RowIndex { get; set; }
-    /// <summary>格式校验是否通过</summary>
-    public bool IsValid { get; set; }
-    /// <summary>错误码</summary>
-    public string? ErrorCode { get; set; }
-    /// <summary>错误描述</summary>
-    public string? ErrorMessage { get; set; }
-    /// <summary>修正建议</summary>
-    public string? FixSuggestion { get; set; }
-
-    /// <summary>所属批次</summary>
-    public ImportBatch? Batch { get; set; }
+    public Guid ImportBatchId { get; private set; }
+    public string ImportType { get; private set; } = string.Empty;
+    public int RowIndex { get; private set; }
+    public bool IsValid { get; private set; }
+    public string? ErrorCode { get; private set; }
+    public string? ErrorMessage { get; private set; }
+    public string? FixSuggestion { get; private set; }
 
     protected ImportBatchItem() : base() { }
 

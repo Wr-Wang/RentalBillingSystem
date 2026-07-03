@@ -33,6 +33,7 @@ public class CollectionStagesController : ControllerBase
     {
         var entity = await _uow.CollectionStages.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
+        await _uow.CollectionStages.UpdateAsync(dto, ct);
         await _uow.CommitAsync(ct);
         return NoContent();
     }

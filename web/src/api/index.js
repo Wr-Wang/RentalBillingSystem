@@ -107,7 +107,7 @@ export function confirmReceipt(id) { return request({ url: `/receipts/${id}/conf
 export function rejectReceipt(id, data) { return request({ url: `/receipts/${id}/reject`, method: 'put', data }) }
 export function reverseReceipt(id, data) { return request({ url: `/receipts/${id}/reverse`, method: 'post', data }) }
 export function refundReceipt(id, data) { return request({ url: `/receipts/${id}/refund`, method: 'post', data }) }
-export function batchConfirmReceipts(data) { return request({ url: '/receipts/batchconfirm', method: 'post', data }) }
+export function batchConfirmReceipts(data) { return request({ url: '/receipts/batch-confirm', method: 'post', data }) }
 
 // Deposits
 export function getDeposits(params) { return request({ url: '/deposits', method: 'get', params }) }
@@ -117,7 +117,9 @@ export function deductDeposit(data) { return request({ url: '/deposits/deduct', 
 // Collection
 export function getCollectionOverview() { return request({ url: '/collection/overview', method: 'get' }) }
 export function getCollectionStages() { return request({ url: '/collectionstages', method: 'get' }) }
+export function createCollectionStage(data) { return request({ url: '/collectionstages', method: 'post', data }) }
 export function updateCollectionStage(id, data) { return request({ url: `/collectionstages/${id}`, method: 'put', data }) }
+export function deleteCollectionStage(id) { return request({ url: `/collectionstages/${id}`, method: 'delete' }) }
 export function getCollectionRecords(params) { return request({ url: '/collectionrecords', method: 'get', params }) }
 export function manualCollection(data) { return request({ url: '/collectionrecords/manual', method: 'post', data }) }
 
@@ -253,3 +255,9 @@ export function getFloorLevelBands() { return request({ url: '/floorlevelbands',
 export function createFloorLevelBand(data) { return request({ url: '/floorlevelbands', method: 'post', data }) }
 export function updateFloorLevelBand(id, data) { return request({ url: '/floorlevelbands/' + id, method: 'put', data }) }
 export function deleteFloorLevelBand(id) { return request({ url: '/floorlevelbands/' + id, method: 'delete' }) }
+
+// Late Fee Config
+export function getLateFeeConfigs() { return request({ url: '/latefeeconfig', method: 'get' }) }
+export function getActiveLateFeeConfig() { return request({ url: '/latefeeconfig/active', method: 'get' }) }
+export function saveLateFeeConfig(data) { return request({ url: '/latefeeconfig', method: 'post', data }) }
+export function deleteLateFeeConfig(id) { return request({ url: `/latefeeconfig/${id}`, method: 'delete' }) }

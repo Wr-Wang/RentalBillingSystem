@@ -6,19 +6,23 @@
       <el-button type="primary" @click="loadData">查询</el-button>
     </div>
     <el-table :data="items" stripe v-loading="loading" show-summary :summary-method="summary">
-      <el-table-column prop="code" label="科目编码" width="120" />
-      <el-table-column prop="name" label="科目名称" width="200" />
-      <el-table-column prop="direction" label="方向" width="70">
-        <template #default="{ row }">{{ row.direction === 'Debit' ? '借' : '贷' }}</template>
+      <el-table-column label="科目编码" width="120">
+        <template #default="{ row }">{{ row.code }}</template>
       </el-table-column>
-      <el-table-column prop="debitAmount" label="借方发生额" width="150" align="right">
-        <template #default="{ row }">¥{{ row.debitAmount?.toFixed(2) }}</template>
+      <el-table-column label="科目名称" width="200">
+        <template #default="{ row }">{{ row.name }}</template>
       </el-table-column>
-      <el-table-column prop="creditAmount" label="贷方发生额" width="150" align="right">
-        <template #default="{ row }">¥{{ row.creditAmount?.toFixed(2) }}</template>
+      <el-table-column label="方向" width="70">
+        <template #default="{ row }">{{ (row.direction || row.Direction) === 'Debit' ? '借' : '贷' }}</template>
       </el-table-column>
-      <el-table-column prop="balance" label="余额" width="150" align="right">
-        <template #default="{ row }">¥{{ row.balance?.toFixed(2) }}</template>
+      <el-table-column label="借方发生额" width="150" align="right">
+        <template #default="{ row }">¥{{ (row.debitAmount || row.DebitAmount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</template>
+      </el-table-column>
+      <el-table-column label="贷方发生额" width="150" align="right">
+        <template #default="{ row }">¥{{ (row.creditAmount || row.CreditAmount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</template>
+      </el-table-column>
+      <el-table-column label="余额" width="150" align="right">
+        <template #default="{ row }">¥{{ (row.balance || row.Balance || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</template>
       </el-table-column>
     </el-table>
   </div>

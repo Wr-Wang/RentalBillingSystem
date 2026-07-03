@@ -20,10 +20,11 @@ public abstract class AuditableEntity
     protected AuditableEntity()
     {
         Id = Guid.NewGuid();
+        CreatedAt = RBS.Core.Common.ChinaTime.Now;
     }
 
     /// <summary>
-    /// 由 DapperRepository.AddAsync / 领域工厂方法在创建实体时调用
+    /// 由领域工厂方法在创建实体时调用（基础设施层不再自动调用）
     /// </summary>
     public void SetCreated(Guid userId, DateTime utcNow, string? ip, string? hostname)
     {

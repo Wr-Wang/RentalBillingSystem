@@ -7,6 +7,9 @@ namespace RBS.Application.Common.Interfaces;
 /// </summary>
 public interface IDebitNoteService
 {
+    /// <summary>查询指定公司的账单列表</summary>
+    Task<List<DebitNote>> GetByCompanyAsync(Guid companyId, string? period = null, CancellationToken ct = default);
+
     /// <summary>查询指定合同的账单</summary>
     Task<List<DebitNote>> GetByContractAsync(Guid contractId, CancellationToken ct = default);
 

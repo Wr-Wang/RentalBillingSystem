@@ -117,12 +117,28 @@ public class DapperUnitOfWork : IUnitOfWork
         var batch = await multi.ReadSingleOrDefaultAsync<ImportBatch>();
         if (batch != null)
         {
-            batch.Items = (await multi.ReadAsync<ImportBatchItem>()).ToList();
+            batch.LoadItems((await multi.ReadAsync<ImportBatchItem>()).ToList());
         }
         return batch;
     }
     public Task<int> CommitAsync(CancellationToken ct = default) => Task.FromResult(0);
     public Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class => Task.CompletedTask;
+
+    public async Task<List<DebitNote>> GetDebitNotesByCompanyAsync(Guid companyId, string? period = null, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var sqlKey = string.IsNullOrEmpty(period)
+            ? "Billing.Select.DebitNote.ByCompany"
+            : "Billing.Select.DebitNote.ByPeriodCompany";
+        var param = new { CompanyId = companyId, Period = period ?? "" };
+        return (await conn.QueryAsync<DebitNote>(_sql.Get(sqlKey), param)).ToList();
+    }
+
+    public async Task<List<DebitNote>> GetDebitNotesByTenantAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        return (await conn.QueryAsync<DebitNote>(_sql.Get("Billing.Select.DebitNote.ByTenantId"), new { TenantId = tenantId })).ToList();
+    }
 
     public async Task<List<DebitNoteItem>> GetDebitNoteItemsAsync(Guid debitNoteId, CancellationToken ct = default)
     {

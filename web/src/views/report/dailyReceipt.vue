@@ -2,46 +2,91 @@
   <div>
     <div class="page-header">
       <h2>收款日报</h2>
+      <el-button @click="loadData"><el-icon><Refresh /></el-icon>刷新</el-button>
     </div>
 
     <div class="search-bar">
-      <el-date-picker v-model="searchDate" type="date" placeholder="选择日期" />
-      <el-button type="primary">查询</el-button>
-      <el-button><el-icon><Download /></el-icon>导出</el-button>
+      <el-date-picker v-model="searchDate" type="date" placeholder="选择日期" @change="loadData" />
+      <el-button type="primary" @click="loadData">查询</el-button>
     </div>
 
     <div class="stat-cards">
-      <div class="stat-card"><div class="label">收款笔数</div><div class="value">12</div></div>
-      <div class="stat-card"><div class="label">收款总额</div><div class="value" style="color: #67c23a;">¥85,600</div></div>
-      <div class="stat-card"><div class="label">银行转账</div><div class="value" style="color: #409eff;">¥65,200</div></div>
-      <div class="stat-card"><div class="label">支付宝/微信</div><div class="value" style="color: #409eff;">¥20,400</div></div>
+      <div class="stat-card"><div class="label">收款笔数</div><div class="value">{{ stats.count }}</div></div>
+      <div class="stat-card"><div class="label">收款总额</div><div class="value" style="color: #67c23a;">¥{{ formatMoney(stats.total) }}</div></div>
+      <div class="stat-card"><div class="label">已确认</div><div class="value" style="color: #409eff;">¥{{ formatMoney(stats.confirmed) }}</div></div>
+      <div class="stat-card"><div class="label">待确认</div><div class="value" style="color: #e6a23c;">¥{{ formatMoney(stats.pending) }}</div></div>
     </div>
 
     <el-card>
-      <el-table :data="dailyList" stripe>
-        <el-table-column prop="receiptNo" label="收据号" width="160" />
-        <el-table-column prop="contractNo" label="合同号" width="120" />
-        <el-table-column prop="tenantName" label="租客" width="100" />
-        <el-table-column prop="amount" label="金额" width="110">
-          <template #default="{ row }">¥{{ row.amount?.toLocaleString() }}</template>
+      <template #header>按状态汇总</template>
+      <el-table :data="detailsList" v-loading="loading" stripe style="width:100%">
+        <el-table-column label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'Confirmed' ? 'success' : 'warning'" size="small">
+              {{ row.status === 'Confirmed' ? '已确认' : '待确认' }}
+            </el-tag>
+          </template>
         </el-table-column>
-        <el-table-column prop="channelName" label="支付方式" width="100" />
-        <el-table-column prop="status" label="状态" width="90">
-          <template #default="{ row }"><el-tag :type="row.status === 'Confirmed' ? 'success' : 'warning'" size="small">{{ row.status === 'Confirmed' ? '已确认' : '待确认' }}</el-tag></template>
+        <el-table-column label="笔数" prop="cnt" width="80" />
+        <el-table-column label="金额" min-width="150">
+          <template #default="{ row }">¥{{ (row.total || 0).toLocaleString() }}</template>
         </el-table-column>
-        <el-table-column prop="receivedTime" label="收款时间" width="150" />
       </el-table>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getDailyReceipt } from '@/api'
 
 const searchDate = ref(new Date())
-const dailyList = ref([
-  { receiptNo: 'SJ-20260627-001', contractNo: 'HT-2026-001', tenantName: '张三', amount: 5460, channelName: '银行转账', status: 'Confirmed', receivedTime: '2026-06-27 09:15' },
-  { receiptNo: 'SJ-20260627-002', contractNo: 'HT-2026-005', tenantName: '孙七', amount: 4500, channelName: '支付宝', status: 'PendingConfirm', receivedTime: '2026-06-27 10:30' },
-  { receiptNo: 'SJ-20260627-003', contractNo: 'HT-2026-008', tenantName: '周八', amount: 8200, channelName: '银行转账', status: 'Confirmed', receivedTime: '2026-06-27 11:00' }
-])
+const loading = ref(false)
+const detailsList = ref([])
+const stats = reactive({ count: 0, total: 0, confirmed: 0, pending: 0 })
+
+function formatMoney(v) { return (v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }
+
+async function loadData() {
+  loading.value = true
+  try {
+    const d = searchDate.value || new Date()
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const res = await getDailyReceipt({ date })
+    // 后端返回 { date, details: [{ status, cnt, total }] }
+    const items = res?.details || []
+    detailsList.value = Array.isArray(items) ? items.map(item => ({
+      status: item.status || 'Pending',
+      cnt: item.cnt || 0,
+      total: item.total || 0
+    })) : []
+
+    stats.count = detailsList.value.reduce((s, r) => s + r.cnt, 0)
+    stats.total = detailsList.value.reduce((s, r) => s + r.total, 0)
+    stats.confirmed = detailsList.value.filter(r => r.status === 'Confirmed').reduce((s, r) => s + r.total, 0)
+    stats.pending = detailsList.value.filter(r => r.status !== 'Confirmed').reduce((s, r) => s + r.total, 0)
+  } catch {
+    ElMessage.error('加载收款日报失败')
+  }
+  loading.value = false
+}
+
+onMounted(loadData)
 </script>
+
+<style scoped>
+.stat-cards {
+  display: flex; gap: 16px; margin-bottom: 16px;
+}
+.stat-card {
+  flex: 1; background: #fff; border-radius: 8px; padding: 20px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.stat-card .label {
+  font-size: 13px; color: #909399; margin-bottom: 8px;
+}
+.stat-card .value {
+  font-size: 28px; font-weight: 700;
+  color: #303133;
+}
+</style>

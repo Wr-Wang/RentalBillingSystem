@@ -17,5 +17,6 @@ public class DebitNote : AuditableEntity
         if (string.IsNullOrWhiteSpace(noteNo)) throw new ArgumentException("账单编号不能为空", nameof(noteNo));
         NoteNo = noteNo; ContractId = contractId; Period = period;
     }
+    public void SetTotalAmount(decimal total) { TotalAmount = total; }
     public void LoadItems(IEnumerable<DebitNoteItem> items) { _items.Clear(); _items.AddRange(items); }
 }

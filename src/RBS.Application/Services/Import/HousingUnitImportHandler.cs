@@ -42,24 +42,29 @@ public partial class HousingUnitImportHandler : IImportTypeHandler
 
     public ImportBatchItem ParseAndValidate(Guid importBatchId, int rowIndex, JsonElement data, ImportValidationContext context)
     {
-        var item = new ImportBatchItemHousingUnit(importBatchId, rowIndex)
-        {
-            BuildingName = data.GetStringOrNull("buildingName") ?? "",
-            BuildingCode = data.GetStringOrNull("buildingCode"),
-            BuildingAddress = data.GetStringOrNull("buildingAddress"),
-            FloorName = data.GetStringOrNull("floorName") ?? "",
-            FloorSortOrder = ExtractFloorSortOrder(data.GetStringOrNull("floorName") ?? ""),
-            UnitNo = data.GetStringOrNull("unitNo") ?? "",
-            FullCode = data.GetStringOrNull("fullCode"),
-            RoomTypeName = data.GetStringOrNull("roomTypeName"),
-            Area = data.GetDecimalOrNull("area"),
-            Orientation = data.GetStringOrNull("orientation"),
-        };
+        var item = new ImportBatchItemHousingUnit(importBatchId, rowIndex);
+        item.SetBuildingInfo(
+            data.GetStringOrNull("buildingName") ?? "",
+            data.GetStringOrNull("buildingCode"),
+            data.GetStringOrNull("buildingAddress")
+        );
+        item.SetRoomInfo(
+            data.GetStringOrNull("floorName") ?? "",
+            ExtractFloorSortOrder(data.GetStringOrNull("floorName") ?? ""),
+            data.GetStringOrNull("unitNo") ?? "",
+            data.GetStringOrNull("fullCode")
+        );
+        item.SetPropertyInfo(
+            null,
+            data.GetStringOrNull("roomTypeName"),
+            data.GetDecimalOrNull("area"),
+            data.GetStringOrNull("orientation")
+        );
 
         // 自动生成 FullCode
         if (string.IsNullOrEmpty(item.FullCode) && !string.IsNullOrEmpty(item.BuildingName))
         {
-            item.FullCode = $"{item.BuildingName}-{item.FloorName}-{item.UnitNo}";
+            item.SetRoomInfo(item.FloorName, item.FloorSortOrder, item.UnitNo, $"{item.BuildingName}-{item.FloorName}-{item.UnitNo}");
         }
 
         // ===== 开始 9 项校验 =====
@@ -86,7 +91,7 @@ public partial class HousingUnitImportHandler : IImportTypeHandler
         {
             if (roomTypeMap.TryGetValue(item.RoomTypeName, out var matchedId))
             {
-                item.RoomTypeId = matchedId;
+                item.SetPropertyInfo(matchedId, item.RoomTypeName, item.Area, item.Orientation);
             }
             else
             {
@@ -139,7 +144,7 @@ public partial class HousingUnitImportHandler : IImportTypeHandler
     {
         if (item.FloorSortOrder == null || item.FloorSortOrder <= 0)
         {
-            item.PriceWarning = $"楼层「{item.FloorName}」格式无法识别（未能提取楼层数字），租金未设置";
+            item.SetPricingInfo(item.BaseRentAmount, $"楼层「{item.FloorName}」格式无法识别（未能提取楼层数字），租金未设置");
             return;
         }
 
@@ -149,7 +154,7 @@ public partial class HousingUnitImportHandler : IImportTypeHandler
 
         if (band == null)
         {
-            item.PriceWarning = $"楼层「{item.FloorName}」超出所有楼层分级范围，租金未设置";
+            item.SetPricingInfo(item.BaseRentAmount, $"楼层「{item.FloorName}」超出所有楼层分级范围，租金未设置");
             return;
         }
 
@@ -160,11 +165,11 @@ public partial class HousingUnitImportHandler : IImportTypeHandler
 
         if (pricing != null)
         {
-            item.BaseRentAmount = pricing.RentAmount;
+            item.SetPricingInfo(pricing.RentAmount, item.PriceWarning);
         }
         else
         {
-            item.PriceWarning = $"房型「{item.RoomTypeName}」在{band.Name}无匹配定价标准，租金未设置";
+            item.SetPricingInfo(item.BaseRentAmount, $"房型「{item.RoomTypeName}」在{band.Name}无匹配定价标准，租金未设置");
         }
     }
 

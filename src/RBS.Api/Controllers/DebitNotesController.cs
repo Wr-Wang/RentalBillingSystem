@@ -14,11 +14,31 @@ public class DebitNotesController : ControllerBase
     public DebitNotesController(IDebitNoteService debitNoteService) => _debitNoteService = debitNoteService;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? contractId, CancellationToken ct)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] Guid? companyId,
+        [FromQuery] Guid? contractId,
+        [FromQuery] string? period,
+        [FromQuery] string? status,
+        CancellationToken ct)
     {
-        if (contractId == null) return Ok(new List<object>());
-        var notes = await _debitNoteService.GetByContractAsync(contractId.Value, ct);
-        return Ok(notes);
+        // 按公司查询（主列表）
+        if (companyId != null)
+        {
+            var notes = await _debitNoteService.GetByCompanyAsync(companyId.Value, period, ct);
+            // 按状态过滤（前端）
+            if (!string.IsNullOrEmpty(status) && status != "All")
+                notes = notes.Where(n => n.Status == status).ToList();
+            return Ok(new { items = notes, total = notes.Count });
+        }
+
+        // 按合同查询（旧接口，兼容）
+        if (contractId != null)
+        {
+            var notes = await _debitNoteService.GetByContractAsync(contractId.Value, ct);
+            return Ok(notes);
+        }
+
+        return Ok(new { items = new List<object>(), total = 0 });
     }
 
     [HttpGet("{id}")]

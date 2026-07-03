@@ -17,22 +17,20 @@
     <el-card v-show="step === 0">
       <template #header>选择房屋</template>
       <div class="search-bar">
-        <el-input v-model="roomSearch" placeholder="搜索房间号/地址" clearable style="width: 200px;" />
-        <el-select v-model="selectedBuilding" placeholder="选择座楼" clearable style="width: 140px;">
-          <el-option label="A栋" value="A" />
-          <el-option label="B栋" value="B" />
-          <el-option label="C栋" value="C" />
-        </el-select>
+        <el-input v-model="roomSearch" placeholder="搜索房间号" clearable style="width: 200px;" />
+        <el-button type="primary" @click="loadRooms">查询</el-button>
       </div>
-      <el-table :data="availableRooms" stripe @row-click="selectRoom" highlight-current-row>
+      <el-table :data="filteredRooms" v-loading="roomsLoading" stripe @row-click="selectRoom" highlight-current-row>
         <el-table-column type="selection" width="50" />
         <el-table-column prop="fullCode" label="房间编号" />
         <el-table-column prop="buildingName" label="座楼" />
         <el-table-column prop="roomNo" label="房间号" />
         <el-table-column prop="roomTypeName" label="房型" />
-        <el-table-column prop="area" label="面积(m²)" />
-        <el-table-column prop="standardRent" label="标准租金">
-          <template #default="{ row }">¥{{ row.standardRent?.toLocaleString() }}</template>
+        <el-table-column label="面积(m²)">
+          <template #default="{ row }">{{ row.area || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="标准租金">
+          <template #default="{ row }">¥{{ (row.standardRent || 0).toLocaleString() }}</template>
         </el-table-column>
       </el-table>
       <div style="text-align: right; margin-top: 16px;">
@@ -44,13 +42,14 @@
     <el-card v-show="step === 1">
       <template #header>选择租客</template>
       <div class="search-bar">
-        <el-input v-model="tenantSearch" placeholder="搜索租客姓名/电话" clearable style="width: 220px;" />
+        <el-input v-model="tenantSearch" placeholder="搜索租客姓名/电话" clearable style="width: 220px;" @keyup.enter="loadTenants" />
+        <el-button type="primary" @click="loadTenants">查询</el-button>
         <el-button @click="showNewTenant = true">新增租客</el-button>
       </div>
-      <el-table :data="tenantList" stripe @row-click="selectTenant" highlight-current-row>
+      <el-table :data="filteredTenants" v-loading="tenantsLoading" stripe @row-click="selectTenant" highlight-current-row>
         <el-table-column type="selection" width="50" />
         <el-table-column prop="name" label="姓名" />
-        <el-table-column prop="identityNo" label="身份证号" />
+        <el-table-column prop="idCard" label="身份证号" />
         <el-table-column prop="phone" label="电话" />
       </el-table>
       <div style="text-align: right; margin-top: 16px;">
@@ -107,13 +106,8 @@
             <span v-if="row.chargeMethod === '按表计量'" style="margin-left: 8px;">{{ row.unit }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="初始读数" v-if="hasMeterBased">
-          <template #default="{ row }">
-            <el-input-number v-if="row.chargeMethod === '按表计量'" v-model="row.initialReading" :min="0" :precision="2" style="width: 120px;" />
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="80">
-          <template #default="{ row, $index }">
+          <template #default="{ row }">
             <el-switch v-model="row.enabled" />
           </template>
         </el-table-column>
@@ -138,7 +132,7 @@
 
       <el-table :data="feeConfigs.filter(f => f.enabled)" stripe style="margin-top: 16px;">
         <el-table-column prop="feeName" label="收费项目" />
-        <el-table-column prop="unitPrice" label="金额/单价">
+        <el-table-column label="金额/单价">
           <template #default="{ row }">{{ row.chargeMethod === '固定金额' ? '¥' + row.unitPrice : row.unitPrice }}</template>
         </el-table-column>
         <el-table-column prop="chargeMethod" label="计费方式" />
@@ -159,7 +153,7 @@
           <el-input v-model="newTenantForm.name" />
         </el-form-item>
         <el-form-item label="身份证号">
-          <el-input v-model="newTenantForm.identityNo" />
+          <el-input v-model="newTenantForm.idCard" />
         </el-form-item>
         <el-form-item label="电话">
           <el-input v-model="newTenantForm.phone" />
@@ -167,7 +161,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showNewTenant = false">取消</el-button>
-        <el-button type="primary" @click="addNewTenant">确定</el-button>
+        <el-button type="primary" :loading="creatingTenant" @click="addNewTenant">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -177,31 +171,28 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/store/user'
+import { getHousingUnits, getTenants, getFeeCodes, createTenant, createContract } from '@/api'
 
 const router = useRouter()
+const userStore = useUserStore()
 const step = ref(0)
 const submitting = ref(false)
+const creatingTenant = ref(false)
 
 const roomSearch = ref('')
 const tenantSearch = ref('')
-const selectedBuilding = ref('')
 const selectedRoom = ref(null)
 const selectedTenant = ref(null)
 const showNewTenant = ref(false)
+const roomsLoading = ref(false)
+const tenantsLoading = ref(false)
 
-const newTenantForm = reactive({ name: '', identityNo: '', phone: '' })
+const newTenantForm = reactive({ name: '', idCard: '', phone: '' })
 
-const availableRooms = ref([
-  { id: 'r1', fullCode: 'A-1-101', buildingName: 'A栋', roomNo: '101', roomTypeName: '两室一厅', area: 85, standardRent: 5200 },
-  { id: 'r2', fullCode: 'A-1-102', buildingName: 'A栋', roomNo: '102', roomTypeName: '一室一厅', area: 55, standardRent: 3800 },
-  { id: 'r3', fullCode: 'B-1-101', buildingName: 'B栋', roomNo: '101', roomTypeName: '两室一厅', area: 88, standardRent: 5000 }
-])
-
-const tenantList = ref([
-  { id: 't1', name: '张三', identityNo: '110101199001011234', phone: '13800138001' },
-  { id: 't2', name: '李四', identityNo: '110101199002021235', phone: '13800138002' },
-  { id: 't3', name: '王五', identityNo: '110101199003031236', phone: '13800138003' }
-])
+const allRooms = ref([])
+const allTenants = ref([])
+const feeCodesList = ref([])
 
 const contractForm = reactive({
   rentAmount: 0, depositAmount: 0,
@@ -209,34 +200,140 @@ const contractForm = reactive({
   allowDepositAsLastRent: false
 })
 
-const feeConfigs = ref([
-  { feeName: '房租费', chargeMethod: '固定金额', unitPrice: 5200, unit: '', enabled: true, initialReading: 0 },
-  { feeName: '水费', chargeMethod: '按表计量', unitPrice: 6.00, unit: '元/吨', enabled: true, initialReading: 0 },
-  { feeName: '电费', chargeMethod: '按表计量', unitPrice: 0.80, unit: '元/度', enabled: true, initialReading: 0 },
-  { feeName: '卫生费', chargeMethod: '固定金额', unitPrice: 30, unit: '', enabled: true, initialReading: 0 },
-  { feeName: '管理费', chargeMethod: '固定金额', unitPrice: 150, unit: '', enabled: true, initialReading: 0 },
-  { feeName: '燃气费', chargeMethod: '按表计量', unitPrice: 3.50, unit: '元/方', enabled: true, initialReading: 0 },
-  { feeName: '网费', chargeMethod: '固定金额', unitPrice: 80, unit: '', enabled: true, initialReading: 0 },
-  { feeName: '电视费', chargeMethod: '固定金额', unitPrice: 25, unit: '', enabled: false, initialReading: 0 }
-])
+const feeConfigs = ref([])
 
-const hasMeterBased = computed(() => feeConfigs.value.some(f => f.chargeMethod === '按表计量' && f.enabled))
+const filteredRooms = computed(() => {
+  let list = allRooms.value
+  if (roomSearch.value) {
+    const kw = roomSearch.value.toLowerCase()
+    list = list.filter(r => (r.fullCode || '').toLowerCase().includes(kw))
+  }
+  return list
+})
+
+const filteredTenants = computed(() => {
+  let list = allTenants.value
+  if (tenantSearch.value) {
+    const kw = tenantSearch.value.toLowerCase()
+    list = list.filter(t => (t.name || '').toLowerCase().includes(kw) || (t.phone || '').includes(kw))
+  }
+  return list
+})
+
+async function loadRooms() {
+  roomsLoading.value = true
+  try {
+    const res = await getHousingUnits({ pageSize: 500 })
+    const items = res.items || res.data || res || []
+    allRooms.value = items.filter(u => u.unitType === 'Room').map(u => ({
+      id: u.id,
+      fullCode: u.fullCode || u.name || '',
+      buildingName: u.buildingName || '',
+      roomNo: u.roomNo || '',
+      roomTypeName: u.roomTypeName || '',
+      area: u.area || 0,
+      standardRent: u.standardRent || u.rentAmount || 0
+    }))
+  } catch { ElMessage.error('加载房屋数据失败') }
+  roomsLoading.value = false
+}
+
+async function loadTenants() {
+  tenantsLoading.value = true
+  try {
+    const res = await getTenants({ keyword: tenantSearch.value || undefined })
+    const items = Array.isArray(res) ? res : (res.items || res.data || res || [])
+    allTenants.value = items.map(t => ({
+      id: t.id,
+      name: t.name || '',
+      idCard: t.idCard || '',
+      phone: t.phone || ''
+    }))
+  } catch { /* 静默 */ }
+  tenantsLoading.value = false
+}
+
+async function loadFeeCodes() {
+  try {
+    const res = await getFeeCodes({})
+    const items = Array.isArray(res) ? res : (res.items || res.data || res || [])
+    feeCodesList.value = items
+    // 初始化费用配置
+    feeConfigs.value = items.map(fc => ({
+      feeCodeId: fc.id,
+      feeName: fc.name || fc.feeName || '未知',
+      chargeMethod: fc.chargeMethod || (fc.isMeterBased ? '按表计量' : '固定金额'),
+      unitPrice: fc.defaultPrice || 0,
+      unit: fc.unit || '',
+      enabled: true
+    }))
+  } catch { /* 静默 */ }
+}
 
 function selectRoom(row) { selectedRoom.value = row; contractForm.rentAmount = row.standardRent }
 function selectTenant(row) { selectedTenant.value = row }
 
-function addNewTenant() {
-  tenantList.value.push({ id: 't' + Date.now(), ...newTenantForm })
-  ElMessage.success('租客已添加')
-  showNewTenant.value = false
+async function addNewTenant() {
+  if (!newTenantForm.name) { ElMessage.warning('请输入姓名'); return }
+  const companyId = userStore.effectiveCompanyId || userStore.homeCompanyId
+  if (!companyId) { ElMessage.warning('请先选择公司'); return }
+  creatingTenant.value = true
+  try {
+    const res = await createTenant({
+      name: newTenantForm.name,
+      idCard: newTenantForm.idCard || undefined,
+      phone: newTenantForm.phone || undefined,
+      companyId
+    })
+    allTenants.value.push({
+      id: res.id,
+      name: res.name,
+      idCard: res.idCard || '',
+      phone: res.phone || ''
+    })
+    ElMessage.success('租客已创建')
+    showNewTenant.value = false
+    newTenantForm.name = ''; newTenantForm.idCard = ''; newTenantForm.phone = ''
+  } catch { ElMessage.error('创建租客失败') }
+  creatingTenant.value = false
 }
 
-function submitContract() {
+async function submitContract() {
+  if (!selectedRoom.value || !selectedTenant.value) { ElMessage.warning('请完成所有步骤'); return }
+  const companyId = userStore.effectiveCompanyId || userStore.homeCompanyId
+  if (!companyId) { ElMessage.warning('请先选择公司'); return }
+
   submitting.value = true
-  setTimeout(() => {
-    submitting.value = false
+  try {
+    const enabledFees = feeConfigs.value.filter(f => f.enabled)
+    await createContract({
+      roomId: selectedRoom.value.id,
+      tenantIds: [selectedTenant.value.id],
+      companyId,
+      rentAmount: contractForm.rentAmount,
+      depositAmount: contractForm.depositAmount,
+      startDate: contractForm.startDate,
+      endDate: contractForm.endDate,
+      paymentCycle: 'MONTHLY',
+      allowDepositAsLastRent: contractForm.allowDepositAsLastRent,
+      feeConfigs: enabledFees.map(f => ({
+        feeCodeId: f.feeCodeId,
+        unitPrice: f.unitPrice,
+        chargeMethod: f.chargeMethod,
+        isMeterBased: f.chargeMethod === '按表计量'
+      }))
+    })
     ElMessage.success('合同创建成功，已提交审批')
     router.push('/contracts')
-  }, 1000)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '创建合同失败')
+  }
+  submitting.value = false
 }
+
+onMounted(() => {
+  loadRooms()
+  loadTenants()
+  loadFeeCodes()
+})
 </script>

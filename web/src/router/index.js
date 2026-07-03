@@ -272,7 +272,7 @@ const routes = [
       },
       // 续签看板
       {
-        path: 'renewal-dashboard',
+        path: 'renewaldashboard',
         name: 'RenewalDashboard',
         component: () => import('../views/renewal/dashboard.vue'),
         meta: { title: '待续签看板', icon: 'RefreshRight', roles: ['Admin', 'OpsSupervisor', 'DeptManager'] }
@@ -332,7 +332,7 @@ const routes = [
       { path: 'confirm', redirect: '/receipts/confirm', meta: { hidden: true } },
       { path: 'config', redirect: '/collection/config', meta: { hidden: true } },
       { path: 'records', redirect: '/collection/records', meta: { hidden: true } },
-      { path: 'my-requests', redirect: '/approvals/myrequests', meta: { hidden: true } },
+      { path: 'myrequests', redirect: '/approvals/myrequests', meta: { hidden: true } },
       { path: 'history', redirect: '/approvals/history', meta: { hidden: true } },
       { path: 'subjects', redirect: '/accounting/subjects', meta: { hidden: true } },
       { path: 'journal', redirect: '/accounting/journal', meta: { hidden: true } },

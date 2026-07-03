@@ -101,9 +101,8 @@ public class ImportService : IImportService
             await _uow.ImportBatchItems.AddAsync(item, ct);
         }
 
-        batch.TotalRows = request.Items.Count;
-        batch.ValidRows = validCount;
-        batch.FailedRows = failures.Count;
+        batch.SetRowCounts(request.Items.Count, 0); // TotalRows
+        batch.SetRowCounts(validCount, failures.Count);
 
         // 5. 如果有有效行 → 提交审批
         Guid? approvalRequestId = null;
@@ -120,7 +119,7 @@ public class ImportService : IImportService
             }, ct);
 
             approvalRequestId = submitResult?.Id;
-            batch.ApprovalRequestId = approvalRequestId;
+            batch.SetApprovalRequest(approvalRequestId);
         }
 
         await _uow.CommitAsync(ct);
@@ -145,8 +144,8 @@ public class ImportService : IImportService
 
         var created = await handler.ExecuteAsync(batch, ct);
 
-        batch.Status = "Approved";
-        batch.ValidRows = created;
+        batch.Approve();
+        batch.SetRowCounts(created, 0);
 
         await _uow.CommitAsync(ct);
     }

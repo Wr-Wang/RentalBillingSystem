@@ -54,7 +54,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     var batch = await _uow.ImportBatches.GetByIdAsync(@event.TargetEntityId, ct);
                     if (batch != null && batch.Status == "PendingApproval")
                     {
-                        batch.Status = "Rejected";
+                        batch.Reject();
                         await _uow.CommitAsync(ct);
                     }
                 }
