@@ -214,8 +214,38 @@ async function confirmClearRange() {
   } catch (e) { /* cancelled */ }
 }
 
-function handleExport() {
-  ElMessage.info('导出功能开发中')
+async function handleExport() {
+  try {
+    const params = { page: 1, pageSize: 10000 }
+    if (filter.method) params.method = filter.method
+    if (filter.path) params.path = filter.path
+    if (filter.statusCode) params.statusCode = parseInt(filter.statusCode)
+    if (filter.startDate) params.startDate = filter.startDate
+    if (filter.endDate) params.endDate = filter.endDate
+    const res = await getApiLogs(params)
+    const items = res.items || res || []
+    if (items.length === 0) {
+      ElMessage.warning('没有可导出的数据')
+      return
+    }
+    // CSV 导出（BOM for Excel 中文兼容）
+    const headers = ['方法', '路径', '状态码', '耗时(ms)', 'IP', '用户', '时间']
+    const rows = items.map(l => [
+      l.httpMethod || '', l.path || '', l.statusCode || '', l.durationMs || '',
+      l.ipAddress || '', l.userDisplayName || '', l.createdAt || ''
+    ])
+    const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n')
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `API日志_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success(`导出成功，共 ${items.length} 条`)
+  } catch {
+    ElMessage.error('导出失败')
+  }
 }
 
 function formatJson(str) {

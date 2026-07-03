@@ -140,6 +140,26 @@ async function loadData() {
     todoList.value = items.length > 0 ? items : [{ type: '提示', tagType: 'info', content: '暂无待办事项', date: today }]
   } catch {}
   finally { todoLoading.value = false }
+  // 近7日收款趋势
+  await loadDailyTrend()
+}
+
+async function loadDailyTrend() {
+  const data = []
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date()
+    dt.setDate(dt.getDate() - i)
+    const dateStr = dt.toISOString().slice(0, 10)
+    try {
+      const dr = await getDailyReceipt({ date: dateStr })
+      const details = dr.details || dr || []
+      const total = details.reduce((s, r) => s + (r.total || 0), 0)
+      data.push(total)
+    } catch {
+      data.push(0)
+    }
+  }
+  trendData.value = data
 }
 
 function handleAction(row) {
@@ -162,7 +182,7 @@ const trendOption = computed(() => ({
   grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true }
 }))
 const trendLabels = computed(() => { const d = []; for (let i = 6; i >= 0; i--) { const dt = new Date(); dt.setDate(dt.getDate() - i); d.push(`${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`) }; return d })
-const trendData = computed(() => [0, 0, 0, 0, 0, 0, 0])
+const trendData = ref([0, 0, 0, 0, 0, 0, 0])
 
 onMounted(loadData)
 </script>

@@ -164,6 +164,38 @@
             </el-timeline-item>
           </el-timeline>
         </el-tab-pane>
+
+        <!-------- 2d. Change Requests ------>
+        <el-tab-pane label="变更请求" name="changeRequests">
+          <div style="margin-bottom:12px;display:flex;gap:8px;">
+            <el-button type="primary" size="small" @click="showNewChangeRequest = true">新建变更请求</el-button>
+          </div>
+          <el-table :data="changeRequestList" stripe v-loading="crLoading" style="width:100%;">
+            <el-table-column label="变更类型" width="120">
+              <template #default="{ row }">
+                {{ {RENT_ADJUST:'租金调整',FEE_ADJUST:'费用调价',TERMS_MODIFY:'条款修改',OTHER:'其他'}[row.changeType] || row.changeType }}
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'Approved' ? 'success' : row.status === 'Rejected' ? 'danger' : row.status === 'PendingApproval' ? 'warning' : 'info'" size="small">
+                  {{ row.statusLabel || row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="reason" label="原因" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="effectiveDate" label="生效日期" width="110" />
+            <el-table-column label="提交时间" width="160">
+              <template #default="{ row }">{{ row.createdAt?.split('T')[0] || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="{ row }">
+                <el-button v-if="row.status === 'Draft'" text size="small" type="primary" :loading="row._submitting" @click="handleSubmitCR(row)">提交审批</el-button>
+                <el-button v-else text size="small" type="primary" @click="showCRDetail(row)">详情</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
 
@@ -509,6 +541,15 @@
       </template>
     </el-dialog>
 
+    <!-- Change Request Dialog -->
+    <ChangeRequestDialog
+      :contract-id="contract.id"
+      :contract="contract"
+      :visible="showNewChangeRequest"
+      @close="showNewChangeRequest = false"
+      @submitted="onCRSubmitted"
+    />
+
     <!-- Suspend Confirm -->
     <el-dialog v-model="showSuspend" title="暂停合同" width="400px">
       <p>暂停期间将不生成新的应收计划。确定暂停合同 <strong>{{ contract.contractNo }}</strong> 吗？</p>
@@ -529,7 +570,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, terminateContract, renewContract, suspendContract, resumeContract, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations } from '@/api/index.js'
+import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getChangeRequests } from '@/api/index.js'
+import ChangeRequestDialog from './ChangeRequestDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -641,7 +683,10 @@ async function fetchContract() {
   }
 }
 
-onMounted(fetchContract)
+onMounted(() => {
+  fetchContract()
+  fetchChangeRequests()
+})
 
 const isActive = computed(() => contract.value.status === 'Active')
 
@@ -1199,6 +1244,43 @@ async function generateReceivables() {
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '生成应收失败')
   }
+}
+
+// ================================================================
+// Change Requests
+// ================================================================
+const changeRequestList = ref([])
+const crLoading = ref(false)
+const showNewChangeRequest = ref(false)
+
+async function fetchChangeRequests() {
+  crLoading.value = true
+  try {
+    const res = await getChangeRequests({ contractId: route.params.id })
+    changeRequestList.value = Array.isArray(res) ? res : []
+  } catch { /* silent */ }
+  crLoading.value = false
+}
+
+function onCRSubmitted() {
+  showNewChangeRequest.value = false
+  fetchChangeRequests()
+}
+
+async function handleSubmitCR(row) {
+  row._submitting = true
+  try {
+    const res = await submitChangeRequest(row.id)
+    ElMessage.success('已提交审批')
+    fetchChangeRequests()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '提交失败')
+  }
+  row._submitting = false
+}
+
+function showCRDetail(row) {
+  ElMessage.info(`审批请求ID: ${row.approvalRequestId || '暂无'}`)
 }
 </script>
 <style scoped>

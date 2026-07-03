@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<IContractTimelineService, ContractTimelineService>();
         services.AddScoped<IAutoVoucherService, AutoVoucherService>();
         services.AddScoped<IReportingService, ReportingService>();
+        services.AddScoped<IChangeRequestService, ChangeRequestAppService>();
 
         // 定时作业
         services.AddTransient<IScheduledJob, MonthlyFeeBillJob>();

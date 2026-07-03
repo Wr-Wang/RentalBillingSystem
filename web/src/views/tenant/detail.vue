@@ -40,6 +40,27 @@
         暂无关联合同
       </div>
     </el-card>
+
+    <el-card v-if="billHistory.length > 0" style="margin-bottom: 16px;">
+      <template #header>账单历史</template>
+      <el-table :data="billHistory" stripe>
+        <el-table-column prop="period" label="账期" width="100" />
+        <el-table-column label="金额" width="120">
+          <template #default="{ row }">¥{{ (row.totalAmount || 0).toLocaleString() }}</template>
+        </el-table-column>
+        <el-table-column label="已付" width="120">
+          <template #default="{ row }">¥{{ (row.paidAmount || 0).toLocaleString() }}</template>
+        </el-table-column>
+        <el-table-column prop="dueDate" label="到期日" width="110" />
+        <el-table-column label="状态" width="80">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'Paid' ? 'success' : row.status === 'Overdue' ? 'danger' : 'warning'" size="small">
+              {{ row.status === 'Paid' ? '已付清' : row.status === 'Overdue' ? '逾期' : '待收' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -56,6 +77,7 @@ const tenant = ref({
 })
 const currentContracts = ref([])
 const contractsLoading = ref(false)
+const billHistory = ref([])
 
 const statusLabelMap = {
   Draft: '草稿', PendingApproval: '待审批', Active: '活跃',

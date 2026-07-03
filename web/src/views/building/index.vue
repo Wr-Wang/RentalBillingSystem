@@ -303,7 +303,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getHousingUnits, getHousingUnitTree, getHousingUnitStats,
@@ -313,6 +313,7 @@ import {
 import { useUserStore } from '../../store/user'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 // ==================== State ====================
@@ -523,6 +524,12 @@ async function handleDelete(row) {
 onMounted(async () => {
   await Promise.all([fetchBuildingList(), fetchUnitTree(), fetchRoomTypes(), fetchStats()])
   await fetchUnits()
+  // 从编辑导航进入时，自动打开编辑对话框
+  if (route.query.editId) {
+    const unit = roomList.value.find(u => u.id === route.query.editId)
+    if (unit) openEdit(unit)
+    router.replace({ query: { ...route.query, editId: undefined } })
+  }
 })
 </script>
 

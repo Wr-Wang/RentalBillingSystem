@@ -31,6 +31,54 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _notificationService = notificationService;
     }
 
+    /// <summary>
+    /// 审批通过后，将变更请求的 items 逐条应用到合同上
+    /// </summary>
+    private async Task ApplyChangeRequestAsync(RBS.Core.Entities.Contract.ChangeRequest changeRequest, CancellationToken ct)
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(changeRequest.ContractId, ct);
+        if (contract == null) return;
+
+        foreach (var item in changeRequest.Items)
+        {
+            switch (item.TargetType)
+            {
+                case "Contract":
+                    if (item.FieldName == "RentAmount")
+                    {
+                        var amount = item.NewValueDecimal ??
+                            (decimal.TryParse(item.NewValue, out var parsed) ? parsed : 0);
+                        if (amount > 0)
+                        {
+                            contract.SetRentAmount(amount);
+                            await _uow.Contracts.UpdateAsync(contract, ct);
+                        }
+                    }
+                    break;
+
+                case "ContractFeeConfig":
+                    if (item.TargetId.HasValue && item.NewValueDecimal.HasValue)
+                    {
+                        var expiryStr = changeRequest.EffectiveDate?.ToString("yyyy-MM-dd") ??
+                            DateTime.UtcNow.ToString("yyyy-MM-dd");
+                        // 到期停用旧配置
+                        await _uow.ExecuteSqlRawAsync(
+                            "UPDATE ContractFeeConfigs SET ExpiryDate = @ExpiryDate, IsActive = 0, UpdatedAt = GETUTCDATE() WHERE Id = @Id AND IsActive = 1",
+                            new object[] { expiryStr, item.TargetId.Value }, ct);
+                        // 复制旧配置并创建新版本（保留原有 FeeCodeId 和 BillingMode）
+                        await _uow.ExecuteSqlRawAsync(
+                            "INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt) " +
+                            "SELECT NEWID(), @ContractId, FeeCodeId, @NewAmount, BillingMode, 1, @EffectiveDate, NULL, @CreatedBy, GETUTCDATE() " +
+                            "FROM ContractFeeConfigs WHERE Id = @OldId",
+                            new object[] { changeRequest.ContractId, item.NewValueDecimal.Value, expiryStr,
+                                _uow is not null ? contract.CreatedBy : Guid.Empty, item.TargetId.Value }, ct);
+                    }
+                    break;
+            }
+        }
+        await _uow.CommitAsync(ct);
+    }
+
     public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         // 1. 业务回调
@@ -101,6 +149,28 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                         await _uow.ExecuteSqlRawAsync(
                             "UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = GETUTCDATE() WHERE Id = @Id AND Status = 'PendingApproval'",
                             new object[] { renewal.Id }, ct);
+                    }
+                }
+                break;
+
+            case "ChangeRequest":
+                if (@event.Action == "Approved")
+                {
+                    var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
+                    if (changeRequest != null)
+                    {
+                        changeRequest.Approve();
+                        await _uow.CommitAsync(ct);
+                        await ApplyChangeRequestAsync(changeRequest, ct);
+                    }
+                }
+                else if (@event.Action == "Rejected")
+                {
+                    var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
+                    if (changeRequest != null)
+                    {
+                        changeRequest.Reject();
+                        await _uow.CommitAsync(ct);
                     }
                 }
                 break;

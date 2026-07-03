@@ -261,3 +261,9 @@ export function getLateFeeConfigs() { return request({ url: '/latefeeconfig', me
 export function getActiveLateFeeConfig() { return request({ url: '/latefeeconfig/active', method: 'get' }) }
 export function saveLateFeeConfig(data) { return request({ url: '/latefeeconfig', method: 'post', data }) }
 export function deleteLateFeeConfig(id) { return request({ url: `/latefeeconfig/${id}`, method: 'delete' }) }
+
+// Change Requests
+export function getChangeRequests(params) { return request({ url: '/changerequests', method: 'get', params }) }
+export function getChangeRequest(id) { return request({ url: `/changerequests/${id}`, method: 'get' }) }
+export function createChangeRequest(data) { return request({ url: '/changerequests', method: 'post', data }) }
+export function submitChangeRequest(id) { return request({ url: `/changerequests/${id}/submit`, method: 'post' }) }

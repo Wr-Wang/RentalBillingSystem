@@ -147,6 +147,7 @@ import { useNotificationStore } from '../store/notification'
 import router from '../router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bell } from '@element-plus/icons-vue'
+import { changePassword as apiChangePassword } from '@/api'
 
 const userStore = useUserStore()
 const appStore = useAppStore()
@@ -225,14 +226,22 @@ function saveProfile() {
   showProfile.value = false
 }
 
-function changePassword() {
+async function changePassword() {
   if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
     ElMessage.error('两次密码不一致')
     return
   }
-  ElMessage.success('密码修改成功')
-  showChangePassword.value = false
-  passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+  try {
+    await apiChangePassword({
+      oldPassword: passwordForm.value.oldPassword,
+      newPassword: passwordForm.value.newPassword
+    })
+    ElMessage.success('密码修改成功')
+    showChangePassword.value = false
+    passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '密码修改失败')
+  }
 }
 </script>
 

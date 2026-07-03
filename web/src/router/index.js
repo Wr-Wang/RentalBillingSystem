@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import RouteView from '../layout/RouteView.vue'
 
+import NotFound from '../views/error/NotFound.vue'
+
 const routes = [
   // Redirect helper（用于视角切换时强制刷新页面）
   {
@@ -453,7 +455,9 @@ const routes = [
         ]
       }
     ]
-  }
+  },
+  // 404 catch-all
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound, meta: { title: '页面不存在', hidden: true } }
 ]
 
 const router = createRouter({

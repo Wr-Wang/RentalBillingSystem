@@ -88,5 +88,14 @@ IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1
 INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
 VALUES ('F2111111-1111-1111-1111-111111111013','F1111111-1111-1111-1111-111111111006',2,@R_DeptMgr,5000,99999999,@Cid,@SysUserId,@Now);
 
+-- 合同变更请求：1级（运营主管）
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CHANGE_REQUEST')
+INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+VALUES ('F1111111-1111-1111-1111-111111111008',N'合同变更','CHANGE_REQUEST',N'合同信息变更请求需要审批',1,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1111111-1111-1111-1111-111111111008' AND [Level] = 1)
+INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+VALUES ('F2111111-1111-1111-1111-111111111014','F1111111-1111-1111-1111-111111111008',1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
+
 PRINT N'审批类型及级别数据初始化完成！';
 GO

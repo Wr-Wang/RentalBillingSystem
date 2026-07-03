@@ -62,6 +62,14 @@ VALUES
 ('F2111111-1111-1111-1111-111111111010','F1111111-1111-1111-1111-111111111005',2,@DeptMgr,NULL,NULL,@Cid,@Sys,@Now),
 ('F2111111-1111-1111-1111-111111111011','F1111111-1111-1111-1111-111111111005',3,@GenMgr,NULL,NULL,@Cid,@Sys,@Now);
 
+-- 合同变更请求
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CHANGE_REQUEST')
+INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+VALUES ('F1111111-1111-1111-1111-111111111008',N'合同变更','CHANGE_REQUEST',N'合同信息变更请求需要审批',1,@Cid,@Sys,@Now);
+IF NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = 'F1111111-1111-1111-1111-111111111008' AND [Level] = 1)
+INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+VALUES ('F2111111-1111-1111-1111-111111111014','F1111111-1111-1111-1111-111111111008',1,@OpsSup,NULL,NULL,@Cid,@Sys,@Now);
+
 -- 验证
 SELECT t.Name AS 审批类型, t.Code, COUNT(l.Id) AS 级别数
 FROM ApprovalTypes t LEFT JOIN ApprovalLevelConfigs l ON l.ApprovalTypeId = t.Id

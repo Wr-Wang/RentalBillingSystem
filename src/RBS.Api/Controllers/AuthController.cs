@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using RBS.Core.Interfaces.Services;
 using UserEntity = RBS.Core.Entities.Organization.User;
 using RBS.Core.Interfaces.UnitOfWork;
 
@@ -15,14 +16,18 @@ public class AuthController : ControllerBase
 {
     private readonly IConfiguration _configuration;
     private readonly IUnitOfWork _uow;
+    private readonly ICurrentUserService _currentUser;
 
-    public AuthController(IConfiguration configuration, IUnitOfWork uow)
+    public AuthController(IConfiguration configuration, IUnitOfWork uow, ICurrentUserService currentUser)
     {
         _configuration = configuration;
         _uow = uow;
+        _currentUser = currentUser;
     }
 
     public record LoginRequest(string Username, string Password);
+
+    public record ChangePasswordRequest(string OldPassword, string NewPassword);
 
     /// <summary>
     /// 用户登录 — 验证凭据并返回 JWT Token
@@ -96,6 +101,35 @@ public class AuthController : ControllerBase
             Roles = roles.Select(r => new { r.Id, r.Name, r.Code }),
             Permissions = permissions
         });
+    }
+
+    /// <summary>
+    /// 修改当前用户密码
+    /// </summary>
+    [HttpPost("changepassword")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.OldPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { message = "参数不能为空" });
+
+        if (request.OldPassword == request.NewPassword)
+            return BadRequest(new { message = "新密码不能与旧密码相同" });
+
+        var userId = _currentUser.UserId;
+        var user = await _uow.Users.GetByIdAsync(userId, ct);
+        if (user == null)
+            return NotFound(new { message = "用户不存在" });
+
+        // TODO: 使用 BCrypt 验证密码
+        if (user.PasswordHash != request.OldPassword)
+            return BadRequest(new { message = "原密码不正确" });
+
+        user.ChangePassword(request.NewPassword);
+        await _uow.Users.UpdateAsync(user, ct);
+        await _uow.CommitAsync(ct);
+
+        return Ok(new { message = "密码修改成功" });
     }
 
     private string GenerateJwtToken(UserEntity user)

@@ -1,90 +1,76 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RBS.Core.Entities.Contract;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Contract;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
 
 [ApiController]
-[Route("api/change-requests")]
+[Route("api/changerequests")]
 [Authorize]
 public class ChangeRequestsController : ControllerBase
 {
+    private readonly IChangeRequestService _service;
+    private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _uow;
-    public ChangeRequestsController(IUnitOfWork uow) => _uow = uow;
+
+    public ChangeRequestsController(
+        IChangeRequestService service,
+        ICurrentUserService currentUser,
+        IUnitOfWork uow)
+    {
+        _service = service;
+        _currentUser = currentUser;
+        _uow = uow;
+    }
 
     /// <summary>获取指定合同的变更请求列表</summary>
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractId, CancellationToken ct)
     {
-        var all = await _uow.ChangeRequests.GetAllAsync(ct);
-        if (contractId.HasValue)
-            all = all.Where(c => c.ContractId == contractId.Value).ToList();
-        return Ok(all.OrderByDescending(c => c.CreatedAt));
+        if (!contractId.HasValue)
+            return Ok(Array.Empty<ChangeRequestDto>());
+
+        var result = await _service.GetByContractAsync(contractId.Value, ct);
+        return Ok(result);
     }
 
-    /// <summary>创建合同变更请求</summary>
+    /// <summary>获取变更请求详情</summary>
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
+    {
+        var result = await _service.GetByIdAsync(id, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
+    /// <summary>创建变更请求</summary>
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateChangeRequest request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateChangeRequestDto request, CancellationToken ct)
     {
         if (request.ContractId == Guid.Empty || string.IsNullOrEmpty(request.ChangeType))
             return BadRequest(new { message = "参数错误" });
 
-        var entity = new ChangeRequest(request.ContractId, request.CompanyId, request.ChangeType, request.Reason);
-        if (request.EffectiveDate.HasValue)
-            entity.SetEffectiveDate(request.EffectiveDate.Value);
-
-        if (request.Items?.Count > 0)
-        {
-            foreach (var item in request.Items)
-            {
-                entity.AddItem(item.TargetType, item.TargetId, item.FieldName,
-                    item.OldValue, item.NewValue, item.OldValueDecimal, item.NewValueDecimal);
-            }
-        }
-
-        await _uow.ChangeRequests.AddAsync(entity, ct);
-        await _uow.CommitAsync(ct);
-        return Ok(entity);
+        var userId = _currentUser.UserId;
+        var result = await _service.CreateAsync(request, userId, ct);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     /// <summary>提交变更审批</summary>
     [HttpPost("{id}/submit")]
     public async Task<IActionResult> Submit(Guid id, CancellationToken ct)
     {
-        var entity = await _uow.ChangeRequests.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-
+        var userId = _currentUser.UserId;
         try
         {
-            entity.SubmitForApproval();
-            await _uow.CommitAsync(ct);
-            return Ok(new { message = "已提交审批", id = entity.Id, status = entity.Status });
+            var result = await _service.SubmitAsync(id, userId, ct);
+            return Ok(new { message = "已提交审批", id = result.Id, status = result.Status, approvalRequestId = result.ApprovalRequestId });
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
     }
-}
-
-public class CreateChangeRequest
-{
-    public Guid ContractId { get; set; }
-    public Guid CompanyId { get; set; }
-    public string ChangeType { get; set; } = "";
-    public string? Reason { get; set; }
-    public DateOnly? EffectiveDate { get; set; }
-    public List<ChangeRequestItemDto>? Items { get; set; }
-}
-
-public class ChangeRequestItemDto
-{
-    public string TargetType { get; set; } = "";
-    public Guid? TargetId { get; set; }
-    public string FieldName { get; set; } = "";
-    public string? OldValue { get; set; }
-    public string NewValue { get; set; } = "";
-    public decimal? OldValueDecimal { get; set; }
-    public decimal? NewValueDecimal { get; set; }
 }
