@@ -129,7 +129,7 @@ public class UserService : IUserService
         };
 
         var roles = (await conn.QueryAsync(
-            "SELECT ur.RoleId, r.Name FROM UserRoles ur LEFT JOIN Roles r ON r.Id = ur.RoleId WHERE ur.UserId = @UserId",
+            _sql.Get("Identity.Select.UserRoles.ByUserId"),
             new { UserId = user.Id })).ToList();
         foreach (var row in roles)
         {
@@ -141,7 +141,7 @@ public class UserService : IUserService
         if (user.HomeCompanyId.HasValue)
         {
             dto.HomeCompanyName = await conn.QuerySingleOrDefaultAsync<string>(
-                "SELECT Name FROM Companies WHERE Id = @Id", new { Id = user.HomeCompanyId.Value });
+                _sql.Get("Organization.Select.Company.NameById"), new { Id = user.HomeCompanyId.Value });
         }
 
         return dto;

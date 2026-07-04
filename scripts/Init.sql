@@ -244,6 +244,58 @@ GO
 GO
 
 -- ===================================================================
+-- 8a. ApprovalBizData - 审批业务数据表（合同操作闭环）
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ApprovalBizData]'))
+CREATE TABLE [ApprovalBizData] (
+    [Id] uniqueidentifier NOT NULL,
+    [ApprovalRequestId] uniqueidentifier NULL,
+    [ContractId] uniqueidentifier NOT NULL,
+    [ContractNo] nvarchar(100) NULL,
+    [CompanyId] uniqueidentifier NOT NULL,
+    [ChangeType] nvarchar(30) NOT NULL,
+    [EffectiveDate] date NULL,
+    [OldAmount] decimal(18,2) NULL,
+    [NewAmount] decimal(18,2) NULL,
+    [Reason] nvarchar(500) NULL,
+    [TerminateType] nvarchar(20) NULL,
+    [ActualEndDate] date NULL,
+    [DepositReturn] nvarchar(20) NULL,
+    [IsProcessed] bit NOT NULL DEFAULT 0,
+    [ProcessedAt] datetime2 NULL,
+    [CreatedBy] uniqueidentifier NOT NULL,
+    [CreatedAt] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+    [UpdatedBy] uniqueidentifier NULL,
+    [UpdatedAt] datetime2 NULL,
+    CONSTRAINT [PK_ApprovalBizData] PRIMARY KEY ([Id])
+);
+CREATE UNIQUE INDEX [IX_ApprovalBizData_ApprovalRequestId]
+    ON [ApprovalBizData]([ApprovalRequestId]) WHERE [ApprovalRequestId] IS NOT NULL;
+CREATE INDEX [IX_ApprovalBizData_ContractId] ON [ApprovalBizData]([ContractId]);
+GO
+
+-- ===================================================================
+-- 8b. ApprovalFeeItems - 审批调价明细表（合同操作闭环）
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ApprovalFeeItems]'))
+CREATE TABLE [ApprovalFeeItems] (
+    [Id] uniqueidentifier NOT NULL,
+    [ApprovalRequestId] uniqueidentifier NOT NULL,
+    [ContractId] uniqueidentifier NOT NULL,
+    [FeeCodeId] uniqueidentifier NOT NULL,
+    [FeeName] nvarchar(100) NOT NULL,
+    [OldAmount] decimal(18,2) NOT NULL,
+    [NewAmount] decimal(18,2) NOT NULL,
+    [BillingMode] nvarchar(20) NOT NULL,
+    [Unit] nvarchar(20) NULL,
+    [CreatedBy] uniqueidentifier NOT NULL,
+    [CreatedAt] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT [PK_ApprovalFeeItems] PRIMARY KEY ([Id])
+);
+CREATE INDEX [IX_ApprovalFeeItems_ApprovalRequestId] ON [ApprovalFeeItems]([ApprovalRequestId]);
+GO
+
+-- ===================================================================
 -- 8. ApprovalRequests - 审批申请表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ApprovalRequests]'))

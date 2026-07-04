@@ -45,7 +45,7 @@ public class ReceiptService : IReceiptService
 
         using var conn = _db.CreateConnection(); conn.Open();
         var allocRows = await conn.QueryAsync(
-            "SELECT ReceivablePlanId, Amount FROM ReceiptAllocations WHERE ReceiptId=@Id",
+            _sql.Get("Billing.Select.ReceiptAllocation.ByReceiptId"),
             new { Id = id });
 
         foreach (var row in allocRows)

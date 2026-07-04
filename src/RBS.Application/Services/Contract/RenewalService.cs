@@ -38,13 +38,8 @@ public class RenewalService : IRenewalService
         using var conn = _db.CreateConnection();
         conn.Open();
 
-        var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(@"
-            SELECT c.Id, c.ContractNo, c.RentAmount, c.DepositAmount,
-                   c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.RenewalCount,
-                   r.FullCode AS RoomFullCode
-            FROM Contracts c
-            LEFT JOIN HousingUnits r ON r.Id = c.RoomId
-            WHERE c.Id = @Id", new { Id = contractId });
+        var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            _sql.Get("Lease.Select.Contract.RenewalPreview"), new { Id = contractId });
 
         if (contract == null)
             throw new KeyNotFoundException("合同不存在");
@@ -62,26 +57,18 @@ public class RenewalService : IRenewalService
         };
 
         // 查租客
-        var tenants = await conn.QueryAsync<RenewalInheritedTenantDto>(@"
-            SELECT ct.TenantId, t.Name AS TenantName, ct.IsPrimary
-            FROM ContractTenants ct
-            INNER JOIN Tenants t ON t.Id = ct.TenantId
-            WHERE ct.ContractId = @Id", new { Id = contractId });
+        var tenants = await conn.QueryAsync<RenewalInheritedTenantDto>(
+            _sql.Get("Lease.Select.ContractTenant.WithNameByContract"), new { Id = contractId });
         dto.Tenants = tenants.ToList();
 
         // 查费用配置
-        var fees = await conn.QueryAsync<RenewalInheritedFeeDto>(@"
-            SELECT cf.FeeCodeId, fc.Name AS FeeName, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice
-            FROM ContractFeeConfigs cf
-            LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
-            WHERE cf.ContractId = @Id AND cf.IsActive = 1", new { Id = contractId });
+        var fees = await conn.QueryAsync<RenewalInheritedFeeDto>(
+            _sql.Get("Lease.Select.ContractFeeConfig.ActiveWithFeeName"), new { Id = contractId });
         dto.FeeConfigs = fees.ToList();
 
         // 欠费检查
-        var outstanding = await conn.QuerySingleAsync<decimal>(@"
-            SELECT ISNULL(SUM(rp.Amount - rp.Received), 0)
-            FROM ReceivablePlans rp
-            WHERE rp.ContractId = @Id AND rp.Status IN ('Pending', 'Partial', 'Overdue')",
+        var outstanding = await conn.QuerySingleAsync<decimal>(
+            _sql.Get("Billing.Select.ReceivablePlan.OutstandingByContract"),
             new { Id = contractId });
         dto.Checks.PaymentStatus = new PaymentStatusDto
         {
@@ -90,9 +77,8 @@ public class RenewalService : IRenewalService
         };
 
         // 并发检查
-        var hasPending = await conn.QuerySingleAsync<int>(@"
-            SELECT COUNT(1) FROM ApprovalRequests
-            WHERE ContractId = @Id AND Status = 'Pending'",
+        var hasPending = await conn.QuerySingleAsync<int>(
+            _sql.Get("Approval.Select.Request.PendingByContractId"),
             new { Id = contractId });
         dto.Checks.ConcurrentApprovals = new ConcurrentApprovalsDto
         {
@@ -101,9 +87,8 @@ public class RenewalService : IRenewalService
         };
 
         // 重复续签检查：是否已有合同指向本合同（PreviousContractId = 本合同Id）
-        var renewedInfo = await conn.QuerySingleOrDefaultAsync<dynamic>(@"
-            SELECT c.Id, c.ContractNo FROM Contracts c
-            WHERE c.PreviousContractId = @Id",
+        var renewedInfo = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            _sql.Get("Lease.Select.Contract.ByPreviousContractId"),
             new { Id = contractId });
         if (renewedInfo != null)
         {
@@ -164,7 +149,7 @@ public class RenewalService : IRenewalService
         {
             checkConn.Open();
             var existing = await checkConn.QuerySingleOrDefaultAsync<dynamic>(
-                "SELECT Id, ContractNo FROM Contracts WHERE PreviousContractId = @Id",
+                _sql.Get("Lease.Select.Contract.ByPreviousContractId"),
                 new { Id = request.ContractId });
             if (existing != null)
                 throw new InvalidOperationException($"该合同已被续签（新合同号：{existing.ContractNo}），不可再次续签");
@@ -174,10 +159,8 @@ public class RenewalService : IRenewalService
         using (var conn = _db.CreateConnection())
         {
             conn.Open();
-            var outstanding = await conn.QuerySingleAsync<decimal>(@"
-                SELECT ISNULL(SUM(rp.Amount - rp.Received), 0)
-                FROM ReceivablePlans rp
-                WHERE rp.ContractId = @Id AND rp.Status IN ('Pending', 'Partial', 'Overdue')",
+            var outstanding = await conn.QuerySingleAsync<decimal>(
+                _sql.Get("Billing.Select.ReceivablePlan.OutstandingByContract"),
                 new { Id = request.ContractId });
 
             if (outstanding > 0)
@@ -247,9 +230,8 @@ public class RenewalService : IRenewalService
         using (var updateConn = _db.CreateConnection())
         {
             updateConn.Open();
-            await updateConn.ExecuteAsync(@"
-                INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
-                VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)",
+            await updateConn.ExecuteAsync(
+                _sql.Get("Lease.Insert.RenewalRequest.ApprovalRecord"),
                 new
                 {
                     firstRecord.Id, ApprovalRequestId = approvalRequest.Id,
@@ -259,12 +241,12 @@ public class RenewalService : IRenewalService
 
             // 更新状态
             await updateConn.ExecuteAsync(
-                "UPDATE ApprovalRequests SET Status = @Status, ContractId = @ContractId WHERE Id = @Id",
+                _sql.Get("Lease.Update.ApprovalRequest.StatusAndContract"),
                 new { approvalRequest.Status, ContractId = oldContract.Id, approvalRequest.Id });
 
             // 更新 RenewalRequest 状态
             await updateConn.ExecuteAsync(
-                "UPDATE RenewalRequests SET Status = 'PendingApproval' WHERE Id = @Id",
+                _sql.Get("Lease.Update.RenewalRequest.SetPendingApproval"),
                 new { renewal.Id });
         }
 
@@ -302,7 +284,7 @@ public class RenewalService : IRenewalService
 
             // 1. 乐观锁：原子性地标记 RenewalRequest 防止重复执行
             var locked = await conn.ExecuteAsync(
-                "UPDATE RenewalRequests SET Status = 'Executing', UpdatedAt = @Now WHERE Id = @Id AND Status = 'PendingApproval'",
+                _sql.Get("Lease.Update.RenewalRequest.LockExecuting"),
                 new { renewal.Id, Now = now }, tx);
             if (locked == 0)
                 throw new InvalidOperationException("续签请求已被其他操作处理，请刷新后重试");
@@ -313,14 +295,14 @@ public class RenewalService : IRenewalService
             {
                 // 已到期合同 → 标记 Renewed（终态）
                 affected = await conn.ExecuteAsync(
-                    "UPDATE Contracts SET Status = 'Renewed' WHERE Id = @Id AND Status = 'Expired'",
+                    _sql.Get("Lease.Update.Contract.RenewedGuard"),
                     new { Id = renewal.OldContractId }, tx);
             }
             else
             {
                 // 未到期合同 → 继续保持 Active，只校验状态未被修改
                 affected = await conn.ExecuteAsync(
-                    "UPDATE Contracts SET Status = 'Active' WHERE Id = @Id AND Status = 'Active'",
+                    _sql.Get("Lease.Update.Contract.ActiveGuard"),
                     new { Id = renewal.OldContractId }, tx);
             }
             if (affected == 0)
@@ -339,13 +321,8 @@ public class RenewalService : IRenewalService
 
             var startDate = oldContract.EndDate.AddDays(1);
 
-            await conn.ExecuteAsync(@"
-                INSERT INTO Contracts (Id, ContractNo, RoomId, RentAmount, DepositAmount, StartDate, EndDate, PaymentCycle, Status, CompanyId,
-                    PreviousContractId, RenewalCount, OriginalContractId, MarketPriceAtRenewal,
-                    CreatedBy, CreatedAt)
-                VALUES (@Id, @ContractNo, @RoomId, @RentAmount, @DepositAmount, @StartDate, @EndDate, @PaymentCycle, 'Active', @CompanyId,
-                    @PreviousContractId, @RenewalCount, @OriginalContractId, @MarketPrice,
-                    @CreatedBy, @CreatedAt)",
+            await conn.ExecuteAsync(
+                _sql.Get("Lease.Insert.Contract.FromRenewal"),
                 new
                 {
                     Id = newId, ContractNo = renewal.ContractNo,
@@ -362,14 +339,13 @@ public class RenewalService : IRenewalService
 
             // 3. 复制租客
             var tenants = await conn.QueryAsync<dynamic>(
-                "SELECT TenantId, IsPrimary FROM ContractTenants WHERE ContractId = @Id",
+                _sql.Get("Lease.Select.ContractTenant.PrimaryByContract"),
                 new { Id = renewal.OldContractId }, tx);
 
             foreach (var t in tenants)
             {
-                await conn.ExecuteAsync(@"
-                    INSERT INTO ContractTenants (Id, ContractId, TenantId, IsPrimary, CreatedBy, CreatedAt)
-                    VALUES (@Id, @ContractId, @TenantId, @IsPrimary, @CreatedBy, @CreatedAt)",
+                await conn.ExecuteAsync(
+                    _sql.Get("Lease.Insert.ContractTenant.Default"),
                     new { Id = Guid.NewGuid(), ContractId = newId, t.TenantId, t.IsPrimary, CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
             }
 
@@ -390,9 +366,8 @@ public class RenewalService : IRenewalService
             if (renewal.DepositHandling == "TRANSFER")
             {
                 // 原押金转移
-                await conn.ExecuteAsync(@"
-                    INSERT INTO DepositLogs (Id, ContractId, Amount, Balance, Action, Remark, CreatedBy, CreatedAt)
-                    VALUES (@Id, @ContractId, @Amount, @Balance, @Action, @Remark, @CreatedBy, @CreatedAt)",
+                await conn.ExecuteAsync(
+                    _sql.Get("Lease.Insert.DepositLog.Default"),
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = renewal.OldContractId,
@@ -401,9 +376,8 @@ public class RenewalService : IRenewalService
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
 
-                await conn.ExecuteAsync(@"
-                    INSERT INTO DepositLogs (Id, ContractId, Amount, Balance, Action, Remark, CreatedBy, CreatedAt)
-                    VALUES (@Id, @ContractId, @Amount, @Balance, @Action, @Remark, @CreatedBy, @CreatedAt)",
+                await conn.ExecuteAsync(
+                    _sql.Get("Lease.Insert.DepositLog.Default"),
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = newId,
@@ -417,33 +391,31 @@ public class RenewalService : IRenewalService
                 var diff = (renewal.NewDepositAmount ?? 0) - renewal.OldDepositAmount;
 
                 // 退旧押金
-                await conn.ExecuteAsync(@"
-                    INSERT INTO DepositLogs (Id, ContractId, Amount, Balance, Action, Remark, CreatedBy, CreatedAt)
-                    VALUES (@Id, @ContractId, @Amount, 0, 'Refund', @Remark, @CreatedBy, @CreatedAt)",
+                await conn.ExecuteAsync(
+                    _sql.Get("Lease.Insert.DepositLog.Default"),
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = renewal.OldContractId,
-                        Amount = -renewal.OldDepositAmount,
-                        Remark = $"续签退押金，新押金 ¥{renewal.NewDepositAmount:N2}",
+                        Amount = -renewal.OldDepositAmount, Balance = 0m,
+                        Action = "Refund", Remark = $"续签退押金，新押金 ¥{renewal.NewDepositAmount:N2}",
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
 
                 // 收新押金
-                await conn.ExecuteAsync(@"
-                    INSERT INTO DepositLogs (Id, ContractId, Amount, Balance, Action, Remark, CreatedBy, CreatedAt)
-                    VALUES (@Id, @ContractId, @Amount, @Amount, 'Collection', @Remark, @CreatedBy, @CreatedAt)",
+                await conn.ExecuteAsync(
+                    _sql.Get("Lease.Insert.DepositLog.Default"),
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = newId,
-                        Amount = renewal.NewDepositAmount,
-                        Remark = "续签新收押金",
+                        Amount = renewal.NewDepositAmount, Balance = renewal.NewDepositAmount,
+                        Action = "Collection", Remark = "续签新收押金",
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
             }
 
             // 6. 更新 RenewalRequest
             await conn.ExecuteAsync(
-                "UPDATE RenewalRequests SET NewContractId = @NewContractId, Status = 'Completed', UpdatedAt = @Now WHERE Id = @Id",
+                _sql.Get("Lease.Update.RenewalRequest.Complete"),
                 new { NewContractId = newId, renewal.Id, Now = now }, tx);
 
             tx.Commit();
@@ -459,13 +431,9 @@ public class RenewalService : IRenewalService
     {
         using var conn = _db.CreateConnection();
         conn.Open();
-        var rows = await conn.QueryAsync<RenewalHistoryDto>(@"
-            SELECT Id, ContractNo, PreviousRent, NewRent,
-                   CONVERT(NVARCHAR(10), NewEndDate, 23) AS NewEndDate,
-                   DepositHandling, Status, CreatedAt, Remark, NewContractId
-            FROM RenewalRequests
-            WHERE OldContractId = @Id
-            ORDER BY CreatedAt DESC", new { Id = contractId });
+        var rows = await conn.QueryAsync<RenewalHistoryDto>(
+            _sql.Get("Lease.Select.RenewalRequest.History"),
+            new { Id = contractId });
         return rows.ToList();
     }
 
@@ -475,29 +443,17 @@ public class RenewalService : IRenewalService
         conn.Open();
 
         // 先找到原始合同（OriginalContractId 或自身）
-        var rootId = await conn.QuerySingleAsync<Guid?>(@"
-            SELECT COALESCE(OriginalContractId, Id) FROM Contracts WHERE Id = @Id",
+        var rootId = await conn.QuerySingleAsync<Guid?>(
+            _sql.Get("Lease.Select.Contract.RootId"),
             new { Id = contractId });
 
         if (rootId == null)
             return new List<RenewalChainNodeDto>();
 
         // 获取整条链
-        var chain = await conn.QueryAsync<RenewalChainNodeDto>(@"
-            WITH ContractChain AS (
-                SELECT Id, ContractNo, Status, RentAmount, StartDate, EndDate, RenewalCount
-                FROM Contracts WHERE Id = @RootId
-                UNION ALL
-                SELECT c.Id, c.ContractNo, c.Status, c.RentAmount, c.StartDate, c.EndDate, c.RenewalCount
-                FROM Contracts c
-                INNER JOIN ContractChain cc ON cc.Id = c.PreviousContractId
-            )
-            SELECT Id AS ContractId, ContractNo, Status, RentAmount,
-                   CONVERT(NVARCHAR(10), StartDate, 23) AS StartDate,
-                   CONVERT(NVARCHAR(10), EndDate, 23) AS EndDate, RenewalCount,
-                   CASE WHEN Id = @TargetId THEN 1 ELSE 0 END AS IsCurrent
-            FROM ContractChain
-            ORDER BY RenewalCount", new { RootId = rootId, TargetId = contractId });
+        var chain = await conn.QueryAsync<RenewalChainNodeDto>(
+            _sql.Get("Lease.Select.Contract.RenewalChain"),
+            new { RootId = rootId, TargetId = contractId });
         return chain.ToList();
     }
 
@@ -523,10 +479,8 @@ public class RenewalService : IRenewalService
         // 检查是否有待审批流
         using var conn = _db.CreateConnection();
         conn.Open();
-        var pendingType = await conn.QuerySingleOrDefaultAsync<string>(@"
-            SELECT at.Code FROM ApprovalRequests ar
-            INNER JOIN ApprovalTypes at ON at.Id = ar.ApprovalTypeId
-            WHERE ar.ContractId = @Id AND ar.Status = 'Pending'",
+        var pendingType = await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Lease.Select.ApprovalType.PendingByContract"),
             new { Id = contractId });
 
         if (pendingType != null)
@@ -562,7 +516,7 @@ public class RenewalService : IRenewalService
         using var conn = _db.CreateConnection();
         conn.Open();
         var hasPending = await conn.QuerySingleAsync<int>(
-            "SELECT COUNT(1) FROM ApprovalRequests WHERE ContractId = @Id AND Status = 'Pending'",
+            _sql.Get("Approval.Select.Request.PendingByContractId"),
             new { Id = contractId });
 
         if (hasPending > 0)

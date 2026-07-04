@@ -41,7 +41,7 @@ public class MeterReadingsController : ControllerBase
         var entity = await _uow.MeterReadings.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
         await _db.CreateConnection().ExecuteAsync(
-            "UPDATE MeterReadings SET CurrentReading=@Current, Status='Confirmed' WHERE Id=@Id AND Status='Draft'",
+            _sql.Get("Utility.Update.MeterReading.ConfirmWithReading"),
             new { Current = dto.CurrentReading, Id = id });
         return Ok(new { id, status = "Confirmed" });
     }
@@ -55,7 +55,7 @@ public class MeterReadingsController : ControllerBase
         {
             // DapperRepository 不支持属性赋值，使用 SQL 更新
             await _db.CreateConnection().ExecuteAsync(
-                "UPDATE MeterReadings SET Status='Confirmed' WHERE Id=@Id AND Status='Draft'", new { Id = id });
+                _sql.Get("Utility.Update.MeterReading.Confirm"), new { Id = id });
         }
         return Ok(new { id, status = "Confirmed" });
     }

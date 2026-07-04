@@ -69,6 +69,8 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db, _sql, _auditWriter, this);
     public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db, _sql, _auditWriter, this);
     public IRepository<ChangeRequest> ChangeRequests => _changeRequests ??= new DapperRepository<ChangeRequest>(_db, _auditWriter, tracker: this);
+    public IApprovalBizDataRepository ApprovalBizData => _approvalBizData ??= new DapperApprovalBizDataRepository(_db, _sql, _auditWriter, this);
+    public IApprovalFeeItemRepository ApprovalFeeItems => _approvalFeeItems ??= new DapperApprovalFeeItemRepository(_db, _sql, _auditWriter, this);
 
     private IUserRepository? _users;
     private IRoleRepository? _roles;
@@ -109,6 +111,8 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IContractRepository? _contracts;
     private IRenewalRequestRepository? _renewalRequests;
     private IRepository<ChangeRequest>? _changeRequests;
+    private IApprovalBizDataRepository? _approvalBizData;
+    private IApprovalFeeItemRepository? _approvalFeeItems;
 
     // ==================================================================
     // IChangeTracker 实现
@@ -236,7 +240,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     {
         using var conn = _db.CreateConnection(); conn.Open();
         return (await conn.QueryAsync<DebitNoteItem>(
-            "SELECT * FROM DebitNoteItems WHERE DebitNoteId=@Id ORDER BY CreatedAt",
+            _sql.Get("Billing.Select.DebitNoteItem.ByDebitNoteId"),
             new { Id = debitNoteId })).ToList();
     }
 
@@ -256,6 +260,20 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         var dp = new DynamicParameters();
         for (int i = 0; i < args.Length; i++)
             dp.Add($"p{i}", args[i]);
+
+        if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open)
+        {
+            return await _sharedConnection.ExecuteAsync(sql, dp, _sharedTransaction);
+        }
+
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        return await conn.ExecuteAsync(sql, dp);
+    }
+
+    public async Task<int> ExecuteSqlRawAsync(string sql, object parameters, CancellationToken ct = default)
+    {
+        var dp = new DynamicParameters(parameters);
 
         if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open)
         {

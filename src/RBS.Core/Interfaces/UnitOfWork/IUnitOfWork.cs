@@ -67,6 +67,8 @@ public interface IUnitOfWork : IDisposable
     IApprovalRequestRepository ApprovalRequests { get; }
     IRepository<ApprovalType> ApprovalTypes { get; }
     IRepository<ApprovalLevelConfig> ApprovalLevelConfigs { get; }
+    IApprovalBizDataRepository ApprovalBizData { get; }
+    IApprovalFeeItemRepository ApprovalFeeItems { get; }
 
     // 会计
     IRepository<Voucher> Vouchers { get; }
@@ -100,6 +102,7 @@ public interface IUnitOfWork : IDisposable
 
     /// <summary>执行原始 SQL 命令（绕过 SaveChanges 管道，不触发拦截器）</summary>
     Task<int> ExecuteSqlRawAsync(string sql, IEnumerable<object> parameters, CancellationToken ct = default);
+    Task<int> ExecuteSqlRawAsync(string sql, object parameters, CancellationToken ct = default);
 
     /// <summary>乐观锁失败时自动重试</summary>
     Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default);

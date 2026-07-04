@@ -1,8 +1,8 @@
-namespace RBS.Core.DomainServices;
-
 using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Contract;
 using RBS.Core.Entities.SystemConfig;
+
+namespace RBS.Core.DomainServices;
 
 /// <summary>
 /// 计费领域服务 — 应收生成和滞纳金计算
@@ -18,8 +18,11 @@ public class BillingDomainService : IBillingDomainService
 
         foreach (var feeConfig in contract.FeeConfigs.Where(f => f.IsActive))
         {
-            decimal amount = feeConfig.Amount;
+            // ★ v3: 费用版本化过滤 — 账期必须在 EffectiveDate ~ ExpiryDate 范围内
+            if (!IsFeeEffectiveForPeriod(feeConfig, period))
+                continue;
 
+            decimal amount = feeConfig.Amount;
             // TODO: 首月或末月按天分摊计算，需根据合同起止日期和账期判断
 
             var plan = new ReceivablePlan(
@@ -33,6 +36,22 @@ public class BillingDomainService : IBillingDomainService
         }
 
         return plans;
+    }
+
+    /// <summary>判断费用配置在指定账期是否有效</summary>
+    private static bool IsFeeEffectiveForPeriod(ContractFeeConfig feeConfig, string period)
+    {
+        // EffectiveDate 不为空且账期早于生效日期 → 跳过
+        if (feeConfig.EffectiveDate != null &&
+            string.Compare(period, feeConfig.EffectiveDate.Substring(0, 7), StringComparison.Ordinal) < 0)
+            return false;
+
+        // ExpiryDate 不为空且账期晚于到期日期 → 跳过
+        if (feeConfig.ExpiryDate != null &&
+            string.Compare(period, feeConfig.ExpiryDate.Substring(0, 7), StringComparison.Ordinal) > 0)
+            return false;
+
+        return true;
     }
 
     public decimal CalculateLateFee(ReceivablePlan plan, LateFeeConfig config, DateOnly asOfDate)
@@ -53,7 +72,6 @@ public class BillingDomainService : IBillingDomainService
 
         var fee = overdueBalance * config.DailyRate * effectiveDays;
 
-        // 如有上限则取较小值
         if (config.MaxRate.HasValue && config.MaxRate.Value > 0)
         {
             var maxFee = overdueBalance * config.MaxRate.Value / 100;

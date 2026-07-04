@@ -570,7 +570,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getChangeRequests } from '@/api/index.js'
+import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, rentAdjust, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getChangeRequests } from '@/api/index.js'
 import ChangeRequestDialog from './ChangeRequestDialog.vue'
 
 const route = useRoute()
@@ -882,6 +882,29 @@ function toGuidId(id) {
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`
 }
 
+/* ================================================================
+ * Fee Price Adjustment (CONTRACT_FEE_CHANGE — Fixed 1级)
+ * ================================================================ */
+const showModifyFee = ref(false)
+const feeAdjustItems = reactive([])
+const feeAdjustEffectiveDate = ref('')
+const feeAdjustReason = ref('')
+
+function openFeeAdjust() {
+  showModifyFee.value = true
+  if (feeConfigs.value.length > 0) {
+    feeAdjustItems.splice(0, feeAdjustItems.length, ...feeConfigs.value.map(f => ({
+      feeCodeId: f.feeCodeId || '',
+      feeName: f.feeName,
+      chargeMethod: f.billingMode === 'MeterBased' ? '按表计量' : '固定金额',
+      oldPrice: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
+      oldPriceVal: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
+      newPrice: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
+      unit: f.unit || ''
+    })))
+  }
+}
+
 // 获取 CONTRACT_MODIFY 审批类型 ID（带缓存，不存在则自动创建）
 async function ensureContractModifyTypeId() {
   if (contractModifyTypeId.value) return contractModifyTypeId.value
@@ -926,70 +949,37 @@ const rentApprovalLevel = computed(() => {
 })
 
 async function submitRentAdjust() {
-  if (!rentForm.newAmount || rentForm.newAmount <= 0) { ElMessage.warning('请输入有效的新租金'); return }
-  if (!rentForm.effectiveDate) { ElMessage.warning('请选择生效日期'); return }
-  if (!rentForm.reason) { ElMessage.warning('请填写调整原因'); return }
+	  if (!rentForm.newAmount || rentForm.newAmount <= 0) { ElMessage.warning('请输入有效的新租金'); return }
+	  if (!rentForm.effectiveDate) { ElMessage.warning('请选择生效日期'); return }
+	  if (!rentForm.reason) { ElMessage.warning('请填写调整原因'); return }
 
-  const approvalTypeId = await ensureContractModifyTypeId()
-  if (!approvalTypeId) {
-    ElMessage.error('未找到合同租金调整审批类型配置，请联系管理员')
-    return
-  }
+	  submittingRent.value = true
+	  try {
+	    const res = await rentAdjust(toGuidId(contract.value.id), {
+	      newAmount: rentForm.newAmount,
+	      effectiveDate: rentForm.effectiveDate,
+	      reason: rentForm.reason
+	    })
 
-  submittingRent.value = true
-  try {
-    await submitApproval({
-      approvalTypeId: approvalTypeId,
-      title: `合同租金调整 - ${contract.value.contractNo}`,
-      description: `月租金 ¥${contract.value.rentAmount?.toLocaleString()} → ¥${rentForm.newAmount.toLocaleString()}，差额：${rentDiff.value >= 0 ? '+' : ''}¥${rentDiff.value.toLocaleString()}，生效日期：${rentForm.effectiveDate}，调整原因：${rentForm.reason}`,
-      targetEntityId: toGuidId(contract.value.id),
-      targetEntityType: 'Contract'
-    })
+	    changeHistory.value.unshift({
+	      date: new Date().toISOString().split('T')[0],
+	      title: '租金调整审批中',
+	      detail: `月租金 ${contract.value.rentAmount?.toLocaleString()} → ${rentForm.newAmount.toLocaleString()}（${rentForm.reason}）`,
+	      operator: '当前用户',
+	      type: 'warning',
+	      hollow: false,
+	      changes: [{ field: '月租金', oldValue: '¥' + contract.value.rentAmount?.toLocaleString(), newValue: '¥' + rentForm.newAmount.toLocaleString() }],
+	      approval: { status: '审批中', level: rentApprovalLevel.value }
+	    })
 
-    // Push to change history
-    changeHistory.value.unshift({
-      date: new Date().toISOString().split('T')[0],
-      title: '租金调整审批中',
-      detail: `月租金 ¥${contract.value.rentAmount?.toLocaleString()} → ¥${rentForm.newAmount.toLocaleString()}（${rentForm.reason}）`,
-      operator: '当前用户',
-      type: 'warning',
-      hollow: false,
-      changes: [{ field: '月租金', oldValue: '¥' + contract.value.rentAmount?.toLocaleString(), newValue: '¥' + rentForm.newAmount.toLocaleString() }],
-      approval: { status: '审批中', level: rentApprovalLevel.value }
-    })
-
-    contract.value.rentAmount = rentForm.newAmount
-    ElMessage.success(`租金调整申请已提交${rentApprovalLevel.value}审批`)
-    showModifyRent.value = false
-  } catch (e) {
-    ElMessage.error(e?.response?.data?.message || e?.message || '提交审批失败，请重试')
-  } finally {
-    submittingRent.value = false
-  }
-}
-
-/* ================================================================
- * Fee Price Adjustment (CONTRACT_FEE_CHANGE — Fixed 1级)
- * ================================================================ */
-const feeAdjustEffectiveDate = ref('')
-const feeAdjustReason = ref('')
-
-const feeAdjustItems = reactive([])
-
-const showModifyFee = ref(false)
-// 打开弹窗时从 feeConfigs 加载当前价格
-function openFeeAdjust() {
-  showModifyFee.value = true
-  if (feeConfigs.value.length > 0) {
-    feeAdjustItems.splice(0, feeAdjustItems.length, ...feeConfigs.value.map(f => ({
-      feeName: f.feeName,
-      chargeMethod: f.chargeMethod,
-      oldPrice: typeof f.unitPrice === 'number' ? f.unitPrice : parseFloat(f.unitPrice) || 0,
-      newPrice: typeof f.unitPrice === 'number' ? f.unitPrice : parseFloat(f.unitPrice) || 0,
-      unit: f.unit || ''
-    })))
-  }
-}
+	    ElMessage.success(res?.message || '租金调整申请已提交审批')
+	    showModifyRent.value = false
+	  } catch (e) {
+	    ElMessage.error(e?.response?.data?.message || e?.message || '提交审批失败，请重试')
+	  } finally {
+	    submittingRent.value = false
+	  }
+	}
 
 async function submitFeeAdjust() {
   if (!feeAdjustReason.value) { ElMessage.warning('请填写调价原因'); return }
@@ -998,46 +988,48 @@ async function submitFeeAdjust() {
   const changedItems = feeAdjustItems.filter(item => item.newPrice !== item.oldPrice)
   if (changedItems.length === 0) { ElMessage.warning('没有费用项目价格发生变化'); return }
 
-  // Submit approval for fee change
-  const approvalTypeId = await ensureContractModifyTypeId()
-  if (approvalTypeId) {
-    try {
-      const desc = changedItems.map(i =>
-        `${i.feeName}: ${i.oldPrice} → ${i.newPrice}${i.unit ? ' (' + i.unit + ')' : ''}`
-      ).join('；')
-      await submitApproval({
-        approvalTypeId,
-        title: `合同费用调价 - ${contract.value.contractNo}`,
-        description: `调价项目: ${desc}，生效日期: ${feeAdjustEffectiveDate.value}，原因: ${feeAdjustReason.value}`,
-        targetEntityId: toGuidId(contract.value.id),
-        targetEntityType: 'Contract'
-      })
-    } catch { /* 静默 */ }
-  }
+  try {
+    const items = changedItems.map(i => ({
+      feeCodeId: i.feeCodeId || '',
+      feeName: i.feeName,
+      oldAmount: i.oldPriceVal || i.oldPrice,
+      newAmount: i.newPrice,
+      billingMode: i.chargeMethod === '按表计量' ? 'MeterBased' : 'FixedAmount',
+      unit: i.unit || ''
+    }))
 
-  changedItems.forEach(item => {
-    const config = feeConfigs.value.find(c => c.feeName === item.feeName)
-    if (config) {
-      if (!config.history) config.history = []
-      config.history.unshift({
-        price: (item.chargeMethod === '固定金额' ? '¥' : '') + item.newPrice + (item.unit || ''),
-        date: (feeAdjustEffectiveDate.value || '新') + '生效'
-      })
-    }
-    changeHistory.value.unshift({
-      date: new Date().toISOString().split('T')[0],
-      title: `${item.feeName}调价审批中`,
-      detail: `${item.feeName}: ${item.oldPrice} → ${item.newPrice}（${feeAdjustReason.value}）`,
-      operator: '当前用户',
-      type: 'warning',
-      hollow: false,
-      changes: [{ field: item.feeName, oldValue: String(item.oldPrice), newValue: String(item.newPrice) }],
-      approval: { status: '审批中', level: '运营主管(1级)' }
+    const res = await feeAdjust(toGuidId(contract.value.id), {
+      effectiveDate: feeAdjustEffectiveDate.value,
+      reason: feeAdjustReason.value,
+      items
     })
-  })
 
-  ElMessage.success(`费用调价申请已提交审批，涉及 ${changedItems.length} 项费用`)
-  showModifyFee.value = false
+    changedItems.forEach(item => {
+      const config = feeConfigs.value.find(c => c.feeName === item.feeName)
+      if (config) {
+        if (!config.history) config.history = []
+        config.history.unshift({
+          price: (item.chargeMethod === '固定金额' ? '¥' : '') + item.newPrice + (item.unit || ''),
+          date: (feeAdjustEffectiveDate.value || '新') + '生效'
+        })
+      }
+      changeHistory.value.unshift({
+        date: new Date().toISOString().split('T')[0],
+        title: `${item.feeName}调价审批中`,
+        detail: `${item.feeName}: ${item.oldPrice} → ${item.newPrice}（${feeAdjustReason.value}）`,
+        operator: '当前用户',
+        type: 'warning',
+        hollow: false,
+        changes: [{ field: item.feeName, oldValue: String(item.oldPrice), newValue: String(item.newPrice) }],
+        approval: { status: '审批中', level: '运营主管(1级)' }
+      })
+    })
+
+    ElMessage.success(res?.message || `费用调价申请已提交审批，涉及 ${changedItems.length} 项费用`)
+    showModifyFee.value = false
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '提交失败')
+  }
 }
 
 /* ================================================================
@@ -1164,33 +1156,44 @@ async function submitTerminate() {
   if (!terminateForm.actualEndDate) { ElMessage.warning('请选择实际搬离日'); return }
 
   try {
-    await terminateContract(toGuidId(contract.value.id), { reason: terminateForm.reason })
-    contract.value.status = 'Terminated'
-    changeHistory.value.unshift({
-      date: new Date().toISOString().split('T')[0],
-      title: '合同终止',
-      detail: `终止原因: ${terminateForm.reason}，搬离日: ${terminateForm.actualEndDate}`,
-      operator: '当前用户',
-      type: 'danger',
-      hollow: false
+    const res = await terminateContract(toGuidId(contract.value.id), {
+      terminateType: terminateForm.type || 'EARLY',
+      actualEndDate: terminateForm.actualEndDate,
+      depositReturn: terminateForm.depositReturn || 'FULL',
+      reason: terminateForm.reason
     })
-    ElMessage.success('合同已终止')
+    if (res?.status === 'Pending' || res?.id) {
+      changeHistory.value.unshift({
+        date: new Date().toISOString().split('T')[0],
+        title: '合同终止审批中',
+        detail: `终止原因: ${terminateForm.reason}，搬离日: ${terminateForm.actualEndDate}`,
+        operator: '当前用户',
+        type: 'danger',
+        hollow: false
+      })
+      ElMessage.success('终止申请已提交审批')
+    } else {
+      contract.value.status = 'Terminated'
+      changeHistory.value.unshift({
+        date: new Date().toISOString().split('T')[0],
+        title: '合同终止',
+        detail: `终止原因: ${terminateForm.reason}，搬离日: ${terminateForm.actualEndDate}`,
+        operator: '当前用户',
+        type: 'danger',
+        hollow: false
+      })
+      ElMessage.success('合同已终止')
+    }
     showTerminate.value = false
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '终止失败')
   }
 }
 
-/* ================================================================
- * Suspend / Resume
- * ================================================================ */
-const showSuspend = ref(false)
-const suspendReason = ref('')
-
 async function handleSuspend() {
   if (!suspendReason.value) { ElMessage.warning('请填写暂停原因'); return }
   try {
-    await suspendContract(toGuidId(contract.value.id))
+    await suspendContract(toGuidId(contract.value.id), { reason: suspendReason.value })
     contract.value.status = 'Suspended'
     changeHistory.value.unshift({
       date: new Date().toISOString().split('T')[0],

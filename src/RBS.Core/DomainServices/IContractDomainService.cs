@@ -25,4 +25,7 @@ public interface IContractDomainService
 
     /// <summary>按天分摊计算应收金额</summary>
     decimal CalculateProratedAmount(decimal monthlyAmount, DateOnly startDate, DateOnly endDate, DateOnly periodStart, DateOnly periodEnd);
+
+    /// <summary>执行合同终止（审批通过后回调）— 取消应收 + 费用到期 + 押金处理</summary>
+    Task ExecuteContractTerminationAsync(Guid contractId, DateOnly? actualEndDate, string depositReturn, string reason, Guid userId, CancellationToken ct = default);
 }

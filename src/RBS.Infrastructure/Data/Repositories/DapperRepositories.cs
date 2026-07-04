@@ -463,3 +463,32 @@ public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, 
     public async Task<bool> HasPendingForContractAsync(Guid contractId, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Lease.Select.RenewalRequest.HasPendingForContract"), new { Id = contractId }) > 0; }
 }
+
+// ===== Dapper 仓储 — IApprovalBizDataRepository =====
+public class DapperApprovalBizDataRepository : DapperRepository<ApprovalBizData>, IApprovalBizDataRepository
+{
+    private readonly ISqlLoader _sql;
+    public DapperApprovalBizDataRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, "ApprovalBizData", tracker)
+    {
+        _sql = sql;
+    }
+
+    public async Task<ApprovalBizData?> GetByApprovalRequestIdAsync(Guid approvalRequestId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); var e = await conn.QuerySingleOrDefaultAsync<ApprovalBizData>(_sql.Get("Approval.Select.ApprovalBizData.ByApprovalRequestId"), new { Id = approvalRequestId }); if (e != null) _tracker?.Track(e, "ApprovalBizData"); return e; }
+
+    public async Task<List<ApprovalBizData>> GetByContractIdAsync(Guid contractId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); var list = (await conn.QueryAsync<ApprovalBizData>(_sql.Get("Approval.Select.ApprovalBizData.ByContractId"), new { Id = contractId })).ToList(); foreach (var e in list) _tracker?.Track(e, "ApprovalBizData"); return list; }
+}
+
+// ===== Dapper 仓储 — IApprovalFeeItemRepository =====
+public class DapperApprovalFeeItemRepository : DapperRepository<ApprovalFeeItem>, IApprovalFeeItemRepository
+{
+    private readonly ISqlLoader _sql;
+    public DapperApprovalFeeItemRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, "ApprovalFeeItems", tracker)
+    {
+        _sql = sql;
+    }
+
+    public async Task<List<ApprovalFeeItem>> GetByApprovalRequestIdAsync(Guid approvalRequestId, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ApprovalFeeItem>(_sql.Get("Approval.Select.ApprovalFeeItems.ByApprovalRequestId"), new { Id = approvalRequestId })).ToList(); }
+}

@@ -11,11 +11,13 @@ public class AutoVoucherService : IAutoVoucherService
 {
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
-    public AutoVoucherService(IUnitOfWork uow, IDbConnectionFactory db)
+    public AutoVoucherService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
     {
         _uow = uow;
         _db = db;
+        _sql = sql;
     }
 
     public async Task<Voucher?> GenerateFromReceiptAsync(Guid receiptId, CancellationToken ct)
@@ -76,8 +78,7 @@ public class AutoVoucherService : IAutoVoucherService
         foreach (var entry in voucher.Entries)
         {
             await conn.ExecuteAsync(
-                "INSERT INTO JournalEntries (Id,VoucherId,AccountingSubjectId,Direction,Amount,Summary,CreatedBy,CreatedAt) " +
-                "VALUES (@Id,@VId,@SId,@Dir,@Amt,@Sum,@CBy,@Now)",
+                _sql.Get("Accounting.Insert.JournalEntry.Default"),
                 new
                 {
                     Id = Guid.NewGuid(), VId = voucher.Id, SId = entry.AccountingSubjectId,

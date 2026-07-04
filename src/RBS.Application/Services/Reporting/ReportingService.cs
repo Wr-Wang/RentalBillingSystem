@@ -22,14 +22,9 @@ public class ReportingService : IReportingService
     public async Task<object> GetCollectionRateAsync(string? period, CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var sql = @"SELECT
-            p.Period, COUNT(1) AS TotalPlans,
-            SUM(p.Amount) AS TotalAmount, SUM(p.Received) AS TotalReceived,
-            CASE WHEN SUM(p.Amount) > 0 THEN ROUND(SUM(p.Received)/SUM(p.Amount)*100,1) ELSE 0 END AS Rate
-        FROM ReceivablePlans p
-        WHERE (@Period IS NULL OR p.Period = @Period)
-        GROUP BY p.Period ORDER BY p.Period DESC";
-        return await conn.QueryAsync(sql, new { Period = period });
+        return await conn.QueryAsync(
+            _sql.Get("Billing.Select.ReceivablePlan.CollectionRate"),
+            new { Period = period });
     }
 
     public async Task<object> GetOverdueDetailAsync(Guid? companyId, string? period, CancellationToken ct)
@@ -49,12 +44,7 @@ public class ReportingService : IReportingService
 
         var ids = raw.Select(p => p.ContractId).Distinct().ToList();
         var contracts = await conn.QueryAsync<(Guid, string, string, string)>(
-            @"SELECT c.Id, c.ContractNo, t.Name AS TenantName, h.FullCode AS RoomFullCode
-              FROM Contracts c
-              LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
-              LEFT JOIN Tenants t ON t.Id = ct.TenantId
-              LEFT JOIN HousingUnits h ON h.Id = c.RoomId
-              WHERE c.Id IN @Ids", new { Ids = ids });
+            _sql.Get("Billing.Select.Contract.OverdueData"), new { Ids = ids });
         var contractDict = contracts.ToDictionary(c => c.Item1);
 
         var enriched = raw.Select(p =>
@@ -78,7 +68,7 @@ public class ReportingService : IReportingService
         using var conn = _db.CreateConnection(); conn.Open();
         var d = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var result = await conn.QueryAsync(
-            "SELECT Status, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE ReceivedDate=@D GROUP BY Status",
+            _sql.Get("Billing.Select.Receipt.DailyReceipt"),
             new { D = d });
         return new { date = d, details = result };
     }
@@ -91,12 +81,12 @@ public class ReportingService : IReportingService
 
         // 月度汇总
         var plans = await conn.QueryAsync(
-            "SELECT COUNT(1) AS TotalPlans, SUM(Amount) AS TotalAmount, SUM(Received) AS TotalReceived FROM ReceivablePlans WHERE Period=@P",
+            _sql.Get("Billing.Select.ReceivablePlan.MonthlySummary"),
             new { P = p });
 
         // 每日收款明细（用于趋势图）
         var daily = await conn.QueryAsync(
-            "SELECT DAY(ReceivedDate) AS D, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE FORMAT(ReceivedDate, 'yyyy-MM')=@P GROUP BY DAY(ReceivedDate) ORDER BY D",
+            _sql.Get("Billing.Select.Receipt.DailyByMonth"),
             new { P = p });
 
         // 填充每日数据（无收款的日期补 0）
@@ -118,10 +108,7 @@ public class ReportingService : IReportingService
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var result = await conn.QueryAsync(
-            @"SELECT f.Name AS FeeName, f.Code, COUNT(1) AS Cnt, SUM(p.Amount) AS TotalAmount, SUM(p.Received) AS TotalReceived
-            FROM ReceivablePlans p INNER JOIN FeeCodes f ON f.Id = p.FeeCodeId
-            WHERE (@Period IS NULL OR p.Period = @Period)
-            GROUP BY f.Name, f.Code ORDER BY TotalAmount DESC",
+            _sql.Get("Billing.Select.FeeRevenue.All"),
             new { Period = period });
         return result;
     }
@@ -130,13 +117,7 @@ public class ReportingService : IReportingService
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var result = await conn.QueryAsync(
-            @"SELECT hu.BuildingName, hu.Id AS BuildingId,
-            COUNT(hu.Id) AS TotalRooms,
-            SUM(CASE WHEN hu.Status='Rented' THEN 1 ELSE 0 END) AS RentedRooms,
-            ROUND(CAST(SUM(CASE WHEN hu.Status='Rented' THEN 1 ELSE 0 END) AS FLOAT)/NULLIF(COUNT(hu.Id),0)*100,1) AS OccupancyRate
-            FROM HousingUnits hu
-            WHERE hu.BuildingName IS NOT NULL
-            GROUP BY hu.BuildingName, hu.Id ORDER BY hu.BuildingName");
+            _sql.Get("Billing.Select.HousingUnit.OccupancyRate"));
         return result;
     }
 }

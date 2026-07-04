@@ -6,6 +6,7 @@ using RBS.Application.DTOs.Import;
 using RBS.Core.Entities.Import;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Core.Interfaces.Services;
 using System.Data;
 
 namespace RBS.Api.Controllers;
@@ -18,12 +19,14 @@ public class ImportsController : ControllerBase
     private readonly IImportService _importService;
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
-    public ImportsController(IImportService importService, IUnitOfWork uow, IDbConnectionFactory db)
+    public ImportsController(IImportService importService, IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
     {
         _importService = importService;
         _uow = uow;
         _db = db;
+        _sql = sql;
     }
 
     [HttpPost("submit")]
@@ -54,7 +57,7 @@ public class ImportsController : ControllerBase
         // Load items with proper type mapping via Dapper
         using var conn = _db.CreateConnection(); conn.Open();
         var rows = await conn.QueryAsync<dynamic>(
-            "SELECT * FROM ImportBatchItems WHERE ImportBatchId = @Id ORDER BY RowIndex",
+            _sql.Get("Import.Select.BatchItem.ByBatchId"),
             new { Id = id });
 
         var items = rows.Select(r =>

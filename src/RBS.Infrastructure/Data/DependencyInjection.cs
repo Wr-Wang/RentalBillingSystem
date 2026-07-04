@@ -59,6 +59,8 @@ public static class DependencyInjection
         services.AddScoped<IRepository<RoomType>, DapperRepository<RoomType>>();
         services.AddScoped<IRepository<ApprovalType>, DapperRepository<ApprovalType>>();
         services.AddScoped<IRepository<ApprovalLevelConfig>, DapperRepository<ApprovalLevelConfig>>();
+        services.AddScoped<IApprovalBizDataRepository, DapperApprovalBizDataRepository>();
+        services.AddScoped<IApprovalFeeItemRepository, DapperApprovalFeeItemRepository>();
         services.AddScoped<IRepository<FloorLevelBand>, DapperRepository<FloorLevelBand>>();
         services.AddScoped<IRepository<TaxRateConfig>, DapperRepository<TaxRateConfig>>();
         services.AddScoped<IRepository<AccountingSubject>, DapperRepository<AccountingSubject>>();
@@ -81,6 +83,9 @@ public static class DependencyInjection
         services.AddScoped<IEventHandler<ApprovalCompletedEvent>, ApprovalCompletedEventHandler>();
         services.AddScoped<IEventHandler<ApprovalSubmittedEvent>, ApprovalSubmittedEventHandler>();
         services.AddScoped<IEventHandler<ApprovalLevelAdvancedEvent>, ApprovalLevelAdvancedEventHandler>();
+        services.AddScoped<IEventHandler<ContractSuspendedEvent>, ContractSuspendedEventHandler>();
+        services.AddScoped<IEventHandler<ContractResumedEvent>, ContractResumedEventHandler>();
+        services.AddScoped<IEventHandler<ContractRentAdjustedEvent>, ContractRentAdjustedEventHandler>();
         services.AddScoped<IBillingDomainService, BillingDomainService>();
         services.AddScoped<IApprovalDomainService, ApprovalDomainService>();
 

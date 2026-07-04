@@ -19,26 +19,17 @@ public class ContractAppService : IContractService
     public async Task<List<ContractDto>> GetListAsync(Guid companyId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var rows = await conn.QueryAsync<ContractDto>(@"
-            SELECT c.Id, c.ContractNo, c.RoomId, r.FullCode AS RoomFullCode,
-                   c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate,
-                   c.PaymentCycle, c.Status, c.CompanyId,
-                   CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract,
-                   c.AutoRenew
-            FROM Contracts c
-            LEFT JOIN HousingUnits r ON r.Id = c.RoomId
-            WHERE c.CompanyId = @Id
-            ORDER BY c.CreatedAt DESC", new { Id = companyId });
+        var rows = await conn.QueryAsync<ContractDto>(
+            _sql.Get("Lease.Select.Contract.ListByCompany"),
+            new { Id = companyId });
         var list = rows.ToList();
 
         if (list.Count > 0)
         {
             var ids = list.Select(x => x.Id).ToList();
-            var tenants = await conn.QueryAsync<dynamic>(@"
-                SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone
-                FROM ContractTenants ct
-                INNER JOIN Tenants t ON t.Id = ct.TenantId
-                WHERE ct.ContractId IN @Ids AND ct.IsPrimary = 1", new { Ids = ids });
+            var tenants = await conn.QueryAsync<dynamic>(
+                _sql.Get("Lease.Select.ContractTenant.PrimaryByIds"),
+                new { Ids = ids });
             var tenantLookup = tenants.Cast<IDictionary<string, object>>()
                 .GroupBy(d => (Guid)d["ContractId"])
                 .ToDictionary(g => g.Key, g => g.First());
@@ -55,16 +46,9 @@ public class ContractAppService : IContractService
     public async Task<List<ContractDto>> GetByTenantIdAsync(Guid tenantId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var rows = await conn.QueryAsync<ContractDto>(@"SELECT c.Id, c.ContractNo, c.RoomId, r.FullCode AS RoomFullCode,
-                   c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate,
-                   c.PaymentCycle, c.Status, c.CompanyId,
-                   CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract,
-                   c.AutoRenew
-            FROM Contracts c
-            LEFT JOIN HousingUnits r ON r.Id = c.RoomId
-            INNER JOIN ContractTenants ct ON ct.ContractId = c.Id
-            WHERE ct.TenantId = @TenantId
-            ORDER BY c.CreatedAt DESC", new { TenantId = tenantId });
+        var rows = await conn.QueryAsync<ContractDto>(
+            _sql.Get("Lease.Select.Contract.ByTenantId"),
+            new { TenantId = tenantId });
         var list = rows.ToList();
         if (list.Count > 0)
         {
@@ -97,11 +81,9 @@ public class ContractAppService : IContractService
         if (list.Count > 0)
         {
             var ids = list.Select(x => x.Id).ToList();
-            var tenants = await conn.QueryAsync<dynamic>(@"
-                SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone
-                FROM ContractTenants ct
-                INNER JOIN Tenants t ON t.Id = ct.TenantId
-                WHERE ct.ContractId IN @Ids AND ct.IsPrimary = 1", new { Ids = ids });
+            var tenants = await conn.QueryAsync<dynamic>(
+                _sql.Get("Lease.Select.ContractTenant.PrimaryByIds"),
+                new { Ids = ids });
             var tenantLookup = tenants.Cast<IDictionary<string, object>>()
                 .GroupBy(d => (Guid)d["ContractId"])
                 .ToDictionary(g => g.Key, g => g.First());
@@ -126,15 +108,8 @@ public class ContractAppService : IContractService
     public async Task<ContractDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        using var multi = await conn.QueryMultipleAsync(@"
-            SELECT c.Id, c.ContractNo, c.RoomId, r.FullCode AS RoomFullCode,
-                   c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate,
-                   c.PaymentCycle, c.Status, c.CompanyId,
-                   CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract,
-                   c.AutoRenew FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
-            SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id;
-            SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice, cf.IsActive,
-                   CONVERT(NVARCHAR(10), cf.EffectiveDate, 23) AS EffectiveDate, CONVERT(NVARCHAR(10), cf.ExpiryDate, 23) AS ExpiryDate FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id AND cf.IsActive = 1",
+        using var multi = await conn.QueryMultipleAsync(
+            _sql.Get("Lease.Select.Contract.DetailMulti"),
             new { Id = id });
         var dto = await multi.ReadSingleOrDefaultAsync<ContractDto>();
         if (dto == null) return null;

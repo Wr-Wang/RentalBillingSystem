@@ -71,9 +71,11 @@ public class LastRejectedApprovalDto
 /// <summary>审批业务详情 — 统一对比展示</summary>
 public class ApprovalBizDetailDto
 {
-    public string BizType { get; set; } = string.Empty;
+    public string BizType { get; set; } = string.Empty;   // RENT_ADJUST | FEE_ADJUST | TERMINATE
     public string Title { get; set; } = string.Empty;
+    public string? EffectiveDate { get; set; }             // 生效日期（独立字段，前端直接展示）
     public List<BizFieldDto> Fields { get; set; } = new();
+    public List<BizFeeItemDto>? FeeItems { get; set; }     // 调价时：费用项的逐项对比
 }
 
 public class BizFieldDto
@@ -82,4 +84,14 @@ public class BizFieldDto
     public string? OldValue { get; set; }
     public string? NewValue { get; set; }
     public bool IsChanged { get; set; }
+}
+
+/// <summary>调价审批的费用项对比明细</summary>
+public class BizFeeItemDto
+{
+    public string FeeName { get; set; } = string.Empty;
+    public decimal OldAmount { get; set; }
+    public decimal NewAmount { get; set; }
+    public string? BillingMode { get; set; }
+    public string? Unit { get; set; }
 }

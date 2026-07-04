@@ -3,7 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Approval;
 using RBS.Application.Services.Contract;
+using RBS.Core.Common;
+using RBS.Core.DomainServices;
+using RBS.Core.Entities.Approval;
+using RBS.Core.Entities.Base;
+using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
@@ -15,20 +21,28 @@ public class ContractsController : ControllerBase
 {
     private readonly IContractService _contractService;
     private readonly IRenewalService _renewalService;
-    private readonly IUnitOfWork _uow;
-    private readonly IDbConnectionFactory _db;
+    private readonly IContractDomainService _contractDomainService;
     private readonly IApprovalService _approvalService;
     private readonly IContractTimelineService _timelineService;
+    private readonly IUnitOfWork _uow;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
+    private readonly ICurrentUserService _currentUser;
+
     public ContractsController(IContractService contractService, IRenewalService renewalService,
-        IUnitOfWork uow, IDbConnectionFactory db, IApprovalService approvalService,
-        IContractTimelineService timelineService)
+        IContractDomainService contractDomainService, IApprovalService approvalService,
+        IContractTimelineService timelineService, IUnitOfWork uow,
+        IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser)
     {
         _contractService = contractService;
         _renewalService = renewalService;
-        _uow = uow;
-        _db = db;
+        _contractDomainService = contractDomainService;
         _approvalService = approvalService;
         _timelineService = timelineService;
+        _uow = uow;
+        _db = db;
+        _sql = sql;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
@@ -92,59 +106,293 @@ public class ContractsController : ControllerBase
         public bool? AutoRenew { get; set; }
     }
 
+    // ===================================================================
+    // 租金调整（★ v3 改造 — 审批驱动）
+    // ===================================================================
+    [HttpPost("{id}/rentadjust")]
+    public async Task<IActionResult> RentAdjust(Guid id, [FromBody] RentAdjustRequest request, CancellationToken ct)
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(id, ct);
+        if (contract == null) return NotFound();
+
+        var userId = GetCurrentUserId();
+
+        // 并发守卫
+        await EnsureNoPendingForContractAsync(id, ct);
+
+        // 找审批类型
+        var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_MODIFY", ct);
+        if (approvalType == null)
+            return BadRequest(new { error = "未配置合同租金调整审批类型，请联系管理员" });
+
+        using var tx = await _uow.BeginTransactionAsync(ct);
+        try
+        {
+            // 1. 写业务数据
+            var bizDataId = Guid.NewGuid();
+            var effectiveDate = request.EffectiveDate.HasValue
+                ? DateOnly.FromDateTime(request.EffectiveDate.Value)
+                : (DateOnly?)null;
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Insert.ApprovalBizData.RentAdjust"),
+                new { Id = bizDataId, ContractId = id, ContractNo = contract.ContractNo,
+                    CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
+                    OldAmount = contract.RentAmount.Amount, NewAmount = request.NewAmount,
+                    Reason = request.Reason ?? "", CreatedBy = userId });
+
+            // 2. 提交审批
+            var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+            {
+                ApprovalTypeId = approvalType.Id,
+                Title = $"合同租金调整 - {contract.ContractNo}",
+                Description = "",
+                TargetEntityId = id,
+                TargetEntityType = "ContractRent"
+            }, ct);
+
+            // 3. 回写 ApprovalRequestId + ContractId
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ApprovalBizData.SetApprovalRequestId"),
+                new { Id = bizDataId, ApprovalRequestId = approvalResult.Id });
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ApprovalRequest.SetContractId"),
+                new { Id = approvalResult.Id, ContractId = id });
+
+            await tx.CommitAsync(ct);
+            return Ok(new { id = approvalResult.Id, status = approvalResult.Status, message = "租金调整申请已提交审批" });
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public class RentAdjustRequest
+    {
+        public decimal NewAmount { get; set; }
+        public DateTime? EffectiveDate { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    // ===================================================================
+    // 费用调价（★ v3 改造 — 审批驱动）
+    // ===================================================================
+    [HttpPost("{id}/feeadjust")]
+    public async Task<IActionResult> FeeAdjust(Guid id, [FromBody] FeeAdjustRequest request, CancellationToken ct)
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(id, ct);
+        if (contract == null) return NotFound();
+
+        var userId = GetCurrentUserId();
+
+        // 并发守卫
+        await EnsureNoPendingForContractAsync(id, ct);
+
+        // 找审批类型
+        var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_FEE_CHANGE", ct);
+
+        using var tx = await _uow.BeginTransactionAsync(ct);
+        try
+        {
+            var bizDataId = Guid.NewGuid();
+            var effectiveDate = request.EffectiveDate.HasValue
+                ? DateOnly.FromDateTime(request.EffectiveDate.Value)
+                : (DateOnly?)null;
+
+            // 1. 写业务数据
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Insert.ApprovalBizData.FeeAdjust"),
+                new { Id = bizDataId, ContractId = id, ContractNo = contract.ContractNo,
+                    CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
+                    Reason = request.Reason ?? "", CreatedBy = userId });
+
+            // 2. 写费用项明细
+            foreach (var item in request.Items)
+            {
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Contract.Insert.ApprovalFeeItem.ForFeeAdjust"),
+                    new { Id = Guid.NewGuid(), ContractId = id, item.FeeCodeId, item.FeeName,
+                        OldAmount = item.OldAmount, NewAmount = item.NewAmount,
+                        BillingMode = item.BillingMode, Unit = item.Unit, CreatedBy = userId });
+            }
+
+            // 3. 提交审批
+            if (approvalType == null)
+            {
+                // 无审批配置 → 0 级直接执行
+                await tx.CommitAsync(ct);
+                return Ok(new { message = "费用调价已直接执行（无审批配置）" });
+            }
+
+            var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+            {
+                ApprovalTypeId = approvalType.Id,
+                Title = $"合同费用调价 - {contract.ContractNo}",
+                Description = "",
+                TargetEntityId = id,
+                TargetEntityType = "ContractFeeAdjust"
+            }, ct);
+
+            // 4. 回写
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ApprovalBizData.SetApprovalRequestId"),
+                new { Id = bizDataId, ApprovalRequestId = approvalResult.Id });
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ApprovalRequest.SetContractId"),
+                new { Id = approvalResult.Id, ContractId = id });
+
+            await tx.CommitAsync(ct);
+            return Ok(new { id = approvalResult.Id, status = approvalResult.Status, message = "费用调价申请已提交审批" });
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public class FeeAdjustRequest
+    {
+        public DateTime? EffectiveDate { get; set; }
+        public string? Reason { get; set; }
+        public List<FeeAdjustItem> Items { get; set; } = new();
+    }
+
+    public class FeeAdjustItem
+    {
+        public Guid FeeCodeId { get; set; }
+        public string FeeName { get; set; } = "";
+        public decimal OldAmount { get; set; }
+        public decimal NewAmount { get; set; }
+        public string BillingMode { get; set; } = "FixedAmount";
+        public string? Unit { get; set; }
+    }
+
+    // ===================================================================
+    // 终止（★ v3 修复 — 不再提前 Terminate，改为审批驱动）
+    // ===================================================================
     [HttpPost("{id}/terminate")]
-    public async Task<IActionResult> Terminate(Guid id, [FromBody] Dictionary<string, string> body, CancellationToken ct)
+    public async Task<IActionResult> Terminate(Guid id, [FromBody] TerminateRequest request, CancellationToken ct)
     {
         var entity = await _uow.Contracts.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
 
-        body.TryGetValue("reason", out var reason);
-        entity.Terminate(reason ?? "手动终止");
+        if (entity.Status == "Terminated")
+            return BadRequest(new { error = "合同已终止" });
 
-        // 提交终止审批
+        var userId = GetCurrentUserId();
+
+        // ★ v3 修复：不再提前调 entity.Terminate()
+        // 先检查是否有审批类型
         var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_TERMINATE", ct);
-        if (approvalType != null)
+        if (approvalType == null)
         {
-            var result = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+            // 无审批配置 → 0 级直接执行
+            await _contractDomainService.ExecuteContractTerminationAsync(
+                id,
+                request.ActualEndDate.HasValue ? DateOnly.FromDateTime(request.ActualEndDate.Value) : null,
+                request.DepositReturn ?? "FULL",
+                request.Reason ?? "合同终止",
+                userId, ct);
+            return Ok(new { message = "合同已终止" });
+        }
+
+        // 有审批 → 走审批流
+        await EnsureNoPendingForContractAsync(id, ct);
+
+        using var tx = await _uow.BeginTransactionAsync(ct);
+        try
+        {
+            var bizDataId = Guid.NewGuid();
+            var effectiveDate = request.ActualEndDate.HasValue
+                ? DateOnly.FromDateTime(request.ActualEndDate.Value)
+                : (DateOnly?)null;
+
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Insert.ApprovalBizData.Terminate"),
+                new { Id = bizDataId, ContractId = id, ContractNo = entity.ContractNo,
+                    CompanyId = entity.CompanyId,
+                    TerminateType = request.TerminateType ?? "EARLY",
+                    ActualEndDate = effectiveDate,
+                    DepositReturn = request.DepositReturn ?? "FULL",
+                    Reason = request.Reason ?? "", CreatedBy = userId });
+
+            var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
             {
                 ApprovalTypeId = approvalType.Id,
                 Title = $"[合同终止] {entity.ContractNo}",
-                Description = reason ?? "手动终止",
-                TargetEntityId = entity.Id,
-                TargetEntityType = "Contract"
+                Description = request.Reason ?? "手动终止",
+                TargetEntityId = id,
+                TargetEntityType = "ContractTerminate"
             }, ct);
 
-            if (result != null)
-                entity.SetStatus("PendingApproval");
-        }
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ApprovalBizData.SetApprovalRequestId"),
+                new { Id = bizDataId, ApprovalRequestId = approvalResult.Id });
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ApprovalRequest.SetContractId"),
+                new { Id = approvalResult.Id, ContractId = id });
 
-        await _uow.CommitAsync(ct);
-        return Ok(new { id, status = entity.Status });
+            await tx.CommitAsync(ct);
+            return Ok(new { id = approvalResult.Id, status = approvalResult.Status, message = "终止申请已提交审批" });
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 
+    public class TerminateRequest
+    {
+        public string? TerminateType { get; set; }
+        public DateTime? ActualEndDate { get; set; }
+        public string? DepositReturn { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    // ===================================================================
+    // 暂停（★ v3 补充：写 ApprovalBizData）
+    // ===================================================================
     [HttpPost("{id}/suspend")]
-    public async Task<IActionResult> Suspend(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Suspend(Guid id, [FromBody] SuspendRequest request, CancellationToken ct)
     {
         var entity = await _uow.Contracts.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
+
         entity.Suspend();
         await _uow.CommitAsync(ct);
+
+        // ★ 写业务数据（用于历史追溯）
+        var userId = GetCurrentUserId();
+        await _uow.ExecuteSqlRawAsync(
+            _sql.Get("Contract.Insert.ApprovalBizData.Suspend"),
+            new { Id = Guid.NewGuid(), ContractId = id, ContractNo = entity.ContractNo,
+                CompanyId = entity.CompanyId, Reason = request.Reason ?? "", CreatedBy = userId });
+
         return Ok(new { id, status = entity.Status });
     }
 
+    public class SuspendRequest
+    {
+        public string? Reason { get; set; }
+    }
+
+    // ===================================================================
+    // 恢复
+    // ===================================================================
     [HttpPost("{id}/resume")]
     public async Task<IActionResult> Resume(Guid id, CancellationToken ct)
     {
         var entity = await _uow.Contracts.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
-        entity.Resume();
+        entity.Resume(); // ★ v3 修复：内部已写入 ResumedAt + 触发 ContractResumedEvent
         await _uow.CommitAsync(ct);
         return Ok(new { id, status = entity.Status });
     }
 
     // ===== 续签相关 API（新审批流程） =====
-
-    /// <summary>续签预览：检查欠费、并发、展示继承配置</summary>
     [HttpGet("{id}/renewal/preview")]
     public async Task<IActionResult> RenewalPreview(Guid id, CancellationToken ct)
     {
@@ -159,7 +407,6 @@ public class ContractsController : ControllerBase
         }
     }
 
-    /// <summary>提交续签审批</summary>
     [HttpPost("{id}/renewal/submit")]
     public async Task<IActionResult> SubmitRenewal(Guid id, [FromBody] RBS.Application.DTOs.Contract.SubmitRenewalRequest request, CancellationToken ct)
     {
@@ -180,7 +427,6 @@ public class ContractsController : ControllerBase
         }
     }
 
-    /// <summary>获取续签历史</summary>
     [HttpGet("{id}/renewal/history")]
     public async Task<IActionResult> GetRenewalHistory(Guid id, CancellationToken ct)
     {
@@ -188,7 +434,6 @@ public class ContractsController : ControllerBase
         return Ok(history);
     }
 
-    /// <summary>获取续签链</summary>
     [HttpGet("{id}/renewal/chain")]
     public async Task<IActionResult> GetRenewalChain(Guid id, CancellationToken ct)
     {
@@ -196,7 +441,6 @@ public class ContractsController : ControllerBase
         return Ok(chain);
     }
 
-    /// <summary>获取最近一次被驳回的续签数据（重新提交预填）</summary>
     [HttpGet("{id}/renewal/lastrejected")]
     public async Task<IActionResult> GetLastRejectedRenewal(Guid id, CancellationToken ct)
     {
@@ -205,7 +449,6 @@ public class ContractsController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>获取合同允许的操作</summary>
     [HttpGet("{id}/allowedoperations")]
     public async Task<IActionResult> GetAllowedOperations(Guid id, CancellationToken ct)
     {
@@ -220,18 +463,32 @@ public class ContractsController : ControllerBase
         }
     }
 
+    [HttpGet("{id}/timeline")]
+    public async Task<IActionResult> GetTimeline(Guid id, CancellationToken ct)
+    {
+        var events = await _timelineService.GetTimelineAsync(id, ct);
+        return Ok(events);
+    }
+
+    // ===================================================================
+    // 并发守卫
+    // ===================================================================
+    private async Task EnsureNoPendingForContractAsync(Guid contractId, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var hasPending = await Dapper.SqlMapper.QuerySingleAsync<int>(conn,
+            _sql.Get("Approval.Select.Request.PendingByContractId"),
+            new { Id = contractId });
+        if (hasPending > 0)
+            throw new InvalidOperationException("该合同存在待审批的申请，请处理完成后再提交");
+    }
+
     private Guid GetCurrentUserId()
     {
         var claim = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
         if (claim != null && Guid.TryParse(claim.Value, out var userId))
             return userId;
         return Guid.Empty;
-    }
-
-    [HttpGet("{id}/timeline")]
-    public async Task<IActionResult> GetTimeline(Guid id, CancellationToken ct)
-    {
-        var events = await _timelineService.GetTimelineAsync(id, ct);
-        return Ok(events);
     }
 }

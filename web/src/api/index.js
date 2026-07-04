@@ -64,6 +64,8 @@ export function getContract(id) { return request({ url: `/contracts/${id}`, meth
 export function createContract(data) { return request({ url: '/contracts', method: 'post', data }) }
 export function updateContract(id, data) { return request({ url: `/contracts/${id}`, method: 'put', data }) }
 export function terminateContract(id, data) { return request({ url: `/contracts/${id}/terminate`, method: 'post', data }) }
+export function rentAdjust(id, data) { return request({ url: `/contracts/${id}/rentadjust`, method: 'post', data }) }
+export function feeAdjust(id, data) { return request({ url: `/contracts/${id}/feeadjust`, method: 'post', data }) }
 export function renewContract(id, data) { return request({ url: `/contracts/${id}/renew`, method: 'post', data }) }
 export function previewRenewal(id) { return request({ url: `/contracts/${id}/renewal/preview`, method: 'get' }) }
 export function getLastRejectedRenewal(id) { return request({ url: `/contracts/${id}/renewal/lastrejected`, method: 'get' }) }
@@ -72,7 +74,7 @@ export function submitRenewal(id, data) { return request({ url: `/contracts/${id
 export function getRenewalHistory(id) { return request({ url: `/contracts/${id}/renewal/history`, method: 'get' }) }
 export function getRenewalChain(id) { return request({ url: `/contracts/${id}/renewal/chain`, method: 'get' }) }
 export function getAllowedOperations(id) { return request({ url: `/contracts/${id}/allowedoperations`, method: 'get' }) }
-export function suspendContract(id) { return request({ url: `/contracts/${id}/suspend`, method: 'post' }) }
+export function suspendContract(id, data) { return request({ url: `/contracts/${id}/suspend`, method: 'post', data }) }
 export function resumeContract(id) { return request({ url: `/contracts/${id}/resume`, method: 'post' }) }
 export function getContractTimeline(id) { return request({ url: `/contracts/${id}/timeline`, method: 'get' }) }
 
@@ -132,7 +134,7 @@ export function getMyApprovalRequests() { return request({ url: '/approvals/myre
 export function approveApproval(id, data) { return request({ url: `/approvals/${id}/approve`, method: 'post', data }) }
 export function rejectApproval(id, data) { return request({ url: `/approvals/${id}/reject`, method: 'post', data }) }
 export function getApprovalDetail(id) { return request({ url: `/approvals/${id}`, method: 'get' }) }
-export function getApprovalBizDetail(id) { return request({ url: `/approvals/${id}/bizdetail`, method: 'get' }) }
+export function getApprovalBizDetail(id) { return request({ url: `/approvals/${id}/bizdetail`, method: 'get', validateStatus: s => s < 500 }).catch(() => null) }
 export function getApprovalHistoryList(params) { return request({ url: '/approvals/history', method: 'get', params }) }
 export function getApprovalHistory(id) { return request({ url: `/approvals/${id}/history`, method: 'get' }) }
 export function cancelApproval(id, data) { return request({ url: `/approvals/${id}/cancel`, method: 'post', data }) }

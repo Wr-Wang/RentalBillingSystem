@@ -37,7 +37,7 @@ public class ContractTimelineService : IContractTimelineService
 
         // 合同创建事件（从 Contract 实体获取 CreatedAt）
         var created = await conn.QuerySingleOrDefaultAsync<DateTime?>(
-            "SELECT CreatedAt FROM Contracts WHERE Id=@Id", new { Id = contractId });
+            _sql.Get("Lease.Select.Contract.CreatedAt"), new { Id = contractId });
         if (created.HasValue)
             events.Add(new TimelineEvent { Time = created.Value, Type = "Created", Title = "合同创建" });
 

@@ -246,40 +246,121 @@
             </el-card>
           </el-tab-pane>
 
-          <!-- ═══════ Tab 3: 业务数据（统一对比表） ═══════ -->
+          <!-- ═══════ Tab 3: 业务数据（v3 增强版 — 三种布局） ═══════ -->
           <el-tab-pane v-if="showBizTab" name="biz" lazy>
             <template #label>
               <span class="tab-label"><el-icon><DataBoard /></el-icon> 业务数据</span>
             </template>
-            <el-card shadow="never" class="section-card">
-              <template #header>
-                <span style="font-weight: 600;">{{ bizDetail?.title || '变更对比' }}</span>
+            <div v-loading="bizLoading">
+              <template v-if="bizDetail">
+                <!-- ===== 1. 通用字段对比表（所有 BizType） ===== -->
+                <el-card v-if="bizDetail.fields?.length || bizDetail.effectiveDate" shadow="never" class="section-card">
+                  <template #header>
+                    <span style="font-weight: 600;">变更摘要</span>
+                    <el-tag v-if="bizDetail.effectiveDate" size="small" type="warning" effect="plain" style="float: right;">
+                      生效日: {{ bizDetail.effectiveDate }}
+                    </el-tag>
+                  </template>
+                  <el-table v-if="bizDetail.fields?.length" :data="bizDetail.fields" stripe size="small">
+                    <el-table-column prop="label" label="字段" width="130" />
+                    <el-table-column label="原值" width="180">
+                      <template #default="{ row }">
+                        <span v-if="row.oldValue" style="color: #909399;">{{ row.oldValue }}</span>
+                        <span v-else style="color: #c0c4cc;">-</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="新值" width="180">
+                      <template #default="{ row }">
+                        <span v-if="row.newValue" :style="{ color: row.isChanged ? '#e6a23c' : '#303133', fontWeight: row.isChanged ? 'bold' : 'normal' }">{{ row.newValue }}</span>
+                        <span v-else style="color: #c0c4cc;">-</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="变化" width="70" align="center">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.isChanged" size="small" type="warning" effect="plain">变更</el-tag>
+                        <el-tag v-else size="small" type="info" effect="plain">不变</el-tag>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </el-card>
+
+                <!-- ===== 2. [调价专用] 费用项目明细表 ===== -->
+                <el-card v-if="bizDetail.bizType === 'FEE_ADJUST' && bizDetail.feeItems?.length"
+                  shadow="never" class="section-card" style="margin-top: 14px;">
+                  <template #header>
+                    <span style="font-weight: 600;">费用项目明细</span>
+                    <el-tag size="small" type="warning" effect="plain" style="float: right;">
+                      共 {{ bizDetail.feeItems.length }} 项
+                    </el-tag>
+                  </template>
+                  <el-table :data="bizDetail.feeItems" stripe size="small">
+                    <el-table-column prop="feeName" label="收费项目" min-width="110" />
+                    <el-table-column label="原价" width="120" align="right">
+                      <template #default="{ row }">
+                        ¥{{ row.oldAmount?.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="新价" width="120" align="right">
+                      <template #default="{ row }">
+                        <span style="color: #e6a23c; font-weight: bold;">
+                          ¥{{ row.newAmount?.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
+                        </span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="涨幅" width="100" align="center">
+                      <template #default="{ row }">
+                        <el-tag
+                          :type="row.newAmount > row.oldAmount ? 'danger' : row.newAmount < row.oldAmount ? 'success' : 'info'"
+                          size="small" effect="plain">
+                          {{ row.oldAmount > 0 ? ((row.newAmount - row.oldAmount) / row.oldAmount * 100).toFixed(1) + '%' : '-' }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="billingMode" label="计费方式" width="100">
+                      <template #default="{ row }">
+                        {{ row.billingMode === 'MeterBased' ? '按表计量' : '固定金额' }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="unit" label="单位" width="60" />
+                  </el-table>
+                </el-card>
+
+                <!-- ===== 3. [终止专用] 终止详情卡片 ===== -->
+                <el-card v-if="bizDetail.bizType === 'TERMINATE'"
+                  shadow="never" class="section-card" style="margin-top: 14px;">
+                  <template #header>
+                    <span style="font-weight: 600;">终止详情</span>
+                  </template>
+                  <el-descriptions :column="2" border size="small">
+                    <el-descriptions-item label="终止类型">
+                      <el-tag
+                        :type="getFieldValue('终止类型') === '提前解约' ? 'danger' : 'info'"
+                        size="small">
+                        {{ getFieldValue('终止类型') }}
+                      </el-tag>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="实际搬离日">
+                      <span style="font-weight: 500;">{{ getFieldValue('实际搬离日') }}</span>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="押金处理">
+                      <el-tag
+                        :type="getFieldValue('押金处理') === '全额退还' ? 'success' : getFieldValue('押金处理') === '扣款后退还' ? 'warning' : 'info'"
+                        size="small">
+                        {{ getFieldValue('押金处理') }}
+                      </el-tag>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="终止原因" :span="2">
+                      {{ getFieldValue('终止原因') }}
+                    </el-descriptions-item>
+                  </el-descriptions>
+                </el-card>
+
+                <!-- ===== 4. 无业务字段时的兜底提示 ===== -->
+                <el-empty v-if="!bizDetail.fields?.length && !bizDetail.feeItems?.length && bizDetail.bizType !== 'TERMINATE'"
+                  description="暂无结构化业务数据" :image-size="60" />
               </template>
-              <div v-loading="bizLoading">
-                <el-table v-if="bizDetail?.fields?.length" :data="bizDetail.fields" stripe size="small">
-                  <el-table-column prop="label" label="字段" width="140" />
-                  <el-table-column label="原值" width="180">
-                    <template #default="{ row }">
-                      <span v-if="row.oldValue" style="color: #909399;">{{ row.oldValue }}</span>
-                      <span v-else style="color: #c0c4cc;">-</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="新值" width="180">
-                    <template #default="{ row }">
-                      <span v-if="row.newValue" :style="{ color: row.isChanged ? '#e6a23c' : '#303133', fontWeight: row.isChanged ? 'bold' : 'normal' }">{{ row.newValue }}</span>
-                      <span v-else style="color: #c0c4cc;">-</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="变化" width="80" align="center">
-                    <template #default="{ row }">
-                      <el-tag v-if="row.isChanged" size="small" type="warning" effect="plain">变更</el-tag>
-                      <el-tag v-else size="small" type="info" effect="plain">不变</el-tag>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <el-empty v-else description="暂无业务数据" :image-size="60" />
-              </div>
-            </el-card>
+              <el-empty v-else-if="!bizLoading" description="暂无结构化业务数据" :image-size="60" />
+            </div>
           </el-tab-pane>
 
           <!-- ═══════ Tab 4: 导入数据（lazy 确保 DOM 在 Tab 激活后才渲染） ═══════ -->
@@ -589,6 +670,13 @@ async function loadImportBatch(batchId) {
 }
 
 // —— Helpers ——
+// ★ v3: 按 label 查找审批业务字段值
+function getFieldValue(label) {
+  if (!bizDetail.value?.fields) return '-'
+  const field = bizDetail.value.fields.find(f => f.label === label)
+  return field?.newValue || field?.oldValue || '-'
+}
+
 function formatTime(t) {
   if (!t) return ''
   const d = new Date(t)

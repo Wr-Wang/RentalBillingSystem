@@ -107,6 +107,22 @@ public class ReceivablePlan : AggregateRoot
         Status = "Cancelled";
     }
 
+    /// <summary>冻结应收（暂停时调用）</summary>
+    public void Freeze()
+    {
+        if (Status != "Pending")
+            throw new InvalidOperationException($"状态为 {Status} 的应收不能冻结");
+        Status = "Frozen";
+    }
+
+    /// <summary>解冻应收（恢复时调用）</summary>
+    public void Unfreeze()
+    {
+        if (Status != "Frozen")
+            throw new InvalidOperationException($"状态为 {Status} 的应收不能解冻");
+        Status = "Pending";
+    }
+
     /// <summary>判断是否逾期</summary>
     public bool IsOverdue => Status is "Pending" or "Partial"
         && DueDate < DateOnly.FromDateTime(ChinaTime.Now);

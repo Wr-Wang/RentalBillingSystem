@@ -1,7 +1,10 @@
 using System.Text.RegularExpressions;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
+using RBS.Core.DomainServices;
+using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Base;
+using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 
@@ -9,12 +12,14 @@ namespace RBS.Application.EventHandlers;
 
 /// <summary>
 /// 审批完成事件处理器 — 审批通过/驳回后执行业务回调 + 通知相关人员
+/// ★ v3 重构：幂等守卫 + 按 TargetEntityType 分发
 /// </summary>
 public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEvent>
 {
     private readonly IImportService _importService;
     private readonly IContractService _contractService;
     private readonly IRenewalService _renewalService;
+    private readonly IContractDomainService _contractDomainService;
     private readonly IUnitOfWork _uow;
     private readonly INotificationService _notificationService;
     private readonly ISqlLoader _sql;
@@ -23,6 +28,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         IImportService importService,
         IContractService contractService,
         IRenewalService renewalService,
+        IContractDomainService contractDomainService,
         IUnitOfWork uow,
         INotificationService notificationService,
         ISqlLoader sql)
@@ -30,15 +36,273 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _importService = importService;
         _contractService = contractService;
         _renewalService = renewalService;
+        _contractDomainService = contractDomainService;
         _uow = uow;
         _notificationService = notificationService;
         _sql = sql;
     }
 
-    /// <summary>
-    /// 审批通过后，将变更请求的 items 逐条应用到合同上
-    /// </summary>
-    private async Task ApplyChangeRequestAsync(RBS.Core.Entities.Contract.ChangeRequest changeRequest, CancellationToken ct)
+    public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+    {
+        // ★ 幂等守卫：通过 ApprovalBizData.IsProcessed（直接查 DB 避免缓存的脏数据）
+        var bizData = await _uow.ApprovalBizData.GetByApprovalRequestIdAsync(@event.ApprovalRequestId, ct);
+        if (bizData != null && bizData.IsProcessed)
+        {
+            return; // 已处理过，跳过
+        }
+
+        // 1. 业务回调
+        await ExecuteBusinessCallbacksAsync(@event, bizData, ct);
+
+        // 2. ★ 幂等标记：直接用 SQL 更新（回调内部可能已调 CommitAsync 清空了 ChangeTracker）
+        if (bizData != null)
+        {
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Approval.Update.ApprovalBizData.MarkProcessed"),
+                new { Id = bizData.Id });  // 用匿名类型匹配 @Id
+        }
+
+        // 3. 通知相关人员
+        await SendNotificationsAsync(@event, ct);
+    }
+
+    private async Task ExecuteBusinessCallbacksAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
+    {
+        switch (@event.TargetEntityType)
+        {
+            case "Import":
+                await HandleImportAsync(@event, ct);
+                break;
+
+            case "ContractRent":
+                await HandleContractRentAsync(@event, bizData, ct);
+                break;
+
+            case "ContractFeeAdjust":
+                await HandleContractFeeAdjustAsync(@event, bizData, ct);
+                break;
+
+            case "ContractTerminate":
+                await HandleContractTerminateAsync(@event, bizData, ct);
+                break;
+
+            case "ContractRenewal":
+                await HandleContractRenewalAsync(@event, ct);
+                break;
+
+            case "ChangeRequest":
+                await HandleChangeRequestAsync(@event, ct);
+                break;
+
+            // ★ 向后兼容：旧审批 TargetEntityType="Contract"（调租或终止）
+            case "Contract":
+                await HandleLegacyContractAsync(@event, bizData, ct);
+                break;
+        }
+    }
+
+    // ★ 向后兼容：旧审批 TargetEntityType="Contract"
+    private async Task HandleLegacyContractAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
+    {
+        var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
+        if (request?.Title == null) return;
+
+        if (@event.Action == "Approved")
+        {
+            if (request.Title.StartsWith("[合同终止]"))
+            {
+                // 旧终止审批：直接 Terminate
+                if (bizData != null)
+                {
+                    await _contractDomainService.ExecuteContractTerminationAsync(
+                        bizData.ContractId, null, "FULL", request.Description ?? "合同终止", Guid.Empty, ct);
+                }
+                else
+                {
+                    // 极旧数据无 bizData → 直接调 Terminate
+                    var contract = await _uow.Contracts.GetByIdAsync(@event.TargetEntityId, ct);
+                    if (contract != null && contract.Status != "Terminated")
+                    {
+                        contract.Terminate(request.Description ?? "合同终止");
+                        await _uow.CommitAsync(ct);
+                    }
+                }
+            }
+            else
+            {
+                // 旧租金调整：从 Description 正则解析
+                var match = System.Text.RegularExpressions.Regex.Match(request.Description ?? "", @"→\s*¥([\d,]+)");
+                if (match.Success)
+                {
+                    var newAmount = decimal.Parse(match.Groups[1].Value.Replace(",", ""));
+                    await _contractService.AdjustRentAsync(@event.TargetEntityId, newAmount, ct);
+                }
+            }
+        }
+    }
+
+    // ===== Import =====
+    private async Task HandleImportAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+    {
+        if (@event.Action == "Approved")
+        {
+            await _importService.ExecuteApprovedImportAsync(@event.TargetEntityId, ct);
+        }
+        else if (@event.Action == "Rejected")
+        {
+            var batch = await _uow.ImportBatches.GetByIdAsync(@event.TargetEntityId, ct);
+            if (batch != null && batch.Status == "PendingApproval")
+            {
+                batch.Reject();
+                await _uow.CommitAsync(ct);
+            }
+        }
+    }
+
+    // ===== 租金调整 =====
+    private async Task HandleContractRentAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
+    {
+        if (@event.Action != "Approved" || bizData == null) return;
+        var contractId = bizData.ContractId;
+        var newAmount = bizData.NewAmount ?? 0;
+        var effectiveDate = bizData.EffectiveDate;
+
+        var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
+        if (contract == null) return;
+
+        // 调整租金（走领域模型）
+        contract.AdjustRent(newAmount, effectiveDate);
+
+        // 同步更新房租费 FeeConfig
+        var rentFeeConfig = contract.FeeConfigs
+            .FirstOrDefault(f => f.IsActive);
+        if (rentFeeConfig != null)
+        {
+            var effDateStr = effectiveDate?.ToString("yyyy-MM-dd") ?? "";
+            if (!string.IsNullOrEmpty(effDateStr))
+            {
+                var expiryDate = DateOnly.Parse(effDateStr).AddDays(-1).ToString("yyyy-MM-dd");
+                rentFeeConfig.ExpireOn(expiryDate);
+
+                // 旧配置到期 + 新配置
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
+                    new object[] { expiryDate, rentFeeConfig.Id }, ct);
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
+                    new object[] { Guid.NewGuid(), contract.Id, rentFeeConfig.FeeCodeId, "FixedAmount",
+                        newAmount, effDateStr, contract.CreatedBy, ChinaTime.Now }, ct);
+            }
+        }
+
+        await _uow.ExecuteSqlRawAsync(
+            _sql.Get("Lease.Update.Contract.RentAmount"),
+            new { Id = contractId, NewAmount = newAmount }, ct);
+        await _uow.CommitAsync(ct);
+    }
+
+    // ===== 费用调价 =====
+    private async Task HandleContractFeeAdjustAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
+    {
+        if (@event.Action != "Approved" || bizData == null) return;
+
+        var feeItems = await _uow.ApprovalFeeItems.GetByApprovalRequestIdAsync(@event.ApprovalRequestId, ct);
+        if (feeItems.Count == 0) return;
+
+        var approvalReq = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
+        var userId = approvalReq?.CreatedBy ?? Guid.Empty;
+
+        var effectiveDate = bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
+        if (string.IsNullOrEmpty(effectiveDate)) return;
+        var expiryDate = DateOnly.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
+
+        foreach (var item in feeItems)
+        {
+            // 旧配置到期
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
+                new { ExpiryDate = expiryDate, ContractId = item.ContractId, FeeCodeId = item.FeeCodeId });
+
+            if (item.BillingMode == "MeterBased")
+            {
+                // 抄表计量：Amount 不变，调 UnitPrice
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Contract.Insert.ContractFeeConfig.MeterBased"),
+                    new { Id = Guid.NewGuid(), ContractId = item.ContractId, FeeCodeId = item.FeeCodeId,
+                        Amount = item.OldAmount, Unit = item.Unit, UnitPrice = item.NewAmount,
+                        EffectiveDate = effectiveDate, CreatedBy = userId });
+            }
+            else
+            {
+                // 固定金额：调 Amount
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
+                    new object[] { Guid.NewGuid(), item.ContractId, item.FeeCodeId, "FixedAmount",
+                        item.NewAmount, effectiveDate, userId, ChinaTime.Now }, ct);
+            }
+        }
+
+        await _uow.CommitAsync(ct);
+    }
+
+    // ===== 合同终止 =====
+    private async Task HandleContractTerminateAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
+    {
+        if (@event.Action != "Approved" || bizData == null) return;
+
+        await _contractDomainService.ExecuteContractTerminationAsync(
+            bizData.ContractId,
+            bizData.ActualEndDate,
+            bizData.DepositReturn ?? "FULL",
+            bizData.Reason ?? "合同终止",
+            Guid.Empty, ct);
+    }
+
+    // ===== 续签 =====
+    private async Task HandleContractRenewalAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+    {
+        if (@event.Action == "Approved")
+        {
+            await _renewalService.ExecuteRenewalAsync(@event.TargetEntityId, ct);
+        }
+        else if (@event.Action == "Rejected")
+        {
+            var renewal = await _uow.RenewalRequests.GetByIdAsync(@event.TargetEntityId, ct);
+            if (renewal != null)
+            {
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Approval.Update.RenewalRequest.ToRejected"),
+                    new object[] { renewal.Id }, ct);
+            }
+        }
+    }
+
+    // ===== 变更请求 =====
+    private async Task HandleChangeRequestAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+    {
+        if (@event.Action == "Approved")
+        {
+            var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
+            if (changeRequest != null)
+            {
+                changeRequest.Approve();
+                await _uow.CommitAsync(ct);
+                await ApplyChangeRequestAsync(changeRequest, ct);
+            }
+        }
+        else if (@event.Action == "Rejected")
+        {
+            var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
+            if (changeRequest != null)
+            {
+                changeRequest.Reject();
+                await _uow.CommitAsync(ct);
+            }
+        }
+    }
+
+    /// <summary>变更请求的 items 逐条应用到合同</summary>
+    private async Task ApplyChangeRequestAsync(ChangeRequest changeRequest, CancellationToken ct)
     {
         var contract = await _uow.Contracts.GetByIdAsync(changeRequest.ContractId, ct);
         if (contract == null) return;
@@ -54,8 +318,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                             (decimal.TryParse(item.NewValue, out var parsed) ? parsed : 0);
                         if (amount > 0)
                         {
-                            contract!.SetRentAmount(amount);
-                            await _uow!.Contracts.UpdateAsync(contract, ct);
+                            contract.SetRentAmount(amount);
+                            await _uow.Contracts.UpdateAsync(contract, ct);
                         }
                     }
                     break;
@@ -65,118 +329,18 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     {
                         var expiryStr = changeRequest.EffectiveDate?.ToString("yyyy-MM-dd") ??
                             DateTime.UtcNow.ToString("yyyy-MM-dd");
-                        // 到期停用旧配置
-                        await _uow!.ExecuteSqlRawAsync(
+                        await _uow.ExecuteSqlRawAsync(
                             _sql.Get("Approval.Update.ContractFeeConfig.ExpireById"),
                             new object[] { expiryStr, item.TargetId.Value }, ct);
-                        // 复制旧配置并创建新版本（保留原有 FeeCodeId 和 BillingMode）
                         await _uow.ExecuteSqlRawAsync(
                             _sql.Get("Approval.Insert.ContractFeeConfig.CopyFrom"),
                             new object[] { changeRequest.ContractId, item.NewValueDecimal.Value, expiryStr,
-                                _uow is not null ? contract.CreatedBy : Guid.Empty, item.TargetId.Value }, ct);
+                                Guid.Empty, item.TargetId.Value }, ct);
                     }
                     break;
             }
         }
-        await _uow!.CommitAsync(ct);
-    }
-
-    public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
-    {
-        // 1. 业务回调
-        await ExecuteBusinessCallbacksAsync(@event, ct);
-
-        // 2. 通知相关人员
-        await SendNotificationsAsync(@event, ct);
-    }
-
-    private async Task ExecuteBusinessCallbacksAsync(ApprovalCompletedEvent @event, CancellationToken ct)
-    {
-        switch (@event.TargetEntityType)
-        {
-            case "Import":
-                if (@event.Action == "Approved")
-                {
-                    await _importService.ExecuteApprovedImportAsync(@event.TargetEntityId, ct);
-                }
-                else if (@event.Action == "Rejected")
-                {
-                    var batch = await _uow.ImportBatches.GetByIdAsync(@event.TargetEntityId, ct);
-                    if (batch != null && batch.Status == "PendingApproval")
-                    {
-                        batch.Reject();
-                        await _uow.CommitAsync(ct);
-                    }
-                }
-                break;
-
-            case "Contract":
-                if (@event.Action == "Approved")
-                {
-                    var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
-                    if (request?.Description == null) break;
-
-                    // 合同终止
-                    if (request.Title.StartsWith("[合同终止]"))
-                    {
-                        var contract = await _uow.Contracts.GetByIdAsync(@event.TargetEntityId, ct);
-                        if (contract != null && contract.Status != "Terminated")
-                        {
-                            contract.Terminate(request.Description);
-                            await _uow.CommitAsync(ct);
-                        }
-                    }
-                    else
-                    {
-                        // 租金调整（现有逻辑）
-                        var match = Regex.Match(request.Description, @"→\s*¥([\d,]+)");
-                        if (match.Success && decimal.TryParse(match.Groups[1].Value.Replace(",", ""), out var newAmount))
-                        {
-                            await _contractService.AdjustRentAsync(@event.TargetEntityId, newAmount, ct);
-                        }
-                    }
-                }
-                break;
-
-            case "ContractRenewal":
-                if (@event.Action == "Approved")
-                {
-                    await _renewalService.ExecuteRenewalAsync(@event.TargetEntityId, ct);
-                }
-                else if (@event.Action == "Rejected")
-                {
-                    var renewal = await _uow.RenewalRequests.GetByIdAsync(@event.TargetEntityId, ct);
-                    if (renewal != null)
-                    {
-                        await _uow.ExecuteSqlRawAsync(
-                            _sql.Get("Approval.Update.RenewalRequest.ToRejected"),
-                            new object[] { renewal.Id }, ct);
-                    }
-                }
-                break;
-
-            case "ChangeRequest":
-                if (@event.Action == "Approved")
-                {
-                    var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
-                    if (changeRequest != null)
-                    {
-                        changeRequest.Approve();
-                        await _uow.CommitAsync(ct);
-                        await ApplyChangeRequestAsync(changeRequest, ct);
-                    }
-                }
-                else if (@event.Action == "Rejected")
-                {
-                    var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
-                    if (changeRequest != null)
-                    {
-                        changeRequest.Reject();
-                        await _uow.CommitAsync(ct);
-                    }
-                }
-                break;
-        }
+        await _uow.CommitAsync(ct);
     }
 
     private async Task SendNotificationsAsync(ApprovalCompletedEvent @event, CancellationToken ct)
@@ -186,25 +350,21 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
         if (@event.Action == "Approved")
         {
-            // 通知提交人
             await _notificationService.NotifySubmitterAsync(
                 @event.ApprovalRequestId, $"{request.Title} 已通过", null, ct);
-
-            // 通知全部审批参与人
             await _notificationService.NotifyAllParticipantsAsync(
                 @event.ApprovalRequestId, $"{request.Title} 已通过", null, ct);
         }
         else if (@event.Action == "Rejected")
         {
-            // 找驳回记录中的审批意见
             var records = (await _uow.ApprovalRequests.GetByIdWithRecordsAsync(@event.ApprovalRequestId, ct))?.Records;
             var rejectRecord = records?.FirstOrDefault(r => r.Action == "Rejected");
             var reason = rejectRecord?.Comment;
             var content = reason != null ? $"原因：{reason}" : null;
-
-            // 通知提交人
             await _notificationService.NotifySubmitterAsync(
                 @event.ApprovalRequestId, $"{request.Title} 已驳回", content, ct);
         }
     }
+
+    // 需要 using RBS.Core.Entities.Contract — 已通过 namespace 引用
 }

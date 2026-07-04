@@ -23,6 +23,12 @@ public class SchedulingHostedService : BackgroundService
         _logger = logger;
     }
 
+    private ISqlLoader ResolveSql()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<ISqlLoader>();
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("调度引擎启动");
@@ -112,31 +118,28 @@ public class SchedulingHostedService : BackgroundService
 
     private async Task<int> GetRunningLogsAsync(IDbConnectionFactory db, string taskName, Guid companyId, string month, CancellationToken ct)
     {
+        var sql = ResolveSql();
         using var conn = db.CreateConnection(); conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(1) FROM ScheduledTaskLogs WHERE TaskName=@p0 AND CompanyId=@p1 AND TargetMonth=@p2 AND Status='Running'";
-        cmd.Parameters.Add(new { });
-        // 用 Dapper 替代
         return await Dapper.SqlMapper.QuerySingleAsync<int>(conn,
-            "SELECT COUNT(1) FROM ScheduledTaskLogs WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running'",
+            sql.Get("Scheduling.Select.TaskLog.Running"),
             new { Name = taskName, Cid = companyId, Month = month });
     }
 
     private async Task CreateTaskLogAsync(IDbConnectionFactory db, string taskName, Guid companyId, string month, string status, CancellationToken ct)
     {
+        var sql = ResolveSql();
         using var conn = db.CreateConnection(); conn.Open();
         await Dapper.SqlMapper.ExecuteAsync(conn,
-            "INSERT INTO ScheduledTaskLogs (Id, TaskName, CompanyId, TargetMonth, Status, StartedAt, HeartbeatAt, CreatedBy, CreatedAt) " +
-            "VALUES (@Id, @Name, @Cid, @Month, @Status, @Now, @Now, @Empty, @Now)",
+            sql.Get("Scheduling.Insert.TaskLog.Default"),
             new { Id = Guid.NewGuid(), Name = taskName, Cid = companyId, Month = month, Status = status, Now = ChinaTime.Now, Empty = Guid.Empty });
     }
 
     private async Task UpdateTaskLogAsync(IDbConnectionFactory db, string taskName, Guid companyId, string month, string status, string? error, CancellationToken ct)
     {
+        var sql = ResolveSql();
         using var conn = db.CreateConnection(); conn.Open();
         await Dapper.SqlMapper.ExecuteAsync(conn,
-            "UPDATE ScheduledTaskLogs SET Status=@Status, CompletedAt=@Now, ErrorMessage=@Error " +
-            "WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running'",
+            sql.Get("Scheduling.Update.TaskLog.Complete"),
             new { Status = status, Now = ChinaTime.Now, Error = error, Name = taskName, Cid = companyId, Month = month });
     }
 }

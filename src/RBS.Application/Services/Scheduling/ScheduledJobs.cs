@@ -55,12 +55,14 @@ public class LateFeeCalcJob : IScheduledJob
     private readonly IUnitOfWork _uow;
     private readonly IBillingDomainService _billingDomain;
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
-    public LateFeeCalcJob(IUnitOfWork uow, IBillingDomainService billingDomain, IDbConnectionFactory db)
+    public LateFeeCalcJob(IUnitOfWork uow, IBillingDomainService billingDomain, IDbConnectionFactory db, ISqlLoader sql)
     {
         _uow = uow;
         _billingDomain = billingDomain;
         _db = db;
+        _sql = sql;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
@@ -83,7 +85,7 @@ public class LateFeeCalcJob : IScheduledJob
                 plan.SetLateFee(fee);
                 using var conn = _db.CreateConnection(); conn.Open();
                 await conn.ExecuteAsync(
-                    "UPDATE ReceivablePlans SET LateFee = @Fee WHERE Id = @Id",
+                    _sql.Get("Billing.Update.ReceivablePlan.LateFee"),
                     new { Fee = fee, Id = plan.Id });
                 count++;
             }

@@ -69,6 +69,17 @@ public class Contract : AggregateRoot, IHasCompany
         RentAmount = amount;
     }
 
+    /// <summary>调租 — 非 Draft 状态也可调整租金（审批通过后回调调用）</summary>
+    public void AdjustRent(decimal newAmount, DateOnly? effectiveDate = null)
+    {
+        if (newAmount < 0) throw new ArgumentException("租金不能为负数");
+        if (Status != "Active" && Status != "Suspended")
+            throw new InvalidOperationException("只有生效中或已暂停的合同可以调整租金");
+        var oldAmount = RentAmount;
+        RentAmount = newAmount;
+        AddDomainEvent(new ContractRentAdjustedEvent(Id, oldAmount, newAmount, effectiveDate));
+    }
+
     public void SetDepositAmount(decimal amount)
     {
         if (amount < 0) throw new ArgumentException("押金不能为负数");
@@ -185,6 +196,8 @@ public class Contract : AggregateRoot, IHasCompany
         if (Status != "Suspended")
             throw new InvalidOperationException("只有已暂停的合同可以恢复");
         Status = "Active";
+        ResumedAt = ChinaTime.Now;
+        AddDomainEvent(new ContractResumedEvent(Id, ResumedAt.Value));
     }
 
     public void Terminate(string reason)
