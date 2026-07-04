@@ -6,24 +6,43 @@
 
     <!-- 搜索栏 -->
     <div class="search-bar">
-      <el-select v-model="search.tableName" placeholder="选择实体类型" clearable style="width: 160px;" @change="fetchHistory">
-        <el-option label="公司管理" value="Companies" />
-        <el-option label="审批流程" value="ApprovalTypes" />
-        <el-option label="审批级别" value="ApprovalLevelConfigs" />
-        <el-option label="房源" value="HousingUnits" />
-        <el-option label="房型" value="RoomTypes" />
-        <el-option label="费用项目" value="FeeCodes" />
-        <el-option label="定价标准" value="RoomPricingStandards" />
-        <el-option label="楼层级别" value="FloorLevelBands" />
-        <el-option label="支付通道" value="PaymentChannels" />
-        <el-option label="税率配置" value="TaxRateConfigs" />
+      <el-select v-model="search.tableName" placeholder="选择实体类型" clearable style="width: 180px;" @change="fetchHistory">
         <el-option label="会计科目" value="AccountingSubjects" />
-        <el-option label="滞纳金配置" value="LateFeeConfigs" />
+        <el-option label="审批级别" value="ApprovalLevelConfigs" />
+        <el-option label="审批申请" value="ApprovalRequests" />
+        <el-option label="审批类型" value="ApprovalTypes" />
+        <el-option label="催缴记录" value="CollectionRecords" />
+        <el-option label="催缴阶段" value="CollectionStages" />
+        <el-option label="公司" value="Companies" />
+        <el-option label="合同费用配置" value="ContractFeeConfigs" />
+        <el-option label="合同" value="Contracts" />
+        <el-option label="账单" value="DebitNotes" />
+        <el-option label="押金日志" value="DepositLogs" />
+        <el-option label="收费项目" value="FeeCodes" />
+        <el-option label="费用模板" value="FeeCodeTemplates" />
+        <el-option label="楼层级别" value="FloorLevelBands" />
+        <el-option label="节假日" value="HolidayCalendars" />
+        <el-option label="房源" value="HousingUnits" />
+        <el-option label="导入批次" value="ImportBatches" />
+        <el-option label="导入明细" value="ImportBatchItems" />
         <el-option label="调度任务" value="JobSchedules" />
-        <el-option label="排期执行实例" value="JobScheduleExecutions" />
+        <el-option label="调度执行" value="JobScheduleExecutions" />
+        <el-option label="任务模板" value="JobTemplates" />
+        <el-option label="凭证分录" value="JournalEntries" />
+        <el-option label="滞纳金配置" value="LateFeeConfigs" />
         <el-option label="菜单" value="Menus" />
+        <el-option label="抄表估读" value="MeterEstimationConfigs" />
+        <el-option label="抄表记录" value="MeterReadings" />
+        <el-option label="支付通道" value="PaymentChannels" />
+        <el-option label="收款" value="Receipts" />
+        <el-option label="应收计划" value="ReceivablePlans" />
         <el-option label="角色" value="Roles" />
+        <el-option label="定价标准" value="RoomPricingStandards" />
+        <el-option label="房型" value="RoomTypes" />
+        <el-option label="税率" value="TaxRateConfigs" />
+        <el-option label="租客" value="Tenants" />
         <el-option label="用户" value="Users" />
+        <el-option label="凭证" value="Vouchers" />
       </el-select>
       <el-input v-model="search.recordId" placeholder="记录ID" clearable style="width: 200px;" @clear="fetchHistory" @keyup.enter="fetchHistory" />
       <el-date-picker

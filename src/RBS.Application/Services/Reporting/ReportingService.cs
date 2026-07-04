@@ -131,11 +131,10 @@ public class ReportingService : IReportingService
         using var conn = _db.CreateConnection(); conn.Open();
         var result = await conn.QueryAsync(
             @"SELECT hu.BuildingName, hu.Id AS BuildingId,
-            COUNT(r.Id) AS TotalRooms,
-            SUM(CASE WHEN r.Status='Rented' THEN 1 ELSE 0 END) AS RentedRooms,
-            ROUND(CAST(SUM(CASE WHEN r.Status='Rented' THEN 1 ELSE 0 END) AS FLOAT)/NULLIF(COUNT(r.Id),0)*100,1) AS OccupancyRate
+            COUNT(hu.Id) AS TotalRooms,
+            SUM(CASE WHEN hu.Status='Rented' THEN 1 ELSE 0 END) AS RentedRooms,
+            ROUND(CAST(SUM(CASE WHEN hu.Status='Rented' THEN 1 ELSE 0 END) AS FLOAT)/NULLIF(COUNT(hu.Id),0)*100,1) AS OccupancyRate
             FROM HousingUnits hu
-            LEFT JOIN Rooms r ON r.BuildingId = hu.Id
             WHERE hu.BuildingName IS NOT NULL
             GROUP BY hu.BuildingName, hu.Id ORDER BY hu.BuildingName");
         return result;

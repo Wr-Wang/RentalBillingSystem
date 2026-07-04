@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using System.Linq.Expressions;
 using RBS.Core.Common;
 using RBS.Core.Entities.Organization;
@@ -8,6 +8,7 @@ using RBS.Core.Entities.Contract;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Core.Interfaces.Services;
 
 namespace RBS.Infrastructure.Data.Repositories;
 
@@ -19,11 +20,13 @@ public class DapperUserRepository : IUserRepository
 {
     protected readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
+    private readonly IAuditLogWriter _auditWriter;
 
-    public DapperUserRepository(IDbConnectionFactory db, ISqlLoader sql)
+    public DapperUserRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter)
     {
         _db = db;
         _sql = sql;
+        _auditWriter = auditWriter;
     }
 
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -40,17 +43,22 @@ public class DapperUserRepository : IUserRepository
     {
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Identity.Insert.User.Default"), entity);
+        var changes = new Dictionary<string, object?> { ["Username"] = entity.Username, ["DisplayName"] = entity.DisplayName };
+        await _auditWriter.LogChangesAsync("Users", entity.Id.ToString(), "Create", changes, entity.CreatedBy, ct);
         return entity;
     }
     public async Task UpdateAsync(User entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Identity.Update.User.Default"), entity);
+        var changes = new Dictionary<string, object?> { ["DisplayName"] = entity.DisplayName, ["Phone"] = entity.Phone, ["Email"] = entity.Email };
+        await _auditWriter.LogChangesAsync("Users", entity.Id.ToString(), "Update", changes, entity.UpdatedBy ?? Guid.Empty, ct);
     }
     public async Task DeleteAsync(User entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Identity.Delete.User.ById"), new { entity.Id });
+        await _auditWriter.LogChangesAsync("Users", entity.Id.ToString(), "Delete", new() { ["Id"] = entity.Id.ToString() }, Guid.Empty, ct);
     }
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default)
     {
@@ -93,6 +101,7 @@ public class DapperUserRepository : IUserRepository
             await conn.ExecuteAsync(_sql.Get("Identity.Insert.UserRole.Default"),
                 new { Id = Guid.NewGuid(), UserId = userId, RoleId = roleId, CreatedBy = changedBy, CreatedAt = ChinaTime.Now }, tx);
         tx.Commit();
+        await _auditWriter.LogChangesAsync("UserRoles", userId.ToString(), "Update", new() { ["RoleIds"] = string.Join(",", newRoleIds) }, changedBy, ct);
     }
     public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, Expression<Func<User, bool>>? predicate = null, Func<IQueryable<User>, IOrderedQueryable<User>>? orderBy = null, CancellationToken ct = default)
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
@@ -106,13 +115,14 @@ public class DapperRoleRepository : IRoleRepository
 {
     protected readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
-    public DapperRoleRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
+    private readonly IAuditLogWriter _auditWriter;
+    public DapperRoleRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) { _db = db; _sql = sql; _auditWriter = auditWriter; }
 
     public async Task<Role?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ById"), new { Id = id }); }
     public async Task<List<Role>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>(_sql.Get("Authorization.Select.Role.All"))).ToList(); }
-    public async Task<Role> AddAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Insert.Role.Default"), entity); return entity; }
-    public async Task UpdateAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Update.Role.Default"), entity); }
-    public async Task DeleteAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Delete.Role.ById"), new { entity.Id }); }
+    public async Task<Role> AddAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Insert.Role.Default"), entity); await _auditWriter.LogChangesAsync("Roles", entity.Id.ToString(), "Create", new() { ["Name"] = entity.Name, ["Code"] = entity.Code }, entity.CreatedBy, ct); return entity; }
+    public async Task UpdateAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Update.Role.Default"), entity); await _auditWriter.LogChangesAsync("Roles", entity.Id.ToString(), "Update", new() { ["Name"] = entity.Name }, entity.UpdatedBy ?? Guid.Empty, ct); }
+    public async Task DeleteAsync(Role entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Delete.Role.ById"), new { entity.Id }); await _auditWriter.LogChangesAsync("Roles", entity.Id.ToString(), "Delete", new() { ["Id"] = entity.Id.ToString() }, Guid.Empty, ct); }
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Authorization.Select.Role.Exists"), new { Id = id }) > 0; }
     public async Task<Role?> GetByCodeAsync(string code, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ByCode"), new { Code = code }); }
     public async Task<List<Role>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>(_sql.Get("Authorization.Select.Role.ByUserId"), new { UserId = userId })).ToList(); }
@@ -129,13 +139,14 @@ public class DapperMenuRepository : IMenuRepository
 {
     protected readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
-    public DapperMenuRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
+    private readonly IAuditLogWriter _auditWriter;
+    public DapperMenuRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) { _db = db; _sql = sql; _auditWriter = auditWriter; }
 
     public async Task<Menu?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Menu>(_sql.Get("Authorization.Select.Menu.ById"), new { Id = id }); }
     public async Task<List<Menu>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>(_sql.Get("Authorization.Select.Menu.All"))).ToList(); }
-    public async Task<Menu> AddAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Insert.Menu.Default"), entity); return entity; }
-    public async Task UpdateAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Update.Menu.Default"), entity); }
-    public async Task DeleteAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Delete.Menu.ById"), new { entity.Id }); }
+    public async Task<Menu> AddAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Insert.Menu.Default"), entity); await _auditWriter.LogChangesAsync("Menus", entity.Id.ToString(), "Create", new() { ["Name"] = entity.Name, ["PermissionCode"] = entity.PermissionCode }, entity.CreatedBy, ct); return entity; }
+    public async Task UpdateAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Update.Menu.Default"), entity); await _auditWriter.LogChangesAsync("Menus", entity.Id.ToString(), "Update", new() { ["Name"] = entity.Name }, entity.UpdatedBy ?? Guid.Empty, ct); }
+    public async Task DeleteAsync(Menu entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Authorization.Delete.Menu.ById"), new { entity.Id }); await _auditWriter.LogChangesAsync("Menus", entity.Id.ToString(), "Delete", new() { ["Id"] = entity.Id.ToString() }, Guid.Empty, ct); }
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Authorization.Select.Menu.Exists"), new { Id = id }) > 0; }
     public async Task<List<Menu>> GetByRoleIdsAsync(List<Guid> roleIds, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>(_sql.Get("Authorization.Select.Menu.ByRoleIds"), new { Ids = roleIds })).ToList(); }
     public async Task<List<Menu>> GetTreeAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Menu>(_sql.Get("Authorization.Select.Menu.All"))).ToList(); }
@@ -151,13 +162,14 @@ public class DapperCompanyRepository : ICompanyRepository
 {
     protected readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
-    public DapperCompanyRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
+    private readonly IAuditLogWriter _auditWriter;
+    public DapperCompanyRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) { _db = db; _sql = sql; _auditWriter = auditWriter; }
 
     public async Task<Company?> GetByIdAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Company>(_sql.Get("Organization.Select.Company.ById"), new { Id = id }); }
     public async Task<List<Company>> GetAllAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Company>(_sql.Get("Organization.Select.Company.All"))).ToList(); }
-    public async Task<Company> AddAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Insert.Company.Default"), entity); return entity; }
-    public async Task UpdateAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Default"), entity); }
-    public async Task DeleteAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Delete.Company.ById"), new { entity.Id }); }
+    public async Task<Company> AddAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Insert.Company.Default"), entity); await _auditWriter.LogChangesAsync("Companies", entity.Id.ToString(), "Create", new() { ["Name"] = entity.Name, ["Code"] = entity.Code }, entity.CreatedBy, ct); return entity; }
+    public async Task UpdateAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Default"), entity); await _auditWriter.LogChangesAsync("Companies", entity.Id.ToString(), "Update", new() { ["Name"] = entity.Name }, entity.UpdatedBy ?? Guid.Empty, ct); }
+    public async Task DeleteAsync(Company entity, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Organization.Delete.Company.ById"), new { entity.Id }); await _auditWriter.LogChangesAsync("Companies", entity.Id.ToString(), "Delete", new() { ["Id"] = entity.Id.ToString() }, Guid.Empty, ct); }
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Organization.Select.Company.Exists"), new { Id = id }) > 0; }
     public async Task<Company?> GetByNameAsync(string name, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Company>(_sql.Get("Organization.Select.Company.ByName"), new { Name = name }); }
     public async Task<List<Company>> GetActiveAsync(CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Company>(_sql.Get("Organization.Select.Company.Active"))).ToList(); }
@@ -169,7 +181,8 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
 {
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
-    public DapperApprovalRequestRepository(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
+    private readonly IAuditLogWriter _auditWriter;
+    public DapperApprovalRequestRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) { _db = db; _sql = sql; _auditWriter = auditWriter; }
 
     public async Task<ApprovalRequest?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
@@ -188,6 +201,7 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
         if (entity.CreatedAt == default) entity.SetCreated(Guid.NewGuid(), ChinaTime.Now, null, null);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Approval.Insert.Request.Default"), entity);
+        await _auditWriter.LogChangesAsync("ApprovalRequests", entity.Id.ToString(), "Create", new() { ["Title"] = entity.Title, ["Status"] = entity.Status ?? "Pending" }, entity.CreatedBy, ct);
         return entity;
     }
 
@@ -195,12 +209,14 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
     {
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Approval.Update.Request.Default"), entity);
+        await _auditWriter.LogChangesAsync("ApprovalRequests", entity.Id.ToString(), "Update", new() { ["Status"] = entity.Status }, entity.UpdatedBy ?? entity.CreatedBy, ct);
     }
 
     public async Task DeleteAsync(ApprovalRequest entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Approval.Delete.Request.ById"), new { entity.Id });
+        await _auditWriter.LogChangesAsync("ApprovalRequests", entity.Id.ToString(), "Delete", new() { ["Id"] = entity.Id.ToString() }, Guid.Empty, ct);
     }
 
     public Task<PagedResult<ApprovalRequest>> GetPagedAsync(int page, int pageSize,
@@ -291,7 +307,7 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
 public class DapperFeeCodeRepository : DapperRepository<FeeCode>, IFeeCodeRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperFeeCodeRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db, "FeeCodes")
+    public DapperFeeCodeRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter, "FeeCodes")
     {
         _sql = sql;
     }
@@ -305,7 +321,7 @@ public class DapperFeeCodeRepository : DapperRepository<FeeCode>, IFeeCodeReposi
 public class DapperPaymentChannelRepository : DapperRepository<PaymentChannel>, IPaymentChannelRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperPaymentChannelRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db, "PaymentChannels")
+    public DapperPaymentChannelRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter, "PaymentChannels")
     {
         _sql = sql;
     }
@@ -317,7 +333,7 @@ public class DapperPaymentChannelRepository : DapperRepository<PaymentChannel>, 
 public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>, IHolidayCalendarRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperHolidayCalendarRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db, "HolidayCalendars")
+    public DapperHolidayCalendarRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter, "HolidayCalendars")
     {
         _sql = sql;
     }
@@ -330,7 +346,7 @@ public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>
 public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperTenantRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    public DapperTenantRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter)
     {
         _sql = sql;
     }
@@ -343,7 +359,7 @@ public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepositor
 public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperReceiptRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    public DapperReceiptRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter)
     {
         _sql = sql;
     }
@@ -358,7 +374,7 @@ public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptReposi
 public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, IReceivablePlanRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperReceivablePlanRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    public DapperReceivablePlanRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter)
     {
         _sql = sql;
     }
@@ -373,7 +389,7 @@ public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, 
 public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMeterReadingRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperMeterReadingRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    public DapperMeterReadingRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter)
     {
         _sql = sql;
     }
@@ -388,7 +404,7 @@ public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMet
 public class DapperContractRepository : DapperRepository<Contract>, IContractRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperContractRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    public DapperContractRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter)
     {
         _sql = sql;
     }
@@ -405,7 +421,7 @@ public class DapperContractRepository : DapperRepository<Contract>, IContractRep
 public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, IRenewalRequestRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperRenewalRequestRepository(IDbConnectionFactory db, ISqlLoader sql) : base(db)
+    public DapperRenewalRequestRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) : base(db, auditWriter)
     {
         _sql = sql;
     }

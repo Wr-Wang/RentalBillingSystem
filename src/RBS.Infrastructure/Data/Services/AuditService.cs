@@ -118,30 +118,34 @@ public class AuditService : IAuditService
         var now = RBS.Core.Common.ChinaTime.Now;
         using var conn = _db.CreateConnection(); conn.Open();
 
-        var result = await conn.QuerySingleAsync(@"
-            SELECT
-                ISNULL((SELECT COUNT(*) FROM [Companies_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @todayStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @todayStart), 0) AS TodayCount,
-                ISNULL((SELECT COUNT(*) FROM [Companies_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @weekStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @weekStart), 0) AS WeekCount,
-                ISNULL((SELECT COUNT(*) FROM [Companies_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Menus_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Roles_Audit] WHERE [AuditChangedAt] >= @monthStart), 0)
-                + ISNULL((SELECT COUNT(*) FROM [Users_Audit] WHERE [AuditChangedAt] >= @monthStart), 0) AS MonthCount,
-                4 AS TotalTables",
-            new { todayStart = now.Date, weekStart = now.AddDays(-(int)now.DayOfWeek).Date,
-                  monthStart = new DateTime(now.Year, now.Month, 1) });
+        var tables = (await conn.QueryAsync<string>(
+            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME LIKE '%_Audit%'")).ToList();
+
+        long todaySum = 0, weekSum = 0, monthSum = 0;
+        var weekStart = now.AddDays(-(int)now.DayOfWeek).Date;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        foreach (var t in tables)
+        {
+            var row = await conn.QuerySingleAsync(
+                $"SELECT COUNT(*) FROM [{t}] WHERE [AuditChangedAt] >= @d0",
+                new { d0 = now.Date });
+            todaySum += (long)row;
+            row = await conn.QuerySingleAsync(
+                $"SELECT COUNT(*) FROM [{t}] WHERE [AuditChangedAt] >= @d0",
+                new { d0 = weekStart });
+            weekSum += (long)row;
+            row = await conn.QuerySingleAsync(
+                $"SELECT COUNT(*) FROM [{t}] WHERE [AuditChangedAt] >= @d0",
+                new { d0 = monthStart });
+            monthSum += (long)row;
+        }
 
         return new AuditStatsDto
         {
-            TodayCount = (int)result.TodayCount,
-            WeekCount = (int)result.WeekCount,
-            MonthCount = (int)result.MonthCount,
-            TotalTables = (int)result.TotalTables
+            TodayCount = (int)todaySum,
+            WeekCount = (int)weekSum,
+            MonthCount = (int)monthSum,
+            TotalTables = tables.Count
         };
     }
 

@@ -1,6 +1,7 @@
 using Dapper;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Core.Interfaces.Services;
 
 namespace RBS.Infrastructure.Data.Repositories;
 
@@ -8,10 +9,12 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
 {
     protected readonly IDbConnectionFactory _db;
     protected readonly string _tableName;
+    protected readonly IAuditLogWriter _auditWriter;
 
-    public DapperRepository(IDbConnectionFactory db, string? tableName = null)
+    public DapperRepository(IDbConnectionFactory db, IAuditLogWriter auditWriter, string? tableName = null)
     {
         _db = db;
+        _auditWriter = auditWriter;
         _tableName = tableName ?? InferTableName();
     }
 
@@ -29,18 +32,25 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
 
     public async Task<T> AddAsync(T entity, CancellationToken ct = default)
     {
-        // CreatedBy 由应用层在调用前设置（DDD：基础设施层不控制领域审计信息）
         using var conn = _db.CreateConnection(); conn.Open();
         var bp = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
         var props = bp.Where(p => p.CanRead && !IsNavProp(p)).Select(p => p.Name).ToList();
         var cols = string.Join(",", props);
         var vals = string.Join(",", props.Select(p => "@" + p));
         await conn.ExecuteAsync($"INSERT INTO [{_tableName}] ({cols}) VALUES ({vals})", entity);
+
+        // 审计：记录所有字段
+        var createdBy = typeof(T).GetProperty("CreatedBy")?.GetValue(entity) as Guid? ?? Guid.Empty;
+        await _auditWriter.LogChangesAsync(_tableName, GetEntityId(entity), "Create", EntityToDict(entity), createdBy, ct);
         return entity;
     }
 
     public async Task UpdateAsync(T entity, CancellationToken ct = default)
     {
+        // 1. 读取旧值
+        var oldEntity = await GetByIdAsync(GetEntityGuidId(entity), ct);
+
+        // 2. 更新主表
         using var conn = _db.CreateConnection(); conn.Open();
         var exclude = new HashSet<string> { "Id", "CreatedBy", "CreatedAt", "CreatedIp", "CreatedHostname" };
         var sets = string.Join(",",
@@ -48,13 +58,25 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
                 .Where(p => p.CanRead && !exclude.Contains(p.Name) && !IsNavProp(p))
                 .Select(p => $"[{p.Name}]=@{p.Name}"));
         await conn.ExecuteAsync($"UPDATE [{_tableName}] SET {sets} WHERE Id=@Id", entity);
+
+        // 3. 审计：计算差异
+        if (oldEntity != null)
+        {
+            var changes = DiffDict(EntityToDict(oldEntity), EntityToDict(entity));
+            var updatedBy = typeof(T).GetProperty("UpdatedBy")?.GetValue(entity) as Guid? ?? Guid.Empty;
+            await _auditWriter.LogChangesAsync(_tableName, GetEntityId(entity), "Update", changes, updatedBy, ct);
+        }
     }
 
     public async Task DeleteAsync(T entity, CancellationToken ct = default)
     {
-        var id = typeof(T).GetProperty("Id")?.GetValue(entity);
+        var id = GetEntityGuidId(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync($"DELETE FROM [{_tableName}] WHERE Id=@Id", new { Id = id });
+
+        // 审计
+        var changes = new Dictionary<string, object?> { ["Id"] = id.ToString() };
+        await _auditWriter.LogChangesAsync(_tableName, id.ToString(), "Delete", changes, Guid.Empty, ct);
     }
 
     public Task<PagedResult<T>> GetPagedAsync(int page, int pageSize,
@@ -66,6 +88,46 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
     {
         using var conn = _db.CreateConnection(); conn.Open();
         return await conn.QuerySingleAsync<int>($"SELECT COUNT(1) FROM [{_tableName}] WHERE Id=@Id", new { Id = id }) > 0;
+    }
+
+    // ===== 辅助方法 =====
+
+    private static string GetEntityId(T entity)
+    {
+        return typeof(T).GetProperty("Id")?.GetValue(entity)?.ToString() ?? Guid.Empty.ToString();
+    }
+
+    private static Guid GetEntityGuidId(T entity)
+    {
+        return typeof(T).GetProperty("Id")?.GetValue(entity) is Guid g ? g : Guid.Empty;
+    }
+
+    protected static Dictionary<string, object?> EntityToDict(T entity)
+    {
+        var dict = new Dictionary<string, object?>();
+        var props = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        foreach (var p in props)
+        {
+            if (IsNavProp(p) || p.Name is "DomainEvents" or "RowVersion") continue;
+            dict[p.Name] = p.GetValue(entity);
+        }
+        return dict;
+    }
+
+    protected static Dictionary<string, object?> DiffDict(Dictionary<string, object?> old, Dictionary<string, object?> now)
+    {
+        var diff = new Dictionary<string, object?>();
+        var exclude = new HashSet<string> { "RowVersion", "UpdatedAt", "UpdatedBy", "UpdatedIp", "UpdatedHostname" };
+        foreach (var kv in now)
+        {
+            if (exclude.Contains(kv.Key)) continue;
+            if (!old.ContainsKey(kv.Key)) { diff[kv.Key] = kv.Value; continue; }
+            var oldVal = old[kv.Key];
+            var newVal = kv.Value;
+            if (!Equals(oldVal, newVal))
+                diff[kv.Key] = newVal;
+        }
+        return diff;
     }
 
     private static bool IsNavProp(System.Reflection.PropertyInfo p)
