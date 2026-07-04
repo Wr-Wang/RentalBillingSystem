@@ -102,8 +102,8 @@ public class ContractFeeConfigsController : ControllerBase
         {
             id = (Guid)((dynamic)r).Id,
             amount = (decimal)((dynamic)r).Amount,
-            effectiveDate = ((DateTime)((dynamic)r).EffectiveDate).ToString("yyyy-MM-dd"),
-            expiryDate = ((dynamic)r).ExpiryDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : null,
+            effectiveDate = ((dynamic)r).EffectiveDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : null,
+            expiryDate = ((dynamic)r).ExpiryDate is DateTime xd ? xd.ToString("yyyy-MM-dd") : null,
             isActive = (bool)((dynamic)r).IsActive,
             createdAt = ((DateTime)((dynamic)r).CreatedAt).ToString("yyyy-MM-dd HH:mm")
         }).ToList();

@@ -62,9 +62,7 @@ public class DebitNoteService : IDebitNoteService
         var total = periodPlans.Sum(p => p.Amount);
         note.SetTotalAmount(total);
 
-        // 4. 使用反射设置 TotalAmount
-
-        // 写入 DebitNoteItems
+        // 4. 写入 DebitNoteItems
         foreach (var plan in periodPlans)
         {
             await _uow.ExecuteSqlRawAsync(
@@ -72,8 +70,6 @@ public class DebitNoteService : IDebitNoteService
                 new object[] { Guid.NewGuid(), note.Id, plan.FeeCodeId, plan.Amount, Guid.Empty, DateTime.UtcNow },
                 ct);
         }
-
-        await _uow.CommitAsync(ct);
         note.LoadItems(periodPlans.Select(p => new DebitNoteItem(note.Id, p.FeeCodeId, p.Amount)).ToList());
         return note;
     }

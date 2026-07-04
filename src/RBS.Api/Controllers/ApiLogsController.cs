@@ -34,28 +34,37 @@ public class ApiLogsController : ControllerBase
         var parms = new DynamicParameters();
 
         if (!string.IsNullOrEmpty(method)) { where.Add("HttpMethod = @Method"); parms.Add("@Method", method); }
-        if (!string.IsNullOrEmpty(path)) { where.Add("Path LIKE @Path"); parms.Add("@Path", $"%{path}%"); }
+        if (!string.IsNullOrEmpty(path)) { where.Add("ApiPath LIKE @Path"); parms.Add("@Path", $"%{path}%"); }
         if (statusCode.HasValue) { where.Add("StatusCode = @StatusCode"); parms.Add("@StatusCode", statusCode.Value); }
         if (userId.HasValue) { where.Add("UserId = @UserId"); parms.Add("@UserId", userId.Value); }
-        if (startDate.HasValue) { where.Add("CreatedAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
-        if (endDate.HasValue) { where.Add("CreatedAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
+        if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
+        if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
 
         var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
         var offset = (page - 1) * pageSize;
         parms.Add("@Offset", offset);
         parms.Add("@PageSize", pageSize);
 
-        var total = await conn.QuerySingleAsync<int>($"SELECT COUNT(*) FROM ApiLogs {w}", parms);
-        var items = await conn.QueryAsync($"SELECT * FROM ApiLogs {w} ORDER BY CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
+        var total = Convert.ToInt32(await conn.ExecuteScalarAsync($"SELECT COUNT(*) FROM ApiLogs {w}", parms));
+        var items = await conn.QueryAsync($"SELECT * FROM ApiLogs {w} ORDER BY RequestAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
 
         return Ok(new
         {
-            items = items.Select(l => new
+            items = items.Select(l =>
             {
-                ((dynamic)l).Id, ((dynamic)l).HttpMethod, ((dynamic)l).Path,
-                ((dynamic)l).QueryString, ((dynamic)l).StatusCode,
-                ((dynamic)l).DurationMs, ((dynamic)l).IpAddress,
-                ((dynamic)l).UserId, ((dynamic)l).UserDisplayName, ((dynamic)l).CreatedAt
+                dynamic r = l;
+                return new
+                {
+                    id = (Guid)r.Id,
+                    httpMethod = (string)r.HttpMethod,
+                    path = (string)r.ApiPath,
+                    statusCode = (int)r.StatusCode,
+                    durationMs = (int)r.DurationMs,
+                    ipAddress = (string?)r.ClientIp,
+                    userId = (Guid?)r.UserId,
+                    createdAt = (DateTime)r.RequestAt,
+                    userDisplayName = (string?)null   // 暂为 null，待数据库加列后补全
+                };
             }),
             total, page, pageSize
         });
@@ -76,17 +85,17 @@ public class ApiLogsController : ControllerBase
         {
             id = (Guid)d.Id,
             userId = (Guid?)d.UserId,
-            userDisplayName = (string?)d.UserDisplayName,
             httpMethod = (string)d.HttpMethod,
-            path = (string)d.Path,
-            queryString = (string?)d.QueryString,
+            path = (string)d.ApiPath,
+            queryString = (string?)null,     // 暂为 null，待数据库加列后补全
             requestBody = (string?)d.RequestBody,
             statusCode = (int)d.StatusCode,
             responseBody = (string?)d.ResponseBody,
-            durationMs = (long)d.DurationMs,
-            ipAddress = (string?)d.IpAddress,
-            userAgent = (string?)d.UserAgent,
-            createdAt = (DateTime)d.CreatedAt
+            durationMs = (long)(int)d.DurationMs,
+            ipAddress = (string?)d.ClientIp,
+            userAgent = (string?)null,       // 暂为 null，待数据库加列后补全
+            userDisplayName = (string?)null, // 暂为 null，待数据库加列后补全
+            createdAt = (DateTime)d.RequestAt
         });
     }
 
@@ -112,8 +121,8 @@ public class ApiLogsController : ControllerBase
         using var conn = _db.CreateConnection(); conn.Open();
         var where = new List<string>();
         var parms = new DynamicParameters();
-        if (startDate.HasValue) { where.Add("CreatedAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
-        if (endDate.HasValue) { where.Add("CreatedAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
+        if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
+        if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
         var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
 
         await conn.ExecuteAsync($"DELETE FROM ApiLogs {w}", parms);

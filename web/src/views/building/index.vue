@@ -163,17 +163,17 @@
         </el-form-item>
         <el-divider content-position="left">楼层房号</el-divider>
         <el-row :gutter="16">
-          <el-col :span="8">
+          <el-col :span="7">
             <el-form-item label="楼层" prop="floorName">
               <el-input v-model="addForm.floorName" placeholder="如：1层" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="10">
             <el-form-item label="排序值" prop="floorSortOrder">
-              <el-input-number v-model="addForm.floorSortOrder" :min="1" :max="999" style="width: 100%;" />
+              <AppInputNumber v-model="addForm.floorSortOrder" :min="0" :max="999" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="7">
             <el-form-item label="房号" prop="unitNo">
               <el-input v-model="addForm.unitNo" placeholder="如：101" />
             </el-form-item>
@@ -223,7 +223,7 @@
     </el-dialog>
 
     <!-- Edit Unit Dialog -->
-    <el-dialog v-model="showEditUnit" :title="'编辑房源 - ' + editForm.fullCode" width="600px">
+    <el-dialog :key="editKey" v-model="showEditUnit" :title="'编辑房源 - ' + editForm.fullCode" width="600px" destroy-on-close>
       <el-form :model="editForm" label-width="100px">
         <el-divider content-position="left">座楼信息</el-divider>
         <el-row :gutter="16">
@@ -243,19 +243,24 @@
         </el-form-item>
         <el-divider content-position="left">楼层房号</el-divider>
         <el-row :gutter="16">
-          <el-col :span="8">
+          <el-col :span="7">
             <el-form-item label="楼层">
               <el-input v-model="editForm.floorName" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="10">
             <el-form-item label="排序值">
-              <el-input-number v-model="editForm.floorSortOrder" :min="1" :max="999" style="width: 100%;" />
+              <AppInputNumber v-model="editForm.floorSortOrder" :min="0" :max="999" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="7">
             <el-form-item label="房号">
               <el-input v-model="editForm.unitNo" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="10">
+            <el-form-item label="完整编码">
+              <el-input v-model="editForm.fullCode" placeholder="自动生成，可手动修改" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -311,6 +316,7 @@ import {
   createHousingUnit, updateHousingUnit, deleteHousingUnit
 } from '../../api/index'
 import { useUserStore } from '../../store/user'
+import AppInputNumber from '../../components/AppInputNumber.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -358,13 +364,13 @@ const addRules = {
 }
 
 // ==================== Edit Form ====================
+const editKey = ref(0)
 const editForm = reactive({
   id: '', fullCode: '',
   buildingName: '', buildingCode: '', buildingAddress: '',
   floorName: '', floorSortOrder: 1, unitNo: '',
-  roomTypeId: null, area: 0, orientation: '', baseRentAmount: 0
+  roomTypeId: null, area: null, orientation: '', baseRentAmount: null
 })
-
 // ==================== Data Fetching ====================
 async function fetchStats() {
   try {
@@ -432,15 +438,19 @@ function handleNodeClick(data) {
 function viewDetail(row) { router.push('/buildings/unit/' + row.id) }
 
 function editRoom(row) {
-  Object.assign(editForm, {
-    id: row.id, fullCode: row.fullCode || row.unitNo,
-    buildingName: row.buildingName || '', buildingCode: row.buildingCode || '',
-    buildingAddress: row.buildingAddress || '',
-    floorName: row.floorName || '', floorSortOrder: row.floorSortOrder || 1,
-    unitNo: row.unitNo || '',
-    roomTypeId: row.roomTypeId || null, area: row.area || 0,
-    orientation: row.orientation || '', baseRentAmount: row.baseRentAmount || 0
-  })
+  editKey.value++
+  editForm.id = row.id
+  editForm.fullCode = row.fullCode || row.unitNo
+  editForm.buildingName = row.buildingName || ''
+  editForm.buildingCode = row.buildingCode || ''
+  editForm.buildingAddress = row.buildingAddress || ''
+  editForm.floorName = row.floorName || ''
+  editForm.floorSortOrder = row.floorSortOrder ?? 1
+  editForm.unitNo = row.unitNo || ''
+  editForm.roomTypeId = row.roomTypeId || null
+  editForm.area = row.area ?? null
+  editForm.orientation = row.orientation || ''
+  editForm.baseRentAmount = row.baseRentAmount ?? null
   showEditUnit.value = true
 }
 
@@ -478,11 +488,12 @@ async function saveEdit() {
   try {
     await updateHousingUnit(editForm.id, {
       buildingName: editForm.buildingName || undefined,
-      buildingCode: editForm.buildingCode || undefined,
-      buildingAddress: editForm.buildingAddress || undefined,
+      buildingCode: editForm.buildingCode || null,
+      buildingAddress: editForm.buildingAddress || null,
       floorName: editForm.floorName || undefined,
-      floorSortOrder: editForm.floorSortOrder || undefined,
+      floorSortOrder: editForm.floorSortOrder,
       unitNo: editForm.unitNo || undefined,
+      fullCode: editForm.fullCode || null,
       roomTypeId: editForm.roomTypeId || null,
       area: editForm.area || null,
       orientation: editForm.orientation || null,
@@ -527,7 +538,7 @@ onMounted(async () => {
   // 从编辑导航进入时，自动打开编辑对话框
   if (route.query.editId) {
     const unit = roomList.value.find(u => u.id === route.query.editId)
-    if (unit) openEdit(unit)
+    if (unit) editRoom(unit)
     router.replace({ query: { ...route.query, editId: undefined } })
   }
 })

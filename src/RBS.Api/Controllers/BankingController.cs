@@ -57,7 +57,7 @@ public class BankingController : ControllerBase
         return Ok(dto);
     }
 
-    [HttpPost("reconciliations/{id}/auto-match")]
+    [HttpPost("reconciliations/{id}/automatch")]
     public async Task<IActionResult> AutoMatch(Guid id, CancellationToken ct)
     {
         try

@@ -71,7 +71,7 @@ public class ReceiptsController : ControllerBase
         return Ok(entity);
     }
 
-    [HttpPost("batch-confirm")]
+    [HttpPost("batchconfirm")]
     public async Task<IActionResult> BatchConfirm([FromBody] List<Guid> ids, CancellationToken ct)
         => Ok(await _receiptService.BatchConfirmAsync(ids, ct));
 

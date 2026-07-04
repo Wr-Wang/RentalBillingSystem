@@ -39,11 +39,20 @@ public class HolidayCalendarService : IHolidayCalendarService
     {
         var holiday = await _uow.HolidayCalendars.GetByIdAsync(id, ct)
             ?? throw new KeyNotFoundException("节假日不存在");
-        if (request.HolidayDate.HasValue)
+
+        if (request.HolidayDate.HasValue && request.HolidayDate.Value != holiday.HolidayDate)
+        {
+            // 日期变更 → 重建（HolidayCalendar 的 Date 不可变）
+            await _uow.HolidayCalendars.DeleteAsync(holiday, ct);
             holiday = new HolidayCalendar(request.HolidayDate.Value, holiday.Name, holiday.IsWorkingDay, holiday.CompanyId);
-        if (request.Name != null) holiday.SetName(request.Name);
-        if (request.IsWorkingDay.HasValue) holiday.SetIsWorkingDay(request.IsWorkingDay.Value);
-        await _uow.CommitAsync(ct);
+            await _uow.HolidayCalendars.AddAsync(holiday, ct);
+        }
+        else
+        {
+            if (request.Name != null) holiday.SetName(request.Name);
+            if (request.IsWorkingDay.HasValue) holiday.SetIsWorkingDay(request.IsWorkingDay.Value);
+            await _uow.CommitAsync(ct);
+        }
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)

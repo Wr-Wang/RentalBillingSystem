@@ -50,8 +50,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                             (decimal.TryParse(item.NewValue, out var parsed) ? parsed : 0);
                         if (amount > 0)
                         {
-                            contract.SetRentAmount(amount);
-                            await _uow.Contracts.UpdateAsync(contract, ct);
+                            contract!.SetRentAmount(amount);
+                            await _uow!.Contracts.UpdateAsync(contract, ct);
                         }
                     }
                     break;
@@ -62,7 +62,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                         var expiryStr = changeRequest.EffectiveDate?.ToString("yyyy-MM-dd") ??
                             DateTime.UtcNow.ToString("yyyy-MM-dd");
                         // 到期停用旧配置
-                        await _uow.ExecuteSqlRawAsync(
+                        await _uow!.ExecuteSqlRawAsync(
                             "UPDATE ContractFeeConfigs SET ExpiryDate = @ExpiryDate, IsActive = 0, UpdatedAt = GETUTCDATE() WHERE Id = @Id AND IsActive = 1",
                             new object[] { expiryStr, item.TargetId.Value }, ct);
                         // 复制旧配置并创建新版本（保留原有 FeeCodeId 和 BillingMode）
@@ -76,7 +76,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     break;
             }
         }
-        await _uow.CommitAsync(ct);
+        await _uow!.CommitAsync(ct);
     }
 
     public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)

@@ -26,7 +26,7 @@ public class NotificationController : ControllerBase
     }
 
     /// <summary>各分类未读计数</summary>
-    [HttpGet("unread-counts")]
+    [HttpGet("unreadcounts")]
     public async Task<IActionResult> GetUnreadCounts(CancellationToken ct = default)
     {
         var result = await _notificationService.GetUnreadCountsAsync(ct);
@@ -45,7 +45,7 @@ public class NotificationController : ControllerBase
     }
 
     /// <summary>全部标记已读</summary>
-    [HttpPut("read-all")]
+    [HttpPut("readall")]
     public async Task<IActionResult> MarkAllRead(CancellationToken ct = default)
     {
         await _notificationService.MarkAllReadAsync(ct);

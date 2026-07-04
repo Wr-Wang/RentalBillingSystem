@@ -197,7 +197,7 @@ public class ContractsController : ControllerBase
     }
 
     /// <summary>获取合同允许的操作</summary>
-    [HttpGet("{id}/allowed-operations")]
+    [HttpGet("{id}/allowedoperations")]
     public async Task<IActionResult> GetAllowedOperations(Guid id, CancellationToken ct)
     {
         try

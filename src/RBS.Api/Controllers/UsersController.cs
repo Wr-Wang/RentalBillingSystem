@@ -53,7 +53,7 @@ public class UsersController : ControllerBase
     /// <summary>
     /// 设置当前用户的默认公司（页面切换公司时持久化）
     /// </summary>
-    [HttpPut("me/default-company")]
+    [HttpPut("me/defaultcompany")]
     public async Task<IActionResult> SetDefaultCompany([FromBody] SetDefaultCompanyRequest request, CancellationToken ct)
     {
         var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value!);

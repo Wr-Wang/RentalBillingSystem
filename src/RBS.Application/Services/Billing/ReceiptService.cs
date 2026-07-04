@@ -51,7 +51,10 @@ public class ReceiptService : IReceiptService
         foreach (var row in allocRows)
         {
             var plan = await _uow.ReceivablePlans.GetByIdAsync((Guid)row.ReceivablePlanId, ct);
-            plan?.ReversePayment((decimal)row.Amount);
+            if (plan != null)
+            {
+                plan.ReversePayment((decimal)row.Amount);
+            }
         }
 
         await conn.ExecuteAsync(_sql.Get("Lease.Delete.ReceiptAllocation.ByReceiptId"), new { Id = id });

@@ -36,6 +36,7 @@ public class UpdateHousingUnitRequest
     public string? FloorName { get; set; }
     public int? FloorSortOrder { get; set; }
     public string? UnitNo { get; set; }
+    public string? FullCode { get; set; }
     public Guid? RoomTypeId { get; set; }
     public decimal? Area { get; set; }
     public string? Orientation { get; set; }

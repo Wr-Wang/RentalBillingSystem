@@ -18,7 +18,7 @@ export function getUser(id) { return request({ url: `/users/${id}`, method: 'get
 export function createUser(data) { return request({ url: '/users', method: 'post', data }) }
 export function updateUser(id, data) { return request({ url: `/users/${id}`, method: 'put', data }) }
 export function deleteUser(id) { return request({ url: `/users/${id}`, method: 'delete' }) }
-export function setMyDefaultCompany(companyId) { return request({ url: '/users/me/default-company', method: 'put', data: { companyId } }) }
+export function setMyDefaultCompany(companyId) { return request({ url: '/users/me/defaultcompany', method: 'put', data: { companyId } }) }
 
 // Roles
 export function getRoles(params) { return request({ url: '/roles', method: 'get', params }) }
@@ -69,7 +69,7 @@ export function previewRenewal(id) { return request({ url: `/contracts/${id}/ren
 export function submitRenewal(id, data) { return request({ url: `/contracts/${id}/renewal/submit`, method: 'post', data }) }
 export function getRenewalHistory(id) { return request({ url: `/contracts/${id}/renewal/history`, method: 'get' }) }
 export function getRenewalChain(id) { return request({ url: `/contracts/${id}/renewal/chain`, method: 'get' }) }
-export function getAllowedOperations(id) { return request({ url: `/contracts/${id}/allowed-operations`, method: 'get' }) }
+export function getAllowedOperations(id) { return request({ url: `/contracts/${id}/allowedoperations`, method: 'get' }) }
 export function suspendContract(id) { return request({ url: `/contracts/${id}/suspend`, method: 'post' }) }
 export function resumeContract(id) { return request({ url: `/contracts/${id}/resume`, method: 'post' }) }
 export function getContractTimeline(id) { return request({ url: `/contracts/${id}/timeline`, method: 'get' }) }
@@ -107,7 +107,7 @@ export function confirmReceipt(id) { return request({ url: `/receipts/${id}/conf
 export function rejectReceipt(id, data) { return request({ url: `/receipts/${id}/reject`, method: 'put', data }) }
 export function reverseReceipt(id, data) { return request({ url: `/receipts/${id}/reverse`, method: 'post', data }) }
 export function refundReceipt(id, data) { return request({ url: `/receipts/${id}/refund`, method: 'post', data }) }
-export function batchConfirmReceipts(data) { return request({ url: '/receipts/batch-confirm', method: 'post', data }) }
+export function batchConfirmReceipts(data) { return request({ url: '/receipts/batchconfirm', method: 'post', data }) }
 
 // Deposits
 export function getDeposits(params) { return request({ url: '/deposits', method: 'get', params }) }
@@ -160,7 +160,7 @@ export function getBankStatements(params) { return request({ url: '/banking/stat
 export function importBankStatements(data) { return request({ url: '/banking/statements/import', method: 'post', data }) }
 export function getBankReconciliations(params) { return request({ url: '/banking/reconciliations', method: 'get', params }) }
 export function createBankReconciliation(data) { return request({ url: '/banking/reconciliations', method: 'post', data }) }
-export function autoMatchBank(id) { return request({ url: `/banking/reconciliations/${id}/auto-match`, method: 'post' }) }
+export function autoMatchBank(id) { return request({ url: `/banking/reconciliations/${id}/automatch`, method: 'post' }) }
 export function completeReconciliation(id) { return request({ url: `/banking/reconciliations/${id}/complete`, method: 'post' }) }
 export function manualMatchBank(data) { return request({ url: '/banking/matches', method: 'post', data }) }
 export function getBankMatches(params) { return request({ url: '/banking/matches', method: 'get', params }) }
@@ -228,9 +228,9 @@ export function clearSystemLogs() { return request({ url: '/systemlogs', method:
 
 // Notifications
 export function getNotifications(params) { return request({ url: '/notifications', method: 'get', params }) }
-export function getUnreadCounts() { return request({ url: '/notifications/unread-counts', method: 'get' }) }
+export function getUnreadCounts() { return request({ url: '/notifications/unreadcounts', method: 'get' }) }
 export function markNotificationRead(id) { return request({ url: `/notifications/${id}/read`, method: 'put' }) }
-export function markAllNotificationsRead() { return request({ url: '/notifications/read-all', method: 'put' }) }
+export function markAllNotificationsRead() { return request({ url: '/notifications/readall', method: 'put' }) }
 
 // Api Logs
 export function getApiLogs(params) { return request({ url: '/apilogs', method: 'get', params }) }

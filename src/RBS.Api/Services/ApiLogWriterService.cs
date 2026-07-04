@@ -73,13 +73,14 @@ public class ApiLogWriterService : BackgroundService
             foreach (var log in buffer)
             {
                 await conn.ExecuteAsync(@"
-                    INSERT INTO ApiLogs (Id, UserId, UserDisplayName, HttpMethod, Path, QueryString, RequestBody, StatusCode, ResponseBody, DurationMs, IpAddress, UserAgent, CreatedAt)
-                    VALUES (@Id, @UserId, @UserDisplayName, @HttpMethod, @Path, @QueryString, @RequestBody, @StatusCode, @ResponseBody, @DurationMs, @IpAddress, @UserAgent, @CreatedAt)",
+                    INSERT INTO ApiLogs (Id, UserId, UserDisplayName, HttpMethod, ApiPath, QueryString, RequestBody, StatusCode, ResponseBody, DurationMs, ClientIp, UserAgent, RequestAt)
+                    VALUES (@Id, @UserId, @UserDisplayName, @HttpMethod, @ApiPath, @QueryString, @RequestBody, @StatusCode, @ResponseBody, @DurationMs, @ClientIp, @UserAgent, @RequestAt)",
                     new
                     {
-                        log.Id, log.UserId, log.UserDisplayName, log.HttpMethod, log.Path,
-                        log.QueryString, log.RequestBody, log.StatusCode, log.ResponseBody,
-                        log.DurationMs, log.IpAddress, log.UserAgent, log.CreatedAt
+                        log.Id, log.UserId, log.UserDisplayName, log.HttpMethod,
+                        ApiPath = log.Path, log.QueryString, log.RequestBody, log.StatusCode, log.ResponseBody,
+                        log.DurationMs, ClientIp = log.IpAddress, log.UserAgent,
+                        RequestAt = log.RequestAt
                     });
             }
         }

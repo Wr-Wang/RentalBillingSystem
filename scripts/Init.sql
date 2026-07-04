@@ -88,11 +88,23 @@ CREATE TABLE [ApiLogs] (
     [RequestHeaders] nvarchar(MAX) NULL,
     [ClientIp] nvarchar(50) NULL,
     [UserId] uniqueidentifier NULL,
+    [UserDisplayName] nvarchar(100) NULL,
     [DurationMs] int DEFAULT ((0)),
+    [QueryString] nvarchar(2000) NULL,
+    [UserAgent] nvarchar(500) NULL,
     [RequestAt] datetime2 DEFAULT (getutcdate()),
     [ResponseAt] datetime2 NULL,
     CONSTRAINT [PK_ApiLogs] PRIMARY KEY ([Id])
 );
+GO
+
+-- 为已有表补充缺失列（幂等）
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApiLogs]') AND name='UserDisplayName')
+    ALTER TABLE [ApiLogs] ADD [UserDisplayName] nvarchar(100) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApiLogs]') AND name='QueryString')
+    ALTER TABLE [ApiLogs] ADD [QueryString] nvarchar(2000) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApiLogs]') AND name='UserAgent')
+    ALTER TABLE [ApiLogs] ADD [UserAgent] nvarchar(500) NULL;
 GO
 
 EXEC sp_addextendedproperty 'MS_Description', N'ID', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'Id';
@@ -104,7 +116,10 @@ EXEC sp_addextendedproperty 'MS_Description', N'响应体', 'SCHEMA', 'dbo', 'TA
 EXEC sp_addextendedproperty 'MS_Description', N'请求头', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'RequestHeaders';
 EXEC sp_addextendedproperty 'MS_Description', N'客户端IP', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'ClientIp';
 EXEC sp_addextendedproperty 'MS_Description', N'用户ID', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'UserId';
+EXEC sp_addextendedproperty 'MS_Description', N'用户显示名', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'UserDisplayName';
 EXEC sp_addextendedproperty 'MS_Description', N'耗时(毫秒)', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'DurationMs';
+EXEC sp_addextendedproperty 'MS_Description', N'查询参数', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'QueryString';
+EXEC sp_addextendedproperty 'MS_Description', N'用户代理', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'UserAgent';
 EXEC sp_addextendedproperty 'MS_Description', N'请求时间', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'RequestAt';
 EXEC sp_addextendedproperty 'MS_Description', N'响应时间', 'SCHEMA', 'dbo', 'TABLE', N'ApiLogs', 'COLUMN', N'ResponseAt';
 GO
@@ -251,6 +266,7 @@ CREATE TABLE [ApprovalRequests] (
     [UpdatedAt] datetime2 NULL,
     [UpdatedIp] nvarchar(50) NULL,
     [UpdatedHostname] nvarchar(100) NULL,
+    [ContractId] uniqueidentifier NULL,
     [CompanyId] uniqueidentifier NULL,
     CONSTRAINT [PK_ApprovalRequests] PRIMARY KEY ([Id])
 );
@@ -273,7 +289,13 @@ EXEC sp_addextendedproperty 'MS_Description', N'更新人', 'SCHEMA', 'dbo', 'TA
 EXEC sp_addextendedproperty 'MS_Description', N'更新时间', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'UpdatedAt';
 EXEC sp_addextendedproperty 'MS_Description', N'更新IP', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'UpdatedIp';
 EXEC sp_addextendedproperty 'MS_Description', N'更新主机名', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'UpdatedHostname';
+EXEC sp_addextendedproperty 'MS_Description', N'合同ID（用于并发控制）', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'ContractId';
 EXEC sp_addextendedproperty 'MS_Description', N'公司ID', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'CompanyId';
+GO
+
+-- 为已有 ApprovalRequests 表补充缺失列（幂等）
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApprovalRequests]') AND name='ContractId')
+    ALTER TABLE [ApprovalRequests] ADD [ContractId] uniqueidentifier NULL;
 GO
 
 -- ===================================================================
@@ -615,6 +637,8 @@ CREATE TABLE [ChangeRequestItems] (
     [NewValue] nvarchar(100) NULL,
     [OldValueDecimal] decimal(18,2) NULL,
     [NewValueDecimal] decimal(18,2) NULL,
+    [CreatedBy] uniqueidentifier NULL,
+    [CreatedAt] datetime2 DEFAULT (getutcdate()),
     CONSTRAINT [PK_ChangeRequestItems] PRIMARY KEY ([Id])
 );
 GO
@@ -628,6 +652,8 @@ EXEC sp_addextendedproperty 'MS_Description', N'旧值', 'SCHEMA', 'dbo', 'TABLE
 EXEC sp_addextendedproperty 'MS_Description', N'新值', 'SCHEMA', 'dbo', 'TABLE', N'ChangeRequestItems', 'COLUMN', N'NewValue';
 EXEC sp_addextendedproperty 'MS_Description', N'旧值(数值)', 'SCHEMA', 'dbo', 'TABLE', N'ChangeRequestItems', 'COLUMN', N'OldValueDecimal';
 EXEC sp_addextendedproperty 'MS_Description', N'新值(数值)', 'SCHEMA', 'dbo', 'TABLE', N'ChangeRequestItems', 'COLUMN', N'NewValueDecimal';
+EXEC sp_addextendedproperty 'MS_Description', N'创建人', 'SCHEMA', 'dbo', 'TABLE', N'ChangeRequestItems', 'COLUMN', N'CreatedBy';
+EXEC sp_addextendedproperty 'MS_Description', N'创建时间', 'SCHEMA', 'dbo', 'TABLE', N'ChangeRequestItems', 'COLUMN', N'CreatedAt';
 GO
 
 -- ===================================================================
@@ -842,6 +868,8 @@ CREATE TABLE [ContractFeeConfigs] (
     [Unit] nvarchar(20) NULL,
     [UnitPrice] decimal(18,4) NULL,
     [IsActive] bit DEFAULT (CONVERT([bit],(1))),
+    [EffectiveDate] date NULL,
+    [ExpiryDate] date NULL,
     [CreatedBy] uniqueidentifier NULL,
     [CreatedAt] datetime2 DEFAULT (getutcdate()),
     [CreatedIp] nvarchar(50) NULL,
@@ -854,6 +882,13 @@ CREATE TABLE [ContractFeeConfigs] (
 );
 GO
 
+-- 为已有 ContractFeeConfigs 表补充缺失列（幂等）
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractFeeConfigs]') AND name='EffectiveDate')
+    ALTER TABLE [ContractFeeConfigs] ADD [EffectiveDate] date NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractFeeConfigs]') AND name='ExpiryDate')
+    ALTER TABLE [ContractFeeConfigs] ADD [ExpiryDate] date NULL;
+GO
+
 EXEC sp_addextendedproperty 'MS_Description', N'ID', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'Id';
 EXEC sp_addextendedproperty 'MS_Description', N'合同ID', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'ContractId';
 EXEC sp_addextendedproperty 'MS_Description', N'费用项目ID', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'FeeCodeId';
@@ -862,6 +897,8 @@ EXEC sp_addextendedproperty 'MS_Description', N'金额', 'SCHEMA', 'dbo', 'TABLE
 EXEC sp_addextendedproperty 'MS_Description', N'计量单位', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'Unit';
 EXEC sp_addextendedproperty 'MS_Description', N'单价', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'UnitPrice';
 EXEC sp_addextendedproperty 'MS_Description', N'是否启用', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'IsActive';
+EXEC sp_addextendedproperty 'MS_Description', N'生效日期', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'EffectiveDate';
+EXEC sp_addextendedproperty 'MS_Description', N'到期日期，NULL 表示当前生效', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'ExpiryDate';
 EXEC sp_addextendedproperty 'MS_Description', N'创建人', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'CreatedBy';
 EXEC sp_addextendedproperty 'MS_Description', N'创建时间', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'CreatedAt';
 EXEC sp_addextendedproperty 'MS_Description', N'创建IP', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'CreatedIp';
@@ -3077,6 +3114,7 @@ CREATE TABLE [Users] (
     [Email] nvarchar(200) NULL,
     [IsActive] bit DEFAULT (CONVERT([bit],(1))),
     [HomeCompanyId] uniqueidentifier NULL,
+    [DefaultCompanyId] uniqueidentifier NULL,
     [IsSuperAdmin] bit DEFAULT (CONVERT([bit],(0))),
     [CreatedBy] uniqueidentifier NULL,
     [CreatedAt] datetime2 DEFAULT (getutcdate()),
@@ -3090,6 +3128,11 @@ CREATE TABLE [Users] (
 );
 GO
 
+-- 为已有 Users 表补充缺失列（幂等）
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Users]') AND name='DefaultCompanyId')
+    ALTER TABLE [Users] ADD [DefaultCompanyId] uniqueidentifier NULL;
+GO
+
 EXEC sp_addextendedproperty 'MS_Description', N'ID', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'Id';
 EXEC sp_addextendedproperty 'MS_Description', N'登录用户名，全局唯一', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'Username';
 EXEC sp_addextendedproperty 'MS_Description', N'密码哈希值', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'PasswordHash';
@@ -3098,6 +3141,7 @@ EXEC sp_addextendedproperty 'MS_Description', N'手机号', 'SCHEMA', 'dbo', 'TA
 EXEC sp_addextendedproperty 'MS_Description', N'电子邮箱', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'Email';
 EXEC sp_addextendedproperty 'MS_Description', N'是否启用', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'IsActive';
 EXEC sp_addextendedproperty 'MS_Description', N'所属公司ID', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'HomeCompanyId';
+EXEC sp_addextendedproperty 'MS_Description', N'当前默认公司ID', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'DefaultCompanyId';
 EXEC sp_addextendedproperty 'MS_Description', N'是否为超级管理员', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'IsSuperAdmin';
 EXEC sp_addextendedproperty 'MS_Description', N'创建人', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'CreatedBy';
 EXEC sp_addextendedproperty 'MS_Description', N'创建时间', 'SCHEMA', 'dbo', 'TABLE', N'Users', 'COLUMN', N'CreatedAt';

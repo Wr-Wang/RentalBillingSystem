@@ -17,7 +17,7 @@ using RBS.Infrastructure.Data.Repositories;
 
 namespace RBS.Infrastructure.Data.UnitOfWork;
 
-public class DapperUnitOfWork : IUnitOfWork
+public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
 {
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
@@ -25,47 +25,50 @@ public class DapperUnitOfWork : IUnitOfWork
     private IDbConnection? _sharedConnection;
     private IDbTransaction? _sharedTransaction;
 
+    // ===== 变更追踪 =====
+    private readonly Dictionary<string, Dictionary<Guid, TrackedEntry>> _tracked = new();
+
     public DapperUnitOfWork(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter) { _db = db; _sql = sql; _auditWriter = auditWriter; }
 
-    public IUserRepository Users => _users ??= new DapperUserRepository(_db, _sql, _auditWriter);
-    public IRoleRepository Roles => _roles ??= new DapperRoleRepository(_db, _sql, _auditWriter);
-    public IMenuRepository Menus => _menus ??= new DapperMenuRepository(_db, _sql, _auditWriter);
-    public ICompanyRepository Companies => _companies ??= new DapperCompanyRepository(_db, _sql, _auditWriter);
-    public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new DapperApprovalRequestRepository(_db, _sql, _auditWriter);
-    public IFeeCodeRepository FeeCodes => _feeCodes ??= new DapperFeeCodeRepository(_db, _sql, _auditWriter);
-    public IRepository<FeeCodeTemplate> FeeCodeTemplates => _feeCodeTemplates ??= new DapperRepository<FeeCodeTemplate>(_db, _auditWriter);
-    public IPaymentChannelRepository PaymentChannels => _paymentChannels ??= new DapperPaymentChannelRepository(_db, _sql, _auditWriter);
-    public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new DapperHolidayCalendarRepository(_db, _sql, _auditWriter);
-    public IRepository<HousingUnit> HousingUnits => _housingUnits ??= new DapperRepository<HousingUnit>(_db, _auditWriter);
-    public IRepository<RoomType> RoomTypes => _roomTypes ??= new DapperRepository<RoomType>(_db, _auditWriter);
-    public IRepository<ApprovalType> ApprovalTypes => _approvalTypes ??= new DapperRepository<ApprovalType>(_db, _auditWriter);
-    public IRepository<ApprovalLevelConfig> ApprovalLevelConfigs => _approvalLevelConfigs ??= new DapperRepository<ApprovalLevelConfig>(_db, _auditWriter);
-    public IRepository<FloorLevelBand> FloorLevelBands => _floorLevelBands ??= new DapperRepository<FloorLevelBand>(_db, _auditWriter);
-    public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new DapperRepository<TaxRateConfig>(_db, _auditWriter);
-    public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new DapperRepository<LateFeeConfig>(_db, _auditWriter);
-    public IRepository<AutoRenewConfig> AutoRenewConfigs => _autoRenewConfigs ??= new DapperRepository<AutoRenewConfig>(_db, _auditWriter);
-    public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db, _auditWriter);
-    public IRepository<Voucher> Vouchers => _vouchers ??= new DapperRepository<Voucher>(_db, _auditWriter);
-    public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new DapperRepository<JobSchedule>(_db, _auditWriter);
-    public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new DapperRepository<JobTemplate>(_db, _auditWriter);
-    public IRepository<JobScheduleExecution> JobScheduleExecutions => _jobScheduleExecutions ??= new DapperRepository<JobScheduleExecution>(_db, _auditWriter);
-    public IRepository<ImportBatch> ImportBatches => _importBatches ??= new DapperRepository<ImportBatch>(_db, _auditWriter);
-    public IRepository<ImportBatchItem> ImportBatchItems => _importBatchItems ??= new DapperRepository<ImportBatchItem>(_db, _auditWriter);
-    public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new DapperRepository<RoomPricingStandard>(_db, _auditWriter);
-    public ITenantRepository Tenants => _tenants ??= new DapperTenantRepository(_db, _sql, _auditWriter);
-    public IReceivablePlanRepository ReceivablePlans => _receivablePlans ??= new DapperReceivablePlanRepository(_db, _sql, _auditWriter);
-    public IReceiptRepository Receipts => _receipts ??= new DapperReceiptRepository(_db, _sql, _auditWriter);
-    public IRepository<BankStatement> BankStatements => _bankStatements ??= new DapperRepository<BankStatement>(_db, _auditWriter);
-    public IRepository<BankReconciliation> BankReconciliations => _bankReconciliations ??= new DapperRepository<BankReconciliation>(_db, _auditWriter);
-    public IRepository<BankMatch> BankMatches => _bankMatches ??= new DapperRepository<BankMatch>(_db, _auditWriter);
-    public IRepository<DepositLog> DepositLogs => _depositLogs ??= new DapperRepository<DepositLog>(_db, _auditWriter);
-    public IRepository<CollectionStage> CollectionStages => _collectionStages ??= new DapperRepository<CollectionStage>(_db, _auditWriter);
-    public IRepository<CollectionRecord> CollectionRecords => _collectionRecords ??= new DapperRepository<CollectionRecord>(_db, _auditWriter);
-    public IRepository<DebitNote> DebitNotes => _debitNotes ??= new DapperRepository<DebitNote>(_db, _auditWriter);
-    public IMeterReadingRepository MeterReadings => _meterReadings ??= new DapperMeterReadingRepository(_db, _sql, _auditWriter);
-    public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db, _sql, _auditWriter);
-    public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db, _sql, _auditWriter);
-    public IRepository<ChangeRequest> ChangeRequests => _changeRequests ??= new DapperRepository<ChangeRequest>(_db, _auditWriter);
+    public IUserRepository Users => _users ??= new DapperUserRepository(_db, _sql, _auditWriter, this);
+    public IRoleRepository Roles => _roles ??= new DapperRoleRepository(_db, _sql, _auditWriter, this);
+    public IMenuRepository Menus => _menus ??= new DapperMenuRepository(_db, _sql, _auditWriter, this);
+    public ICompanyRepository Companies => _companies ??= new DapperCompanyRepository(_db, _sql, _auditWriter, this);
+    public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new DapperApprovalRequestRepository(_db, _sql, _auditWriter, this);
+    public IFeeCodeRepository FeeCodes => _feeCodes ??= new DapperFeeCodeRepository(_db, _sql, _auditWriter, this);
+    public IRepository<FeeCodeTemplate> FeeCodeTemplates => _feeCodeTemplates ??= new DapperRepository<FeeCodeTemplate>(_db, _auditWriter, tracker: this);
+    public IPaymentChannelRepository PaymentChannels => _paymentChannels ??= new DapperPaymentChannelRepository(_db, _sql, _auditWriter, this);
+    public IHolidayCalendarRepository HolidayCalendars => _holidayCalendars ??= new DapperHolidayCalendarRepository(_db, _sql, _auditWriter, this);
+    public IRepository<HousingUnit> HousingUnits => _housingUnits ??= new DapperRepository<HousingUnit>(_db, _auditWriter, tracker: this);
+    public IRepository<RoomType> RoomTypes => _roomTypes ??= new DapperRepository<RoomType>(_db, _auditWriter, tracker: this);
+    public IRepository<ApprovalType> ApprovalTypes => _approvalTypes ??= new DapperRepository<ApprovalType>(_db, _auditWriter, tracker: this);
+    public IRepository<ApprovalLevelConfig> ApprovalLevelConfigs => _approvalLevelConfigs ??= new DapperRepository<ApprovalLevelConfig>(_db, _auditWriter, tracker: this);
+    public IRepository<FloorLevelBand> FloorLevelBands => _floorLevelBands ??= new DapperRepository<FloorLevelBand>(_db, _auditWriter, tracker: this);
+    public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new DapperRepository<TaxRateConfig>(_db, _auditWriter, tracker: this);
+    public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new DapperRepository<LateFeeConfig>(_db, _auditWriter, tracker: this);
+    public IRepository<AutoRenewConfig> AutoRenewConfigs => _autoRenewConfigs ??= new DapperRepository<AutoRenewConfig>(_db, _auditWriter, tracker: this);
+    public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db, _auditWriter, tracker: this);
+    public IRepository<Voucher> Vouchers => _vouchers ??= new DapperRepository<Voucher>(_db, _auditWriter, tracker: this);
+    public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new DapperRepository<JobSchedule>(_db, _auditWriter, tracker: this);
+    public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new DapperRepository<JobTemplate>(_db, _auditWriter, tracker: this);
+    public IRepository<JobScheduleExecution> JobScheduleExecutions => _jobScheduleExecutions ??= new DapperRepository<JobScheduleExecution>(_db, _auditWriter, tracker: this);
+    public IRepository<ImportBatch> ImportBatches => _importBatches ??= new DapperRepository<ImportBatch>(_db, _auditWriter, tracker: this);
+    public IRepository<ImportBatchItem> ImportBatchItems => _importBatchItems ??= new DapperRepository<ImportBatchItem>(_db, _auditWriter, tracker: this);
+    public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new DapperRepository<RoomPricingStandard>(_db, _auditWriter, tracker: this);
+    public ITenantRepository Tenants => _tenants ??= new DapperTenantRepository(_db, _sql, _auditWriter, this);
+    public IReceivablePlanRepository ReceivablePlans => _receivablePlans ??= new DapperReceivablePlanRepository(_db, _sql, _auditWriter, this);
+    public IReceiptRepository Receipts => _receipts ??= new DapperReceiptRepository(_db, _sql, _auditWriter, this);
+    public IRepository<BankStatement> BankStatements => _bankStatements ??= new DapperRepository<BankStatement>(_db, _auditWriter, tracker: this);
+    public IRepository<BankReconciliation> BankReconciliations => _bankReconciliations ??= new DapperRepository<BankReconciliation>(_db, _auditWriter, tracker: this);
+    public IRepository<BankMatch> BankMatches => _bankMatches ??= new DapperRepository<BankMatch>(_db, _auditWriter, tracker: this);
+    public IRepository<DepositLog> DepositLogs => _depositLogs ??= new DapperRepository<DepositLog>(_db, _auditWriter, tracker: this);
+    public IRepository<CollectionStage> CollectionStages => _collectionStages ??= new DapperRepository<CollectionStage>(_db, _auditWriter, tracker: this);
+    public IRepository<CollectionRecord> CollectionRecords => _collectionRecords ??= new DapperRepository<CollectionRecord>(_db, _auditWriter, tracker: this);
+    public IRepository<DebitNote> DebitNotes => _debitNotes ??= new DapperRepository<DebitNote>(_db, _auditWriter, tracker: this);
+    public IMeterReadingRepository MeterReadings => _meterReadings ??= new DapperMeterReadingRepository(_db, _sql, _auditWriter, this);
+    public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db, _sql, _auditWriter, this);
+    public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db, _sql, _auditWriter, this);
+    public IRepository<ChangeRequest> ChangeRequests => _changeRequests ??= new DapperRepository<ChangeRequest>(_db, _auditWriter, tracker: this);
 
     private IUserRepository? _users;
     private IRoleRepository? _roles;
@@ -107,6 +110,93 @@ public class DapperUnitOfWork : IUnitOfWork
     private IRenewalRequestRepository? _renewalRequests;
     private IRepository<ChangeRequest>? _changeRequests;
 
+    // ==================================================================
+    // IChangeTracker 实现
+    // ==================================================================
+
+    void IChangeTracker.Track<T>(T entity, string tableName)
+    {
+        var id = typeof(T).GetProperty("Id")?.GetValue(entity) is Guid g ? g : Guid.Empty;
+        if (id == Guid.Empty) return;
+        if (!_tracked.ContainsKey(tableName))
+            _tracked[tableName] = new Dictionary<Guid, TrackedEntry>();
+        _tracked[tableName][id] = new TrackedEntry(entity, EntityToDict(entity));
+    }
+
+    IReadOnlyDictionary<string, Dictionary<Guid, TrackedEntry>> IChangeTracker.DirtyEntries
+        => _tracked;
+
+    void IChangeTracker.Clear() => _tracked.Clear();
+
+    // ==================================================================
+    // CommitAsync — 真正的变更持久化入口
+    // ==================================================================
+
+    public async Task<int> CommitAsync(CancellationToken ct = default)
+    {
+        if (_tracked.Count == 0) return 0;
+
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            int affected = 0;
+            var auditBatch = new List<(string tableName, string entityId, string action, Dictionary<string, object?> changes, Guid userId)>();
+
+            foreach (var (tableName, entities) in _tracked)
+            {
+                foreach (var (id, entry) in entities)
+                {
+                    var now = EntityToDict(entry.Entity);
+                    var changes = DiffDict(entry.Snapshot, now);
+                    if (changes.Count == 0) continue;
+
+                    // 生成 UPDATE — 只 SET 变化的字段
+                    var sets = string.Join(",", changes.Keys.Select(k => $"[{k}]=@{k}"));
+                    var sql = $"UPDATE [{tableName}] SET {sets} WHERE Id=@Id";
+                    var parms = new DynamicParameters();
+                    parms.Add("@Id", id);
+                    foreach (var k in changes.Keys)
+                    {
+                        var prop = entry.Entity.GetType().GetProperty(k);
+                        parms.Add($"@{k}", prop?.GetValue(entry.Entity));
+                    }
+
+                    affected += await conn.ExecuteAsync(sql, parms, tx);
+
+                    // 收集审计（延迟写入避免与事务表竞争）
+                    var updatedBy = entry.Entity.GetType().GetProperty("UpdatedBy")?.GetValue(entry.Entity) as Guid? ?? Guid.Empty;
+                    auditBatch.Add((tableName, id.ToString(), "Update", changes, updatedBy));
+                }
+            }
+
+            tx.Commit();
+
+            // 审计日志在事务外写入（审计表不应影响业务事务）
+            foreach (var (tn, eid, action, chg, uid) in auditBatch)
+            {
+                await _auditWriter.LogChangesAsync(tn, eid, action, chg, uid, ct);
+            }
+
+            _tracked.Clear();
+            return affected;
+        }
+        catch
+        {
+            tx.Rollback();
+            _tracked.Clear();
+            throw;
+        }
+    }
+
+    public Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class => Task.CompletedTask;
+
+    // ==================================================================
+    // 其他方法（原样保留）
+    // ==================================================================
+
     public async Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -125,8 +215,6 @@ public class DapperUnitOfWork : IUnitOfWork
         }
         return batch;
     }
-    public Task<int> CommitAsync(CancellationToken ct = default) => Task.FromResult(0);
-    public Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class => Task.CompletedTask;
 
     public async Task<List<DebitNote>> GetDebitNotesByCompanyAsync(Guid companyId, string? period = null, CancellationToken ct = default)
     {
@@ -171,7 +259,6 @@ public class DapperUnitOfWork : IUnitOfWork
 
         if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open)
         {
-            // 有活跃事务时复用连接和事务
             return await _sharedConnection.ExecuteAsync(sql, dp, _sharedTransaction);
         }
 
@@ -186,5 +273,46 @@ public class DapperUnitOfWork : IUnitOfWork
         _sharedConnection?.Dispose();
         _sharedTransaction = null;
         _sharedConnection = null;
+    }
+
+    // ==================================================================
+    // 快照/比对工具（与 DapperRepository 共享逻辑）
+    // ==================================================================
+
+    internal static Dictionary<string, object?> EntityToDict(object entity)
+    {
+        var dict = new Dictionary<string, object?>();
+        var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        foreach (var p in props)
+        {
+            if (p.Name is "DomainEvents" or "RowVersion") continue;
+            if (!p.CanWrite) continue; // 排除计算属性（如 IsVacant/IsRented）
+            if (IsNavProp(p)) continue;
+            dict[p.Name] = p.GetValue(entity);
+        }
+        return dict;
+    }
+
+    internal static Dictionary<string, object?> DiffDict(Dictionary<string, object?> old, Dictionary<string, object?> now)
+    {
+        var diff = new Dictionary<string, object?>();
+        var exclude = new HashSet<string> { "RowVersion", "UpdatedAt", "UpdatedBy", "UpdatedIp", "UpdatedHostname" };
+        foreach (var kv in now)
+        {
+            if (exclude.Contains(kv.Key)) continue;
+            if (!old.ContainsKey(kv.Key)) { diff[kv.Key] = kv.Value; continue; }
+            var oldVal = old[kv.Key];
+            var newVal = kv.Value;
+            if (!Equals(oldVal, newVal))
+                diff[kv.Key] = newVal;
+        }
+        return diff;
+    }
+
+    private static bool IsNavProp(System.Reflection.PropertyInfo p)
+    {
+        var t = p.PropertyType;
+        return t == typeof(System.Collections.IList) || t.IsGenericType ||
+               p.Name is "DomainEvents" or "RowVersion" or "Records" or "Roles";
     }
 }

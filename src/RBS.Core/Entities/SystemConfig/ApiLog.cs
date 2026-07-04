@@ -28,7 +28,7 @@ public class ApiLog
     public string? UserAgent { get; private set; }
 
     // ===== 时间 =====
-    public DateTime CreatedAt { get; private set; }
+    public DateTime RequestAt { get; private set; }
 
     private ApiLog() { }
 
@@ -50,7 +50,7 @@ public class ApiLog
         UserAgent = Truncate(userAgent, 500);
         UserId = userId;
         UserDisplayName = Truncate(userDisplayName, 100);
-        CreatedAt = ChinaTime.Now;
+        RequestAt = ChinaTime.Now;
     }
 
     private static string? Truncate(string? value, int maxLength) =>

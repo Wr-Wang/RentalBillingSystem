@@ -42,8 +42,8 @@ public class AuditService : IAuditService
         using var conn = _db.CreateConnection();
         conn.Open();
 
-        var total = await conn.QuerySingleAsync<int>(
-            $"SELECT COUNT(*) FROM [{tableName}] {whereSql}", parameters);
+        var total = Convert.ToInt32(await conn.ExecuteScalarAsync(
+            $"SELECT COUNT(*) FROM [{tableName}] {whereSql}", parameters));
 
         var offset = (query.Page - 1) * query.PageSize;
         parameters.Add("@Offset", offset);
@@ -126,18 +126,18 @@ public class AuditService : IAuditService
         var monthStart = new DateTime(now.Year, now.Month, 1);
         foreach (var t in tables)
         {
-            var row = await conn.QuerySingleAsync(
+            var today = Convert.ToInt64(await conn.ExecuteScalarAsync(
                 $"SELECT COUNT(*) FROM [{t}] WHERE [AuditChangedAt] >= @d0",
-                new { d0 = now.Date });
-            todaySum += (long)row;
-            row = await conn.QuerySingleAsync(
+                new { d0 = now.Date }));
+            todaySum += today;
+            var week = Convert.ToInt64(await conn.ExecuteScalarAsync(
                 $"SELECT COUNT(*) FROM [{t}] WHERE [AuditChangedAt] >= @d0",
-                new { d0 = weekStart });
-            weekSum += (long)row;
-            row = await conn.QuerySingleAsync(
+                new { d0 = weekStart }));
+            weekSum += week;
+            var month = Convert.ToInt64(await conn.ExecuteScalarAsync(
                 $"SELECT COUNT(*) FROM [{t}] WHERE [AuditChangedAt] >= @d0",
-                new { d0 = monthStart });
-            monthSum += (long)row;
+                new { d0 = monthStart }));
+            monthSum += month;
         }
 
         return new AuditStatsDto

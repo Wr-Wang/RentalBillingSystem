@@ -58,12 +58,18 @@ public partial class HousingUnitService : IHousingUnitService
     public async Task UpdateAsync(Guid id, UpdateHousingUnitRequest r, CancellationToken ct = default)
     {
         var u = await _uow.HousingUnits.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("房源不存在");
+
+        // 必填字段 — 有值才更新
         if (!string.IsNullOrEmpty(r.BuildingName)) u.SetBuildingName(r.BuildingName);
-        if (r.BuildingCode != null || r.BuildingAddress != null) u.SetBuildingInfo(r.BuildingCode ?? u.BuildingCode, r.BuildingAddress ?? u.BuildingAddress);
         if (!string.IsNullOrEmpty(r.UnitNo)) u.SetUnitNo(r.UnitNo);
-        if (r.FloorName != null || r.FloorSortOrder.HasValue) u.SetFloor(r.FloorName ?? u.FloorName, r.FloorSortOrder ?? u.FloorSortOrder);
-        if (r.RoomTypeId.HasValue || r.Area.HasValue || r.Orientation != null || r.BaseRentAmount.HasValue)
-            u.UpdateDetails(r.RoomTypeId, r.Area, r.Orientation, r.BaseRentAmount);
+
+        // 可空字段 — 允许清空（null/空字符串均视为清空）
+        u.SetBuildingInfo(r.BuildingCode, r.BuildingAddress);
+        if (r.FloorName != null || r.FloorSortOrder.HasValue)
+            u.SetFloor(r.FloorName ?? u.FloorName, r.FloorSortOrder ?? u.FloorSortOrder);
+        if (r.FullCode != null) u.SetFullCode(string.IsNullOrEmpty(r.FullCode) ? null : r.FullCode);
+        u.UpdateDetails(r.RoomTypeId, r.Area, r.Orientation, r.BaseRentAmount);
+
         if (!string.IsNullOrEmpty(r.Status))
         {
             switch (r.Status) { case "Rented": u.Occupy(); break; case "Vacant": u.Vacate(); break; case "Maintenance": u.SetMaintenance(); break; }

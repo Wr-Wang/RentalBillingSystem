@@ -10,24 +10,30 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
     protected readonly IDbConnectionFactory _db;
     protected readonly string _tableName;
     protected readonly IAuditLogWriter _auditWriter;
+    protected readonly IChangeTracker? _tracker;
 
-    public DapperRepository(IDbConnectionFactory db, IAuditLogWriter auditWriter, string? tableName = null)
+    public DapperRepository(IDbConnectionFactory db, IAuditLogWriter auditWriter, string? tableName = null, IChangeTracker? tracker = null)
     {
         _db = db;
         _auditWriter = auditWriter;
+        _tracker = tracker;
         _tableName = tableName ?? InferTableName();
     }
 
     public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return await conn.QuerySingleOrDefaultAsync<T>($"SELECT * FROM [{_tableName}] WHERE Id=@Id", new { Id = id });
+        var entity = await conn.QuerySingleOrDefaultAsync<T>($"SELECT * FROM [{_tableName}] WHERE Id=@Id", new { Id = id });
+        if (entity != null) _tracker?.Track(entity, _tableName);
+        return entity;
     }
 
     public async Task<List<T>> GetAllAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return (await conn.QueryAsync<T>($"SELECT * FROM [{_tableName}]")).ToList();
+        var list = (await conn.QueryAsync<T>($"SELECT * FROM [{_tableName}]")).ToList();
+        foreach (var entity in list) _tracker?.Track(entity, _tableName);
+        return list;
     }
 
     public async Task<T> AddAsync(T entity, CancellationToken ct = default)
@@ -42,6 +48,7 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
         // 审计：记录所有字段
         var createdBy = typeof(T).GetProperty("CreatedBy")?.GetValue(entity) as Guid? ?? Guid.Empty;
         await _auditWriter.LogChangesAsync(_tableName, GetEntityId(entity), "Create", EntityToDict(entity), createdBy, ct);
+        _tracker?.Track(entity, _tableName);
         return entity;
     }
 
@@ -52,10 +59,10 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
 
         // 2. 更新主表
         using var conn = _db.CreateConnection(); conn.Open();
-        var exclude = new HashSet<string> { "Id", "CreatedBy", "CreatedAt", "CreatedIp", "CreatedHostname" };
+        var exclude = new HashSet<string> { "Id", "CreatedBy", "CreatedAt", "CreatedIp", "CreatedHostname", "UpdatedBy", "UpdatedAt", "UpdatedIp", "UpdatedHostname" };
         var sets = string.Join(",",
             typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                .Where(p => p.CanRead && !exclude.Contains(p.Name) && !IsNavProp(p))
+                .Where(p => p.CanRead && p.CanWrite && !exclude.Contains(p.Name) && !IsNavProp(p))
                 .Select(p => $"[{p.Name}]=@{p.Name}"));
         await conn.ExecuteAsync($"UPDATE [{_tableName}] SET {sets} WHERE Id=@Id", entity);
 
@@ -109,6 +116,7 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
         foreach (var p in props)
         {
             if (IsNavProp(p) || p.Name is "DomainEvents" or "RowVersion") continue;
+            if (!p.CanWrite) continue; // 排除计算属性（如 IsVacant/IsRented）
             dict[p.Name] = p.GetValue(entity);
         }
         return dict;

@@ -60,7 +60,7 @@ public class MeterReadingsController : ControllerBase
         return Ok(new { id, status = "Confirmed" });
     }
 
-    [HttpGet("by-month")]
+    [HttpGet("bymonth")]
     public async Task<IActionResult> GetByMonth([FromQuery] Guid? companyId, [FromQuery] int? year, [FromQuery] int? month, CancellationToken ct)
     {
         if (companyId == null) return Ok(new List<object>());
