@@ -1531,93 +1531,91 @@ VALUES (NEWID(),0.0005,3,100.00,1.00,'2026-01-01',1,@Cid,@SysUserId,@Now);
 GO
 
 -- ===================================================================
--- 18. 房源
+-- 18. 房源（含完整属性：面积、朝向、基础租金、房型）
 -- ===================================================================
 DECLARE @Sys uniqueidentifier = '00000000-0000-0000-0000-000000000000';
 DECLARE @Now datetime2 = GETDATE();
 DECLARE @GS001Id uniqueidentifier; SELECT @GS001Id = [Id] FROM [Companies] WHERE [Code] = 'GS001';
 DECLARE @GS002Id uniqueidentifier; SELECT @GS002Id = [Id] FROM [Companies] WHERE [Code] = 'GS002';
 DECLARE @GS003Id uniqueidentifier; SELECT @GS003Id = [Id] FROM [Companies] WHERE [Code] = 'GS003';
+DECLARE @Studio uniqueidentifier; SELECT @Studio = [Id] FROM [RoomTypes] WHERE [Name] = N'一室一厅';
+DECLARE @TwoBr uniqueidentifier; SELECT @TwoBr = [Id] FROM [RoomTypes] WHERE [Name] = N'两室一厅';
+DECLARE @ThreeBr uniqueidentifier; SELECT @ThreeBr = [Id] FROM [RoomTypes] WHERE [Name] = N'三室一厅';
+DECLARE @ThreeBrTwo uniqueidentifier; SELECT @ThreeBrTwo = [Id] FROM [RoomTypes] WHERE [Name] = N'三室两厅';
 
 DELETE FROM HousingUnits;
 
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'A栋', N'A', N'上海市浦东新区陆家嘴金融中心A座', @GS001Id, N'1层', 1, N'101', N'A栋-1层-101', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'A栋', N'A', N'上海市浦东新区陆家嘴金融中心A座', @GS001Id, N'1层', 1, N'102', N'A栋-1层-102', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'A栋', N'A', N'上海市浦东新区陆家嘴金融中心A座', @GS001Id, N'2层', 2, N'201', N'A栋-2层-201', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'A栋', N'A', N'上海市浦东新区陆家嘴金融中心A座', @GS001Id, N'2层', 2, N'202', N'A栋-2层-202', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'A栋', N'A', N'上海市浦东新区陆家嘴金融中心A座', @GS001Id, N'3层', 3, N'301', N'A栋-3层-301', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'A栋', N'A', N'上海市浦东新区陆家嘴金融中心A座', @GS001Id, N'3层', 3, N'302', N'A栋-3层-302', 'Vacant', NULL, @Sys, @Now);
+-- A栋（6层×2户=12套）- 上海浦东 GS001
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'1层',1,N'101',N'A栋-1层-101',@TwoBr,85,N'南',5500,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'1层',1,N'102',N'A栋-1层-102',@Studio,65,N'北',4200,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'2层',2,N'201',N'A栋-2层-201',@TwoBr,95,N'南',6000,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'2层',2,N'202',N'A栋-2层-202',@Studio,70,N'东',4500,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'3层',3,N'301',N'A栋-3层-301',@ThreeBr,125,N'南',7800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'3层',3,N'302',N'A栋-3层-302',@TwoBr,90,N'西',5800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'4层',4,N'401',N'A栋-4层-401',@ThreeBrTwo,145,N'南',8800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'4层',4,N'402',N'A栋-4层-402',@TwoBr,95,N'北',6200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'5层',5,N'501',N'A栋-5层-501',@ThreeBr,130,N'南',8200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'5层',5,N'502',N'A栋-5层-502',@TwoBr,100,N'东',6500,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'6层',6,N'601',N'A栋-6层-601',@ThreeBrTwo,150,N'南',9500,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'6层',6,N'602',N'A栋-6层-602',@ThreeBr,120,N'西',7500,'Vacant',@Sys,@Now);
 
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'B栋', N'B', N'上海市浦东新区陆家嘴金融中心B座', @GS001Id, N'1层', 1, N'101', N'B栋-1层-101', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'B栋', N'B', N'上海市浦东新区陆家嘴金融中心B座', @GS001Id, N'1层', 1, N'102', N'B栋-1层-102', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'B栋', N'B', N'上海市浦东新区陆家嘴金融中心B座', @GS001Id, N'2层', 2, N'201', N'B栋-2层-201', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'B栋', N'B', N'上海市浦东新区陆家嘴金融中心B座', @GS001Id, N'2层', 2, N'202', N'B栋-2层-202', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'B栋', N'B', N'上海市浦东新区陆家嘴金融中心B座', @GS001Id, N'3层', 3, N'301', N'B栋-3层-301', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'B栋', N'B', N'上海市浦东新区陆家嘴金融中心B座', @GS001Id, N'3层', 3, N'302', N'B栋-3层-302', 'Vacant', NULL, @Sys, @Now);
+-- B栋（12套）- 上海浦东 GS001
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'1层',1,N'101',N'B栋-1层-101',@Studio,60,N'南',4000,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'1层',1,N'102',N'B栋-1层-102',@TwoBr,85,N'北',5300,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'2层',2,N'201',N'B栋-2层-201',@TwoBr,95,N'南',6200,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'2层',2,N'202',N'B栋-2层-202',@Studio,65,N'东',4300,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'3层',3,N'301',N'B栋-3层-301',@ThreeBr,128,N'南',7900,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'3层',3,N'302',N'B栋-3层-302',@TwoBr,88,N'西',5600,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'4层',4,N'401',N'B栋-4层-401',@ThreeBrTwo,140,N'南',8500,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'4层',4,N'402',N'B栋-4层-402',@TwoBr,92,N'北',6000,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'5层',5,N'501',N'B栋-5层-501',@ThreeBr,135,N'南',8600,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'5层',5,N'502',N'B栋-5层-502',@TwoBr,105,N'东',6800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'6层',6,N'601',N'B栋-6层-601',@ThreeBrTwo,155,N'南',9800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'6层',6,N'602',N'B栋-6层-602',@ThreeBr,125,N'西',7800,'Vacant',@Sys,@Now);
 
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'C栋', N'C', N'南京市鼓楼区新街口广场C座', @GS002Id, N'1层', 1, N'101', N'C栋-1层-101', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'C栋', N'C', N'南京市鼓楼区新街口广场C座', @GS002Id, N'1层', 1, N'102', N'C栋-1层-102', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'C栋', N'C', N'南京市鼓楼区新街口广场C座', @GS002Id, N'2层', 2, N'201', N'C栋-2层-201', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'C栋', N'C', N'南京市鼓楼区新街口广场C座', @GS002Id, N'2层', 2, N'202', N'C栋-2层-202', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'C栋', N'C', N'南京市鼓楼区新街口广场C座', @GS002Id, N'3层', 3, N'301', N'C栋-3层-301', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'C栋', N'C', N'南京市鼓楼区新街口广场C座', @GS002Id, N'3层', 3, N'302', N'C栋-3层-302', 'Vacant', NULL, @Sys, @Now);
+-- C栋（12套）- 上海浦东 GS001
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'1层',1,N'101',N'C栋-1层-101',@Studio,65,N'南',4200,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'1层',1,N'102',N'C栋-1层-102',@TwoBr,82,N'北',5200,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'2层',2,N'201',N'C栋-2层-201',@TwoBr,92,N'南',6000,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'2层',2,N'202',N'C栋-2层-202',@Studio,68,N'东',4400,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'3层',3,N'301',N'C栋-3层-301',@ThreeBr,122,N'南',7600,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'3层',3,N'302',N'C栋-3层-302',@TwoBr,90,N'西',5800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'4层',4,N'401',N'C栋-4层-401',@ThreeBrTwo,138,N'南',8400,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'4层',4,N'402',N'C栋-4层-402',@TwoBr,95,N'北',6200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'5层',5,N'501',N'C栋-5层-501',@ThreeBr,130,N'南',8100,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'5层',5,N'502',N'C栋-5层-502',@TwoBr,100,N'东',6500,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'6层',6,N'601',N'C栋-6层-601',@ThreeBrTwo,148,N'南',9200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'6层',6,N'602',N'C栋-6层-602',@ThreeBr,125,N'西',7800,'Vacant',@Sys,@Now);
 
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'D栋', N'D', N'南京市鼓楼区新街口广场D座', @GS002Id, N'1层', 1, N'101', N'D栋-1层-101', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'D栋', N'D', N'南京市鼓楼区新街口广场D座', @GS002Id, N'1层', 1, N'102', N'D栋-1层-102', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'D栋', N'D', N'南京市鼓楼区新街口广场D座', @GS002Id, N'2层', 2, N'201', N'D栋-2层-201', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'D栋', N'D', N'南京市鼓楼区新街口广场D座', @GS002Id, N'2层', 2, N'202', N'D栋-2层-202', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'D栋', N'D', N'南京市鼓楼区新街口广场D座', @GS002Id, N'3层', 3, N'301', N'D栋-3层-301', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'D栋', N'D', N'南京市鼓楼区新街口广场D座', @GS002Id, N'3层', 3, N'302', N'D栋-3层-302', 'Vacant', NULL, @Sys, @Now);
+-- D栋（8套）- 南京鼓楼 GS002
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'1层',1,N'101',N'D栋-1层-101',@Studio,60,N'南',3200,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'1层',1,N'102',N'D栋-1层-102',@TwoBr,80,N'北',4200,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'2层',2,N'201',N'D栋-2层-201',@TwoBr,88,N'南',4800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'2层',2,N'202',N'D栋-2层-202',@Studio,62,N'东',3500,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'3层',3,N'301',N'D栋-3层-301',@ThreeBr,118,N'南',6200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'3层',3,N'302',N'D栋-3层-302',@TwoBr,85,N'西',4600,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'4层',4,N'401',N'D栋-4层-401',@ThreeBrTwo,135,N'南',7200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'4层',4,N'402',N'D栋-4层-402',@TwoBr,90,N'北',5000,'Vacant',@Sys,@Now);
 
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'E栋', N'E', N'深圳市南山区科技园E栋', @GS003Id, N'1层', 1, N'101', N'E栋-1层-101', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'E栋', N'E', N'深圳市南山区科技园E栋', @GS003Id, N'1层', 1, N'102', N'E栋-1层-102', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'E栋', N'E', N'深圳市南山区科技园E栋', @GS003Id, N'2层', 2, N'201', N'E栋-2层-201', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'E栋', N'E', N'深圳市南山区科技园E栋', @GS003Id, N'2层', 2, N'202', N'E栋-2层-202', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'E栋', N'E', N'深圳市南山区科技园E栋', @GS003Id, N'3层', 3, N'301', N'E栋-3层-301', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'E栋', N'E', N'深圳市南山区科技园E栋', @GS003Id, N'3层', 3, N'302', N'E栋-3层-302', 'Vacant', NULL, @Sys, @Now);
+-- E栋（8套）- 深圳南山 GS003
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'1层',1,N'101',N'E栋-1层-101',@Studio,65,N'南',3800,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'1层',1,N'102',N'E栋-1层-102',@TwoBr,82,N'北',4800,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'2层',2,N'201',N'E栋-2层-201',@TwoBr,90,N'南',5400,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'2层',2,N'202',N'E栋-2层-202',@Studio,68,N'东',4000,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'3层',3,N'301',N'E栋-3层-301',@ThreeBr,120,N'南',6800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'3层',3,N'302',N'E栋-3层-302',@TwoBr,88,N'西',5200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'4层',4,N'401',N'E栋-4层-401',@ThreeBrTwo,132,N'南',7600,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'4层',4,N'402',N'E栋-4层-402',@TwoBr,92,N'北',5600,'Vacant',@Sys,@Now);
 
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'F栋', N'F', N'深圳市南山区科技园F栋', @GS003Id, N'1层', 1, N'101', N'F栋-1层-101', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'F栋', N'F', N'深圳市南山区科技园F栋', @GS003Id, N'1层', 1, N'102', N'F栋-1层-102', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'F栋', N'F', N'深圳市南山区科技园F栋', @GS003Id, N'2层', 2, N'201', N'F栋-2层-201', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'F栋', N'F', N'深圳市南山区科技园F栋', @GS003Id, N'2层', 2, N'202', N'F栋-2层-202', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'F栋', N'F', N'深圳市南山区科技园F栋', @GS003Id, N'3层', 3, N'301', N'F栋-3层-301', 'Vacant', NULL, @Sys, @Now);
-INSERT INTO HousingUnits (Id, BuildingName, BuildingCode, BuildingAddress, CompanyId, FloorName, FloorSortOrder, UnitNo, FullCode, Status, RoomTypeId, CreatedBy, CreatedAt)
-VALUES (NEWID(), N'F栋', N'F', N'深圳市南山区科技园F栋', @GS003Id, N'3层', 3, N'302', N'F栋-3层-302', 'Vacant', NULL, @Sys, @Now);
+-- F栋（8套）- 深圳南山 GS003
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'1层',1,N'101',N'F栋-1层-101',@Studio,60,N'南',3600,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'1层',1,N'102',N'F栋-1层-102',@TwoBr,78,N'北',4600,'Rented',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'2层',2,N'201',N'F栋-2层-201',@TwoBr,88,N'南',5200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'2层',2,N'202',N'F栋-2层-202',@Studio,65,N'东',3800,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'3层',3,N'301',N'F栋-3层-301',@ThreeBr,118,N'南',6500,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'3层',3,N'302',N'F栋-3层-302',@TwoBr,85,N'西',5000,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'4层',4,N'401',N'F栋-4层-401',@ThreeBrTwo,130,N'南',7200,'Vacant',@Sys,@Now);
+INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'4层',4,N'402',N'F栋-4层-402',@TwoBr,90,N'北',5400,'Vacant',@Sys,@Now);
 
 SELECT COUNT(*) AS TotalHousingUnits FROM HousingUnits;
 GO
@@ -1643,25 +1641,25 @@ DECLARE @TenantLS uniqueidentifier;
 DECLARE @TenantWW uniqueidentifier;
 DECLARE @TenantZL uniqueidentifier;
 
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]='Zhang San')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'Zhang San','13800138001',@Cid,1,@SysUserId,@Now);
-SELECT @TenantZS = [Id] FROM [Tenants] WHERE [Name]='Zhang San';
+IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'张三')
+    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'张三','13800138001',N'310101199001011234',@Cid,1,@SysUserId,@Now);
+SELECT @TenantZS = [Id] FROM [Tenants] WHERE [Name]=N'张三';
 
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]='Li Si')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'Li Si','13900139002',@Cid,1,@SysUserId,@Now);
-SELECT @TenantLS = [Id] FROM [Tenants] WHERE [Name]='Li Si';
+IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'李四')
+    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'李四','13900139002',N'310101199002022345',@Cid,1,@SysUserId,@Now);
+SELECT @TenantLS = [Id] FROM [Tenants] WHERE [Name]=N'李四';
 
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]='Wang Wu')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'Wang Wu','13700137003',@Cid,1,@SysUserId,@Now);
-SELECT @TenantWW = [Id] FROM [Tenants] WHERE [Name]='Wang Wu';
+IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'王五')
+    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'王五','13700137003',N'310101199003033456',@Cid,1,@SysUserId,@Now);
+SELECT @TenantWW = [Id] FROM [Tenants] WHERE [Name]=N'王五';
 
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]='Zhao Liu')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'Zhao Liu','13600136004',@Cid,1,@SysUserId,@Now);
-SELECT @TenantZL = [Id] FROM [Tenants] WHERE [Name]='Zhao Liu';
+IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'赵六')
+    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'赵六','13600136004',N'310101199004044567',@Cid,1,@SysUserId,@Now);
+SELECT @TenantZL = [Id] FROM [Tenants] WHERE [Name]=N'赵六';
 
 DECLARE @Contract1 uniqueidentifier;
 DECLARE @Contract2 uniqueidentifier;
