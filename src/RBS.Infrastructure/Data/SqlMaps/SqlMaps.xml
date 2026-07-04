@@ -18,6 +18,9 @@
   <select id="Identity.Select.User.All">
     <![CDATA[SELECT * FROM Users]]>
   </select>
+  <select id="Identity.Select.User.AllWithRoles">
+    <![CDATA[SELECT * FROM Users; SELECT ur.UserId, ur.RoleId, r.Name AS RoleName, r.Code AS RoleCode FROM UserRoles ur LEFT JOIN Roles r ON r.Id = ur.RoleId]]>
+  </select>
   <select id="Identity.Select.User.ByUsername">
     <![CDATA[SELECT * FROM Users WHERE Username=@Username]]>
   </select>
@@ -204,6 +207,10 @@
     <![CDATA[INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
       VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)]]>
   </insert>
+  <insert id="Approval.Insert.Record.Raw">
+    <![CDATA[INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)]]>
+  </insert>
   <select id="Approval.Select.Record.ByApprovalRequestId">
     <![CDATA[SELECT * FROM ApprovalRecords WHERE ApprovalRequestId=@Id ORDER BY CreatedAt]]>
   </select>
@@ -297,6 +304,10 @@
       WHERE ct.TenantId = @TenantId
       ORDER BY dn.CreatedAt DESC]]>
   </select>
+  <insert id="Billing.Insert.DebitNoteItem.Default">
+    <![CDATA[INSERT INTO DebitNoteItems (Id, DebitNoteId, FeeCodeId, Amount, CreatedBy, CreatedAt)
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5)]]>
+  </insert>
 
   <!-- ================================================================
        模块：ReceivablePlan（应收计划）
@@ -351,13 +362,13 @@
     <![CDATA[SELECT * FROM Contracts WHERE ContractNo=@No]]>
   </select>
   <select id="Lease.Select.Contract.Active">
-    <![CDATA[SELECT * FROM Contracts WHERE CompanyId=@Id AND StatusCode='Active']]>
+    <![CDATA[SELECT * FROM Contracts WHERE CompanyId=@Id AND Status='Active']]>
   </select>
   <select id="Lease.Select.Contract.Expiring">
     <![CDATA[SELECT * FROM Contracts WHERE EndDate=@Date]]>
   </select>
   <select id="Lease.Select.Contract.HasActiveForHousingUnit">
-    <![CDATA[SELECT COUNT(1) FROM Contracts WHERE RoomId=@Id AND StatusCode='Active']]>
+    <![CDATA[SELECT COUNT(1) FROM Contracts WHERE RoomId=@Id AND Status='Active']]>
   </select>
 
   <!-- ================================================================
@@ -468,11 +479,29 @@
   </update>
   <update id="Approval.Update.RenewalRequest.ToRejected">
     <![CDATA[UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = GETUTCDATE()
-      WHERE Id = @Id AND Status = 'PendingApproval']]>
+      WHERE Id = @p0 AND Status = 'PendingApproval']]>
   </update>
   <update id="Approval.Update.Request.SetStatus">
     <![CDATA[UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id]]>
   </update>
+  <update id="Approval.Update.ContractFeeConfig.ExpireById">
+    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0, UpdatedAt = GETUTCDATE() WHERE Id = @p1 AND IsActive = 1]]>
+  </update>
+  <insert id="Approval.Insert.ContractFeeConfig.CopyFrom">
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
+      SELECT NEWID(), @p0, FeeCodeId, @p1, BillingMode, 1, @p2, NULL, @p3, GETUTCDATE()
+      FROM ContractFeeConfigs WHERE Id = @p4]]>
+  </insert>
+  <select id="Approval.Select.Request.PendingCount">
+    <![CDATA[SELECT COUNT(1) FROM ApprovalRequests WHERE TargetEntityId=@Id AND TargetEntityType=@Type AND Status='Pending']]>
+  </select>
+  <select id="Approval.Select.Request.LastRejected">
+    <![CDATA[SELECT TOP 1 Description, CreatedAt FROM ApprovalRequests WHERE TargetEntityId=@Id AND TargetEntityType=@Type AND Status='Rejected' ORDER BY CreatedAt DESC]]>
+  </select>
+  <select id="Lease.Select.RenewalRequest.LastRejected">
+    <![CDATA[SELECT TOP 1 NewRent AS NewRentAmount, CONVERT(NVARCHAR(10), NewEndDate, 23) AS NewEndDate, DepositHandling FROM RenewalRequests
+      WHERE OldContractId=@Id AND Status='Rejected' ORDER BY CreatedAt DESC]]>
+  </select>
 
   <!-- ================================================================
        模块：Contract（合同—SQL 更新语句，用于 ContractAppService）
@@ -539,6 +568,9 @@
   <!-- 合同时间线 -->
   <select id="Lease.Select.Contract.RenewalRequests">
     <![CDATA[SELECT CreatedAt, Status, NewRent FROM RenewalRequests WHERE OldContractId=@Id ORDER BY CreatedAt]]>
+  </select>
+  <select id="Lease.Select.Contract.RenewalStatusByIds">
+    <![CDATA[SELECT OldContractId, Status FROM RenewalRequests WHERE OldContractId IN @Ids]]>
   </select>
   <select id="Lease.Select.Contract.ApprovalRequests">
     <![CDATA[SELECT CreatedAt, Title, Description FROM ApprovalRequests WHERE TargetEntityId=@Id ORDER BY CreatedAt]]>

@@ -27,7 +27,7 @@ public class MonthlyFeeBillJob : IScheduledJob
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
     {
         var contracts = await _uow.Contracts.GetAllAsync(ct);
-        var activeContracts = contracts.Where(c => c.StatusCode == "Active" && c.CompanyId == companyId).ToList();
+        var activeContracts = contracts.Where(c => c.Status == "Active" && c.CompanyId == companyId).ToList();
         if (activeContracts.Count == 0) return "无生效合同";
 
         int total = 0;
@@ -116,7 +116,7 @@ public class AutoRenewJob : IScheduledJob
         var contracts = await _uow.Contracts.GetAllAsync(ct);
         var expiring = contracts
             .Where(c => c.CompanyId == companyId
-                     && c.StatusCode == "Active"
+                     && c.Status == "Active"
                      && c.AutoRenew
                      && c.EndDate == targetDate)
             .ToList();
@@ -135,7 +135,7 @@ public class AutoRenewJob : IScheduledJob
                     {
                         ContractId = contract.Id,
                         NewRentAmount = contract.RentAmount,
-                        NewEndDate = contract.EndDate.AddMonths(12),
+                        NewEndDate = contract.EndDate.AddMonths(12).ToString("yyyy-MM-dd"),
                         DepositHandling = "TRANSFER"
                     }, Guid.Empty, ct);
                 if (result != null) submitted++;
@@ -213,7 +213,7 @@ public class RenewalReminderJob : IScheduledJob
         var contracts = await _uow.Contracts.GetAllAsync(ct);
         var expiring = contracts
             .Where(c => c.CompanyId == companyId
-                     && c.StatusCode == "Active"
+                     && c.Status == "Active"
                      && c.EndDate == targetDate)
             .ToList();
 

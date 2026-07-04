@@ -94,7 +94,32 @@ public class ContractAppService : IContractService
         var total = await conn.QuerySingleAsync<int>($"SELECT COUNT(*) FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId {w}", parms);
         var rows = await conn.QueryAsync<ContractDto>($@"SELECT c.Id, c.ContractNo, c.RoomId, r.FullCode AS RoomFullCode, c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.CompanyId, CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract, c.AutoRenew FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId {w} ORDER BY c.CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         var list = rows.ToList();
-        if (list.Count > 0) { /* 租客查询同 GetListAsync */ }
+        if (list.Count > 0)
+        {
+            var ids = list.Select(x => x.Id).ToList();
+            var tenants = await conn.QueryAsync<dynamic>(@"
+                SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone
+                FROM ContractTenants ct
+                INNER JOIN Tenants t ON t.Id = ct.TenantId
+                WHERE ct.ContractId IN @Ids AND ct.IsPrimary = 1", new { Ids = ids });
+            var tenantLookup = tenants.Cast<IDictionary<string, object>>()
+                .GroupBy(d => (Guid)d["ContractId"])
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // 续签状态：是否有 Pending/Rejected 的续签请求
+            var renewals = (await conn.QueryAsync<dynamic>(
+                _sql.Get("Lease.Select.Contract.RenewalStatusByIds"),
+                new { Ids = ids })).ToList();
+
+            foreach (var item in list)
+            {
+                if (tenantLookup.TryGetValue(item.Id, out var t))
+                    item.Tenants = new List<ContractTenantDto> { new ContractTenantDto { ContractId = item.Id, TenantId = t.ContainsKey("TenantId") && t["TenantId"] is Guid gt ? gt : Guid.Empty, TenantName = t.ContainsKey("TenantName") ? t["TenantName"] as string ?? "" : "", TenantPhone = t.ContainsKey("TenantPhone") ? t["TenantPhone"] as string ?? "" : "" } };
+                var r = renewals.Where(x => x.OldContractId == item.Id).ToList();
+                item.HasPendingRenewal = r.Any(x => x.Status == "PendingApproval");
+                item.HasRejectedRenewal = r.Any(x => x.Status == "Rejected");
+            }
+        }
         return new PagedResult<ContractDto> { Items = list, Total = (int)total, Page = page, PageSize = pageSize, TotalPages = total > 0 ? (int)Math.Ceiling(total / (double)pageSize) : 0 };
     }
 
@@ -108,7 +133,8 @@ public class ContractAppService : IContractService
                    CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract,
                    c.AutoRenew FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
             SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id;
-            SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice, cf.IsActive FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id AND cf.IsActive = 1",
+            SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice, cf.IsActive,
+                   CONVERT(NVARCHAR(10), cf.EffectiveDate, 23) AS EffectiveDate, CONVERT(NVARCHAR(10), cf.ExpiryDate, 23) AS ExpiryDate FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id AND cf.IsActive = 1",
             new { Id = id });
         var dto = await multi.ReadSingleOrDefaultAsync<ContractDto>();
         if (dto == null) return null;

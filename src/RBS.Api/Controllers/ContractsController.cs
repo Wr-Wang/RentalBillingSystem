@@ -119,7 +119,7 @@ public class ContractsController : ControllerBase
         }
 
         await _uow.CommitAsync(ct);
-        return Ok(new { id, status = entity.StatusCode });
+        return Ok(new { id, status = entity.Status });
     }
 
     [HttpPost("{id}/suspend")]
@@ -129,7 +129,7 @@ public class ContractsController : ControllerBase
         if (entity == null) return NotFound();
         entity.Suspend();
         await _uow.CommitAsync(ct);
-        return Ok(new { id, status = entity.StatusCode });
+        return Ok(new { id, status = entity.Status });
     }
 
     [HttpPost("{id}/resume")]
@@ -139,7 +139,7 @@ public class ContractsController : ControllerBase
         if (entity == null) return NotFound();
         entity.Resume();
         await _uow.CommitAsync(ct);
-        return Ok(new { id, status = entity.StatusCode });
+        return Ok(new { id, status = entity.Status });
     }
 
     // ===== 续签相关 API（新审批流程） =====
@@ -194,6 +194,15 @@ public class ContractsController : ControllerBase
     {
         var chain = await _renewalService.GetRenewalChainAsync(id, ct);
         return Ok(chain);
+    }
+
+    /// <summary>获取最近一次被驳回的续签数据（重新提交预填）</summary>
+    [HttpGet("{id}/renewal/lastrejected")]
+    public async Task<IActionResult> GetLastRejectedRenewal(Guid id, CancellationToken ct)
+    {
+        var result = await _renewalService.GetLastRejectedAsync(id, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
     }
 
     /// <summary>获取合同允许的操作</summary>

@@ -15,7 +15,7 @@ public class Contract : AggregateRoot, IHasCompany
     public DateOnly StartDate { get; private set; }
     public DateOnly EndDate { get; private set; }
     public string PaymentCycle { get; private set; }
-    public ContractStatus StatusCode { get; private set; } = ContractStatus.Draft;
+    public ContractStatus Status { get; private set; } = ContractStatus.Draft;
     public Guid CompanyId { get; private set; }
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
@@ -27,10 +27,6 @@ public class Contract : AggregateRoot, IHasCompany
 
     // ===== 自动续签 =====
     public bool AutoRenew { get; private set; } = true;
-
-    /// <summary>兼容旧代码</summary>
-    [Obsolete("Use StatusCode instead")]
-    public string Status => StatusCode;
 
     // ===== 终止信息 =====
     public DateTime? TerminatedAt { get; private set; }
@@ -49,7 +45,7 @@ public class Contract : AggregateRoot, IHasCompany
     {
         ContractNo = string.Empty;
         PaymentCycle = "Monthly";
-        StatusCode = ContractStatus.Draft;
+        Status = ContractStatus.Draft;
     }
 
     // ===== 领域构造函数 =====
@@ -61,7 +57,7 @@ public class Contract : AggregateRoot, IHasCompany
         RoomId = roomId;
         CompanyId = companyId;
         PaymentCycle = "Monthly";
-        StatusCode = "Draft";
+        Status = "Draft";
     }
 
     // ===== 设置器（草稿状态可修改）=====
@@ -98,7 +94,7 @@ public class Contract : AggregateRoot, IHasCompany
     }
 
     /// <summary>供内部/ORM 使用</summary>
-    public void SetStatus(string status) => StatusCode = ContractStatus.FromCode(status);
+    public void SetStatus(string status) => Status = ContractStatus.FromCode(status);
     public void SetRenewalCount(int count) => RenewalCount = count;
     public void SetAutoRenew(bool autoRenew) => AutoRenew = autoRenew;
 
@@ -166,30 +162,29 @@ public class Contract : AggregateRoot, IHasCompany
     {
         AssertValidTransition("PendingApproval");
         ValidateForSubmission();
-        StatusCode = "PendingApproval";
+        Status = "PendingApproval";
     }
 
     public void Activate()
     {
         AssertValidTransition("Active");
-        StatusCode = "Active";
+        Status = "Active";
         AddDomainEvent(new ContractActivatedEvent(Id, RoomId, CompanyId));
     }
 
     public void Suspend()
     {
         AssertValidTransition("Suspended");
-        StatusCode = "Suspended";
+        Status = "Suspended";
         SuspendedAt = ChinaTime.Now;
         AddDomainEvent(new ContractSuspendedEvent(Id));
     }
 
     public void Resume()
     {
-        if (StatusCode != "Suspended")
+        if (Status != "Suspended")
             throw new InvalidOperationException("只有已暂停的合同可以恢复");
-        StatusCode = "Active";
-        ResumedAt = ChinaTime.Now;
+        Status = "Active";
     }
 
     public void Terminate(string reason)
@@ -197,7 +192,7 @@ public class Contract : AggregateRoot, IHasCompany
         AssertValidTransition("Terminated");
         if (string.IsNullOrWhiteSpace(reason))
             throw new ArgumentException("终止原因不能为空");
-        StatusCode = "Terminated";
+        Status = "Terminated";
         TerminatedAt = ChinaTime.Now;
         TerminationReason = reason;
         AddDomainEvent(new ContractTerminatedEvent(Id, RoomId, reason));
@@ -206,13 +201,13 @@ public class Contract : AggregateRoot, IHasCompany
     public void Expire()
     {
         AssertValidTransition("Expired");
-        StatusCode = "Expired";
+        Status = "Expired";
     }
 
     public void MarkAsRenewed()
     {
         AssertValidTransition("Renewed");
-        StatusCode = "Renewed";
+        Status = "Renewed";
     }
 
     /// <summary>设置续签链信息（创建新合同时调用）</summary>
@@ -228,12 +223,12 @@ public class Contract : AggregateRoot, IHasCompany
 
     /// <summary>判断合同在指定日期是否有效</summary>
     public bool IsEffectiveOn(DateOnly date)
-        => StatusCode == "Active" && date >= StartDate && date <= EndDate;
+        => Status == "Active" && date >= StartDate && date <= EndDate;
 
     /// <summary>判断指定账期是否需要生成应收</summary>
     public bool ShouldGenerateReceivableFor(string periodStr)
     {
-        if (StatusCode != "Active") return false;
+        if (Status != "Active") return false;
         var period = Period.Parse(periodStr);
         return period.StartDate <= EndDate && period.EndDate >= StartDate;
     }
@@ -256,7 +251,7 @@ public class Contract : AggregateRoot, IHasCompany
 
     private void AssertIsDraft()
     {
-        if (StatusCode != "Draft")
+        if (Status != "Draft")
             throw new InvalidOperationException("只有草稿状态的合同可以修改");
     }
 
@@ -270,9 +265,9 @@ public class Contract : AggregateRoot, IHasCompany
 
     private void AssertValidTransition(string targetStatus)
     {
-        var current = ContractStatus.FromCode(StatusCode);
+        var current = ContractStatus.FromCode(Status);
         var target = ContractStatus.FromCode(targetStatus);
         if (!current.CanTransitionTo(target))
-            throw new InvalidOperationException($"不允许从 {StatusCode} 变更为 {targetStatus}");
+            throw new InvalidOperationException($"不允许从 {Status} 变更为 {targetStatus}");
     }
 }

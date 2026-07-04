@@ -84,7 +84,21 @@ public class DapperUserRepository : IUserRepository
     public async Task<List<User>> GetAllWithRolesAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        return (await conn.QueryAsync<User>(_sql.Get("Identity.Select.User.All"))).ToList();
+        using var multi = await conn.QueryMultipleAsync(
+            _sql.Get("Identity.Select.User.AllWithRoles"));
+        var users = (await multi.ReadAsync<User>()).ToList();
+        var roleRows = (await multi.ReadAsync<dynamic>()).ToList();
+        var roleField = typeof(User).GetField("_roles",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (roleField != null)
+        {
+            foreach (var u in users)
+            {
+                var urs = roleRows.Where(r => r.UserId == u.Id).Select(r => new UserRole(u.Id, (Guid)r.RoleId)).ToList();
+                roleField.SetValue(u, urs);
+            }
+        }
+        return users;
     }
     public async Task<List<string>> GetUserPermissionsAsync(Guid userId, CancellationToken ct = default)
     {

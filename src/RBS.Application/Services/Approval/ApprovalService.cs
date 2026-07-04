@@ -1,3 +1,4 @@
+using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Approval;
@@ -47,6 +48,17 @@ public class ApprovalService : IApprovalService
 
     public async Task<ApprovalRequestDto> SubmitAsync(SubmitApprovalRequest request, CancellationToken ct = default)
     {
+        // ===== 并发守卫：同一业务实体+同类型不能有两个待审批 =====
+        using (var guardConn = _connectionFactory.CreateConnection())
+        {
+            guardConn.Open();
+            var pending = await guardConn.QuerySingleAsync<int>(
+                _sql.Get("Approval.Select.Request.PendingCount"),
+                new { Id = request.TargetEntityId, Type = request.TargetEntityType });
+            if (pending > 0)
+                throw new InvalidOperationException("该业务已有待审批的申请，请处理完成后再提交");
+        }
+
         var levels = await _uow.ApprovalLevelConfigs.GetAllAsync(ct);
         var typeLevels = levels.Where(l => l.ApprovalTypeId == request.ApprovalTypeId).ToList();
         var maxLevel = typeLevels.Count > 0 ? typeLevels.Max(l => l.Level) : 0;
@@ -59,6 +71,7 @@ public class ApprovalService : IApprovalService
             _tenantService.DefaultCompanyId,
             maxLevel);
 
+        entity.SetCreated(_currentUserService.UserId, ChinaTime.Now, null, null);
         entity.AddRecord(_currentUserService.UserId, "Submitted", request.Description);
         await _uow.ApprovalRequests.AddAsync(entity, ct);
 
@@ -134,7 +147,7 @@ public class ApprovalService : IApprovalService
             // 插入审批记录
             var recordId = Guid.NewGuid();
             await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Approval.Insert.Record.Default"),
+                _sql.Get("Approval.Insert.Record.Raw"),
                 new object[] { recordId, id, entity.CurrentLevel, userId, "Approved",
                     comment ?? "", userId, now }, ct);
 
@@ -196,7 +209,7 @@ public class ApprovalService : IApprovalService
 
             var recordId = Guid.NewGuid();
             await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Approval.Insert.Record.Default"),
+                _sql.Get("Approval.Insert.Record.Raw"),
                 new object[] { recordId, id, entity.CurrentLevel, userId, "Rejected",
                     comment, userId, now }, ct);
 
@@ -252,7 +265,7 @@ public class ApprovalService : IApprovalService
             // 插入"撤回"记录
             var recordId = Guid.NewGuid();
             await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Approval.Insert.Record.Default"),
+                _sql.Get("Approval.Insert.Record.Raw"),
                 new object[] { recordId, id, entity.CurrentLevel, userId, "Cancelled",
                     reason ?? "提交人撤回", userId, now }, ct);
 
@@ -329,6 +342,15 @@ public class ApprovalService : IApprovalService
         };
     }
 
+    public async Task<LastRejectedApprovalDto?> GetLastRejectedAsync(Guid targetEntityId, string targetEntityType, CancellationToken ct = default)
+    {
+        using var conn = _connectionFactory.CreateConnection();
+        conn.Open();
+        return await conn.QuerySingleOrDefaultAsync<LastRejectedApprovalDto>(
+            _sql.Get("Approval.Select.Request.LastRejected"),
+            new { Id = targetEntityId, Type = targetEntityType });
+    }
+
     private async Task<ApprovalRequestDto> MapToDtoAsync(ApprovalRequest entity, CancellationToken ct)
     {
         string? typeName = null;
@@ -339,6 +361,8 @@ public class ApprovalService : IApprovalService
         }
 
         var approverIds = entity.Records.Select(r => r.ApproverId).Distinct().ToList();
+        if (entity.CreatedBy != Guid.Empty && !approverIds.Contains(entity.CreatedBy))
+            approverIds.Add(entity.CreatedBy);
         var userDict = new Dictionary<Guid, (string Name, string Account)>();
         if (approverIds.Count > 0)
         {
@@ -375,9 +399,13 @@ public class ApprovalService : IApprovalService
 
         var levelChain = new List<ApprovalLevelStatusDto>();
         var submitRecord = entity.Records.FirstOrDefault(r => r.Action == "Submitted");
-        if (submitRecord != null)
+        var submitterId = submitRecord?.ApproverId;
+        if (submitterId == null || submitterId.Value == Guid.Empty)
+            submitterId = entity.CreatedBy != Guid.Empty ? entity.CreatedBy : null;
+
+        if (submitterId.HasValue)
         {
-            var submitterInfo = userDict.GetValueOrDefault(submitRecord.ApproverId);
+            var submitterInfo = userDict.GetValueOrDefault(submitterId.Value);
             levelChain.Add(new ApprovalLevelStatusDto
             {
                 Level = 0,
@@ -400,7 +428,7 @@ public class ApprovalService : IApprovalService
 
             string status;
             if (approvedRecord != null)
-                status = "completed";
+                status = approvedRecord.Action == "Rejected" ? "rejected" : "completed";
             else if (lc.Level == entity.CurrentLevel && entity.Status == "Pending")
                 status = "current";
             else if (entity.Status is "Approved" or "Rejected" || lc.Level < entity.CurrentLevel)
@@ -409,11 +437,9 @@ public class ApprovalService : IApprovalService
                 status = "pending";
 
             string? expectedNames = null;
-            string? expectedAccounts = null;
             if (approvedRecord == null && roleUserMap.TryGetValue(lc.RoleId, out var usersWithRole))
             {
-                expectedNames = string.Join("、", usersWithRole.Select(u => u.Name));
-                expectedAccounts = string.Join("、", usersWithRole.Select(u => u.Account));
+                expectedNames = string.Join("、", usersWithRole.Select(u => $"{u.Name}({u.Account})"));
             }
 
             levelChain.Add(new ApprovalLevelStatusDto
@@ -424,7 +450,7 @@ public class ApprovalService : IApprovalService
                 ApproverName = approvedRecord != null
                     ? userDict.GetValueOrDefault(approvedRecord.ApproverId).Name : expectedNames,
                 ApproverAccount = approvedRecord != null
-                    ? userDict.GetValueOrDefault(approvedRecord.ApproverId).Account : expectedAccounts
+                    ? userDict.GetValueOrDefault(approvedRecord.ApproverId).Account : null
             });
         }
 
@@ -440,8 +466,8 @@ public class ApprovalService : IApprovalService
             CurrentLevel = entity.CurrentLevel,
             MaxLevel = entity.MaxLevel,
             ApprovalTypeName = typeName,
-            SubmitterName = entity.Records.FirstOrDefault()?.ApproverId is Guid submitterId
-                ? userDict.GetValueOrDefault(submitterId).Name : null,
+            SubmitterName = entity.CreatedBy != Guid.Empty
+                ? userDict.GetValueOrDefault(entity.CreatedBy).Name : null,
             CurrentLevelName = currentLevelName,
             CreatedAt = entity.CreatedAt,
             CompletedAt = entity.Status is "Approved" or "Rejected" ? lastRecord?.CreatedAt : null,

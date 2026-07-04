@@ -49,7 +49,7 @@ public class ApprovalLevelStatusDto
 {
     public int Level { get; set; }
     public string RoleName { get; set; } = "";
-    /// <summary>completed | current | pending | skipped</summary>
+    /// <summary>completed | rejected | current | pending | skipped</summary>
     public string Status { get; set; } = "pending";
     /// <summary>该级审批人姓名（已审批时有值）</summary>
     public string? ApproverName { get; set; }
@@ -60,4 +60,10 @@ public class ApprovalLevelStatusDto
 public class CancelRequest
 {
     public string? Reason { get; set; }
+}
+
+public class LastRejectedApprovalDto
+{
+    public string? Description { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

@@ -41,6 +41,7 @@
               type="warning"
               @click="withdraw(row)"
             >撤回</el-button>
+            <el-tag v-else-if="row.status === 'Rejected'" size="small" type="danger" effect="plain">已驳回</el-tag>
           </template>
         </el-table-column>
       </el-table>

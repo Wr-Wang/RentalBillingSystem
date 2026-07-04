@@ -1,5 +1,6 @@
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Billing;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Billing;
@@ -11,11 +12,13 @@ public class DebitNoteService : IDebitNoteService
 {
     private readonly IUnitOfWork _uow;
     private readonly IBillPdfGenerator _pdfGenerator;
+    private readonly ISqlLoader _sql;
 
-    public DebitNoteService(IUnitOfWork uow, IBillPdfGenerator pdfGenerator)
+    public DebitNoteService(IUnitOfWork uow, IBillPdfGenerator pdfGenerator, ISqlLoader sql)
     {
         _uow = uow;
         _pdfGenerator = pdfGenerator;
+        _sql = sql;
     }
 
     public async Task<List<DebitNote>> GetByCompanyAsync(Guid companyId, string? period = null, CancellationToken ct = default)
@@ -66,7 +69,7 @@ public class DebitNoteService : IDebitNoteService
         foreach (var plan in periodPlans)
         {
             await _uow.ExecuteSqlRawAsync(
-                "INSERT INTO DebitNoteItems (Id, DebitNoteId, FeeCodeId, Amount, CreatedBy, CreatedAt) VALUES (@Id, @DebitNoteId, @FeeCodeId, @Amount, @CreatedBy, @CreatedAt)",
+                _sql.Get("Billing.Insert.DebitNoteItem.Default"),
                 new object[] { Guid.NewGuid(), note.Id, plan.FeeCodeId, plan.Amount, Guid.Empty, DateTime.UtcNow },
                 ct);
         }

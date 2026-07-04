@@ -94,7 +94,7 @@ public class SubmitRenewalRequest
 {
     public Guid ContractId { get; set; }
     public decimal NewRentAmount { get; set; }
-    public DateOnly NewEndDate { get; set; }
+    public string NewEndDate { get; set; } = string.Empty;
     public string DepositHandling { get; set; } = "TRANSFER";  // TRANSFER / NEW
     public decimal? NewDepositAmount { get; set; }
     public string? Remark { get; set; }
@@ -156,4 +156,12 @@ public class ContractOperationsDto
     public bool CanResume { get; set; } = true;
     public bool CanAdjustFee { get; set; } = true;
     public string? PendingApprovalType { get; set; }
+}
+
+/// <summary>被驳回的续签请求数据（用于重新提交预填）</summary>
+public class RejectedRenewalDto
+{
+    public decimal NewRentAmount { get; set; }
+    public string NewEndDate { get; set; } = string.Empty;
+    public string DepositHandling { get; set; } = "TRANSFER";
 }

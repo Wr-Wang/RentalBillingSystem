@@ -29,8 +29,8 @@ public class ReceivableGenerationService : IReceivableGenerationService
         var contract = await _uow.Contracts.GetByIdAsync(contractId, ct)
             ?? throw new InvalidOperationException($"合同 {contractId} 不存在");
 
-        if (contract.StatusCode != "Active")
-            throw new InvalidOperationException($"合同状态为 {(string)contract.StatusCode}，非生效中无法生成应收");
+        if (contract.Status != "Active")
+            throw new InvalidOperationException($"合同状态为 {(string)contract.Status}，非生效中无法生成应收");
 
         // 2. 确定账期范围
         var allPeriods = SplitPeriods(contract);

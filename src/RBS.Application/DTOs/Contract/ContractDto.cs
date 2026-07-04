@@ -18,6 +18,8 @@ public class ContractDto
     public Guid? OriginalContractId { get; set; }
     public decimal? MarketPriceAtRenewal { get; set; }
     public bool HasRenewalContract { get; set; }  // 是否存在其他合同 PreviousContractId 指向本合同
+    public bool HasPendingRenewal { get; set; }   // 是否有待审批的续签
+    public bool HasRejectedRenewal { get; set; }  // 是否有被驳回的续签
     public bool AutoRenew { get; set; } = true;
     public List<ContractTenantDto> Tenants { get; set; } = new();
     public List<ContractFeeConfigDto> FeeConfigs { get; set; } = new();
@@ -43,6 +45,8 @@ public class ContractFeeConfigDto
     public string? Unit { get; set; }
     public decimal? UnitPrice { get; set; }
     public bool IsActive { get; set; }
+    public string? EffectiveDate { get; set; }
+    public string? ExpiryDate { get; set; }
 }
 
 public class CreateContractRequest

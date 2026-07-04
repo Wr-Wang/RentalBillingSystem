@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
 using RBS.Core.Entities.Base;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.EventHandlers;
@@ -16,19 +17,22 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly IRenewalService _renewalService;
     private readonly IUnitOfWork _uow;
     private readonly INotificationService _notificationService;
+    private readonly ISqlLoader _sql;
 
     public ApprovalCompletedEventHandler(
         IImportService importService,
         IContractService contractService,
         IRenewalService renewalService,
         IUnitOfWork uow,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        ISqlLoader sql)
     {
         _importService = importService;
         _contractService = contractService;
         _renewalService = renewalService;
         _uow = uow;
         _notificationService = notificationService;
+        _sql = sql;
     }
 
     /// <summary>
@@ -63,13 +67,11 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                             DateTime.UtcNow.ToString("yyyy-MM-dd");
                         // 到期停用旧配置
                         await _uow!.ExecuteSqlRawAsync(
-                            "UPDATE ContractFeeConfigs SET ExpiryDate = @ExpiryDate, IsActive = 0, UpdatedAt = GETUTCDATE() WHERE Id = @Id AND IsActive = 1",
+                            _sql.Get("Approval.Update.ContractFeeConfig.ExpireById"),
                             new object[] { expiryStr, item.TargetId.Value }, ct);
                         // 复制旧配置并创建新版本（保留原有 FeeCodeId 和 BillingMode）
                         await _uow.ExecuteSqlRawAsync(
-                            "INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt) " +
-                            "SELECT NEWID(), @ContractId, FeeCodeId, @NewAmount, BillingMode, 1, @EffectiveDate, NULL, @CreatedBy, GETUTCDATE() " +
-                            "FROM ContractFeeConfigs WHERE Id = @OldId",
+                            _sql.Get("Approval.Insert.ContractFeeConfig.CopyFrom"),
                             new object[] { changeRequest.ContractId, item.NewValueDecimal.Value, expiryStr,
                                 _uow is not null ? contract.CreatedBy : Guid.Empty, item.TargetId.Value }, ct);
                     }
@@ -118,7 +120,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     if (request.Title.StartsWith("[合同终止]"))
                     {
                         var contract = await _uow.Contracts.GetByIdAsync(@event.TargetEntityId, ct);
-                        if (contract != null && contract.StatusCode != "Terminated")
+                        if (contract != null && contract.Status != "Terminated")
                         {
                             contract.Terminate(request.Description);
                             await _uow.CommitAsync(ct);
@@ -147,7 +149,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     if (renewal != null)
                     {
                         await _uow.ExecuteSqlRawAsync(
-                            "UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = GETUTCDATE() WHERE Id = @Id AND Status = 'PendingApproval'",
+                            _sql.Get("Approval.Update.RenewalRequest.ToRejected"),
                             new object[] { renewal.Id }, ct);
                     }
                 }

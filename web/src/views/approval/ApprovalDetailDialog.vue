@@ -111,6 +111,12 @@
                         effect="plain"
                       >已通过</el-tag>
                       <el-tag
+                        v-else-if="level.status === 'rejected'"
+                        size="small"
+                        type="danger"
+                        effect="plain"
+                      >已驳回</el-tag>
+                      <el-tag
                         v-else-if="level.status === 'current'"
                         size="small"
                         type="warning"
@@ -140,6 +146,13 @@
                       <el-avatar :size="22" class="step-avatar-success">{{ (level.approverName || '?')[0] }}</el-avatar>
                       <span class="step-name">{{ level.approverName }}</span>
                       <span class="step-account">{{ level.approverAccount }}</span>
+                      <span class="step-time">{{ formatTime(level.timestamp) }}</span>
+                      <div v-if="level.comment" class="step-comment">{{ level.comment }}</div>
+                    </div>
+                    <div v-else-if="level.status === 'rejected'" class="step-detail">
+                      <el-avatar :size="22" class="step-avatar-danger">{{ (level.approverName || '?')[0] }}</el-avatar>
+                      <span class="step-name" style="color:#f56c6c;">{{ level.approverName }}</span>
+                      <span class="step-account" style="color:#f56c6c;">{{ level.approverAccount }}</span>
                       <span class="step-time">{{ formatTime(level.timestamp) }}</span>
                       <div v-if="level.comment" class="step-comment">{{ level.comment }}</div>
                     </div>
@@ -765,6 +778,11 @@ function close() {
 .dot-skipped {
   border-color: #dcdfe6;
 }
+.dot-rejected {
+  border-color: #f56c6c;
+  background: #f56c6c;
+  color: #fff;
+}
 .dot-ring {
   display: block;
   width: 8px;
@@ -819,6 +837,9 @@ function close() {
 .step-status-skipped .step-role {
   color: #c0c4cc;
 }
+.step-status-rejected .step-role {
+  color: #f56c6c;
+}
 .step-level {
   font-size: 11px;
   color: #c0c4cc;
@@ -840,6 +861,10 @@ function close() {
 }
 .step-avatar-pending {
   background: #909399 !important;
+  font-size: 12px;
+}
+.step-avatar-danger {
+  background: #f56c6c !important;
   font-size: 12px;
 }
 .step-name {

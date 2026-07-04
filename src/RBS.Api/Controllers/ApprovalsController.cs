@@ -119,4 +119,13 @@ public class ApprovalsController : ControllerBase
 
         return Ok(new { message = "回调已重新触发" });
     }
+
+    /// <summary>获取最近一次被驳回的审批数据（用于重新提交预填）</summary>
+    [HttpGet("lastrejected")]
+    public async Task<IActionResult> GetLastRejected([FromQuery] Guid targetEntityId, [FromQuery] string targetEntityType, CancellationToken ct)
+    {
+        var result = await _approvalService.GetLastRejectedAsync(targetEntityId, targetEntityType, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
 }

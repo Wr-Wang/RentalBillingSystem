@@ -11,7 +11,7 @@ public class BillingDomainService : IBillingDomainService
 {
     public List<ReceivablePlan> GenerateReceivablePlans(Contract contract, string period, DateOnly dueDate)
     {
-        if (contract.StatusCode != "Active")
+        if (contract.Status != "Active")
             throw new InvalidOperationException("只有生效中的合同才能生成应收计划");
 
         var plans = new List<ReceivablePlan>();

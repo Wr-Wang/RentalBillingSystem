@@ -180,7 +180,6 @@ function goToBiz(item) {
 
 function bizPath(item) {
   const cat = item.category?.toLowerCase()
-  if (cat === 'approval' && item.referenceId) return `/approvals/${item.referenceId}`
   if (cat === 'approval') return '/approvals'
   if (cat === 'renewal') return '/contracts'
   if (cat === 'collection') return '/collection/records'

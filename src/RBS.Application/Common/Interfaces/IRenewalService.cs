@@ -27,4 +27,7 @@ public interface IRenewalService
 
     /// <summary>统一并发检查</summary>
     Task EnsureNoPendingApprovalAsync(Guid contractId, CancellationToken ct = default);
+
+    /// <summary>获取最近一次被驳回的续签数据（用于重新提交预填）</summary>
+    Task<RejectedRenewalDto?> GetLastRejectedAsync(Guid contractId, CancellationToken ct = default);
 }

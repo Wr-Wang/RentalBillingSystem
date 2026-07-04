@@ -2493,6 +2493,12 @@ CREATE TABLE [RenewalRequests] (
     [Remark] nvarchar(500) NULL,
     [CreatedBy] uniqueidentifier NULL,
     [CreatedAt] datetime2 DEFAULT (getdate()),
+    [CreatedIp] nvarchar(50) NULL,
+    [CreatedHostname] nvarchar(100) NULL,
+    [UpdatedBy] uniqueidentifier NULL,
+    [UpdatedAt] datetime2 NULL,
+    [UpdatedIp] nvarchar(50) NULL,
+    [UpdatedHostname] nvarchar(100) NULL,
     CONSTRAINT [PK_RenewalRequests] PRIMARY KEY ([Id])
 );
 GO
@@ -2514,6 +2520,27 @@ EXEC sp_addextendedproperty 'MS_Description', N'状态', 'SCHEMA', 'dbo', 'TABLE
 EXEC sp_addextendedproperty 'MS_Description', N'备注', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'Remark';
 EXEC sp_addextendedproperty 'MS_Description', N'创建人', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'CreatedBy';
 EXEC sp_addextendedproperty 'MS_Description', N'创建时间', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'CreatedAt';
+EXEC sp_addextendedproperty 'MS_Description', N'创建IP', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'CreatedIp';
+EXEC sp_addextendedproperty 'MS_Description', N'创建主机名', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'CreatedHostname';
+EXEC sp_addextendedproperty 'MS_Description', N'更新人', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'UpdatedBy';
+EXEC sp_addextendedproperty 'MS_Description', N'更新时间', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'UpdatedAt';
+EXEC sp_addextendedproperty 'MS_Description', N'更新IP', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'UpdatedIp';
+EXEC sp_addextendedproperty 'MS_Description', N'更新主机名', 'SCHEMA', 'dbo', 'TABLE', N'RenewalRequests', 'COLUMN', N'UpdatedHostname';
+GO
+
+-- 为已有 RenewalRequests 表补充缺失列（幂等）
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RenewalRequests]') AND name='CreatedIp')
+    ALTER TABLE [RenewalRequests] ADD [CreatedIp] nvarchar(50) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RenewalRequests]') AND name='CreatedHostname')
+    ALTER TABLE [RenewalRequests] ADD [CreatedHostname] nvarchar(100) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RenewalRequests]') AND name='UpdatedIp')
+    ALTER TABLE [RenewalRequests] ADD [UpdatedIp] nvarchar(50) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RenewalRequests]') AND name='UpdatedHostname')
+    ALTER TABLE [RenewalRequests] ADD [UpdatedHostname] nvarchar(100) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RenewalRequests]') AND name='UpdatedBy')
+    ALTER TABLE [RenewalRequests] ADD [UpdatedBy] uniqueidentifier NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RenewalRequests]') AND name='UpdatedAt')
+    ALTER TABLE [RenewalRequests] ADD [UpdatedAt] datetime2 NULL;
 GO
 
 -- ===================================================================

@@ -31,4 +31,7 @@ public interface IApprovalService
 
     /// <summary>获取审批历史（分页）</summary>
     Task<PagedResult<ApprovalRequestDto>> GetHistoryAsync(ApprovalHistoryQuery query, CancellationToken ct = default);
+
+    /// <summary>获取最近一次被驳回的审批数据</summary>
+    Task<LastRejectedApprovalDto?> GetLastRejectedAsync(Guid targetEntityId, string targetEntityType, CancellationToken ct = default);
 }

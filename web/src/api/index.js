@@ -66,6 +66,8 @@ export function updateContract(id, data) { return request({ url: `/contracts/${i
 export function terminateContract(id, data) { return request({ url: `/contracts/${id}/terminate`, method: 'post', data }) }
 export function renewContract(id, data) { return request({ url: `/contracts/${id}/renew`, method: 'post', data }) }
 export function previewRenewal(id) { return request({ url: `/contracts/${id}/renewal/preview`, method: 'get' }) }
+export function getLastRejectedRenewal(id) { return request({ url: `/contracts/${id}/renewal/lastrejected`, method: 'get' }) }
+export function getLastRejectedApproval(params) { return request({ url: '/approvals/lastrejected', method: 'get', params }) }
 export function submitRenewal(id, data) { return request({ url: `/contracts/${id}/renewal/submit`, method: 'post', data }) }
 export function getRenewalHistory(id) { return request({ url: `/contracts/${id}/renewal/history`, method: 'get' }) }
 export function getRenewalChain(id) { return request({ url: `/contracts/${id}/renewal/chain`, method: 'get' }) }

@@ -46,7 +46,7 @@ public class ContractDomainService : IContractDomainService
 
     public async Task<Contract> RenewContractAsync(Contract oldContract, DateOnly newEndDate, decimal? newRentAmount, CancellationToken ct = default)
     {
-        if (oldContract.StatusCode != "Active" && oldContract.StatusCode != "Expired")
+        if (oldContract.Status != "Active" && oldContract.Status != "Expired")
             throw new InvalidOperationException("只有生效中或已到期的合同可以续签");
 
         // 标记旧合同为已续签

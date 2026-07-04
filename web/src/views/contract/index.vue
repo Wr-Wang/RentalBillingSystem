@@ -49,11 +49,10 @@
             <el-button text size="small" type="primary" @click="$router.push('/contracts/' + row.id)">详情</el-button>
             <el-button v-if="row.status === 'Active' || row.status === 'Suspended'" text size="small" type="warning" @click="showModifyRent(row)">调租</el-button>
             <el-button v-if="row.status === 'Active' || row.status === 'Suspended'" text size="small" type="warning" @click="showModifyFee(row)">调价</el-button>
-            <el-button v-if="row.status === 'Active' && !row.hasRenewalContract" text size="small" type="primary" @click="handleRenew(row)">续签</el-button>
+            <el-button v-if="(row.status === 'Active' || row.status === 'Expired') && !row.hasRenewalContract" text size="small" type="primary" @click="handleRenew(row)">续签</el-button>
             <el-button v-if="row.status === 'Active'" text size="small" type="danger" @click="handleTerminate(row)">终止</el-button>
             <el-button v-if="row.status === 'Active'" text size="small" type="warning" @click="handleSuspend(row)">暂停</el-button>
             <el-button v-if="row.status === 'Suspended'" text size="small" type="success" @click="handleResume(row)">恢复</el-button>
-            <el-button v-if="row.status === 'Expired' && !row.hasRenewalContract" text size="small" type="primary" @click="handleRenew(row)">续签</el-button>
           </div>
         </template>
       </el-table-column>
@@ -157,7 +156,8 @@
 
     <!-- Renew Dialog -->
     <el-dialog v-model="showRenewDialog" title="合同续签" width="550px">
-      <el-alert title="续签将创建新合同，原合同标记为已续签。审批通过后自动执行。" type="success" show-icon :closable="false" style="margin-bottom: 16px;" />
+      <el-alert v-if="renewFromRejected" title="上次续签被驳回，请修改后重新提交" type="warning" show-icon :closable="false" style="margin-bottom: 16px;" />
+      <el-alert v-else title="续签将创建新合同，原合同标记为已续签。审批通过后自动执行。" type="success" show-icon :closable="false" style="margin-bottom: 16px;" />
       <el-descriptions :column="2" border style="margin-bottom: 16px;">
         <el-descriptions-item label="原合同号">{{ renewTarget?.contractNo }}</el-descriptions-item>
         <el-descriptions-item label="当前月租">¥{{ renewTarget?.rentAmount?.toLocaleString() }}</el-descriptions-item>
@@ -169,7 +169,7 @@
           <el-input-number v-model="renewForm.rentAmount" :min="0" :precision="2" style="width: 200px;" />
         </el-form-item>
         <el-form-item label="新到期日期">
-          <el-date-picker v-model="renewForm.endDate" type="date" />
+          <el-date-picker v-model="renewForm.endDate" type="date" value-format="YYYY-MM-DD" />
           <span style="margin-left: 8px; color: #909399; font-size: 12px;">起租日自动续接</span>
         </el-form-item>
         <el-form-item label="押金处理">
@@ -186,7 +186,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showRenewDialog = false">取消</el-button>
+        <el-button @click="showRenewDialog = false; renewFromRejected = false">取消</el-button>
         <el-button type="primary" @click="submitRenew">提交续签审批</el-button>
       </template>
     </el-dialog>
@@ -197,7 +197,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal } from '@/api/index.js'
+import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal } from '@/api/index.js'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
@@ -247,6 +247,8 @@ async function fetchContracts() {
       renewalCount: c.renewalCount || 0,
       originalContractId: c.originalContractId,
       hasRenewalContract: c.hasRenewalContract || false,
+      hasPendingRenewal: c.hasPendingRenewal || false,
+      hasRejectedRenewal: c.hasRejectedRenewal || false,
       autoRenew: c.autoRenew !== false
     }))
     pagination.total = res.total || 0
@@ -330,6 +332,7 @@ const modifyFeeForm = reactive({ items: [], effectiveDate: '', reason: '' })
 
 // === Renew ===
 const showRenewDialog = ref(false)
+const renewFromRejected = ref(false)
 const renewTarget = ref(null)
 const renewForm = reactive({ rentAmount: 0, endDate: '', depositHandling: 'TRANSFER', newDeposit: 0, remark: '' })
 const renewChecks = ref({})
@@ -450,11 +453,30 @@ function submitModifyFee() {
 
 // === Renew ===
 async function handleRenew(row) {
+  if (row.hasPendingRenewal) {
+    ElMessage.warning('该合同已有待审批的续签申请，请处理完成后再提交')
+    return
+  }
   renewTarget.value = row
   renewForm.rentAmount = row.rentAmount
   renewForm.depositHandling = 'TRANSFER'
   renewForm.newDeposit = row.depositAmount || 0
   renewForm.remark = ''
+  // 有被驳回的续签 → 预填上次数据
+  renewFromRejected.value = false
+  if (row.hasRejectedRenewal) {
+    try {
+      const rejected = await getLastRejectedRenewal(row.id)
+      if (rejected) {
+        renewForm.rentAmount = rejected.newRentAmount || row.rentAmount
+        if (rejected.depositHandling) renewForm.depositHandling = rejected.depositHandling
+        if (rejected.newEndDate) renewForm.endDate = rejected.newEndDate
+        renewFromRejected.value = true
+        showRenewDialog.value = true
+        return
+      }
+    } catch { /* 预填失败走默认值 */ }
+  }
   // Load preview to check constraints
   try {
     const preview = await previewRenewal(row.id)
@@ -471,14 +493,11 @@ async function handleRenew(row) {
       ElMessage.warning(`该合同已被续签（新合同号：${renewChecks.value.concurrentApprovals.renewedContractNo}），不可再次续签`)
       return
     }
-    // Set default dates
-    const endDate = new Date(row.endDate)
-    const nextDay = new Date(endDate)
-    nextDay.setDate(nextDay.getDate() + 1)
-    const newEnd = new Date(nextDay)
-    newEnd.setFullYear(newEnd.getFullYear() + 1)
-    newEnd.setDate(newEnd.getDate() - 1)
-    renewForm.endDate = newEnd.toISOString().split('T')[0]
+    // 使用后端建议的默认日期（消除 JS 时区计算偏差）
+    const suggested = preview.defaultRenewalInfo
+    if (suggested?.suggestedEndDate) {
+      renewForm.endDate = suggested.suggestedEndDate
+    }
     showRenewDialog.value = true
   } catch (e) {
     // Fallback: allow dialog open even if preview fails

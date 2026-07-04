@@ -1,10 +1,12 @@
 using Dapper;
+using Microsoft.Extensions.DependencyInjection;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Contract;
 using RBS.Core.Common;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Contract;
+using RBS.Core.Entities.Base;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 using System.Data;
@@ -19,12 +21,16 @@ public class RenewalService : IRenewalService
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
     private readonly IApprovalService _approvalService;
+    private readonly ISqlLoader _sql;
+    private readonly IServiceProvider _serviceProvider;
 
-    public RenewalService(IUnitOfWork uow, IDbConnectionFactory db, IApprovalService approvalService)
+    public RenewalService(IUnitOfWork uow, IDbConnectionFactory db, IApprovalService approvalService, ISqlLoader sql, IServiceProvider serviceProvider)
     {
         _uow = uow;
         _db = db;
         _approvalService = approvalService;
+        _sql = sql;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<RenewalPreviewDto> PreviewAsync(Guid contractId, CancellationToken ct = default)
@@ -150,7 +156,7 @@ public class RenewalService : IRenewalService
         var oldContract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct)
             ?? throw new KeyNotFoundException("合同不存在");
 
-        if (oldContract.StatusCode != "Active" && oldContract.StatusCode != "Expired")
+        if (oldContract.Status != "Active" && oldContract.Status != "Expired")
             throw new InvalidOperationException("只有生效中或已到期的合同可以续签");
 
         // 3. 重复续签检查：是否已有续签合同指向本合同
@@ -185,7 +191,7 @@ public class RenewalService : IRenewalService
         // 5. 创建 RenewalRequest
         var renewal = new RenewalRequest(
             oldContract.Id, newContractNo, oldContract.RentAmount,
-            request.NewRentAmount, request.NewEndDate);
+            request.NewRentAmount, DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture)));
 
         renewal.SetDepositInfo(
             request.DepositHandling, oldContract.DepositAmount, request.NewDepositAmount);
@@ -214,14 +220,27 @@ public class RenewalService : IRenewalService
             oldContract.CompanyId,
             maxLevel);  // 直接传入 maxLevel，不再用反射
 
-        // 设置合同ID用于并发控制
+        // 设置创建人和合同ID
+        approvalRequest.SetCreated(userId, ChinaTime.Now, null, null);
         approvalRequest.SetContractId(oldContract.Id);
         approvalRequest.AddRecord(userId, "Submitted",
-            $"续签：月租 ¥{oldContract.RentAmount:N2} → ¥{request.NewRentAmount:N2}，" +
-            $"到期日：{request.NewEndDate:yyyy-MM-dd}，押金处理：{request.DepositHandling}");
+            $"续签：月租 ¥{oldContract.RentAmount.Amount:N2} → ¥{request.NewRentAmount:N2}，" +
+            $"到期日：{request.NewEndDate}，押金处理：{(request.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取")}");
 
         approvalRequest.Submit();
         await _uow.ApprovalRequests.AddAsync(approvalRequest, ct);
+
+        // [事件] 提交后通知第一级审批人
+        if (approvalRequest.Status == "Pending")
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var handler = scope.ServiceProvider
+                .GetRequiredService<IEventHandler<ApprovalSubmittedEvent>>();
+            await handler.HandleAsync(
+                new ApprovalSubmittedEvent(approvalRequest.Id, approvalRequest.ApprovalTypeId,
+                    approvalRequest.TargetEntityId, approvalRequest.TargetEntityType, approvalRequest.Title),
+                ct);
+        }
 
         // 7. 提交审批（写入审批记录）
         var firstRecord = approvalRequest.Records.First();
@@ -269,7 +288,7 @@ public class RenewalService : IRenewalService
         var oldContract = await _uow.Contracts.GetByIdAsync(renewal.OldContractId, ct)
             ?? throw new KeyNotFoundException("原合同不存在");
 
-        if (oldContract.StatusCode != "Active" && oldContract.StatusCode != "Expired")
+        if (oldContract.Status != "Active" && oldContract.Status != "Expired")
             throw new InvalidOperationException("原合同状态不允许续签");
 
         using var conn = _db.CreateConnection();
@@ -290,18 +309,18 @@ public class RenewalService : IRenewalService
 
             // 2. 处理旧合同状态（区分 Active 和 Expired）
             int affected;
-            if (oldContract.StatusCode == "Expired")
+            if (oldContract.Status == "Expired")
             {
                 // 已到期合同 → 标记 Renewed（终态）
                 affected = await conn.ExecuteAsync(
-                    "UPDATE Contracts SET StatusCode = 'Renewed' WHERE Id = @Id AND StatusCode = 'Expired'",
+                    "UPDATE Contracts SET Status = 'Renewed' WHERE Id = @Id AND Status = 'Expired'",
                     new { Id = renewal.OldContractId }, tx);
             }
             else
             {
                 // 未到期合同 → 继续保持 Active，只校验状态未被修改
                 affected = await conn.ExecuteAsync(
-                    "UPDATE Contracts SET StatusCode = 'Active' WHERE Id = @Id AND StatusCode = 'Active'",
+                    "UPDATE Contracts SET Status = 'Active' WHERE Id = @Id AND Status = 'Active'",
                     new { Id = renewal.OldContractId }, tx);
             }
             if (affected == 0)
@@ -315,7 +334,7 @@ public class RenewalService : IRenewalService
             var startDate = oldContract.EndDate.AddDays(1);
 
             await conn.ExecuteAsync(@"
-                INSERT INTO Contracts (Id, ContractNo, RoomId, RentAmount, DepositAmount, StartDate, EndDate, PaymentCycle, StatusCode, CompanyId,
+                INSERT INTO Contracts (Id, ContractNo, RoomId, RentAmount, DepositAmount, StartDate, EndDate, PaymentCycle, Status, CompanyId,
                     PreviousContractId, RenewalCount, OriginalContractId, MarketPriceAtRenewal,
                     CreatedBy, CreatedAt)
                 VALUES (@Id, @ContractNo, @RoomId, @RentAmount, @DepositAmount, @StartDate, @EndDate, @PaymentCycle, 'Active', @CompanyId,
@@ -460,14 +479,14 @@ public class RenewalService : IRenewalService
         // 获取整条链
         var chain = await conn.QueryAsync<RenewalChainNodeDto>(@"
             WITH ContractChain AS (
-                SELECT Id, ContractNo, StatusCode, RentAmount, StartDate, EndDate, RenewalCount
+                SELECT Id, ContractNo, Status, RentAmount, StartDate, EndDate, RenewalCount
                 FROM Contracts WHERE Id = @RootId
                 UNION ALL
-                SELECT c.Id, c.ContractNo, c.StatusCode, c.RentAmount, c.StartDate, c.EndDate, c.RenewalCount
+                SELECT c.Id, c.ContractNo, c.Status, c.RentAmount, c.StartDate, c.EndDate, c.RenewalCount
                 FROM Contracts c
                 INNER JOIN ContractChain cc ON cc.Id = c.PreviousContractId
             )
-            SELECT Id AS ContractId, ContractNo, StatusCode AS Status, RentAmount,
+            SELECT Id AS ContractId, ContractNo, Status, RentAmount,
                    CONVERT(NVARCHAR(10), StartDate, 23) AS StartDate,
                    CONVERT(NVARCHAR(10), EndDate, 23) AS EndDate, RenewalCount,
                    CASE WHEN Id = @TargetId THEN 1 ELSE 0 END AS IsCurrent
@@ -483,7 +502,7 @@ public class RenewalService : IRenewalService
 
         var dto = new ContractOperationsDto();
 
-        if (contract.StatusCode == "Renewed")
+        if (contract.Status == "Renewed")
         {
             // 已续签合同完全只读
             dto.CanModifyRent = false;
@@ -514,13 +533,22 @@ public class RenewalService : IRenewalService
         }
 
         // 根据合同状态限制
-        if (contract.StatusCode != "Active")
+        if (contract.Status != "Active")
         {
             dto.CanSuspend = false;
-            dto.CanResume = contract.StatusCode == "Suspended";
+            dto.CanResume = contract.Status == "Suspended";
         }
 
         return dto;
+    }
+
+    public async Task<RejectedRenewalDto?> GetLastRejectedAsync(Guid contractId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        return await conn.QuerySingleOrDefaultAsync<RejectedRenewalDto>(
+            _sql.Get("Lease.Select.RenewalRequest.LastRejected"),
+            new { Id = contractId });
     }
 
     public async Task EnsureNoPendingApprovalAsync(Guid contractId, CancellationToken ct = default)
