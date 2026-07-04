@@ -67,3 +67,19 @@ public class LastRejectedApprovalDto
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>审批业务详情 — 统一对比展示</summary>
+public class ApprovalBizDetailDto
+{
+    public string BizType { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public List<BizFieldDto> Fields { get; set; } = new();
+}
+
+public class BizFieldDto
+{
+    public string Label { get; set; } = string.Empty;
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public bool IsChanged { get; set; }
+}

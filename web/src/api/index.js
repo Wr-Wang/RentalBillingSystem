@@ -132,6 +132,7 @@ export function getMyApprovalRequests() { return request({ url: '/approvals/myre
 export function approveApproval(id, data) { return request({ url: `/approvals/${id}/approve`, method: 'post', data }) }
 export function rejectApproval(id, data) { return request({ url: `/approvals/${id}/reject`, method: 'post', data }) }
 export function getApprovalDetail(id) { return request({ url: `/approvals/${id}`, method: 'get' }) }
+export function getApprovalBizDetail(id) { return request({ url: `/approvals/${id}/bizdetail`, method: 'get' }) }
 export function getApprovalHistoryList(params) { return request({ url: '/approvals/history', method: 'get', params }) }
 export function getApprovalHistory(id) { return request({ url: `/approvals/${id}/history`, method: 'get' }) }
 export function cancelApproval(id, data) { return request({ url: `/approvals/${id}/cancel`, method: 'post', data }) }

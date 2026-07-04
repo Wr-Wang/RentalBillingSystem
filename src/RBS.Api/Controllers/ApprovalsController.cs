@@ -128,4 +128,13 @@ public class ApprovalsController : ControllerBase
         if (result == null) return NotFound();
         return Ok(result);
     }
+
+    /// <summary>获取审批业务详情（对比数据）</summary>
+    [HttpGet("{id}/bizdetail")]
+    public async Task<IActionResult> GetBizDetail(Guid id, CancellationToken ct)
+    {
+        var result = await _approvalService.GetBizDetailAsync(id, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
 }

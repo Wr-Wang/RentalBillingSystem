@@ -266,6 +266,7 @@ CREATE TABLE [ApprovalRequests] (
     [UpdatedAt] datetime2 NULL,
     [UpdatedIp] nvarchar(50) NULL,
     [UpdatedHostname] nvarchar(100) NULL,
+    [CompletedAt] datetime2 NULL,
     [ContractId] uniqueidentifier NULL,
     [CompanyId] uniqueidentifier NULL,
     CONSTRAINT [PK_ApprovalRequests] PRIMARY KEY ([Id])
@@ -289,6 +290,7 @@ EXEC sp_addextendedproperty 'MS_Description', N'更新人', 'SCHEMA', 'dbo', 'TA
 EXEC sp_addextendedproperty 'MS_Description', N'更新时间', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'UpdatedAt';
 EXEC sp_addextendedproperty 'MS_Description', N'更新IP', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'UpdatedIp';
 EXEC sp_addextendedproperty 'MS_Description', N'更新主机名', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'UpdatedHostname';
+EXEC sp_addextendedproperty 'MS_Description', N'审批完成时间（终审通过/驳回时写入，仅一次）', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'CompletedAt';
 EXEC sp_addextendedproperty 'MS_Description', N'合同ID（用于并发控制）', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'ContractId';
 EXEC sp_addextendedproperty 'MS_Description', N'公司ID', 'SCHEMA', 'dbo', 'TABLE', N'ApprovalRequests', 'COLUMN', N'CompanyId';
 GO
@@ -296,6 +298,8 @@ GO
 -- 为已有 ApprovalRequests 表补充缺失列（幂等）
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApprovalRequests]') AND name='ContractId')
     ALTER TABLE [ApprovalRequests] ADD [ContractId] uniqueidentifier NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApprovalRequests]') AND name='CompletedAt')
+    ALTER TABLE [ApprovalRequests] ADD [CompletedAt] datetime2 NULL;
 GO
 
 -- ===================================================================

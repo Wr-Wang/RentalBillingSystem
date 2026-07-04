@@ -326,6 +326,12 @@ public class RenewalService : IRenewalService
             if (affected == 0)
                 throw new InvalidOperationException("原合同状态已被修改，续签执行失败");
 
+            // 2.5 原合同费用配置到期
+            var oldEndDate = oldContract.EndDate.ToString("yyyy-MM-dd");
+            await conn.ExecuteAsync(
+                _sql.Get("Lease.Update.ContractFeeConfig.ExpireByOldContract"),
+                new { p0 = oldEndDate, p1 = renewal.OldContractId }, tx);
+
             // 3. 创建新合同
             var depositAmount = renewal.DepositHandling == "TRANSFER"
                 ? renewal.OldDepositAmount
@@ -367,17 +373,17 @@ public class RenewalService : IRenewalService
                     new { Id = Guid.NewGuid(), ContractId = newId, t.TenantId, t.IsPrimary, CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
             }
 
-            // 4. 复制费用配置
+            // 4. 复制费用配置（生效日期设为新合同起租日）
             var fees = await conn.QueryAsync<dynamic>(
-                "SELECT FeeCodeId, BillingMode, Amount, Unit, UnitPrice FROM ContractFeeConfigs WHERE ContractId = @Id AND IsActive = 1",
+                _sql.Get("Lease.Select.ContractFeeConfig.ActiveByContract"),
                 new { Id = renewal.OldContractId }, tx);
 
             foreach (var f in fees)
             {
-                await conn.ExecuteAsync(@"
-                    INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, CreatedBy, CreatedAt)
-                    VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @CreatedBy, @CreatedAt)",
-                    new { Id = Guid.NewGuid(), ContractId = newId, f.FeeCodeId, f.BillingMode, f.Amount, f.Unit, f.UnitPrice, CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
+                await conn.ExecuteAsync(
+                    _sql.Get("Lease.Insert.ContractFeeConfig.CopyFromRenewal"),
+                    new { Id = Guid.NewGuid(), ContractId = newId, f.FeeCodeId, f.BillingMode, f.Amount, f.Unit, f.UnitPrice,
+                        EffectiveDate = startDate.ToString("yyyy-MM-dd"), CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
             }
 
             // 5. 押金处理

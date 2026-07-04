@@ -34,4 +34,7 @@ public interface IApprovalService
 
     /// <summary>获取最近一次被驳回的审批数据</summary>
     Task<LastRejectedApprovalDto?> GetLastRejectedAsync(Guid targetEntityId, string targetEntityType, CancellationToken ct = default);
+
+    /// <summary>获取审批业务详情（对比数据）</summary>
+    Task<ApprovalBizDetailDto?> GetBizDetailAsync(Guid id, CancellationToken ct = default);
 }

@@ -246,7 +246,43 @@
             </el-card>
           </el-tab-pane>
 
-          <!-- ═══════ Tab 3: 导入数据（lazy 确保 DOM 在 Tab 激活后才渲染） ═══════ -->
+          <!-- ═══════ Tab 3: 业务数据（统一对比表） ═══════ -->
+          <el-tab-pane v-if="showBizTab" name="biz" lazy>
+            <template #label>
+              <span class="tab-label"><el-icon><DataBoard /></el-icon> 业务数据</span>
+            </template>
+            <el-card shadow="never" class="section-card">
+              <template #header>
+                <span style="font-weight: 600;">{{ bizDetail?.title || '变更对比' }}</span>
+              </template>
+              <div v-loading="bizLoading">
+                <el-table v-if="bizDetail?.fields?.length" :data="bizDetail.fields" stripe size="small">
+                  <el-table-column prop="label" label="字段" width="140" />
+                  <el-table-column label="原值" width="180">
+                    <template #default="{ row }">
+                      <span v-if="row.oldValue" style="color: #909399;">{{ row.oldValue }}</span>
+                      <span v-else style="color: #c0c4cc;">-</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="新值" width="180">
+                    <template #default="{ row }">
+                      <span v-if="row.newValue" :style="{ color: row.isChanged ? '#e6a23c' : '#303133', fontWeight: row.isChanged ? 'bold' : 'normal' }">{{ row.newValue }}</span>
+                      <span v-else style="color: #c0c4cc;">-</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="变化" width="80" align="center">
+                    <template #default="{ row }">
+                      <el-tag v-if="row.isChanged" size="small" type="warning" effect="plain">变更</el-tag>
+                      <el-tag v-else size="small" type="info" effect="plain">不变</el-tag>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <el-empty v-else description="暂无业务数据" :image-size="60" />
+              </div>
+            </el-card>
+          </el-tab-pane>
+
+          <!-- ═══════ Tab 4: 导入数据（lazy 确保 DOM 在 Tab 激活后才渲染） ═══════ -->
           <el-tab-pane v-if="showImportTab" name="import" lazy>
             <template #label>
               <span class="tab-label"><el-icon><Upload /></el-icon> 导入数据</span>
@@ -367,8 +403,8 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Close, CircleCheck, List, Upload, InfoFilled, MoreFilled, ChatDotSquare, RefreshLeft } from '@element-plus/icons-vue'
-import { getApprovalDetail, getImportBatch, approveApproval, rejectApproval, cancelApproval } from '../../api/index'
+import { Check, Close, CircleCheck, List, Upload, InfoFilled, MoreFilled, ChatDotSquare, RefreshLeft, DataBoard } from '@element-plus/icons-vue'
+import { getApprovalDetail, getImportBatch, approveApproval, rejectApproval, cancelApproval, getApprovalBizDetail } from '../../api/index'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -388,6 +424,8 @@ const rejecting = ref(false)
 const cancelling = ref(false)
 const importBatch = ref(null)
 const loadingBatch = ref(false)
+const bizDetail = ref(null)
+const bizLoading = ref(false)
 const filterStatus = ref('all')
 const itemsTableRef = ref(null)
 const tableKey = ref(0)
@@ -434,6 +472,8 @@ const canCancel = computed(() => {
 
 /** 是否显示导入数据 Tab */
 const showImportTab = computed(() => data.value?.targetEntityType === 'Import')
+/** 是否显示业务数据 Tab（Import 已有独立 Tab，跳过） */
+const showBizTab = computed(() => data.value && data.value?.targetEntityType !== 'Import')
 
 /** 排序后的审批记录（时间正序） */
 const sortedRecords = computed(() => {
@@ -505,10 +545,24 @@ async function loadDetail() {
     if (res?.targetEntityType === 'Import' && res?.targetEntityId) {
       await loadImportBatch(res.targetEntityId)
     }
+    if (res && res.targetEntityType !== 'Import') {
+      await loadBizDetail()
+    }
   } catch {
     data.value = null
   }
   loading.value = false
+}
+
+async function loadBizDetail() {
+  bizLoading.value = true
+  try {
+    const res = await getApprovalBizDetail(props.approvalId)
+    bizDetail.value = res || null
+  } catch {
+    bizDetail.value = null
+  }
+  bizLoading.value = false
 }
 
 async function loadImportBatch(batchId) {

@@ -459,7 +459,7 @@
        ================================================================ -->
   <update id="Approval.Update.Request.ToApproved">
     <![CDATA[UPDATE ApprovalRequests SET Status = 'Approved',
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+      UpdatedBy = @p0, UpdatedAt = @p1, CompletedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
   </update>
   <update id="Approval.Update.Request.AdvanceLevel">
     <![CDATA[UPDATE ApprovalRequests SET CurrentLevel = CurrentLevel + 1,
@@ -467,7 +467,7 @@
   </update>
   <update id="Approval.Update.Request.ToRejected">
     <![CDATA[UPDATE ApprovalRequests SET Status = 'Rejected',
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+      UpdatedBy = @p0, UpdatedAt = @p1, CompletedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
   </update>
   <update id="Approval.Update.Request.ToCancelled">
     <![CDATA[UPDATE ApprovalRequests SET Status = 'Cancelled',
@@ -502,6 +502,16 @@
     <![CDATA[SELECT TOP 1 NewRent AS NewRentAmount, CONVERT(NVARCHAR(10), NewEndDate, 23) AS NewEndDate, DepositHandling FROM RenewalRequests
       WHERE OldContractId=@Id AND Status='Rejected' ORDER BY CreatedAt DESC]]>
   </select>
+  <update id="Lease.Update.ContractFeeConfig.ExpireByOldContract">
+    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0 WHERE ContractId = @p1 AND ExpiryDate IS NULL]]>
+  </update>
+  <select id="Lease.Select.ContractFeeConfig.ActiveByContract">
+    <![CDATA[SELECT FeeCodeId, BillingMode, Amount, Unit, UnitPrice FROM ContractFeeConfigs WHERE ContractId = @Id AND IsActive = 1]]>
+  </select>
+  <insert id="Lease.Insert.ContractFeeConfig.CopyFromRenewal">
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
+  </insert>
 
   <!-- ================================================================
        模块：Contract（合同—SQL 更新语句，用于 ContractAppService）

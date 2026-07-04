@@ -351,6 +351,81 @@ public class ApprovalService : IApprovalService
             new { Id = targetEntityId, Type = targetEntityType });
     }
 
+    public async Task<ApprovalBizDetailDto?> GetBizDetailAsync(Guid id, CancellationToken ct = default)
+    {
+        var approval = await _uow.ApprovalRequests.GetByIdAsync(id, ct);
+        if (approval == null) return null;
+
+        var dto = new ApprovalBizDetailDto
+        {
+            BizType = approval.TargetEntityType,
+            Title = approval.Title ?? ""
+        };
+
+        // 续签详情
+        if (approval.TargetEntityType == "ContractRenewal" && approval.TargetEntityId != Guid.Empty)
+        {
+            var renewal = await _uow.RenewalRequests.GetByIdAsync(approval.TargetEntityId, ct);
+            if (renewal != null)
+            {
+                var oldContract = await _uow.Contracts.GetByIdAsync(renewal.OldContractId, ct);
+                dto.Fields.Add(new BizFieldDto { Label = "原合同号", OldValue = oldContract?.ContractNo, NewValue = renewal.ContractNo, IsChanged = true });
+                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = oldContract != null ? $"¥{oldContract.RentAmount.Amount:N2}" : "", NewValue = $"¥{renewal.NewRent:N2}", IsChanged = true });
+                dto.Fields.Add(new BizFieldDto { Label = "到期日", OldValue = oldContract?.EndDate.ToString("yyyy-MM-dd"), NewValue = renewal.NewEndDate.ToString("yyyy-MM-dd"), IsChanged = true });
+                dto.Fields.Add(new BizFieldDto { Label = "押金处理", OldValue = null, NewValue = renewal.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取", IsChanged = false });
+                if (!string.IsNullOrEmpty(renewal.Remark))
+                    dto.Fields.Add(new BizFieldDto { Label = "备注", OldValue = null, NewValue = renewal.Remark, IsChanged = true });
+            }
+        }
+        // 租金调整（从 Description 解析）
+        else if (approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == false)
+        {
+            var desc = approval.Description ?? "";
+            var match = System.Text.RegularExpressions.Regex.Match(desc, @"→\s*¥([\d,]+)");
+            if (match.Success)
+            {
+                var newAmount = match.Groups[1].Value;
+                var contract = await _uow.Contracts.GetByIdAsync(approval.TargetEntityId, ct);
+                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = contract != null ? $"¥{contract.RentAmount.Amount:N2}" : "", NewValue = $"¥{newAmount}", IsChanged = true });
+
+                var dateMatch = System.Text.RegularExpressions.Regex.Match(desc, @"生效日期[：:](\S+)");
+                if (dateMatch.Success)
+                    dto.Fields.Add(new BizFieldDto { Label = "生效日期", OldValue = null, NewValue = dateMatch.Groups[1].Value, IsChanged = true });
+
+                var reasonMatch = System.Text.RegularExpressions.Regex.Match(desc, @"调整原因[：:](\S+)");
+                if (reasonMatch.Success)
+                    dto.Fields.Add(new BizFieldDto { Label = "调整原因", OldValue = null, NewValue = reasonMatch.Groups[1].Value, IsChanged = true });
+            }
+        }
+        // 合同终止
+        else if (approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == true)
+        {
+            var contract = await _uow.Contracts.GetByIdAsync(approval.TargetEntityId, ct);
+            dto.Fields.Add(new BizFieldDto { Label = "合同号", OldValue = contract?.ContractNo, NewValue = null, IsChanged = false });
+            dto.Fields.Add(new BizFieldDto { Label = "终止原因", OldValue = null, NewValue = approval.Description, IsChanged = true });
+        }
+        // 变更请求
+        else if (approval.TargetEntityType == "ChangeRequest" && approval.TargetEntityId != Guid.Empty)
+        {
+            var cr = await _uow.ChangeRequests.GetByIdAsync(approval.TargetEntityId, ct);
+            if (cr?.Items != null)
+            {
+                foreach (var item in cr.Items)
+                {
+                    dto.Fields.Add(new BizFieldDto
+                    {
+                        Label = item.TargetType == "Contract" ? "租金调整" : "费用调整",
+                        OldValue = item.OldValue,
+                        NewValue = item.NewValue,
+                        IsChanged = true
+                    });
+                }
+            }
+        }
+
+        return dto.Fields.Count > 0 ? dto : null;
+    }
+
     private async Task<ApprovalRequestDto> MapToDtoAsync(ApprovalRequest entity, CancellationToken ct)
     {
         string? typeName = null;
@@ -470,7 +545,7 @@ public class ApprovalService : IApprovalService
                 ? userDict.GetValueOrDefault(entity.CreatedBy).Name : null,
             CurrentLevelName = currentLevelName,
             CreatedAt = entity.CreatedAt,
-            CompletedAt = entity.Status is "Approved" or "Rejected" ? lastRecord?.CreatedAt : null,
+            CompletedAt = entity.CompletedAt,
             LevelChain = levelChain,
             Records = entity.Records.OrderBy(r => r.CreatedAt).Select(r =>
             {

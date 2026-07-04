@@ -19,6 +19,8 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     public Guid CompanyId { get; private set; }
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
     public Guid? ContractId { get; private set; }  // 合同关联（统一并发控制用）
+    /// <summary>审批完成时间（终审通过/驳回时写入，仅一次）</summary>
+    public DateTime? CompletedAt { get; private set; }
 
     // ===== 审批跟踪 =====
     private readonly List<ApprovalRecord> _records = new();
