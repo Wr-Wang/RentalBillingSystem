@@ -58,9 +58,12 @@ public static class DependencyInjection
         services.AddScoped<IReportingService, ReportingService>();
         services.AddScoped<IChangeRequestService, ChangeRequestAppService>();
 
+        // 任务步骤日志
+        services.AddScoped<ITaskStepLogger, TaskStepLogger>();
+
         // 定时作业
-        services.AddTransient<IScheduledJob, MonthlyFeeBillJob>();
-        services.AddTransient<IScheduledJob, LateFeeCalcJob>();
+        services.AddTransient<IScheduledJob, BillJob>();
+        services.AddTransient<IScheduledJob, SettleJob>();
         services.AddTransient<IScheduledJob, AutoRenewJob>();
         services.AddTransient<IScheduledJob, CollectionJob>();
         services.AddTransient<IScheduledJob, RenewalReminderJob>();

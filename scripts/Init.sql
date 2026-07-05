@@ -1138,7 +1138,11 @@ CREATE TABLE [DebitNoteItems] (
     [Id] uniqueidentifier NULL,
     [DebitNoteId] uniqueidentifier NULL,
     [FeeCodeId] uniqueidentifier NULL,
+    [FeeName] nvarchar(100) NULL,
     [Amount] decimal(18,2) NULL,
+    [Received] decimal(18,2) NOT NULL DEFAULT 0,
+    [BillingMode] nvarchar(20) NULL,
+    [Unit] nvarchar(20) NULL,
     [CreatedBy] uniqueidentifier NULL,
     [CreatedAt] datetime2 DEFAULT (getutcdate()),
     CONSTRAINT [PK_DebitNoteItems] PRIMARY KEY ([Id])
@@ -1183,7 +1187,21 @@ CREATE TABLE [DebitNotes] (
     [ContractId] uniqueidentifier NULL,
     [Period] nvarchar(7) NULL,
     [TotalAmount] decimal(18,2) NULL,
+    [TotalReceived] decimal(18,2) NOT NULL DEFAULT 0,
+    [TotalPrepaid] decimal(18,2) NOT NULL DEFAULT 0,
+    [BalanceDue] decimal(18,2) NOT NULL DEFAULT 0,
     [Status] nvarchar(20) DEFAULT (N'Draft'),
+    [IsHistorical] bit NOT NULL DEFAULT 0,
+    [DueDate] date NULL,
+    [ContractNo] nvarchar(100) NULL,
+    [CompanyId] uniqueidentifier NULL,
+    [RoomFullCode] nvarchar(200) NULL,
+    [TenantName] nvarchar(100) NULL,
+    [GeneratedAt] datetime2 NULL,
+    [CancelledAt] datetime2 NULL,
+    [CancelledBy] uniqueidentifier NULL,
+    [CancelReason] nvarchar(500) NULL,
+    [BillJobTaskLogId] uniqueidentifier NULL,
     [CreatedBy] uniqueidentifier NULL,
     [CreatedAt] datetime2 DEFAULT (getutcdate()),
     [CreatedIp] nvarchar(50) NULL,
@@ -1853,7 +1871,6 @@ IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JobSchedul
 CREATE TABLE [JobSchedules] (
     [Id] uniqueidentifier NULL,
     [JobName] nvarchar(200) NULL,
-    [CronExpression] nvarchar(100) NULL,
     [IsActive] bit DEFAULT (CONVERT([bit],(1))),
     [Description] nvarchar(500) NULL,
     [CreatedBy] uniqueidentifier NULL,
@@ -1896,7 +1913,6 @@ CREATE TABLE [JobSchedules_Audit] (
     [AuditChangedAt] datetime2 NULL,
     [AuditChangedBy] uniqueidentifier NULL,
     [JobName] nvarchar(200) NULL,
-    [CronExpression] nvarchar(100) NULL,
     [IsActive] bit NULL,
     [Description] nvarchar(500) NULL,
     [CreatedBy] uniqueidentifier NULL,
@@ -2199,6 +2215,8 @@ CREATE TABLE [MeterReadings] (
     [PreviousReading] decimal(18,4) NULL,
     [CurrentReading] decimal(18,4) NULL,
     [Status] nvarchar(20) DEFAULT (N'Draft'),
+    [IsHistorical] bit NOT NULL DEFAULT 0,
+    [DueDate] date NULL,
     [CreatedBy] uniqueidentifier NULL,
     [CreatedAt] datetime2 DEFAULT (getutcdate()),
     [CreatedIp] nvarchar(50) NULL,
@@ -2958,7 +2976,68 @@ EXEC sp_addextendedproperty 'MS_Description', N'公司ID', 'SCHEMA', 'dbo', 'TAB
 GO
 
 -- ===================================================================
--- 87. SystemLogs - 系统日志表
+-- 87. TaskLogs - 任务执行日志表（替换旧 ScheduledTaskLogs）
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TaskLogs]'))
+CREATE TABLE [TaskLogs] (
+    [Id]              uniqueidentifier   NOT NULL,
+    [TaskName]        nvarchar(50)       NOT NULL,
+    [CompanyId]       uniqueidentifier   NOT NULL,
+    [ContractId]      uniqueidentifier   NULL,
+    [TargetMonth]     nvarchar(7)        NOT NULL,
+    [TriggerType]     nvarchar(20)       NOT NULL DEFAULT 'Scheduled',
+    [RunMode]         nvarchar(20)       NOT NULL DEFAULT 'Execute',
+    [Status]          nvarchar(20)       NOT NULL DEFAULT 'Running',
+    [Params]          nvarchar(max)      NULL,
+    [StartedAt]       datetime2          NOT NULL,
+    [CompletedAt]     datetime2          NULL,
+    [TotalDurationMs] int                NULL,
+    [TotalCount]      int                NULL,
+    [SuccessCount]    int                NULL,
+    [FailCount]       int                NULL,
+    [WarningCount]    int                NULL,
+    [Summary]         nvarchar(500)      NULL,
+    [HeartbeatAt]     datetime2          NULL,
+    [ResultData]      nvarchar(max)      NULL,
+    [ErrorMessage]    nvarchar(2000)     NULL,
+    [CreatedAt]       datetime2          NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT [PK_TaskLogs] PRIMARY KEY ([Id])
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name=N'IX_TaskLogs_Lock')
+CREATE UNIQUE INDEX [IX_TaskLogs_Lock]
+    ON [TaskLogs]([TaskName], [CompanyId], [TargetMonth])
+    WHERE [Status] IN ('Running', 'RollingBack');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name=N'IX_TaskLogs_Heartbeat')
+CREATE INDEX [IX_TaskLogs_Heartbeat] ON [TaskLogs]([HeartbeatAt])
+    WHERE [Status] IN ('Running', 'RollingBack');
+GO
+
+-- ===================================================================
+-- 88. TaskStepLogs - 任务步骤日志表（★新增）
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TaskStepLogs]'))
+CREATE TABLE [TaskStepLogs] (
+    [Id]              uniqueidentifier   NOT NULL,
+    [TaskLogId]       uniqueidentifier   NOT NULL,
+    [StepName]        nvarchar(50)       NOT NULL,
+    [StepDisplayName] nvarchar(100)      NOT NULL,
+    [ParentId]        uniqueidentifier   NULL,
+    [SortOrder]       int                NOT NULL DEFAULT 0,
+    [Status]          nvarchar(20)       NOT NULL DEFAULT 'Running',
+    [StartedAt]       datetime2          NOT NULL,
+    [CompletedAt]     datetime2          NULL,
+    [DurationMs]      int                NULL,
+    [AffectedCount]   int                NULL,
+    [Message]         nvarchar(500)      NULL,
+    [ErrorMessage]    nvarchar(2000)     NULL,
+    CONSTRAINT [PK_TaskStepLogs] PRIMARY KEY ([Id])
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name=N'IX_TaskStepLogs_LogId')
+CREATE INDEX [IX_TaskStepLogs_LogId] ON [TaskStepLogs]([TaskLogId]);
+GO
+
+-- ===================================================================
+-- 89. SystemLogs - 系统日志表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[SystemLogs]'))
 CREATE TABLE [SystemLogs] (
@@ -3277,6 +3356,8 @@ CREATE TABLE [Vouchers] (
     [VoucherDate] date NULL,
     [Description] nvarchar(500) NULL,
     [Status] nvarchar(20) DEFAULT (N'Draft'),
+    [IsHistorical] bit NOT NULL DEFAULT 0,
+    [DueDate] date NULL,
     [SourceEntityId] uniqueidentifier NULL,
     [SourceEntityType] nvarchar(50) NULL,
     [RowVersion] timestamp NULL,

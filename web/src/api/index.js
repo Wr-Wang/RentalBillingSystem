@@ -218,6 +218,12 @@ export function createExecution(jobId, data) { return request({ url: `/scheduler
 export function updateExecution(jobId, id, data) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}`, method: 'put', data }) }
 export function deleteExecution(jobId, id) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}`, method: 'delete' }) }
 export function generateExecutions(jobId) { return request({ url: `/scheduler/jobs/${jobId}/executions/generate`, method: 'post' }) }
+export function deleteFutureExecutions(jobId) { return request({ url: `/scheduler/jobs/${jobId}/executions/future`, method: 'delete' }) }
+export function executeJob(jobName, data) { return request({ url: `/scheduler/execute/${jobName}`, method: 'post', data }) }
+export function getTaskLogs(taskName, params) { return request({ url: `/scheduler/tasklogs`, method: 'get', params }) }
+export function getTaskLog(id) { return request({ url: `/scheduler/tasklogs/${id}`, method: 'get' }) }
+export function getTaskSteps(id) { return request({ url: `/scheduler/tasklogs/${id}/steps`, method: 'get' }) }
+export function reverseTask(taskLogId, data) { return request({ url: `/scheduler/reverse/${taskLogId}`, method: 'post', data }) }
 
 // Audit
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }

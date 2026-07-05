@@ -6,6 +6,9 @@ using RBS.Application.DTOs.Organization;
 using RBS.Core.Entities.Organization;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
+using Microsoft.Extensions.DependencyInjection;
+using RBS.Core.Entities.Base;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Organization;
@@ -15,10 +18,11 @@ public class CompanyService : ICompanyService
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
     private readonly IUnitOfWork _uow;
+    private readonly IServiceProvider _sp;
 
-    public CompanyService(IDbConnectionFactory db, ISqlLoader sql, IUnitOfWork uow)
+    public CompanyService(IDbConnectionFactory db, ISqlLoader sql, IUnitOfWork uow, IServiceProvider sp)
     {
-        _db = db; _sql = sql; _uow = uow;
+        _db = db; _sql = sql; _uow = uow; _sp = sp;
     }
 
     public async Task<PagedResult<CompanyDto>> GetPagedAsync(CompanyQuery query, CancellationToken ct = default)
@@ -73,6 +77,15 @@ public class CompanyService : ICompanyService
         ApplyCompanyFields(company, request);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Organization.Insert.Company.Default"), company);
+
+        // 发布公司创建事件 → 自动注册 JobSchedule
+        try
+        {
+            var handler = _sp.GetRequiredService<IEventHandler<CompanyCreatedEvent>>();
+            await handler.HandleAsync(new CompanyCreatedEvent(company.Id), ct);
+        }
+        catch { /* 事件处理器失败不影响公司创建 */ }
+
         return MapToDto(company);
     }
 

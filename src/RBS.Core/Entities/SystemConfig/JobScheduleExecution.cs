@@ -7,7 +7,7 @@ using RBS.Core.Entities.Base;
 public class JobScheduleExecution : AuditableEntity, IHasCompany
 {
     public Guid JobScheduleId { get; private set; }
-    public JobSchedule JobSchedule { get; private set; } = null!;
+    // public JobSchedule JobSchedule { get; private set; } = null!; // Dapper不支持导航属性
     public Guid CompanyId { get; private set; }
 
     public DateTime TargetDate { get; private set; }

@@ -147,7 +147,24 @@ public class DapperRoleRepository : IRoleRepository
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Authorization.Select.Role.Exists"), new { Id = id }) > 0; }
     public async Task<Role?> GetByCodeAsync(string code, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ByCode"), new { Code = code }); }
     public async Task<List<Role>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>(_sql.Get("Authorization.Select.Role.ByUserId"), new { UserId = userId })).ToList(); }
-    public async Task<Role?> GetByIdWithRoleMenusAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ById"), new { Id = id }); }
+    public async Task<Role?> GetByIdWithRoleMenusAsync(Guid id, CancellationToken ct = default) {
+        using var conn = _db.CreateConnection(); conn.Open();
+        using var multi = await conn.QueryMultipleAsync(
+            _sql.Get("Authorization.Select.Role.WithMenus"), new { Id = id });
+        var role = await multi.ReadSingleOrDefaultAsync<Role>();
+        if (role != null)
+        {
+            var menuIds = (await multi.ReadAsync<Guid>()).ToList();
+            var field = typeof(Role).GetField("_roleMenus",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null)
+            {
+                var menus = menuIds.Select(mid => new RoleMenu(role.Id, mid)).ToList();
+                field.SetValue(role, menus);
+            }
+        }
+        return role;
+    }
     public Task<PagedResult<Role>> GetPagedAsync(int page, int pageSize, Expression<Func<Role, bool>>? predicate = null, Func<IQueryable<Role>, IOrderedQueryable<Role>>? orderBy = null, CancellationToken ct = default)
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
 }

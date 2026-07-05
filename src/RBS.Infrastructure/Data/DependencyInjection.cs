@@ -68,6 +68,10 @@ public static class DependencyInjection
         // IUnitOfWork（Dapper 实现）
         services.AddScoped<IUnitOfWork, DapperUnitOfWork>();
 
+        // 任务调度仓储
+        services.AddScoped<ITaskLogRepository, DapperTaskLogRepository>();
+        services.AddScoped<ITaskStepLogRepository, DapperTaskStepLogRepository>();
+
         // 多租户
         services.AddScoped<ITenantService, TenantService>();
 
@@ -97,6 +101,7 @@ public static class DependencyInjection
 
         // 调度引擎
         services.AddHostedService<SchedulingHostedService>();
+        services.AddHostedService<JobScheduleGenerator>();
 
         return services;
     }

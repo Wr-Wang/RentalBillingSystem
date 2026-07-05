@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Infrastructure.Scheduling;
@@ -33,6 +34,9 @@ public class SchedulingHostedService : BackgroundService
     {
         _logger.LogInformation("调度引擎启动");
         await Task.Yield();
+
+        // 启动时检测僵死任务
+        await DetectStaleTasksAsync(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -141,5 +145,29 @@ public class SchedulingHostedService : BackgroundService
         await Dapper.SqlMapper.ExecuteAsync(conn,
             sql.Get("Scheduling.Update.TaskLog.Complete"),
             new { Status = status, Now = ChinaTime.Now, Error = error, Name = taskName, Cid = companyId, Month = month });
+    }
+
+    private async Task DetectStaleTasksAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var taskLogRepo = scope.ServiceProvider.GetRequiredService<ITaskLogRepository>();
+            var staleTasks = await taskLogRepo.GetStaleTasksAsync(TimeSpan.FromMinutes(5), ct);
+
+            foreach (var task in staleTasks)
+            {
+                _logger.LogWarning("检测到僵死任务 {TaskName}/{CompanyId}/{TargetMonth}，标记为 Stale",
+                    task.TaskName, task.CompanyId, task.TargetMonth);
+                await taskLogRepo.MarkStaleAsync(task.Id, ct);
+            }
+
+            if (staleTasks.Count > 0)
+                _logger.LogInformation("已标记 {Count} 个僵死任务", staleTasks.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "僵死任务检测异常");
+        }
     }
 }

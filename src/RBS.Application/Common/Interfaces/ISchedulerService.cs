@@ -26,4 +26,5 @@ public interface IJobScheduleExecutionService
     Task UpdateAsync(Guid id, UpdateExecutionRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
     Task<List<ExecutionDto>> GenerateAsync(Guid jobScheduleId, CancellationToken ct = default);
+    Task DeleteFutureAsync(Guid jobScheduleId, CancellationToken ct = default);
 }

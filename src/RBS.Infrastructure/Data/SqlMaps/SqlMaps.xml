@@ -87,6 +87,10 @@
   <select id="Authorization.Select.Role.Exists">
     <![CDATA[SELECT COUNT(1) FROM Roles WHERE Id=@Id]]>
   </select>
+  <select id="Authorization.Select.Role.WithMenus">
+    <![CDATA[SELECT * FROM Roles WHERE Id=@Id;
+      SELECT MenuId FROM RoleMenus WHERE RoleId=@Id]]>
+  </select>
   <insert id="Authorization.Insert.Role.Default">
     <![CDATA[INSERT INTO Roles (Id,Name,Code,Description,IsActive,CreatedBy,CreatedAt) VALUES(@Id,@Name,@Code,@Description,@IsActive,@CreatedBy,@CreatedAt)]]>
   </insert>
@@ -382,173 +386,62 @@
       VALUES (@Id, @VId, @SId, @Dir, @Amt, @Sum, @CBy, @Now)]]>
   </insert>
 
-  <!-- ================================================================
-       模块：Scheduling（调度任务日志）
+    <!-- ================================================================
+       模块：Scheduling（调度任务日志 — 替换旧 ScheduledTaskLogs）
        ================================================================ -->
   <select id="Scheduling.Select.TaskLog.Running">
-    <![CDATA[SELECT COUNT(1) FROM ScheduledTaskLogs WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
+    <![CDATA[SELECT COUNT(1) FROM TaskLogs WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
   </select>
   <insert id="Scheduling.Insert.TaskLog.Default">
-    <![CDATA[INSERT INTO ScheduledTaskLogs (Id, TaskName, CompanyId, TargetMonth, Status, StartedAt, HeartbeatAt, CreatedBy, CreatedAt)
-      VALUES (@Id, @Name, @Cid, @Month, @Status, @Now, @Now, @Empty, @Now)]]>
+    <![CDATA[INSERT INTO TaskLogs (Id, TaskName, CompanyId, ContractId, TargetMonth, TriggerType, RunMode, Status, StartedAt, HeartbeatAt, CreatedAt)
+      VALUES (@Id, @TaskName, @CompanyId, @ContractId, @TargetMonth, @TriggerType, @RunMode, @Status, @StartedAt, @StartedAt, GETUTCDATE())]]>
   </insert>
   <update id="Scheduling.Update.TaskLog.Complete">
-    <![CDATA[UPDATE ScheduledTaskLogs SET Status=@Status, CompletedAt=@Now, ErrorMessage=@Error
-      WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
+    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=GETUTCDATE(),
+      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()),
+      TotalCount=@Total, SuccessCount=@Success, FailCount=@Fail, WarningCount=@Warn, Summary=@Summary
+      WHERE Id=@Id]]>
   </update>
-
-  <!-- ================================================================
-       模块：User（用户—应用服务用额外查询）
-       ================================================================ -->
-  <select id="Identity.Select.UserRoles.ByUserId">
-    <![CDATA[SELECT ur.RoleId, r.Name FROM UserRoles ur LEFT JOIN Roles r ON r.Id = ur.RoleId WHERE ur.UserId = @UserId]]>
-  </select>
-  <select id="Organization.Select.Company.NameById">
-    <![CDATA[SELECT Name FROM Companies WHERE Id = @Id]]>
-  </select>
-
-
-  <!-- ================================================================
-       模块：ReceivablePlan（应收计划）
-       ================================================================ -->
-  <select id="Receivable.Select.Plan.ByContractId">
-    <![CDATA[SELECT * FROM ReceivablePlans WHERE ContractId=@Id ORDER BY Period]]>
-  </select>
-  <select id="Receivable.Select.Plan.ByContractPeriodFee">
-    <![CDATA[SELECT * FROM ReceivablePlans WHERE ContractId=@Id AND Period=@P AND FeeCodeId=@F]]>
-  </select>
-  <select id="Receivable.Select.Plan.Overdue">
-    <![CDATA[SELECT * FROM ReceivablePlans WHERE Status='Pending' AND DueDate < CAST(GETDATE() AS DATE)]]>
-  </select>
-  <select id="Receivable.Select.Plan.OverdueDetail">
-    <![CDATA[SELECT p.*, c.ContractNo, t.Name AS TenantName, h.FullCode AS RoomFullCode
-      FROM ReceivablePlans p
-      JOIN Contracts c ON c.Id = p.ContractId
-      LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
-      LEFT JOIN Tenants t ON t.Id = ct.TenantId
-      LEFT JOIN HousingUnits h ON h.Id = c.RoomId
-      WHERE p.Status IN ('Pending','Partial') AND p.DueDate < CAST(GETDATE() AS DATE)
-      ORDER BY p.DueDate]]>
-  </select>
-
-  <!-- ================================================================
-       模块：MeterReading（抄表）
-       ================================================================ -->
-  <select id="Utility.Select.MeterReading.Latest">
-    <![CDATA[SELECT TOP 1 * FROM MeterReadings WHERE ContractFeeConfigId=@Id ORDER BY Year DESC, Month DESC]]>
-  </select>
-  <select id="Utility.Select.MeterReading.History">
-    <![CDATA[SELECT * FROM MeterReadings WHERE ContractFeeConfigId=@Id AND (Year<@Y OR (Year=@Y AND Month<=@M)) ORDER BY Year DESC, Month DESC]]>
-  </select>
-  <select id="Utility.Select.MeterReading.Exists">
-    <![CDATA[SELECT COUNT(1) FROM MeterReadings WHERE ContractFeeConfigId=@Id AND Year=@Y AND Month=@M]]>
-  </select>
-  <select id="Utility.Select.MeterReading.ByCompanyMonth">
-    <![CDATA[SELECT mr.*, cfc.FeeCodeId, fc.Name AS FeeName, c.ContractNo, h.FullCode AS RoomName
-      FROM MeterReadings mr
-      JOIN ContractFeeConfigs cfc ON cfc.Id = mr.ContractFeeConfigId
-      JOIN Contracts c ON c.Id = cfc.ContractId
-      JOIN HousingUnits h ON h.Id = c.RoomId
-      JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId
-      WHERE c.CompanyId = @CompanyId AND mr.Year = @Year AND mr.Month = @Month
-      ORDER BY h.FullCode, fc.Name]]>
-  </select>
-
-  <!-- ================================================================
-       模块：Contract（合同）
-       ================================================================ -->
-  <select id="Lease.Select.Contract.ByContractNo">
-    <![CDATA[SELECT * FROM Contracts WHERE ContractNo=@No]]>
-  </select>
-  <select id="Lease.Select.Contract.Active">
-    <![CDATA[SELECT * FROM Contracts WHERE CompanyId=@Id AND Status='Active']]>
-  </select>
-  <select id="Lease.Select.Contract.Expiring">
-    <![CDATA[SELECT * FROM Contracts WHERE EndDate=@Date]]>
-  </select>
-  <select id="Lease.Select.Contract.HasActiveForHousingUnit">
-    <![CDATA[SELECT COUNT(1) FROM Contracts WHERE RoomId=@Id AND Status='Active']]>
-  </select>
-
-  <!-- ContractAppService 查询 -->
-  <select id="Lease.Select.Contract.ListByCompany">
-    <![CDATA[SELECT c.Id, c.ContractNo, c.RoomId, r.FullCode AS RoomFullCode, c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate,
-      c.PaymentCycle, c.Status, c.CompanyId,
-      CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract,
-      c.AutoRenew FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.CompanyId = @Id ORDER BY c.CreatedAt DESC]]>
-  </select>
-  <select id="Lease.Select.Contract.ByTenantId">
-    <![CDATA[SELECT c.Id, c.ContractNo, c.RoomId, r.FullCode AS RoomFullCode, c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate,
-      c.PaymentCycle, c.Status, c.CompanyId,
-      CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract,
-      c.AutoRenew FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId INNER JOIN ContractTenants ct ON ct.ContractId = c.Id
-      WHERE ct.TenantId = @TenantId ORDER BY c.CreatedAt DESC]]>
-  </select>
-  <select id="Lease.Select.ContractTenant.PrimaryByIds">
-    <![CDATA[SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone
-      FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId IN @Ids AND ct.IsPrimary = 1]]>
-  </select>
-  <select id="Lease.Select.Contract.DetailMulti">
-    <![CDATA[SELECT c.Id, c.ContractNo, c.RoomId, r.FullCode AS RoomFullCode, c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate,
-      c.PaymentCycle, c.Status, c.CompanyId,
-      CASE WHEN EXISTS (SELECT 1 FROM Contracts r WHERE r.PreviousContractId = c.Id) THEN 1 ELSE 0 END AS HasRenewalContract,
-      c.AutoRenew FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
-      SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone, ct.IsPrimary
-      FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id;
-      SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice, cf.IsActive,
-      CONVERT(NVARCHAR(10), cf.EffectiveDate, 23) AS EffectiveDate, CONVERT(NVARCHAR(10), cf.ExpiryDate, 23) AS ExpiryDate
-      FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id AND cf.IsActive = 1]]>
-  </select>
-  <select id="Lease.Select.Contract.CreatedAt">
-    <![CDATA[SELECT CreatedAt FROM Contracts WHERE Id=@Id]]>
-  </select>
-
-  <!-- ================================================================
-       模块：RenewalRequest（续签请求）
-       ================================================================ -->
-  <select id="Lease.Select.RenewalRequest.ByOldContractId">
-    <![CDATA[SELECT * FROM RenewalRequests WHERE OldContractId=@Id ORDER BY CreatedAt DESC]]>
-  </select>
-  <select id="Lease.Select.RenewalRequest.PendingByContractId">
-    <![CDATA[SELECT * FROM RenewalRequests WHERE OldContractId=@Id AND Status IN ('PendingApproval','Approved')]]>
-  </select>
-  <select id="Lease.Select.RenewalRequest.HasPendingForContract">
-    <![CDATA[SELECT COUNT(1) FROM RenewalRequests WHERE OldContractId=@Id AND Status IN ('PendingApproval','Approved')]]>
-  </select>
-
-  <!-- ================================================================
-       模块：Voucher（凭证）
-       ================================================================ -->
-  <select id="Accounting.Select.Voucher.List">
-    <![CDATA[SELECT * FROM [Vouchers] WHERE (@StartDate IS NULL OR [VoucherDate] >= @StartDate)
-      AND (@EndDate IS NULL OR [VoucherDate] <= @EndDate) ORDER BY [VoucherDate] DESC]]>
-  </select>
-  <select id="Accounting.Select.Voucher.ByIdWithEntries">
-    <![CDATA[SELECT * FROM [Vouchers] WHERE [Id] = @Id;
-    SELECT je.*, s.Code AS SubjectCode, s.Name AS SubjectName
-      FROM [JournalEntries] je
-      LEFT JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
-      WHERE je.[VoucherId] = @Id ORDER BY je.[CreatedAt]]]>
-  </select>
-  <select id="Accounting.Select.Voucher.ById">
-    <![CDATA[SELECT * FROM [Vouchers] WHERE [Id] = @Id]]>
-  </select>
-  <select id="Accounting.Select.Entry.ByVoucherId">
-    <![CDATA[SELECT * FROM [JournalEntries] WHERE [VoucherId] = @Id]]>
-  </select>
-  <update id="Accounting.Update.Voucher.Post">
-    <![CDATA[UPDATE [Vouchers] SET [Status] = @Status, [UpdatedBy] = @UpdatedBy, [UpdatedAt] = @UpdatedAt WHERE [Id] = @Id]]>
+  <update id="Scheduling.Update.TaskLog.Fail">
+    <![CDATA[UPDATE TaskLogs SET Status='Failed', CompletedAt=GETUTCDATE(),
+      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()), ErrorMessage=@Error
+      WHERE Id=@Id]]>
   </update>
+  <update id="Scheduling.Update.TaskLog.Heartbeat">
+    <![CDATA[UPDATE TaskLogs SET HeartbeatAt=GETUTCDATE() WHERE Id=@Id]]>
+  </update>
+  <update id="Scheduling.Update.TaskLog.DryRunResult">
+    <![CDATA[UPDATE TaskLogs SET ResultData=@Data, Status='Completed', CompletedAt=GETUTCDATE() WHERE Id=@Id]]>
+  </update>
+  <select id="Scheduling.Select.TaskLog.Stale">
+    <![CDATA[SELECT * FROM TaskLogs WHERE Status IN ('Running','RollingBack')
+      AND HeartbeatAt < DATEADD(MINUTE, -@Min, GETUTCDATE())]]>
+  </select>
+  <update id="Scheduling.Update.TaskLog.MarkStale">
+    <![CDATA[UPDATE TaskLogs SET Status='Stale' WHERE Id=@Id]]>
+  </update>
+  <select id="Scheduling.Select.TaskLog.ByName">
+    <![CDATA[SELECT * FROM TaskLogs WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month ORDER BY StartedAt DESC]]>
+  </select>
+  <select id="Scheduling.Select.TaskLog.ById">
+    <![CDATA[SELECT * FROM TaskLogs WHERE Id=@Id]]>
+  </select>
 
-  <!-- ================================================================
-       模块：JournalEntry（分录）
-       ================================================================ -->
-  <select id="Accounting.Select.JournalEntry.List">
-    <![CDATA[SELECT je.*, v.VoucherNo, s.Name AS AccountingSubjectName
-      FROM [JournalEntries] je
-      JOIN [Vouchers] v ON v.Id = je.VoucherId
-      JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
-      ORDER BY je.[CreatedAt] DESC]]>
+  <!-- TaskStepLogs -->
+  <insert id="Scheduling.Insert.TaskStepLog.Default">
+    <![CDATA[INSERT INTO TaskStepLogs (Id, TaskLogId, StepName, StepDisplayName, ParentId, SortOrder, Status, StartedAt)
+      VALUES (@Id, @TaskLogId, @StepName, @StepDisplayName, @ParentId, @SortOrder, 'Running', GETUTCDATE())]]>
+  </insert>
+  <update id="Scheduling.Update.TaskStepLog.Complete">
+    <![CDATA[UPDATE TaskStepLogs SET Status='Completed', CompletedAt=GETUTCDATE(),
+      DurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()), AffectedCount=@Count WHERE Id=@Id]]>
+  </update>
+  <update id="Scheduling.Update.TaskStepLog.Fail">
+    <![CDATA[UPDATE TaskStepLogs SET Status='Failed', CompletedAt=GETUTCDATE(),
+      DurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()), ErrorMessage=@Error WHERE Id=@Id]]>
+  </update>
+  <select id="Scheduling.Select.TaskStepLog.ByTaskLogId">
+    <![CDATA[SELECT * FROM TaskStepLogs WHERE TaskLogId=@Id ORDER BY SortOrder, StartedAt]]>
   </select>
 
   <!-- ================================================================
@@ -564,6 +457,15 @@
   <select id="Notification.Select.Notification.PagedCount">
     <![CDATA[SELECT COUNT(*) FROM [Notifications] WHERE [UserId] = @UserId {0}]]>
   </select>
+  <select id="Notification.Select.Notification.UnreadCounts">
+    <![CDATA[SELECT [Category], COUNT(*) AS [Count] FROM [Notifications]
+      WHERE [UserId] = @UserId AND [IsRead] = 0 GROUP BY [Category]]]>
+  </select>
+  <select id="Notification.Select.Notification.DedupCheck">
+    <![CDATA[SELECT COUNT(1) FROM [Notifications]
+      WHERE [UserId] = @UserId AND [Category] = @Category
+      AND CAST([CreatedAt] AS DATE) = CAST(GETUTCDATE() AS DATE)]]>
+  </select>
   <insert id="Notification.Insert.Notification.Default">
     <![CDATA[INSERT INTO [Notifications] ([Id], [UserId], [CompanyId], [Category], [Title], [Content],
       [ReferenceType], [ReferenceId], [IsRead], [CreatedAt])
@@ -576,43 +478,62 @@
   <update id="Notification.Update.Notification.MarkAllRead">
     <![CDATA[UPDATE [Notifications] SET [IsRead] = 1 WHERE [UserId] = @UserId AND [IsRead] = 0]]>
   </update>
-  <select id="Notification.Select.Notification.UnreadCounts">
-    <![CDATA[SELECT [Category], COUNT(*) AS [Count] FROM [Notifications]
-      WHERE [UserId] = @UserId AND [IsRead] = 0 GROUP BY [Category]]]>
-  </select>
-  <select id="Notification.Select.Notification.DedupCheck">
-    <![CDATA[SELECT COUNT(1) FROM [Notifications]
-      WHERE [UserId] = @UserId AND [Category] = @Category
-      AND CAST([CreatedAt] AS DATE) = CAST(GETUTCDATE() AS DATE)]]>
-  </select>
 
-  <!-- ================================================================
-       模块：Approval（审批—SQL 更新语句，用于 ApprovalService）
-       ================================================================ -->
-  <update id="Approval.Update.Request.ToApproved">
-    <![CDATA[UPDATE ApprovalRequests SET Status = 'Approved',
-      UpdatedBy = @p0, UpdatedAt = @p1, CompletedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+  <!-- BillJob / SettleJob 查询 -->
+  <select id="Lease.Select.FeeConfig.WithFeeNameByContract">
+    <![CDATA[SELECT cf.FeeCodeId, cf.Amount, fc.Name AS FeeName
+      FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
+      WHERE cf.ContractId=@Id AND cf.IsActive=1
+      AND (cf.EffectiveDate IS NULL OR cf.EffectiveDate<=@P)
+      AND (cf.ExpiryDate IS NULL OR cf.ExpiryDate>=@P)]]>
+  </select>
+  <select id="Billing.Select.ReceivablePlan.ExistsByKey">
+    <![CDATA[SELECT COUNT(1) FROM ReceivablePlans WHERE ContractId=@C AND FeeCodeId=@F AND Period=@P]]>
+  </select>
+  <select id="Billing.Select.JournalEntry.BalanceBySubject">
+    <![CDATA[SELECT ISNULL(SUM(CASE WHEN Direction='Debit' THEN Amount ELSE -Amount END), 0)
+      FROM JournalEntries je JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
+      WHERE s.Code=@Code AND je.VoucherId IN (SELECT Id FROM Vouchers WHERE SourceEntityId=@SrcId)]]>
+  </select>
+  <select id="Lease.Select.HousingUnit.RoomCodeByContract">
+    <![CDATA[SELECT h.FullCode FROM HousingUnits h JOIN Contracts c ON c.RoomId=h.Id WHERE c.Id=@Id]]>
+  </select>
+  <select id="Lease.Select.Tenant.PrimaryNameByContract">
+    <![CDATA[SELECT t.Name FROM Tenants t JOIN ContractTenants ct ON ct.TenantId=t.Id WHERE ct.ContractId=@Id AND ct.IsPrimary=1]]>
+  </select>
+  <select id="Billing.Select.ReceivablePlan.OverdueByContract">
+    <![CDATA[SELECT Id, Amount, Received, LateFee, DueDate FROM ReceivablePlans
+      WHERE ContractId=@CId AND Status IN ('Pending','Partial') AND DueDate<@Today]]>
+  </select>
+  <update id="Billing.Update.ReceivablePlan.LateFeeIncrement">
+    <![CDATA[UPDATE ReceivablePlans SET LateFee=ISNULL(LateFee,0)+@Fee WHERE Id=@Id]]>
   </update>
-  <update id="Approval.Update.Request.AdvanceLevel">
-    <![CDATA[UPDATE ApprovalRequests SET CurrentLevel = CurrentLevel + 1,
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+  <update id="Billing.Update.ReceivablePlan.MarkOverdueByContract">
+    <![CDATA[UPDATE ReceivablePlans SET Status='Overdue'
+      WHERE ContractId=@CId AND Status IN ('Pending','Partial')
+      AND (Amount-Received-ISNULL(LateFee,0))>0 AND DueDate<@Today]]>
   </update>
-  <update id="Approval.Update.Request.ToRejected">
-    <![CDATA[UPDATE ApprovalRequests SET Status = 'Rejected',
-      UpdatedBy = @p0, UpdatedAt = @p1, CompletedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
-  </update>
-  <update id="Approval.Update.Request.ToCancelled">
-    <![CDATA[UPDATE ApprovalRequests SET Status = 'Cancelled',
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
-  </update>
-  <update id="Approval.Update.ImportBatch.Cancelled">
-    <![CDATA[UPDATE ImportBatches SET Status = 'Cancelled',
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'PendingApproval']]>
-  </update>
-  <update id="Approval.Update.RenewalRequest.ToRejected">
-    <![CDATA[UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = GETUTCDATE()
-      WHERE Id = @p0 AND Status = 'PendingApproval']]>
-  </update>
+  <insert id="Accounting.Insert.Voucher.BillJob">
+    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Description, Status, SourceEntityId, SourceEntityType, CreatedBy, CreatedAt)
+      VALUES (@Id, @No, @Date, @Desc, 'Posted', @SrcId, @Type, @CBy, GETUTCDATE())]]>
+  </insert>
+  <insert id="Accounting.Insert.JournalEntry.Simple">
+    <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
+      VALUES (@Id, @VId, @SId, @Dir, @Amt, @Sum, @CBy, GETUTCDATE())]]>
+  </insert>
+  <insert id="Billing.Insert.ReceivablePlan.Default">
+    <![CDATA[INSERT INTO ReceivablePlans (Id, ContractId, FeeCodeId, Period, Amount, DueDate, Status, Received, LateFee, CreatedBy, CreatedAt)
+      VALUES (@Id, @CId, @FId, @P, @Amt, @Due, 'Pending', 0, 0, @CBy, GETUTCDATE())]]>
+  </insert>
+  <insert id="Lease.Insert.DebitNote.FromBillJob">
+    <![CDATA[INSERT INTO DebitNotes (Id, NoteNo, ContractId, ContractNo, Period, CompanyId,
+      RoomFullCode, TenantName, TotalAmount, TotalReceived, TotalPrepaid, BalanceDue,
+      IsHistorical, DueDate, Status, GeneratedAt, BillJobTaskLogId, CreatedBy, CreatedAt)
+      VALUES (@Id, @NoteNo, @CId, @CNo, @Period, @CoId,
+      @Room, @Tenant, @Amt, 0, 0, @Amt,
+      @IsHist, @Due, 'Published', GETUTCDATE(), @TaskLogId, @CBy, GETUTCDATE())]]>
+  </insert>
+
   <update id="Approval.Update.Request.SetStatus">
     <![CDATA[UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id]]>
   </update>
@@ -789,6 +710,10 @@
       VALUES (@Id, @ContractNo, @RoomId, @RentAmount, @DepositAmount, @StartDate, @EndDate, @PaymentCycle, 'Active', @CompanyId,
       @PreviousContractId, @RenewalCount, @OriginalContractId, @MarketPrice, @CreatedBy, @CreatedAt)]]>
   </insert>
+  <select id="Lease.Select.ContractTenant.PrimaryByIds">
+    <![CDATA[SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone
+      FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId IN @Ids AND ct.IsPrimary = 1]]>
+  </select>
   <select id="Lease.Select.ContractTenant.PrimaryByContract">
     <![CDATA[SELECT TenantId, IsPrimary FROM ContractTenants WHERE ContractId = @Id]]>
   </select>
@@ -905,4 +830,25 @@
   <delete id="Common.Delete.ApiLog.ById">
     <![CDATA[DELETE FROM ApiLogs WHERE Id = @Id]]>
   </delete>
+
+  <select id="Receivable.Select.Plan.Overdue">
+    <![CDATA[SELECT * FROM ReceivablePlans WHERE Status='Pending' AND DueDate < CAST(GETDATE() AS DATE)]]>
+  </select>
+  <select id="Accounting.Select.Voucher.List">
+    <![CDATA[SELECT * FROM [Vouchers] WHERE (@StartDate IS NULL OR [VoucherDate] >= @StartDate)
+      AND (@EndDate IS NULL OR [VoucherDate] <= @EndDate) ORDER BY [VoucherDate] DESC]]>
+  </select>
+  <select id="Accounting.Select.Voucher.ByIdWithEntries">
+    <![CDATA[SELECT * FROM [Vouchers] WHERE [Id] = @Id;
+    SELECT je.*, s.Code AS SubjectCode, s.Name AS SubjectName
+      FROM [JournalEntries] je
+      LEFT JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
+      WHERE je.[VoucherId] = @Id ORDER BY je.[CreatedAt]]]>
+  </select>
+  <select id="Lease.Select.Contract.ByContractNo">
+    <![CDATA[SELECT * FROM Contracts WHERE ContractNo=@No]]>
+  </select>
+  <select id="Lease.Select.Contract.Active">
+    <![CDATA[SELECT * FROM Contracts WHERE CompanyId=@Id AND Status='Active']]>
+  </select>
 </sqlMap>

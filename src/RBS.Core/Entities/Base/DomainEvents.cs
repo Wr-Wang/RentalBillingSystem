@@ -238,3 +238,15 @@ public sealed record ContractResumedEvent : IDomainEvent
         OccurredAt = ChinaTime.Now;
     }
 }
+
+public sealed record CompanyCreatedEvent : IDomainEvent
+{
+    public Guid CompanyId { get; }
+    public DateTime OccurredAt { get; }
+
+    public CompanyCreatedEvent(Guid companyId)
+    {
+        CompanyId = companyId;
+        OccurredAt = ChinaTime.Now;
+    }
+}

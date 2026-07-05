@@ -32,15 +32,15 @@ public class HolidayCalendarsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateHolidayCalendarRequest request, CancellationToken ct)
     {
-        await _service.UpdateAsync(id, request, ct);
-        return NoContent();
+        try { await _service.UpdateAsync(id, request, ct); return NoContent(); }
+        catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        await _service.DeleteAsync(id, ct);
-        return NoContent();
+        try { await _service.DeleteAsync(id, ct); return NoContent(); }
+        catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
     }
 
     /// <summary>从 timor.tech API 导入全年节假日数据</summary>

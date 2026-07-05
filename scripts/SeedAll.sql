@@ -1180,7 +1180,7 @@ VALUES (@M_System_SchedulerConfig,N'调度配置','system:schedulerconfig',@M_Sy
 
 DECLARE @M_System_SchedulerEdit uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_System_SchedulerEdit,N'修改排期','system:scheduleredit',@M_System_Scheduler,11,1,@SysUserId,@Now);
+VALUES (@M_System_SchedulerEdit,N'编辑调度任务','system:scheduleredit',@M_System_Scheduler,11,1,@SysUserId,@Now);
 
 DECLARE @M_System_SchedulerGenerate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1193,6 +1193,35 @@ VALUES (@M_System_SchedulerAdd,N'添加自定义排期','system:scheduleradd',@M
 DECLARE @M_System_SchedulerViewLog uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_SchedulerViewLog,N'查看日志','system:schedulerviewlog',@M_System_Scheduler,14,1,@SysUserId,@Now);
+
+
+DECLARE @M_System_SchedulerCreate uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerCreate,N'新增调度任务','system:schedulercreate',@M_System_Scheduler,19,1,@SysUserId,@Now);
+
+DECLARE @M_System_SchedulerDelete uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerDelete,N'删除调度任务','system:schedulerdelete',@M_System_Scheduler,20,1,@SysUserId,@Now);
+
+DECLARE @M_System_SchedulerExecute uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerExecute,N'手动执行任务','system:schedulerexecute',@M_System_Scheduler,21,1,@SysUserId,@Now);
+
+DECLARE @M_System_SchedulerExecEdit uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerExecEdit,N'编辑执行排期','system:schedulerexcedit',@M_System_Scheduler,22,1,@SysUserId,@Now);
+
+DECLARE @M_System_SchedulerExecDelete uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerExecDelete,N'删除执行排期','system:schedulerexecdelete',@M_System_Scheduler,23,1,@SysUserId,@Now);
+
+DECLARE @M_System_SchedulerReverse uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerReverse,N'反转出账','system:schedulerreverse',@M_System_Scheduler,24,1,@SysUserId,@Now);
+
+DECLARE @M_System_SchedulerBatchDel uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerBatchDel,N'批量删除执行排期','system:schedulerexecbatchdelete',@M_System_Scheduler,25,1,@SysUserId,@Now);
 
 IF @AdminRoleId IS NOT NULL
     INSERT INTO [RoleMenus] ([Id],[RoleId],[MenuId],[CreatedBy],[CreatedAt])
@@ -1257,7 +1286,9 @@ WHERE M.PermissionCode IN (
   'report:dailyreceipt',
   'report:monthlyreceipt',
   'receipt:view',
-  'receipt:list'
+  'receipt:list',
+  'system:scheduler',
+  'system:schedulerviewlog'
 )
   AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = @OpsSup AND RM.MenuId = M.Id);
 
@@ -1314,6 +1345,72 @@ FROM RoleMenus WHERE RoleId = @FinSup;
 SELECT r.Name AS RoleName, r.Code, COUNT(rm.MenuId) AS MenuCount
 FROM Roles r JOIN RoleMenus rm ON rm.RoleId = r.Id
 WHERE r.Code IN ('OpsSupervisor','DeptManager','GeneralManager','FinanceSupervisor','FinanceDirector')
+-- Accountant（会计）
+INSERT INTO RoleMenus (Id, RoleId, MenuId, CreatedBy, CreatedAt)
+SELECT NEWID(), (SELECT Id FROM Roles WHERE Code='Accountant'), M.Id, @SysUserId, @Now
+FROM [Menus] M
+WHERE M.PermissionCode IN (
+  'dashboard:view',
+  'notification:view', 'notification:markallread',
+  'receipt:view', 'receipt:list',
+  'bill:view', 'bill:list',
+  'accounting:view', 'accounting:subjects', 'accounting:journal', 'accounting:vouchers', 'accounting:trialbalance',
+  'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
+  'system:scheduler', 'system:schedulerviewlog'
+)
+  AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = (SELECT Id FROM Roles WHERE Code='Accountant') AND RM.MenuId = M.Id);
+
+-- Operator（运营人员）
+INSERT INTO RoleMenus (Id, RoleId, MenuId, CreatedBy, CreatedAt)
+SELECT NEWID(), (SELECT Id FROM Roles WHERE Code='Operator'), M.Id, @SysUserId, @Now
+FROM [Menus] M
+WHERE M.PermissionCode IN (
+  'dashboard:view',
+  'building:list', 'building:detail', 'building:view',
+  'contract:view', 'contract:list', 'contract:create', 'contract:detail',
+  'tenant:view', 'tenant:list', 'tenant:create', 'tenant:detail', 'tenant:edit',
+  'approval:view', 'approval:myrequests', 'approval:history',
+  'notification:view', 'notification:markallread',
+  'bill:view', 'bill:list',
+  'meter:view', 'meter:list',
+  'report:view', 'report:collectionrate',
+  'system:scheduler', 'system:schedulerviewlog'
+)
+  AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = (SELECT Id FROM Roles WHERE Code='Operator') AND RM.MenuId = M.Id);
+
+-- Legal（法务）
+INSERT INTO RoleMenus (Id, RoleId, MenuId, CreatedBy, CreatedAt)
+SELECT NEWID(), (SELECT Id FROM Roles WHERE Code='Legal'), M.Id, @SysUserId, @Now
+FROM [Menus] M
+WHERE M.PermissionCode IN (
+  'dashboard:view',
+  'contract:view', 'contract:list', 'contract:detail',
+  'approval:view', 'approval:history',
+  'notification:view', 'notification:markallread',
+  'report:view'
+)
+  AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = (SELECT Id FROM Roles WHERE Code='Legal') AND RM.MenuId = M.Id);
+
+-- Landlord（公司账号-只读）
+INSERT INTO RoleMenus (Id, RoleId, MenuId, CreatedBy, CreatedAt)
+SELECT NEWID(), (SELECT Id FROM Roles WHERE Code='Landlord'), M.Id, @SysUserId, @Now
+FROM [Menus] M
+WHERE M.PermissionCode IN (
+  'dashboard:view',
+  'building:list', 'building:detail', 'building:view',
+  'contract:list', 'contract:detail', 'contract:view',
+  'tenant:list', 'tenant:detail', 'tenant:view',
+  'bill:list', 'bill:view',
+  'receipt:list', 'receipt:view',
+  'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt'
+)
+  AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = (SELECT Id FROM Roles WHERE Code='Landlord') AND RM.MenuId = M.Id);
+
+SELECT r.Name AS RoleName, r.Code, COUNT(rm.MenuId) AS MenuCount
+FROM Roles r JOIN RoleMenus rm ON rm.RoleId = r.Id
+WHERE r.Code IN ('Accountant','Operator','Legal','Landlord')
+GROUP BY r.Name, r.Code ORDER BY r.Name;
+
 GROUP BY r.Name, r.Code ORDER BY r.Name;
 GO
 
@@ -1399,92 +1496,92 @@ GO
 DECLARE @Now datetime2 = GETUTCDATE(); DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
 DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
 
-DECLARE @MonthlyFeeBillId  uniqueidentifier; SELECT @MonthlyFeeBillId  = [Id] FROM [JobSchedules] WHERE [JobName]=N'📅 月度应收生成' AND [CompanyId]=@Cid;
-DECLARE @LateFeeCalcId     uniqueidentifier; SELECT @LateFeeCalcId     = [Id] FROM [JobSchedules] WHERE [JobName]=N'💰 滞纳金计算' AND [CompanyId]=@Cid;
-DECLARE @AutoRenewId       uniqueidentifier; SELECT @AutoRenewId       = [Id] FROM [JobSchedules] WHERE [JobName]=N'🔄 自动续签' AND [CompanyId]=@Cid;
-DECLARE @CollectionId      uniqueidentifier; SELECT @CollectionId      = [Id] FROM [JobSchedules] WHERE [JobName]=N'📢 催缴任务' AND [CompanyId]=@Cid;
-DECLARE @RenewalReminderId uniqueidentifier; SELECT @RenewalReminderId = [Id] FROM [JobSchedules] WHERE [JobName]=N'🔔 续签提醒' AND [CompanyId]=@Cid;
+DECLARE @BillJobId  uniqueidentifier; SELECT @BillJobId  = [Id] FROM [JobSchedules] WHERE [JobName]=N'BillJob' AND [CompanyId]=@Cid;
+DECLARE @SettleJobId     uniqueidentifier; SELECT @SettleJobId     = [Id] FROM [JobSchedules] WHERE [JobName]=N'SettleJob' AND [CompanyId]=@Cid;
+DECLARE @AutoRenewJobId       uniqueidentifier; SELECT @AutoRenewJobId       = [Id] FROM [JobSchedules] WHERE [JobName]=N'AutoRenewJob' AND [CompanyId]=@Cid;
+DECLARE @CollectionJobId      uniqueidentifier; SELECT @CollectionJobId      = [Id] FROM [JobSchedules] WHERE [JobName]=N'CollectionJob' AND [CompanyId]=@Cid;
+DECLARE @RenewalReminderJobId uniqueidentifier; SELECT @RenewalReminderJobId = [Id] FROM [JobSchedules] WHERE [JobName]=N'RenewalReminderJob' AND [CompanyId]=@Cid;
 
-IF @MonthlyFeeBillId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@MonthlyFeeBillId AND [Month]='2026-07' AND [IsCustom]=0)
+IF @BillJobId IS NOT NULL BEGIN
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-07' AND [IsCustom]=0)
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@MonthlyFeeBillId,@Cid,'2026-07-24T08:00:00','2026-07-25T08:00:00','2026-07','Pending',N'25日逢周六，提前至24日',1,0,@SysUserId,@Now);
+    VALUES (NEWID(),@BillJobId,@Cid,'2026-07-24T08:00:00','2026-07-25T08:00:00','2026-07','Pending',N'25日逢周六，提前至24日',1,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@MonthlyFeeBillId AND [Month]='2026-08' AND [IsCustom]=0)
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-08' AND [IsCustom]=0)
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@MonthlyFeeBillId,@Cid,'2026-08-25T08:00:00','2026-08-25T08:00:00','2026-08','Pending',N'默认',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@BillJobId,@Cid,'2026-08-25T08:00:00','2026-08-25T08:00:00','2026-08','Pending',N'默认',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@MonthlyFeeBillId AND [Month]='2026-09' AND [IsCustom]=0)
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-09' AND [IsCustom]=0)
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@MonthlyFeeBillId,@Cid,'2026-09-25T08:00:00','2026-09-25T08:00:00','2026-09','Pending',N'默认',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@BillJobId,@Cid,'2026-09-25T08:00:00','2026-09-25T08:00:00','2026-09','Pending',N'默认',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@MonthlyFeeBillId AND [Month]='2026-07' AND [IsCustom]=1)
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-07' AND [IsCustom]=1)
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@MonthlyFeeBillId,@Cid,'2026-07-15T14:30:00',NULL,'2026-07','Pending',N'月中临时加跑一次核对',1,1,@SysUserId,@Now);
+    VALUES (NEWID(),@BillJobId,@Cid,'2026-07-15T14:30:00',NULL,'2026-07','Pending',N'月中临时加跑一次核对',1,1,@SysUserId,@Now);
 
 END
 
-IF @LateFeeCalcId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@LateFeeCalcId AND [Month]='2026-07')
+IF @SettleJobId IS NOT NULL BEGIN
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@SettleJobId AND [Month]='2026-07')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@LateFeeCalcId,@Cid,'2026-07-01T02:00:00','2026-07-01T02:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@SettleJobId,@Cid,'2026-07-01T02:00:00','2026-07-01T02:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@LateFeeCalcId AND [Month]='2026-08')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@SettleJobId AND [Month]='2026-08')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@LateFeeCalcId,@Cid,'2026-08-01T02:00:00','2026-08-01T02:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@SettleJobId,@Cid,'2026-08-01T02:00:00','2026-08-01T02:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@LateFeeCalcId AND [Month]='2026-09')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@SettleJobId AND [Month]='2026-09')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@LateFeeCalcId,@Cid,'2026-09-01T02:00:00','2026-09-01T02:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@SettleJobId,@Cid,'2026-09-01T02:00:00','2026-09-01T02:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
 END
 
-IF @AutoRenewId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewId AND [Month]='2026-07')
+IF @AutoRenewJobId IS NOT NULL BEGIN
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewJobId AND [Month]='2026-07')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AutoRenewId,@Cid,'2026-07-01T00:00:00','2026-07-01T00:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@AutoRenewJobId,@Cid,'2026-07-01T00:00:00','2026-07-01T00:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewId AND [Month]='2026-08')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewJobId AND [Month]='2026-08')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AutoRenewId,@Cid,'2026-08-01T00:00:00','2026-08-01T00:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@AutoRenewJobId,@Cid,'2026-08-01T00:00:00','2026-08-01T00:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewId AND [Month]='2026-09')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewJobId AND [Month]='2026-09')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AutoRenewId,@Cid,'2026-09-01T00:00:00','2026-09-01T00:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@AutoRenewJobId,@Cid,'2026-09-01T00:00:00','2026-09-01T00:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
 END
 
-IF @CollectionId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionId AND [Month]='2026-06')
+IF @CollectionJobId IS NOT NULL BEGIN
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-06')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionId,@Cid,'2026-06-01T09:00:00','2026-06-01T09:00:00','2026-06','Success',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-06-01T09:00:00','2026-06-01T09:00:00','2026-06','Success',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionId AND [Month]='2026-07')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-07')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionId,@Cid,'2026-07-01T09:00:00','2026-07-01T09:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-07-01T09:00:00','2026-07-01T09:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionId AND [Month]='2026-08')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-08')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionId,@Cid,'2026-08-01T09:00:00','2026-08-01T09:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-08-01T09:00:00','2026-08-01T09:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionId AND [Month]='2026-09')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-09')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionId,@Cid,'2026-09-01T09:00:00','2026-09-01T09:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-09-01T09:00:00','2026-09-01T09:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
 END
 
-IF @RenewalReminderId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderId AND [Month]='2026-07')
+IF @RenewalReminderJobId IS NOT NULL BEGIN
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderJobId AND [Month]='2026-07')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@RenewalReminderId,@Cid,'2026-07-01T08:00:00','2026-07-01T08:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@RenewalReminderJobId,@Cid,'2026-07-01T08:00:00','2026-07-01T08:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderId AND [Month]='2026-08')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderJobId AND [Month]='2026-08')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@RenewalReminderId,@Cid,'2026-08-01T08:00:00','2026-08-01T08:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@RenewalReminderJobId,@Cid,'2026-08-01T08:00:00','2026-08-01T08:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderId AND [Month]='2026-09')
+IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderJobId AND [Month]='2026-09')
     INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@RenewalReminderId,@Cid,'2026-09-01T08:00:00','2026-09-01T08:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
+    VALUES (NEWID(),@RenewalReminderJobId,@Cid,'2026-09-01T08:00:00','2026-09-01T08:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
 
 END
 
