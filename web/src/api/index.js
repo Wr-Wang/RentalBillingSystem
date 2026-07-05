@@ -225,6 +225,15 @@ export function getTaskLog(id) { return request({ url: `/scheduler/tasklogs/${id
 export function getTaskSteps(id) { return request({ url: `/scheduler/tasklogs/${id}/steps`, method: 'get' }) }
 export function reverseTask(taskLogId, data) { return request({ url: `/scheduler/reverse/${taskLogId}`, method: 'post', data }) }
 
+// Scheduler — Monitor
+export function getMonitorDashboard() { return request({ url: '/monitor/dashboard', method: 'get' }) }
+export function getMonitorTrend(days) { return request({ url: '/monitor/dashboard/trend', method: 'get', params: { days } }) }
+export function getMonitorDuration(days) { return request({ url: '/monitor/dashboard/duration', method: 'get', params: { days } }) }
+export function getMonitorFailures(days) { return request({ url: '/monitor/dashboard/failures', method: 'get', params: { days } }) }
+export function queryMonitorLogs(params) { return request({ url: '/monitor/logs', method: 'get', params }) }
+export function getMonitorLogDetail(id) { return request({ url: `/monitor/logs/${id}`, method: 'get' }) }
+export function previewReverse(id) { return request({ url: `/monitor/logs/${id}/previewreverse`, method: 'post' }) }
+
 // Audit
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }
 export function compareAuditVersions(tableName, recordId, v1, v2) { return request({ url: `/audit/${tableName}/compare`, method: 'get', params: { recordId, v1, v2 } }) }

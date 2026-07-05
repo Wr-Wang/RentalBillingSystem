@@ -58,6 +58,9 @@ public static class DependencyInjection
         services.AddScoped<IReportingService, ReportingService>();
         services.AddScoped<IChangeRequestService, ChangeRequestAppService>();
 
+        // 调度执行监控
+        services.AddScoped<ITaskMonitorService, TaskMonitorService>();
+
         // 任务步骤日志
         services.AddScoped<ITaskStepLogger, TaskStepLogger>();
 

@@ -851,4 +851,124 @@
   <select id="Lease.Select.Contract.Active">
     <![CDATA[SELECT * FROM Contracts WHERE CompanyId=@Id AND Status='Active']]>
   </select>
+
+  <!-- ================================================================
+       模块：Monitor（调度执行监控）
+       命名规范：{模块}.{CRUD}.{实体}.{描述}
+       ================================================================ -->
+  <select id="Monitor.Select.TaskLog.DashboardStats">
+    <![CDATA[
+      SELECT
+          COUNT(1) AS TodayTotal,
+          SUM(CASE WHEN Status = 'Completed' THEN 1 ELSE 0 END) AS TodaySuccess,
+          SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS TodayFailed,
+          SUM(CASE WHEN Status = 'Running' THEN 1 ELSE 0 END) AS RunningCount
+      FROM TaskLogs
+      WHERE CAST(StartedAt AS DATE) = CAST(GETUTCDATE() AS DATE)
+        AND (RunMode IS NULL OR RunMode = 'Execute');
+      SELECT COUNT(1) AS YesterdayTotal
+      FROM TaskLogs
+      WHERE CAST(StartedAt AS DATE) = CAST(DATEADD(DAY, -1, GETUTCDATE()) AS DATE)
+        AND (RunMode IS NULL OR RunMode = 'Execute');
+    ]]>
+  </select>
+
+  <select id="Monitor.Select.TaskLog.SuccessRateTrend">
+    <![CDATA[SELECT
+        CAST(StartedAt AS DATE) AS Date,
+        ROUND(
+            SUM(CASE WHEN Status = 'Completed' THEN 1.0 ELSE 0 END)
+            / NULLIF(COUNT(1), 0) * 100, 1
+        ) AS SuccessRate,
+        COUNT(1) AS TotalCount,
+        SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS FailCount
+    FROM TaskLogs
+    WHERE StartedAt >= DATEADD(DAY, -@Days, GETUTCDATE())
+      AND (RunMode IS NULL OR RunMode = 'Execute')
+    GROUP BY CAST(StartedAt AS DATE)
+    ORDER BY Date]]>
+  </select>
+
+  <select id="Monitor.Select.TaskLog.AvgDuration">
+    <![CDATA[SELECT
+        TaskName,
+        AVG(CAST(TotalDurationMs AS FLOAT)) AS AvgDurationMs,
+        COUNT(1) AS ExecutionCount
+    FROM TaskLogs
+    WHERE StartedAt >= DATEADD(DAY, -@Days, GETUTCDATE())
+      AND Status IN ('Completed', 'Failed')
+      AND TotalDurationMs IS NOT NULL
+    GROUP BY TaskName
+    ORDER BY AvgDurationMs DESC]]>
+  </select>
+
+  <select id="Monitor.Select.TaskLog.FailureAggregation">
+    <![CDATA[SELECT
+        COALESCE(NULLIF(LEFT(ErrorMessage, 30), ''), 'Unknown') AS ErrorCategory,
+        COUNT(1) AS Count
+    FROM TaskLogs
+    WHERE Status = 'Failed'
+      AND StartedAt >= DATEADD(DAY, -@Days, GETUTCDATE())
+    GROUP BY COALESCE(NULLIF(LEFT(ErrorMessage, 30), ''), 'Unknown')
+    ORDER BY Count DESC]]>
+  </select>
+
+  <select id="Monitor.Select.TaskLog.Paged">
+    <![CDATA[SELECT tl.*, c.Name AS CompanyName
+    FROM TaskLogs tl
+    LEFT JOIN Companies c ON c.Id = tl.CompanyId
+    WHERE (@TaskName IS NULL OR tl.TaskName = @TaskName)
+      AND (@Status IS NULL OR tl.Status = @Status)
+      AND (@TriggerType IS NULL OR tl.TriggerType = @TriggerType)
+      AND (@RunMode IS NULL OR tl.RunMode = @RunMode)
+      AND (@Keyword IS NULL OR tl.Summary LIKE '%' + @Keyword + '%' OR tl.TaskName LIKE '%' + @Keyword + '%')
+      AND (@StartTime IS NULL OR tl.StartedAt >= @StartTime)
+      AND (@EndTime IS NULL OR tl.StartedAt <= @EndTime)
+      AND (@CompanyId IS NULL OR tl.CompanyId = @CompanyId)
+    ORDER BY tl.StartedAt DESC
+    OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
+  </select>
+
+  <select id="Monitor.Select.TaskLog.PagedCount">
+    <![CDATA[SELECT COUNT(1)
+    FROM TaskLogs tl
+    WHERE (@TaskName IS NULL OR tl.TaskName = @TaskName)
+      AND (@Status IS NULL OR tl.Status = @Status)
+      AND (@TriggerType IS NULL OR tl.TriggerType = @TriggerType)
+      AND (@RunMode IS NULL OR tl.RunMode = @RunMode)
+      AND (@Keyword IS NULL OR tl.Summary LIKE '%' + @Keyword + '%' OR tl.TaskName LIKE '%' + @Keyword + '%')
+      AND (@StartTime IS NULL OR tl.StartedAt >= @StartTime)
+      AND (@EndTime IS NULL OR tl.StartedAt <= @EndTime)
+      AND (@CompanyId IS NULL OR tl.CompanyId = @CompanyId)]]>
+  </select>
+
+  <select id="Monitor.Select.TaskLog.Detail">
+    <![CDATA[SELECT tl.*, c.Name AS CompanyName
+    FROM TaskLogs tl
+    LEFT JOIN Companies c ON c.Id = tl.CompanyId
+    WHERE tl.Id = @Id]]>
+  </select>
+
+  <select id="Monitor.Select.TaskStepLog.ByTaskLogId">
+    <![CDATA[SELECT * FROM TaskStepLogs WHERE TaskLogId = @Id ORDER BY SortOrder, StartedAt]]>
+  </select>
+
+  <select id="Monitor.Select.TaskLog.PreviewReverse">
+    <![CDATA[
+      -- 检查该期是否有收款
+      SELECT COUNT(1) FROM JournalEntries je
+      JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
+      WHERE s.Code = '1001' AND je.VoucherId IN
+      (SELECT Id FROM Vouchers WHERE SourceEntityId IN
+      (SELECT ContractId FROM ReceivablePlans WHERE Period = @P));
+      -- 账单数
+      SELECT COUNT(1) FROM DebitNotes WHERE BillJobTaskLogId = @Id AND Status = 'Published';
+      -- 应收计划数
+      SELECT COUNT(1) FROM ReceivablePlans
+      WHERE Period = @P AND CreatedAt >= @Start AND CreatedAt <= @End;
+      -- 凭证数
+      SELECT COUNT(1) FROM Vouchers
+      WHERE SourceEntityType = 'ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End;
+    ]]>
+  </select>
 </sqlMap>

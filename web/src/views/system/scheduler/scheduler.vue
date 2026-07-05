@@ -64,9 +64,9 @@
           </div>
           <div style="margin-top:8px;display:flex;gap:24px;font-size:13px;color:#606266;background:#f5f7fa;padding:8px 12px;border-radius:6px;">
             <span>📄 {{ selectedJob.description||'无描述' }}</span>
-            <span>📊 执行次数: <strong>{{ taskLogs.length }}</strong></span>
-            <span>✅ 成功率: <strong>{{ calcSuccessRate }}%</strong></span>
-            <span v-if="lastLog">⏱ 最近: {{ formatDate(lastLog.startedAt) }} ({{ lastLog.status }})</span>
+            <span>⏱ {{ selectedJob.scheduleType==='Daily'?'每天':`每月${selectedJob.dayOfMonth||1}日` }} {{ String(selectedJob.hour).padStart(2,'0') }}:{{ String(selectedJob.minute).padStart(2,'0') }}</span>
+            <el-tag :type="selectedJob.isActive?'success':'info'" size="small" effect="dark" round>{{ selectedJob.isActive?'已启用':'已停用' }}</el-tag>
+            <el-button text type="primary" size="small" @click="$router.push('/system/scheduler/monitor')">📊 查看执行监控 →</el-button>
           </div>
         </template>
 
@@ -88,42 +88,9 @@
                 <el-button text type="danger" size="small" v-permission="'system:schedulerexecdelete'" @click="confirmDeleteExec(row)">删除</el-button>
               </template></el-table-column>
             </el-table>
-
-          </el-tab-pane>
-
-          <el-tab-pane label="执行历史" name="history">
-            <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;">
-              <el-select v-model="historyFilter.status" placeholder="状态" clearable size="small" style="width:120px;">
-                <el-option label="全部" value="" /><el-option label="成功" value="Completed" /><el-option label="失败" value="Failed" /><el-option label="预执行" value="DryRun" />
-              </el-select>
-              <span style="font-size:12px;color:#909399;">共 {{ filteredLogs.length }} 条</span>
-            </div>
-            <el-table :data="filteredLogs" stripe size="small" v-loading="logLoading" @row-click="showStepDetail" style="cursor:pointer;">
-              <el-table-column label="时间" width="150"><template #default="{row}">{{ formatDate(row.startedAt) }}</template></el-table-column>
-              <el-table-column label="模式" width="65"><template #default="{row}"><el-tag size="small" :type="row.runMode==='DryRun'?'warning':'success'" effect="plain">{{ row.runMode==='DryRun'?'预执行':'执行' }}</el-tag></template></el-table-column>
-              <el-table-column label="触发" width="65"><template #default="{row}">{{ {Scheduled:'自动',Manual:'手动',Event:'事件'}[row.triggerType]||row.triggerType }}</template></el-table-column>
-              <el-table-column label="状态" width="75"><template #default="{row}"><el-tag :type="row.status==='Completed'?'success':row.status==='Failed'?'danger':'info'" size="small">{{ {Completed:'成功',Failed:'失败',Running:'运行中',Reversed:'已反转'}[row.status]||row.status }}</el-tag></template></el-table-column>
-              <el-table-column label="结果" min-width="180"><template #default="{row}">{{ row.summary||'-' }}</template></el-table-column>
-              <el-table-column label="耗时" width="65"><template #default="{row}">{{ row.totalDurationMs?(row.totalDurationMs/1000).toFixed(1)+'s':'-' }}</template></el-table-column>
-              <el-table-column label="成功/失败" width="75"><template #default="{row}">{{ row.successCount??'-' }}/{{ row.failCount??'-' }}</template></el-table-column>
-              <el-table-column label="操作" width="65" fixed="right"><template #default="{row}">
-                <el-button v-if="row.status==='Completed'&&row.runMode!=='DryRun'" text type="warning" size="small" v-permission="'system:schedulerreverse'" @click.stop="handleReverse(row)">反转</el-button>
-              </template></el-table-column>
-            </el-table>
           </el-tab-pane>
         </el-tabs>
       </el-card>
-
-      <el-drawer v-model="stepDrawer" title="步骤耗时详情" :size="500">
-        <el-timeline v-if="steps.length>0">
-          <el-timeline-item v-for="s in steps" :key="s.id" :timestamp="s.durationMs?(s.durationMs/1000).toFixed(2)+'s':''" placement="top">
-            <div><strong>{{ s.stepDisplayName }}</strong> <el-tag size="small" :type="s.status==='Completed'?'success':'danger'">{{ s.status }}</el-tag></div>
-            <div v-if="s.affectedCount!=null" style="font-size:12px;color:#909399;">影响: {{ s.affectedCount }} 条</div>
-            <div v-if="s.errorMessage" style="color:#f56c6c;font-size:12px;">{{ s.errorMessage }}</div>
-          </el-timeline-item>
-        </el-timeline>
-        <el-empty v-else description="暂无步骤数据" />
-      </el-drawer>
     </template>
 
     <!-- 新建/编辑任务 -->
@@ -175,29 +142,11 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSchedulerJobs, getSchedulerTemplates, createSchedulerJob, updateSchedulerJob, deleteSchedulerJob,
   getExecutions, createExecution, updateExecution, deleteExecution, generateExecutions,
-  executeJob, getTaskLogs, getTaskSteps, reverseTask, deleteFutureExecutions } from '../../api/index'
+  executeJob, deleteFutureExecutions } from '../../../api/index'
 
 const jobs = ref([]); const templates = ref([])
 const selectedJob = ref(null); const activeTab = ref('schedule')
 const executions = ref([]); const execLoading = ref(false)
-const taskLogs = ref([]); const logLoading = ref(false)
-const steps = ref([]); const stepDrawer = ref(false)
-const historyFilter = reactive({ status: '' })
-
-const filteredLogs = computed(() => {
-  let list = taskLogs.value
-  if (historyFilter.status === 'DryRun') list = list.filter(l => l.runMode === 'DryRun')
-  else if (historyFilter.status) list = list.filter(l => l.status === historyFilter.status)
-  return list
-})
-
-const lastLog = computed(() => taskLogs.value.length > 0 ? taskLogs.value[0] : null)
-const calcSuccessRate = computed(() => {
-  const total = taskLogs.value.filter(l => l.runMode !== 'DryRun').length
-  if (total === 0) return 100
-  const success = taskLogs.value.filter(l => l.status === 'Completed' && l.runMode !== 'DryRun').length
-  return Math.round(success / total * 100)
-})
 
 const JOB_ICONS = { MonthlyFeeBill:'📅', LateFeeCalc:'💰', AutoRenew:'🔄', Collection:'📢' }
 function getTemplateIcon(c) { return JOB_ICONS[c]||'⚙️' }
@@ -224,19 +173,13 @@ async function fetchJobs() {
 }
 async function selectJob(job) {
   selectedJob.value=job; activeTab.value='schedule'
-  await Promise.all([fetchExecutions(), fetchTaskLogs()])
+  await fetchExecutions()
 }
 async function fetchExecutions() {
   if(!selectedJob.value) return; execLoading.value=true
   try { const r=await getExecutions(selectedJob.value.id,{months:6}); executions.value=Array.isArray(r)?r:(r.items||[]) }
   catch { executions.value=[] }
   execLoading.value=false
-}
-async function fetchTaskLogs() {
-  if(!selectedJob.value) return; logLoading.value=true
-  try { const r=await getTaskLogs(selectedJob.value.jobName,{}); taskLogs.value=Array.isArray(r)?r:[] }
-  catch { taskLogs.value=[] }
-  logLoading.value=false
 }
 
 const execConfirmVisible = ref(false)
@@ -257,21 +200,11 @@ async function doExecute() {
     const r = await executeJob(execJob.value.jobName, { mode:'execute', companyId:'00000000-0000-0000-0000-000000000000', targetMonth:new Date().toISOString().slice(0,7) })
     ElMessage.success(r?.result||'任务已触发')
     execConfirmVisible.value = false
-    await fetchTaskLogs()
   } catch {
     ElMessage.error('执行失败')
   } finally {
     execRunning.value = false
   }
-}
-async function handleReverse(log) {
-  try { await ElMessageBox.confirm('反转后数据将被删除，确认？','确认',{type:'warning'}); await reverseTask(log.id,{reason:'手动反转'}); ElMessage.success('已反转'); await fetchTaskLogs() }
-  catch {}
-}
-async function showStepDetail(row) {
-  if(!row.id) return
-  try { const r=await getTaskSteps(row.id); steps.value=Array.isArray(r)?r:[]; stepDrawer.value=true }
-  catch { steps.value=[] }
 }
 
 const createWizardVisible=ref(false); const createForm=reactive({templateCode:''})

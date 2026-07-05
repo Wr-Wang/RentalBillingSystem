@@ -1223,6 +1223,19 @@ DECLARE @M_System_SchedulerBatchDel uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_SchedulerBatchDel,N'批量删除执行排期','system:schedulerexecbatchdelete',@M_System_Scheduler,25,1,@SysUserId,@Now);
 
+-- ===== 调度执行监控（菜单项）=====
+DECLARE @M_System_SchedulerMonitor uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_SchedulerMonitor,N'调度执行监控','system:monitor:view','/system/scheduler/monitor','DataLine',@M_System,17,1,@SysUserId,@Now);
+
+DECLARE @M_System_MonitorRetry uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_MonitorRetry,N'重试任务','system:monitor:retry',@M_System_SchedulerMonitor,10,1,@SysUserId,@Now);
+
+DECLARE @M_System_MonitorLogs uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_MonitorLogs,N'执行日志','system:monitor:logs','/system/scheduler/monitor/logs',@M_System_SchedulerMonitor,11,1,@SysUserId,@Now);
+
 IF @AdminRoleId IS NOT NULL
     INSERT INTO [RoleMenus] ([Id],[RoleId],[MenuId],[CreatedBy],[CreatedAt])
     SELECT NEWID(), @AdminRoleId, @M_System_ApiLogs, @SysUserId, @Now
@@ -1288,7 +1301,8 @@ WHERE M.PermissionCode IN (
   'receipt:view',
   'receipt:list',
   'system:scheduler',
-  'system:schedulerviewlog'
+  'system:schedulerviewlog',
+  'system:monitor:view'
 )
   AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = @OpsSup AND RM.MenuId = M.Id);
 
@@ -1356,7 +1370,7 @@ WHERE M.PermissionCode IN (
   'bill:view', 'bill:list',
   'accounting:view', 'accounting:subjects', 'accounting:journal', 'accounting:vouchers', 'accounting:trialbalance',
   'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
-  'system:scheduler', 'system:schedulerviewlog'
+  'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )
   AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = (SELECT Id FROM Roles WHERE Code='Accountant') AND RM.MenuId = M.Id);
 
@@ -1374,7 +1388,7 @@ WHERE M.PermissionCode IN (
   'bill:view', 'bill:list',
   'meter:view', 'meter:list',
   'report:view', 'report:collectionrate',
-  'system:scheduler', 'system:schedulerviewlog'
+  'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )
   AND NOT EXISTS (SELECT 1 FROM RoleMenus RM WHERE RM.RoleId = (SELECT Id FROM Roles WHERE Code='Operator') AND RM.MenuId = M.Id);
 

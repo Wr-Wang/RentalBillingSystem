@@ -425,8 +425,20 @@ const routes = [
           {
             path: 'scheduler',
             name: 'SystemScheduler',
-            component: () => import('../views/system/scheduler.vue'),
+            component: () => import('../views/system/scheduler/scheduler.vue'),
             meta: { title: '调度任务管理', icon: 'Timer' }
+          },
+          {
+            path: 'scheduler/monitor',
+            name: 'SystemSchedulerMonitor',
+            component: () => import('../views/system/scheduler/monitor/dashboard.vue'),
+            meta: { title: '调度执行监控', icon: 'DataLine', roles: ['Admin'] }
+          },
+          {
+            path: 'scheduler/monitor/logs',
+            name: 'SystemSchedulerLogs',
+            component: () => import('../views/system/scheduler/monitor/logs.vue'),
+            meta: { title: '执行日志', icon: 'Document', hidden: true }
           },
           {
             path: 'holidays',
