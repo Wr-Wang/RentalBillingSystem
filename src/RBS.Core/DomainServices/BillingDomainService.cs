@@ -16,9 +16,9 @@ public class BillingDomainService : IBillingDomainService
 
         var plans = new List<ReceivablePlan>();
 
-        foreach (var feeConfig in contract.FeeConfigs.Where(f => f.IsActive))
+        foreach (var feeConfig in contract.FeeConfigs)
         {
-            // ★ v3: 费用版本化过滤 — 账期必须在 EffectiveDate ~ ExpiryDate 范围内
+            // ★ v3: 费用版本化过滤 — 仅根据日期区间判断，不依赖 IsActive（历史配置也需要参与应收计算）
             if (!IsFeeEffectiveForPeriod(feeConfig, period))
                 continue;
 
@@ -38,18 +38,25 @@ public class BillingDomainService : IBillingDomainService
         return plans;
     }
 
-    /// <summary>判断费用配置在指定账期是否有效</summary>
+    /// <summary>判断费用配置在指定账期是否有效（按完整日期判断，不依赖 IsActive）</summary>
     private static bool IsFeeEffectiveForPeriod(ContractFeeConfig feeConfig, string period)
     {
-        // EffectiveDate 不为空且账期早于生效日期 → 跳过
-        if (feeConfig.EffectiveDate != null &&
-            string.Compare(period, feeConfig.EffectiveDate.Substring(0, 7), StringComparison.Ordinal) < 0)
-            return false;
+        var periodStart = DateOnly.Parse($"{period}-01");
+        var periodEnd = periodStart.AddDays(DateTime.DaysInMonth(periodStart.Year, periodStart.Month) - 1);
 
-        // ExpiryDate 不为空且账期晚于到期日期 → 跳过
-        if (feeConfig.ExpiryDate != null &&
-            string.Compare(period, feeConfig.ExpiryDate.Substring(0, 7), StringComparison.Ordinal) > 0)
-            return false;
+        // 账期结束日 < 生效日 → 不收费
+        if (feeConfig.EffectiveDate != null)
+        {
+            var eff = DateOnly.Parse(feeConfig.EffectiveDate);
+            if (periodEnd < eff) return false;
+        }
+
+        // 账期起始日 > 到期日 → 不收费
+        if (feeConfig.ExpiryDate != null)
+        {
+            var exp = DateOnly.Parse(feeConfig.ExpiryDate);
+            if (periodStart > exp) return false;
+        }
 
         return true;
     }

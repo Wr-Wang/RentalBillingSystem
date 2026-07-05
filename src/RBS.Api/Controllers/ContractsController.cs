@@ -138,7 +138,7 @@ public class ContractsController : ControllerBase
                 new { Id = bizDataId, ContractId = id, ContractNo = contract.ContractNo,
                     CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
                     OldAmount = contract.RentAmount.Amount, NewAmount = request.NewAmount,
-                    Reason = request.Reason ?? "", CreatedBy = userId });
+                    Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now });
 
             // 2. 提交审批
             var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
@@ -192,52 +192,60 @@ public class ContractsController : ControllerBase
         // 找审批类型
         var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_FEE_CHANGE", ct);
 
+        // 无审批配置 → 0 级直接执行
+        if (approvalType == null)
+        {
+            var effectiveDate = request.EffectiveDate.HasValue
+                ? DateOnly.FromDateTime(request.EffectiveDate.Value)
+                : (DateOnly?)null;
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Insert.ApprovalBizData.FeeAdjust"),
+                new { Id = Guid.NewGuid(), ContractId = id, ContractNo = contract.ContractNo,
+                    CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
+                    Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now,
+                    ApprovalRequestId = (Guid?)null });
+            return Ok(new { message = "费用调价已直接执行（无审批配置）" });
+        }
+
+        // 1. 先创建审批，拿到 ApprovalRequestId
+        var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+        {
+            ApprovalTypeId = approvalType.Id,
+            Title = $"合同费用调价 - {contract.ContractNo}",
+            Description = "",
+            TargetEntityId = id,
+            TargetEntityType = "ContractFeeAdjust"
+        }, ct);
+
         using var tx = await _uow.BeginTransactionAsync(ct);
         try
         {
+            // 2. 写业务数据（带 ApprovalRequestId）
             var bizDataId = Guid.NewGuid();
             var effectiveDate = request.EffectiveDate.HasValue
                 ? DateOnly.FromDateTime(request.EffectiveDate.Value)
                 : (DateOnly?)null;
 
-            // 1. 写业务数据
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Contract.Insert.ApprovalBizData.FeeAdjust"),
                 new { Id = bizDataId, ContractId = id, ContractNo = contract.ContractNo,
                     CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
-                    Reason = request.Reason ?? "", CreatedBy = userId });
+                    Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now,
+                    ApprovalRequestId = approvalResult.Id });
 
-            // 2. 写费用项明细
+            // 3. 写费用项明细（带 ApprovalRequestId）
             foreach (var item in request.Items)
             {
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Contract.Insert.ApprovalFeeItem.ForFeeAdjust"),
                     new { Id = Guid.NewGuid(), ContractId = id, item.FeeCodeId, item.FeeName,
                         OldAmount = item.OldAmount, NewAmount = item.NewAmount,
-                        BillingMode = item.BillingMode, Unit = item.Unit, CreatedBy = userId });
+                        BillingMode = item.BillingMode, Unit = item.Unit,
+                        CreatedBy = userId, CreatedAt = ChinaTime.Now,
+                        ApprovalRequestId = approvalResult.Id });
             }
 
-            // 3. 提交审批
-            if (approvalType == null)
-            {
-                // 无审批配置 → 0 级直接执行
-                await tx.CommitAsync(ct);
-                return Ok(new { message = "费用调价已直接执行（无审批配置）" });
-            }
-
-            var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
-            {
-                ApprovalTypeId = approvalType.Id,
-                Title = $"合同费用调价 - {contract.ContractNo}",
-                Description = "",
-                TargetEntityId = id,
-                TargetEntityType = "ContractFeeAdjust"
-            }, ct);
-
-            // 4. 回写
-            await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Contract.Update.ApprovalBizData.SetApprovalRequestId"),
-                new { Id = bizDataId, ApprovalRequestId = approvalResult.Id });
+            // 4. 回写 ContractId
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Contract.Update.ApprovalRequest.SetContractId"),
                 new { Id = approvalResult.Id, ContractId = id });
@@ -316,7 +324,7 @@ public class ContractsController : ControllerBase
                     TerminateType = request.TerminateType ?? "EARLY",
                     ActualEndDate = effectiveDate,
                     DepositReturn = request.DepositReturn ?? "FULL",
-                    Reason = request.Reason ?? "", CreatedBy = userId });
+                    Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now });
 
             var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
             {
@@ -369,7 +377,7 @@ public class ContractsController : ControllerBase
         await _uow.ExecuteSqlRawAsync(
             _sql.Get("Contract.Insert.ApprovalBizData.Suspend"),
             new { Id = Guid.NewGuid(), ContractId = id, ContractNo = entity.ContractNo,
-                CompanyId = entity.CompanyId, Reason = request.Reason ?? "", CreatedBy = userId });
+                CompanyId = entity.CompanyId, Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now });
 
         return Ok(new { id, status = entity.Status });
     }

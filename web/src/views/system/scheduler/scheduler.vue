@@ -4,7 +4,8 @@
     <template v-if="!selectedJob">
       <div class="page-header">
         <h2>调度任务管理</h2>
-        <el-button type="primary" size="small" v-permission="'system:schedulercreate'" @click="openCreateWizard">+ 新建任务</el-button>
+        <!-- 新建任务: 需求不明确，暂隐藏；现有模板任务由种子数据预置 -->
+        <!-- <el-button type="primary" size="small" v-permission="'system:schedulercreate'" @click="openCreateWizard">+ 新建任务</el-button> -->
       </div>
       <el-row :gutter="16">
         <el-col v-for="job in jobs" :key="job.id" :span="8" style="margin-bottom:16px;">

@@ -854,8 +854,6 @@ CREATE INDEX [IX_CollectionRecords_CreatedAt] ON [CollectionRecords] ([CreatedAt
 
 CREATE INDEX [IX_CollectionStages_CreatedAt] ON [CollectionStages] ([CreatedAt]);
 
-CREATE UNIQUE INDEX [IX_ContractFeeConfigs_ContractId_FeeCodeId] ON [ContractFeeConfigs] ([ContractId], [FeeCodeId]);
-
 CREATE INDEX [IX_ContractFeeConfigs_CreatedAt] ON [ContractFeeConfigs] ([CreatedAt]);
 
 CREATE UNIQUE INDEX [IX_Contracts_ContractNo] ON [Contracts] ([ContractNo]);

@@ -30,7 +30,7 @@ public class Notification
         ReferenceType = referenceType;
         ReferenceId = referenceId;
         IsRead = false;
-        CreatedAt = DateTime.UtcNow;
+        CreatedAt = RBS.Core.Common.ChinaTime.Now;
     }
 
     public void MarkAsRead() => IsRead = true;

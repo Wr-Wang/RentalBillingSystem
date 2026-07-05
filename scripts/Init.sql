@@ -965,6 +965,11 @@ EXEC sp_addextendedproperty 'MS_Description', N'更新IP', 'SCHEMA', 'dbo', 'TAB
 EXEC sp_addextendedproperty 'MS_Description', N'更新主机名', 'SCHEMA', 'dbo', 'TABLE', N'ContractFeeConfigs', 'COLUMN', N'UpdatedHostname';
 GO
 
+-- 删除 IX_ContractFeeConfigs_ContractId_FeeCodeId 唯一索引，改为应用层区间不交叉校验
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractFeeConfigs]') AND name=N'IX_ContractFeeConfigs_ContractId_FeeCodeId')
+    DROP INDEX [IX_ContractFeeConfigs_ContractId_FeeCodeId] ON [ContractFeeConfigs];
+GO
+
 -- ===================================================================
 -- 28. ContractFeeConfigs_Audit - 合同费用配置审计
 -- ===================================================================

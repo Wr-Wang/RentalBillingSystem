@@ -173,7 +173,10 @@ async function viewDetail(item) {
   }
 }
 
-function goToBiz(item) {
+async function goToBiz(item) {
+  if (!item.isRead) {
+    try { await store.markRead(item.id) } catch (e) { /* 静默 */ }
+  }
   const path = bizPath(item)
   if (path) router.push(path)
 }

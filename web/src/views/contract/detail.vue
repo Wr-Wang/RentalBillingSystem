@@ -65,10 +65,10 @@
               <template #default="{ row }">
                 <el-table :data="row.history" size="small" stripe v-loading="row.loadingHistory" style="margin:8px 0;">
                   <el-table-column label="金额" width="100"><template #default="{ row: h }">¥{{ (h.amount || 0).toLocaleString() }}</template></el-table-column>
-                  <el-table-column label="生效日期" width="120"><template #default="{ row: h }">{{ h.effectiveDate || '-' }}</template></el-table-column>
-                  <el-table-column label="到期日期" width="120"><template #default="{ row: h }">{{ h.expiryDate || '至今' }}</template></el-table-column>
+                  <el-table-column label="生效日期" width="120"><template #default="{ row: h }">{{ h.effectiveDate ? formatDate(h.effectiveDate) : '-' }}</template></el-table-column>
+                  <el-table-column label="到期日期" width="120"><template #default="{ row: h }">{{ h.expiryDate ? formatDate(h.expiryDate) : '至今' }}</template></el-table-column>
                   <el-table-column label="状态" width="70"><template #default="{ row: h }"><el-tag :type="h.isActive ? 'success' : 'info'" size="small">{{ h.isActive ? '生效' : '已过期' }}</el-tag></template></el-table-column>
-                  <el-table-column label="创建时间" min-width="140"><template #default="{ row: h }">{{ h.createdAt || '' }}</template></el-table-column>
+                  <el-table-column label="创建时间" min-width="140"><template #default="{ row: h }">{{ h.createdAt ? formatDate(h.createdAt) : '' }}</template></el-table-column>
                 </el-table>
                 <span v-if="!row.history?.length && !row.loadingHistory" style="color:#909399;font-size:13px;padding:8px;">暂无历史记录</span>
               </template>
@@ -86,7 +86,7 @@
             </el-table-column>
             <el-table-column label="生效期" min-width="200">
               <template #default="{ row }">
-                <span style="font-size:13px;">{{ row.effectiveDate || '-' }} ~ {{ row.expiryDate || '至今' }}</span>
+                <span style="font-size:13px;">{{ row.effectiveDate ? formatDate(row.effectiveDate) : '-' }} ~ {{ row.expiryDate ? formatDate(row.expiryDate) : '至今' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="状态" width="65" align="center">
@@ -184,9 +184,11 @@
               </template>
             </el-table-column>
             <el-table-column prop="reason" label="原因" min-width="150" show-overflow-tooltip />
-            <el-table-column prop="effectiveDate" label="生效日期" width="110" />
+            <el-table-column label="生效日期" width="110">
+              <template #default="{ row }">{{ row.effectiveDate ? formatDate(row.effectiveDate) : '-' }}</template>
+            </el-table-column>
             <el-table-column label="提交时间" width="160">
-              <template #default="{ row }">{{ row.createdAt?.split('T')[0] || '-' }}</template>
+              <template #default="{ row }">{{ row.createdAt ? formatDate(row.createdAt) : '-' }}</template>
             </el-table-column>
             <el-table-column label="操作" width="120" fixed="right">
               <template #default="{ row }">
@@ -344,7 +346,8 @@
       </el-table>
       <el-form style="margin-top: 16px;">
         <el-form-item label="生效日期">
-          <el-date-picker v-model="feeAdjustEffectiveDate" type="date" style="width: 200px;" />
+          <el-date-picker v-model="feeAdjustEffectiveDate" type="date" style="width: 200px;"
+    :disabled-date="disabledFeeDate" />
         </el-form-item>
         <el-form-item label="调价原因">
           <el-input v-model="feeAdjustReason" type="textarea" :rows="2" placeholder="必填" />
@@ -889,9 +892,27 @@ const showModifyFee = ref(false)
 const feeAdjustItems = reactive([])
 const feeAdjustEffectiveDate = ref('')
 const feeAdjustReason = ref('')
+/** 费用调价 DatePicker 最小可选日期（当前配置最早生效日 + 2天） */
+const feeAdjustMinDate = computed(() => {
+  const dates = feeConfigs.value
+    .filter(f => f.isActive && f.effectiveDate)
+    .map(f => new Date(f.effectiveDate))
+    .filter(d => !isNaN(d.getTime()))
+  if (dates.length === 0) return null
+  const min = new Date(Math.min(...dates))
+  min.setDate(min.getDate() + 2)
+  return min
+})
+function disabledFeeDate(time) {
+  if (!feeAdjustMinDate.value) return false
+  return time.getTime() < feeAdjustMinDate.value.getTime()
+}
 
 function openFeeAdjust() {
   showModifyFee.value = true
+  feeAdjustEffectiveDate.value = feeAdjustMinDate.value
+    ? feeAdjustMinDate.value.toISOString().split('T')[0]
+    : ''
   if (feeConfigs.value.length > 0) {
     feeAdjustItems.splice(0, feeAdjustItems.length, ...feeConfigs.value.map(f => ({
       feeCodeId: f.feeCodeId || '',
@@ -1284,6 +1305,34 @@ async function handleSubmitCR(row) {
 
 function showCRDetail(row) {
   ElMessage.info(`审批请求ID: ${row.approvalRequestId || '暂无'}`)
+}
+
+/** 格式化日期（仅日期）为 yyyy-MM-dd，兼容 Date 对象/时间戳/各种字符串 */
+function formatDate(d) {
+  if (!d) return ''
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10)
+  const dt = new Date(d)
+  if (!isNaN(dt.getTime())) {
+    const pad = n => String(n).padStart(2, '0')
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+  }
+  // 兜底：英文月份格式提取
+  if (typeof d === 'string') {
+    const m = d.match(/\b(\d{4})\b.*\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b.*\b(\d{1,2})\b/i)
+      || d.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b.*\b(\d{1,2})\b.*\b(\d{4})\b/i)
+    if (m) {
+      const monthMap = { Jan:'01', Feb:'02', Mar:'03', Apr:'04', May:'05', Jun:'06',
+        Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12' }
+      const year = m[1].length === 4 ? m[1] : m[3]
+      const month = monthMap[(m[1].length === 4 ? m[2] : m[1]).toLowerCase()]
+      const day = String(m[1].length === 4 ? m[3] : m[2]).padStart(2, '0')
+      if (year && month) return `${year}-${month}-${day}`
+    }
+    const fallback = d.match(/(\d{4})[^\d](\d{1,2})[^\d](\d{1,2})/)
+    if (fallback) return `${fallback[1]}-${String(fallback[2]).padStart(2,'0')}-${String(fallback[3]).padStart(2,'0')}`
+    return d.slice(0, 10)
+  }
+  return ''
 }
 </script>
 <style scoped>

@@ -534,6 +534,30 @@
       @IsHist, @Due, 'Published', GETUTCDATE(), @TaskLogId, @CBy, GETUTCDATE())]]>
   </insert>
 
+  <update id="Approval.Update.Request.ToApproved">
+    <![CDATA[UPDATE ApprovalRequests SET Status = 'Approved',
+      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+  </update>
+  <update id="Approval.Update.Request.AdvanceLevel">
+    <![CDATA[UPDATE ApprovalRequests SET CurrentLevel = CurrentLevel + 1,
+      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+  </update>
+  <update id="Approval.Update.Request.ToRejected">
+    <![CDATA[UPDATE ApprovalRequests SET Status = 'Rejected',
+      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+  </update>
+  <update id="Approval.Update.Request.ToCancelled">
+    <![CDATA[UPDATE ApprovalRequests SET Status = 'Cancelled',
+      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+  </update>
+  <update id="Approval.Update.ImportBatch.Cancelled">
+    <![CDATA[UPDATE ImportBatches SET Status = 'Cancelled',
+      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'PendingApproval']]>
+  </update>
+  <update id="Approval.Update.RenewalRequest.ToRejected">
+    <![CDATA[UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = GETUTCDATE()
+      WHERE Id = @Id AND Status = 'PendingApproval']]>
+  </update>
   <update id="Approval.Update.Request.SetStatus">
     <![CDATA[UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id]]>
   </update>
@@ -591,7 +615,7 @@
   </insert>
   <insert id="Contract.Insert.ApprovalBizData.FeeAdjust">
     <![CDATA[INSERT INTO ApprovalBizData (Id, ApprovalRequestId, ContractId, ContractNo, CompanyId, ChangeType, EffectiveDate, Reason, IsProcessed, CreatedBy, CreatedAt)
-      VALUES (@Id, NULL, @ContractId, @ContractNo, @CompanyId, 'FEE_ADJUST', @EffectiveDate, @Reason, 0, @CreatedBy, @CreatedAt)]]>
+      VALUES (@Id, @ApprovalRequestId, @ContractId, @ContractNo, @CompanyId, 'FEE_ADJUST', @EffectiveDate, @Reason, 0, @CreatedBy, @CreatedAt)]]>
   </insert>
   <insert id="Contract.Insert.ApprovalBizData.Terminate">
     <![CDATA[INSERT INTO ApprovalBizData (Id, ApprovalRequestId, ContractId, ContractNo, CompanyId, ChangeType, ActualEndDate, Reason, TerminateType, DepositReturn, IsProcessed, CreatedBy, CreatedAt)
@@ -603,7 +627,7 @@
   </insert>
   <insert id="Contract.Insert.ApprovalFeeItem.ForFeeAdjust">
     <![CDATA[INSERT INTO ApprovalFeeItems (Id, ApprovalRequestId, ContractId, FeeCodeId, FeeName, OldAmount, NewAmount, BillingMode, Unit, CreatedBy, CreatedAt)
-      VALUES (@Id, NULL, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @CreatedBy, @CreatedAt)]]>
+      VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="Contract.Update.ApprovalRequest.SetContractId">
     <![CDATA[UPDATE ApprovalRequests SET ContractId = @ContractId WHERE Id = @Id]]>
@@ -637,6 +661,11 @@
   </update>
   <select id="Lease.Select.ContractFeeConfig.ActiveByContract">
     <![CDATA[SELECT FeeCodeId, BillingMode, Amount, Unit, UnitPrice FROM ContractFeeConfigs WHERE ContractId = @Id AND IsActive = 1]]>
+  </select>
+  <select id="Lease.Select.Contract.DetailMulti">
+    <![CDATA[SELECT c.*, r.FullCode AS RoomFullCode FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
+SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id;
+SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id]]>
   </select>
   <insert id="Lease.Insert.ContractFeeConfig.CopyFromRenewal">
     <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt)
@@ -776,9 +805,16 @@
             WHERE Id=@Id]]>
   </update>
   <select id="Lease.Select.ContractFeeConfig.CurrentByContractAndFee">
-    <![CDATA[SELECT Id FROM ContractFeeConfigs
+    <![CDATA[SELECT Id, EffectiveDate FROM ContractFeeConfigs
             WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
               AND ExpiryDate IS NULL AND IsActive=1]]>
+  </select>
+  <select id="Lease.Select.ContractFeeConfig.CheckOverlap">
+    <![CDATA[SELECT COUNT(1) FROM ContractFeeConfigs
+            WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
+              AND (@ExcludeId IS NULL OR Id != @ExcludeId)
+              AND @EffectiveDate < COALESCE(ExpiryDate, '9999-12-31')
+              AND EffectiveDate < COALESCE(@ExpiryDate, '9999-12-31')]]>
   </select>
   <update id="Lease.Update.ContractFeeConfig.ExpiryDate">
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate=@ExpiryDate WHERE Id=@Id]]>
@@ -831,8 +867,24 @@
     <![CDATA[DELETE FROM ApiLogs WHERE Id = @Id]]>
   </delete>
 
+  <select id="Receivable.Select.Plan.ByContractId">
+    <![CDATA[SELECT * FROM ReceivablePlans WHERE ContractId=@Id ORDER BY Period]]>
+  </select>
+  <select id="Receivable.Select.Plan.ByContractPeriodFee">
+    <![CDATA[SELECT * FROM ReceivablePlans WHERE ContractId=@Id AND Period=@P AND FeeCodeId=@F]]>
+  </select>
   <select id="Receivable.Select.Plan.Overdue">
     <![CDATA[SELECT * FROM ReceivablePlans WHERE Status='Pending' AND DueDate < CAST(GETDATE() AS DATE)]]>
+  </select>
+  <select id="Receivable.Select.Plan.OverdueDetail">
+    <![CDATA[SELECT p.*, c.ContractNo, t.Name AS TenantName, h.FullCode AS RoomFullCode
+      FROM ReceivablePlans p
+      JOIN Contracts c ON c.Id = p.ContractId
+      LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
+      LEFT JOIN Tenants t ON t.Id = ct.TenantId
+      LEFT JOIN HousingUnits h ON h.Id = c.RoomId
+      WHERE p.Status IN ('Pending','Partial') AND p.DueDate < CAST(GETDATE() AS DATE)
+      ORDER BY p.DueDate]]>
   </select>
   <select id="Accounting.Select.Voucher.List">
     <![CDATA[SELECT * FROM [Vouchers] WHERE (@StartDate IS NULL OR [VoucherDate] >= @StartDate)
@@ -844,6 +896,13 @@
       FROM [JournalEntries] je
       LEFT JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
       WHERE je.[VoucherId] = @Id ORDER BY je.[CreatedAt]]]>
+  </select>
+  <select id="Accounting.Select.JournalEntry.List">
+    <![CDATA[SELECT je.*, v.VoucherNo, s.Name AS AccountingSubjectName
+      FROM [JournalEntries] je
+      JOIN [Vouchers] v ON v.Id = je.VoucherId
+      JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
+      ORDER BY je.[CreatedAt] DESC]]>
   </select>
   <select id="Lease.Select.Contract.ByContractNo">
     <![CDATA[SELECT * FROM Contracts WHERE ContractNo=@No]]>

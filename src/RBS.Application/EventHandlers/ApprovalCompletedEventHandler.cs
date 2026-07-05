@@ -23,6 +23,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly IUnitOfWork _uow;
     private readonly INotificationService _notificationService;
     private readonly ISqlLoader _sql;
+    private readonly IDbConnectionFactory _db;
 
     public ApprovalCompletedEventHandler(
         IImportService importService,
@@ -31,7 +32,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         IContractDomainService contractDomainService,
         IUnitOfWork uow,
         INotificationService notificationService,
-        ISqlLoader sql)
+        ISqlLoader sql,
+        IDbConnectionFactory db)
     {
         _importService = importService;
         _contractService = contractService;
@@ -40,6 +42,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _uow = uow;
         _notificationService = notificationService;
         _sql = sql;
+        _db = db;
     }
 
     public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
@@ -181,17 +184,22 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             var effDateStr = effectiveDate?.ToString("yyyy-MM-dd") ?? "";
             if (!string.IsNullOrEmpty(effDateStr))
             {
+                // 区间不交叉校验（排除当前配置自身）
+                await EnsureNoOverlappingFeeConfigAsync(contract.Id, rentFeeConfig.FeeCodeId,
+                    effDateStr, null, rentFeeConfig.Id, ct);
+
                 var expiryDate = DateOnly.Parse(effDateStr).AddDays(-1).ToString("yyyy-MM-dd");
                 rentFeeConfig.ExpireOn(expiryDate);
 
                 // 旧配置到期 + 新配置
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
-                    new object[] { expiryDate, rentFeeConfig.Id }, ct);
+                    new { ExpiryDate = expiryDate, Id = rentFeeConfig.Id }, ct);
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
-                    new object[] { Guid.NewGuid(), contract.Id, rentFeeConfig.FeeCodeId, "FixedAmount",
-                        newAmount, effDateStr, contract.CreatedBy, ChinaTime.Now }, ct);
+                    new { Id = Guid.NewGuid(), ContractId = contract.Id, FeeCodeId = rentFeeConfig.FeeCodeId,
+                        BillingMode = "FixedAmount", Amount = newAmount,
+                        EffectiveDate = effDateStr, CreatedBy = contract.CreatedBy, Now = ChinaTime.Now }, ct);
             }
         }
 
@@ -218,10 +226,12 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
         foreach (var item in feeItems)
         {
-            // 旧配置到期
+            // 先到期旧配置，再校验区间不交叉（防止异常数据）
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
                 new { ExpiryDate = expiryDate, ContractId = item.ContractId, FeeCodeId = item.FeeCodeId });
+            await EnsureNoOverlappingFeeConfigAsync(item.ContractId, item.FeeCodeId,
+                effectiveDate, null, null, ct);
 
             if (item.BillingMode == "MeterBased")
             {
@@ -234,11 +244,12 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             }
             else
             {
-                // 固定金额：调 Amount
+                // 固定金额：调 Amount（用匿名类型传命名参数，匹配 SQL 中的 @Id/@ContractId 等）
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
-                    new object[] { Guid.NewGuid(), item.ContractId, item.FeeCodeId, "FixedAmount",
-                        item.NewAmount, effectiveDate, userId, ChinaTime.Now }, ct);
+                    new { Id = Guid.NewGuid(), ContractId = item.ContractId, FeeCodeId = item.FeeCodeId,
+                        BillingMode = "FixedAmount", Amount = item.NewAmount,
+                        EffectiveDate = effectiveDate, CreatedBy = userId, Now = ChinaTime.Now }, ct);
             }
         }
 
@@ -272,7 +283,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             {
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Approval.Update.RenewalRequest.ToRejected"),
-                    new object[] { renewal.Id }, ct);
+                    new { Id = renewal.Id }, ct);
             }
         }
     }
@@ -328,7 +339,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     if (item.TargetId.HasValue && item.NewValueDecimal.HasValue)
                     {
                         var expiryStr = changeRequest.EffectiveDate?.ToString("yyyy-MM-dd") ??
-                            DateTime.UtcNow.ToString("yyyy-MM-dd");
+                            ChinaTime.Now.ToString("yyyy-MM-dd");
                         await _uow.ExecuteSqlRawAsync(
                             _sql.Get("Approval.Update.ContractFeeConfig.ExpireById"),
                             new object[] { expiryStr, item.TargetId.Value }, ct);
@@ -366,5 +377,17 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-    // 需要 using RBS.Core.Entities.Contract — 已通过 namespace 引用
+    /// <summary>校验费用配置区间不交叉（同合同+同费用项目，生效/到期日期不可重叠）</summary>
+    private async Task EnsureNoOverlappingFeeConfigAsync(
+        Guid contractId, Guid feeCodeId, string effectiveDate, string? expiryDate, Guid? excludeId, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var overlap = await Dapper.SqlMapper.QuerySingleAsync<int>(conn,
+            _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+            new { ContractId = contractId, FeeCodeId = feeCodeId,
+                EffectiveDate = effectiveDate, ExpiryDate = expiryDate, ExcludeId = excludeId });
+        if (overlap > 0)
+            throw new InvalidOperationException("费用配置生效日期区间存在交叉，请调整生效日期");
+    }
 }

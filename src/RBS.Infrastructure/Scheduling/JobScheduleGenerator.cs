@@ -58,7 +58,7 @@ public class JobScheduleGenerator : BackgroundService
                 var nextRun = GetNextRunTime(s, now);
                 if (nextRun == null || nextRun > windowEnd) continue;
 
-                var nr = nextRun.Value; var targetMonth = $"{nr.Year}-{nr.Month:D2}";
+                var nr = nextRun!.Value; var targetMonth = $"{nr.Year}-{nr.Month:D2}";
 
                 var exists = await conn.QuerySingleAsync<int>(
                     "SELECT COUNT(1) FROM JobScheduleExecutions WHERE JobScheduleId = @Id AND Month = @Month",

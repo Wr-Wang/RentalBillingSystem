@@ -120,7 +120,7 @@
         <el-descriptions-item label="合同号">{{ modifyFeeTarget?.contractNo }}</el-descriptions-item>
         <el-descriptions-item label="租客">{{ modifyFeeTarget?.tenantName }}</el-descriptions-item>
       </el-descriptions>
-      <el-table :data="modifyFeeForm.items" stripe>
+      <el-table :data="modifyFeeForm.items" stripe v-loading="feeConfigLoading">
         <el-table-column prop="feeName" label="收费项目" width="110" />
         <el-table-column prop="chargeMethod" label="计费方式" width="90" />
         <el-table-column label="当前价格" width="110">
@@ -142,7 +142,8 @@
       </el-table>
       <el-form style="margin-top: 12px;">
         <el-form-item label="生效日期">
-          <el-date-picker v-model="modifyFeeForm.effectiveDate" type="date" />
+          <el-date-picker v-model="modifyFeeForm.effectiveDate" type="date"
+            :disabled-date="disabledFeeDate" />
         </el-form-item>
         <el-form-item label="调价原因">
           <el-input v-model="modifyFeeForm.reason" type="textarea" :rows="2" />
@@ -150,7 +151,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showModifyFeeDialog = false">取消</el-button>
-        <el-button type="primary" @click="submitModifyFee">提交审批</el-button>
+        <el-button type="primary" :loading="submittingFee" @click="submitModifyFee">提交审批</el-button>
       </template>
     </el-dialog>
 
@@ -197,7 +198,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal } from '@/api/index.js'
+import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, rentAdjust, feeAdjust, getContractFeeConfigs } from '@/api/index.js'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
@@ -399,23 +400,15 @@ async function submitModifyRent() {
     return
   }
 
-  const approvalTypeId = await ensureContractModifyTypeId()
-  if (!approvalTypeId) {
-    ElMessage.error('未找到合同租金调整审批类型配置，请联系管理员')
-    return
-  }
-
   submittingRent.value = true
   try {
     const diff = modifyRentForm.newRentAmount - (modifyRentTarget.value?.rentAmount || 0)
     const approvalLevel = Math.abs(diff) > 5000 ? '2级(部门经理)' : '1级(运营主管)'
 
-    await submitApproval({
-      approvalTypeId: approvalTypeId,
-      title: `合同租金调整 - ${modifyRentTarget.value?.contractNo}`,
-      description: `月租金 ¥${modifyRentTarget.value?.rentAmount?.toLocaleString()} → ¥${modifyRentForm.newRentAmount.toLocaleString()}，差额：${diff >= 0 ? '+' : ''}¥${diff.toLocaleString()}，生效日期：${modifyRentForm.effectiveDate || '未指定'}，调整原因：${modifyRentForm.reason}`,
-      targetEntityId: toGuidId(modifyRentTarget.value?.id),
-      targetEntityType: 'Contract'
+    await rentAdjust(toGuidId(modifyRentTarget.value?.id), {
+      newAmount: modifyRentForm.newRentAmount,
+      effectiveDate: modifyRentForm.effectiveDate || null,
+      reason: modifyRentForm.reason
     })
 
     ElMessage.success(`租金调整申请已提交${approvalLevel}审批，等待审批人处理`)
@@ -426,29 +419,100 @@ async function submitModifyRent() {
     submittingRent.value = false
   }
 }
-
 // === Modify Fee ===
-function showModifyFee(row) {
+const feeConfigLoading = ref(false)
+const submittingFee = ref(false)
+const feeMinDate = ref(null)
+function disabledFeeDate(time) {
+  if (!feeMinDate.value) return false
+  return time.getTime() < feeMinDate.value.getTime()
+}
+async function showModifyFee(row) {
   modifyFeeTarget.value = row
-  // 构造调价表单初始数据
-  modifyFeeForm.items = [
-    { feeName: '房租费', chargeMethod: '固定金额', oldPrice: '¥' + row.rentAmount.toLocaleString(), oldPriceVal: row.rentAmount, newPrice: row.rentAmount },
-    { feeName: '水费', chargeMethod: '按表计量', oldPrice: '6.00 元/吨', oldPriceVal: 6.00, newPrice: 6.00 },
-    { feeName: '电费', chargeMethod: '按表计量', oldPrice: '0.80 元/度', oldPriceVal: 0.80, newPrice: 0.80 },
-    { feeName: '管理费', chargeMethod: '固定金额', oldPrice: '¥150', oldPriceVal: 150, newPrice: 150 },
-    { feeName: '网费', chargeMethod: '固定金额', oldPrice: '¥80', oldPriceVal: 80, newPrice: 80 }
-  ]
   modifyFeeForm.effectiveDate = ''
   modifyFeeForm.reason = ''
+  modifyFeeForm.items = []
   showModifyFeeDialog.value = true
+
+  feeConfigLoading.value = true
+  try {
+    const configs = await getContractFeeConfigs(toGuidId(row.id))
+    if (Array.isArray(configs) && configs.length > 0) {
+      // 计算 DatePicker 最小可选日期（最早生效日 + 2天）
+      const dates = configs
+        .filter(f => f.isActive && f.effectiveDate)
+        .map(f => new Date(f.effectiveDate))
+        .filter(d => !isNaN(d.getTime()))
+      if (dates.length > 0) {
+        const min = new Date(Math.min(...dates))
+        min.setDate(min.getDate() + 2)
+        feeMinDate.value = min
+        modifyFeeForm.effectiveDate = min.toISOString().split('T')[0]
+      }
+      modifyFeeForm.items = configs.map(f => {
+        const amount = typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0
+        const isMeter = f.billingMode === 'MeterBased'
+        const priceLabel = isMeter
+          ? `${amount.toFixed(2)} 元/${f.unit || '吨'}`
+          : `¥${amount.toLocaleString()}`
+        return {
+          feeCodeId: f.feeCodeId || '',
+          feeName: f.feeCodeName || f.feeName || '',
+          chargeMethod: isMeter ? '按表计量' : '固定金额',
+          oldPrice: priceLabel,
+          oldPriceVal: amount,
+          newPrice: amount,
+          unit: f.unit || ''
+        }
+      })
+    } else {
+      ElMessage.warning('该合同暂无费用配置，请先在合同详情页添加费用项目')
+    }
+  } catch {
+    ElMessage.error('获取费用配置失败')
+  }
+  feeConfigLoading.value = false
 }
-function submitModifyFee() {
+async function submitModifyFee() {
   if (!modifyFeeForm.reason) {
     ElMessage.warning('请填写调价原因')
     return
   }
-  ElMessage.success('费用调价申请已提交运营主管审批')
-  showModifyFeeDialog.value = false
+  if (!modifyFeeForm.effectiveDate) {
+    ElMessage.warning('请选择生效日期')
+    return
+  }
+
+  const changedItems = modifyFeeForm.items.filter(item => item.newPrice !== item.oldPriceVal)
+  if (changedItems.length === 0) {
+    ElMessage.warning('没有费用项目价格发生变化')
+    return
+  }
+
+  submittingFee.value = true
+  try {
+    const items = changedItems.map(i => ({
+      feeCodeId: i.feeCodeId || '00000000-0000-0000-0000-000000000000',
+      feeName: i.feeName,
+      oldAmount: i.oldPriceVal || 0,
+      newAmount: i.newPrice,
+      billingMode: i.chargeMethod === '按表计量' ? 'MeterBased' : 'FixedAmount',
+      unit: i.unit || ''
+    }))
+
+    const res = await feeAdjust(toGuidId(modifyFeeTarget.value?.id), {
+      effectiveDate: modifyFeeForm.effectiveDate || null,
+      reason: modifyFeeForm.reason,
+      items
+    })
+
+    ElMessage.success(res?.message || '费用调价申请已提交审批')
+    showModifyFeeDialog.value = false
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || e?.message || '提交审批失败，请重试')
+  } finally {
+    submittingFee.value = false
+  }
 }
 
 // === Renew ===

@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
 
@@ -38,6 +39,16 @@ public class ContractFeeConfigsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateFeeConfigRequest request, CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
+
+        // 区间不交叉校验
+        var overlap = await conn.QuerySingleAsync<int>(
+            _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+            new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                ExpiryDate = (string?)null, ExcludeId = (Guid?)null });
+        if (overlap > 0)
+            return Conflict(new { error = "该费用项目在生效日期范围内已存在配置，请调整生效日期" });
+
         var id = Guid.NewGuid();
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
             new
@@ -45,8 +56,8 @@ public class ContractFeeConfigsController : ControllerBase
                 Id = id, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
                 BillingMode = request.BillingMode ?? "FixedAmount",
                 Amount = request.Amount, Unit = request.Unit, UnitPrice = request.UnitPrice,
-                EffectiveDate = request.EffectiveDate ?? DateTime.UtcNow.ToString("yyyy-MM-dd"),
-                CreatedBy = _currentUser.UserId, Now = DateTime.UtcNow
+                EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                CreatedBy = _currentUser.UserId, Now = ChinaTime.Now
             });
         return Ok(new { id });
     }
@@ -65,17 +76,39 @@ public class ContractFeeConfigsController : ControllerBase
     {
         using var conn = _db.CreateConnection(); conn.Open();
 
-        // 查找当前生效记录
+        // 查找当前生效记录（含生效日用于校验）
         var current = await conn.QuerySingleOrDefaultAsync(
             _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
             new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId });
 
-        // 存在则设到期
+        // 生效日校验：新生效日必须 >= 原生效日 + 2天，确保原配置至少有2天有效期，防止 Eff==Exp
+        if (current != null)
+        {
+            var curEff = (DateTime)((dynamic)current).EffectiveDate;
+            var minEffDate = curEff.AddDays(2);
+            var newEff = DateOnly.FromDateTime(DateTime.Parse(request.EffectiveDate));
+            if (newEff < DateOnly.FromDateTime(minEffDate))
+                return BadRequest(new { error = $"生效日期不能早于 {minEffDate:yyyy-MM-dd}（原生效日 {curEff:yyyy-MM-dd} + 2天）" });
+        }
+
+        // 区间不交叉校验（排除当前生效记录自身）
+        var overlap = await conn.QuerySingleAsync<int>(
+            _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+            new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                EffectiveDate = request.EffectiveDate, ExpiryDate = (string?)null,
+                ExcludeId = current != null ? (Guid)((dynamic)current).Id : (Guid?)null });
+        if (overlap > 0)
+            return Conflict(new { error = "该费用项目在新生效日期范围内已存在配置，请调整生效日期" });
+
+        // 存在则设为到期 + 停用
         if (current != null)
         {
             var expiryDate = DateTime.Parse(request.EffectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
             await conn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
                 new { Id = (Guid)((dynamic)current).Id, ExpiryDate = expiryDate });
+            await conn.ExecuteAsync(
+                _sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
+                new { ExpiryDate = expiryDate, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId });
         }
 
         // 创建新记录
@@ -86,7 +119,7 @@ public class ContractFeeConfigsController : ControllerBase
                 Id = newId, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
                 BillingMode = "FixedAmount", Amount = request.NewAmount,
                 EffectiveDate = request.EffectiveDate,
-                CreatedBy = _currentUser.UserId, Now = DateTime.UtcNow
+                CreatedBy = _currentUser.UserId, Now = ChinaTime.Now
             });
 
         return Ok(new { id = newId, message = "调价成功" });
