@@ -313,12 +313,6 @@ public class RenewalService : IRenewalService
             if (affected == 0)
                 throw new InvalidOperationException("原合同状态已被修改，续签执行失败");
 
-            // 2.5 原合同费用配置到期
-            var oldEndDate = oldContract.EndDate.ToString("yyyy-MM-dd");
-            await conn.ExecuteAsync(
-                _sql.Get("Lease.Update.ContractFeeConfig.ExpireByOldContract"),
-                new { p0 = oldEndDate, p1 = renewal.OldContractId }, tx);
-
             // 3. 创建新合同
             var depositAmount = renewal.DepositHandling == "TRANSFER"
                 ? renewal.OldDepositAmount
@@ -366,6 +360,12 @@ public class RenewalService : IRenewalService
                     new { Id = Guid.NewGuid(), ContractId = newId, f.FeeCodeId, f.BillingMode, f.Amount, f.Unit, f.UnitPrice,
                         EffectiveDate = startDate.ToString("yyyy-MM-dd"), CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
             }
+
+            // 4.5 原合同费用配置到期（在复制之后执行，避免 SELECT 查不到数据）
+            var oldEndDate = oldContract.EndDate.ToString("yyyy-MM-dd");
+            await conn.ExecuteAsync(
+                _sql.Get("Lease.Update.ContractFeeConfig.ExpireByOldContract"),
+                new { p0 = oldEndDate, p1 = renewal.OldContractId }, tx);
 
             // 5. 押金处理
             if (renewal.DepositHandling == "TRANSFER")
