@@ -31,6 +31,9 @@
       <el-table-column prop="rentAmount" label="月租金" width="100">
         <template #default="{ row }">¥{{ row.rentAmount?.toLocaleString() }}</template>
       </el-table-column>
+      <el-table-column prop="depositAmount" label="押金" width="100">
+        <template #default="{ row }">¥{{ (row.depositAmount || 0).toLocaleString() }}</template>
+      </el-table-column>
       <el-table-column prop="startDate" label="起租" width="95" />
       <el-table-column prop="endDate" label="到期" width="95" />
       <el-table-column prop="status" label="状态" width="95">
@@ -91,6 +94,7 @@
         <el-descriptions :column="2" border style="margin-bottom: 16px;">
           <el-descriptions-item label="合同号">{{ modifyRentTarget?.contractNo }}</el-descriptions-item>
           <el-descriptions-item label="当前月租">¥{{ modifyRentTarget?.rentAmount?.toLocaleString() }}</el-descriptions-item>
+        <el-descriptions-item label="当前生效日">{{ modifyRentTarget?.rentEffDate || '-' }}</el-descriptions-item>
         </el-descriptions>
         <el-form-item label="新租金 (元/月)">
           <el-input-number v-model="modifyRentForm.newRentAmount" :min="0" :precision="2" style="width: 200px;" />
@@ -114,24 +118,24 @@
     </el-dialog>
 
     <!-- Modify Fee Dialog -->
-    <el-dialog v-model="showModifyFeeDialog" :draggable="true" title="合同费用调价" width="600px">
+    <el-dialog v-model="showModifyFeeDialog" :draggable="true" title="合同费用调价" width="820px">
       <el-alert title="费用中途调价需要运营主管审批。" type="info" show-icon :closable="false" style="margin-bottom: 16px;" />
       <el-descriptions :column="2" border style="margin-bottom: 16px;">
         <el-descriptions-item label="合同号">{{ modifyFeeTarget?.contractNo }}</el-descriptions-item>
         <el-descriptions-item label="租客">{{ modifyFeeTarget?.tenantName }}</el-descriptions-item>
       </el-descriptions>
       <el-table :data="modifyFeeForm.items" stripe v-loading="feeConfigLoading">
-        <el-table-column prop="feeName" label="收费项目" width="110" />
-        <el-table-column prop="chargeMethod" label="计费方式" width="90" />
-        <el-table-column label="当前价格" width="110">
+        <el-table-column prop="feeName" label="收费项目" width="130" />
+        <el-table-column prop="chargeMethod" label="计费方式" width="100" />
+        <el-table-column label="当前价格" width="130">
           <template #default="{ row }">{{ row.oldPrice }}</template>
         </el-table-column>
-        <el-table-column label="生效日期" width="130">
+        <el-table-column label="生效日期" width="160">
           <template #default="{ row }">
             <el-date-picker v-model="row.effectiveDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:115px" :disabled-date="d => row._minDate && d.getTime() < row._minDate.getTime()" />
           </template>
         </el-table-column>
-        <el-table-column label="新价格" width="120">
+        <el-table-column label="新价格" width="140">
           <template #default="{ row }">
             <el-input-number v-model="row.newPrice" :min="0" :precision="row.chargeMethod === '按表计量' ? 4 : 2" size="small" style="width: 100px;" />
           </template>
@@ -183,6 +187,20 @@
         <el-form-item v-if="renewForm.depositHandling === 'NEW'" label="新押金金额">
           <el-input-number v-model="renewForm.newDeposit" :min="0" :precision="2" style="width: 200px;" />
         </el-form-item>
+        <!-- 押金处理摘要 -->
+        <el-form-item label=" ">
+          <div v-if="renewForm.depositHandling === 'NEW'" style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
+            <div>押金：¥{{ (renewTarget?.depositAmount || 0).toFixed(2) }} → ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}
+              <span v-if="renewForm.newDeposit > (renewTarget?.depositAmount || 0)" style="color:#e6a23c;">（上调 ¥{{ (renewForm.newDeposit - (renewTarget?.depositAmount || 0)).toFixed(2) }}）</span>
+              <span v-else-if="renewForm.newDeposit < (renewTarget?.depositAmount || 0)" style="color:#67c23a;">（下调 ¥{{ ((renewTarget?.depositAmount || 0) - renewForm.newDeposit).toFixed(2) }}）</span>
+            </div>
+            <div style="color:#909399;">操作：退还旧押金 ¥{{ (renewTarget?.depositAmount || 0).toFixed(2) }} + 收取新押金 ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}</div>
+          </div>
+          <div v-else style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
+            <div>押金：原押金 ¥{{ (renewTarget?.depositAmount || 0).toFixed(2) }} 延续至新合同</div>
+            <div style="color:#909399;">说明：旧合同押金转出 → 新合同押金转入</div>
+          </div>
+        </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="renewForm.remark" type="textarea" :rows="2" />
         </el-form-item>
@@ -199,7 +217,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, rentAdjust, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory } from '@/api/index.js'
+import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, rentAdjust, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory, handleApiError } from '@/api/index.js'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
@@ -415,7 +433,7 @@ async function submitModifyRent() {
     ElMessage.success(`租金调整申请已提交${approvalLevel}审批，等待审批人处理`)
     showModifyRentDialog.value = false
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || e?.message || '提交审批失败，请重试')
+    handleApiError(e, '提交审批失败')
   } finally {
     submittingRent.value = false
   }
@@ -478,7 +496,7 @@ async function showModifyFee(row) {
       ElMessage.warning('该合同暂无费用配置，请先在合同详情页添加费用项目')
     }
   } catch {
-    ElMessage.error('获取费用配置失败')
+    handleApiError(new Error(), '获取费用配置失败')
   }
   feeConfigLoading.value = false
 }
@@ -543,7 +561,7 @@ async function submitModifyFee() {
     ElMessage.success(res?.message || '费用调价申请已提交审批')
     showModifyFeeDialog.value = false
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || e?.message || '提交审批失败，请重试')
+    handleApiError(e, '提交审批失败')
   } finally {
     submittingFee.value = false
   }
@@ -558,7 +576,7 @@ async function handleRenew(row) {
   renewTarget.value = row
   renewForm.rentAmount = row.rentAmount
   renewForm.depositHandling = 'TRANSFER'
-  renewForm.newDeposit = row.depositAmount || 0
+  renewForm.newDeposit = (row.depositAmount || 0) + 20
   renewForm.remark = ''
   // 有被驳回的续签 → 预填上次数据
   renewFromRejected.value = false

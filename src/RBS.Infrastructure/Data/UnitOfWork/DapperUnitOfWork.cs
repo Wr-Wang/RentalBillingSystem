@@ -68,7 +68,6 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IMeterReadingRepository MeterReadings => _meterReadings ??= new DapperMeterReadingRepository(_db, _sql, _auditWriter, this);
     public IContractRepository Contracts => _contracts ??= new DapperContractRepository(_db, _sql, _auditWriter, this);
     public IRenewalRequestRepository RenewalRequests => _renewalRequests ??= new DapperRenewalRequestRepository(_db, _sql, _auditWriter, this);
-    public IRepository<ChangeRequest> ChangeRequests => _changeRequests ??= new DapperRepository<ChangeRequest>(_db, _auditWriter, tracker: this);
     public IApprovalBizDataRepository ApprovalBizData => _approvalBizData ??= new DapperApprovalBizDataRepository(_db, _sql, _auditWriter, this);
     public IApprovalFeeItemRepository ApprovalFeeItems => _approvalFeeItems ??= new DapperApprovalFeeItemRepository(_db, _sql, _auditWriter, this);
 
@@ -110,7 +109,6 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IMeterReadingRepository? _meterReadings;
     private IContractRepository? _contracts;
     private IRenewalRequestRepository? _renewalRequests;
-    private IRepository<ChangeRequest>? _changeRequests;
     private IApprovalBizDataRepository? _approvalBizData;
     private IApprovalFeeItemRepository? _approvalFeeItems;
 
@@ -330,6 +328,9 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private static bool IsNavProp(System.Reflection.PropertyInfo p)
     {
         var t = p.PropertyType;
+        // 可空值类型 Nullable<T> 不是导航属性，应参与 INSERT/UPDATE
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
+            return false;
         return t == typeof(System.Collections.IList) || t.IsGenericType ||
                p.Name is "DomainEvents" or "RowVersion" or "Records" or "Roles";
     }

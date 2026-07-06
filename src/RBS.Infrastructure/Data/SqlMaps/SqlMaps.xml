@@ -15,6 +15,9 @@
   <select id="Identity.Select.User.ById">
     <![CDATA[SELECT * FROM Users WHERE Id=@Id]]>
   </select>
+  <select id="Identity.Select.User.DisplayName">
+    <![CDATA[SELECT DisplayName FROM Users WHERE Id=@Id]]>
+  </select>
   <select id="Identity.Select.User.All">
     <![CDATA[SELECT * FROM Users]]>
   </select>
@@ -596,6 +599,9 @@
   <update id="Approval.Update.Request.SetStatus">
     <![CDATA[UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id]]>
   </update>
+  <update id="Approval.Update.Request.RollbackToPending">
+    <![CDATA[UPDATE ApprovalRequests SET Status = 'Pending', UpdatedBy = @UpdatedBy, UpdatedAt = GETUTCDATE() WHERE Id = @Id AND Status = 'Approved']]>
+  </update>
   <update id="Approval.Update.ContractFeeConfig.ExpireById">
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0, UpdatedAt = GETUTCDATE() WHERE Id = @p1 AND IsActive = 1]]>
   </update>
@@ -664,6 +670,18 @@
     <![CDATA[INSERT INTO ApprovalFeeItems (Id, ApprovalRequestId, ContractId, FeeCodeId, FeeName, OldAmount, NewAmount, BillingMode, Unit, EffectiveDate, CreatedBy, CreatedAt)
       VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
   </insert>
+  <insert id="Contract.Insert.ChangeHistory.Default">
+    <![CDATA[INSERT INTO ChangeHistory (Id, ContractId, ChangeType, Title, Detail, OldValue, NewValue, EffectiveDate, OperatorId, OperatorName, CreatedAt)
+      VALUES (@Id, @ContractId, @ChangeType, @Title, @Detail, @OldValue, @NewValue, @EffectiveDate, @OperatorId, @OperatorName, GETUTCDATE())]]>
+  </insert>
+  <select id="Contract.Select.ChangeHistory.ByContract">
+    <![CDATA[SELECT
+           Id AS id, ContractId AS contractId, ChangeType AS changeType, Title AS title, Detail AS detail,
+           OldValue AS oldValue, NewValue AS newValue,
+           CONVERT(varchar, EffectiveDate, 23) AS effectiveDate, OperatorId AS operatorId,
+           OperatorName AS operatorName, CreatedAt AS createdAt
+      FROM ChangeHistory WHERE ContractId = @ContractId ORDER BY CreatedAt DESC]]>
+  </select>
   <update id="Contract.Update.ApprovalRequest.SetContractId">
     <![CDATA[UPDATE ApprovalRequests SET ContractId = @ContractId WHERE Id = @Id]]>
   </update>

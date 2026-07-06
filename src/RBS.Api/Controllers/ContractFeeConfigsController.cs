@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,7 +48,7 @@ public class ContractFeeConfigsController : ControllerBase
                 EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                 ExpiryDate = (string?)null, ExcludeId = (Guid?)null });
         if (overlap > 0)
-            return Conflict(new { error = "该费用项目在生效日期范围内已存在配置，请调整生效日期" });
+            return Conflict(new { code = "FEE_CONFIG_OVERLAP", message = "该费用项目在生效日期范围内已存在配置，请调整生效日期" });
 
         var id = Guid.NewGuid();
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
@@ -87,7 +88,7 @@ public class ContractFeeConfigsController : ControllerBase
             var curEff = (DateTime)((dynamic)current).EffectiveDate;
             var newEff = DateOnly.Parse(request.EffectiveDate);
             if (newEff <= DateOnly.FromDateTime(curEff))
-                return BadRequest(new { error = $"生效日期必须晚于当前配置的生效日期 {curEff:yyyy-MM-dd}" });
+                return BadRequest(new { code = "EFF_DATE_BEFORE_CURRENT", message = $"生效日期必须晚于当前配置的生效日期 {curEff:yyyy-MM-dd}" });
         }
 
         // 区间不交叉校验（排除当前生效记录自身）
@@ -97,7 +98,7 @@ public class ContractFeeConfigsController : ControllerBase
                 EffectiveDate = request.EffectiveDate, ExpiryDate = (string?)null,
                 ExcludeId = current != null ? (Guid)((dynamic)current).Id : (Guid?)null });
         if (overlap > 0)
-            return Conflict(new { error = "该费用项目在新生效日期范围内已存在配置，请调整生效日期" });
+            return Conflict(new { code = "FEE_CONFIG_OVERLAP", message = "该费用项目在新生效日期范围内已存在配置，请调整生效日期" });
 
         // 存在则设为到期 + 停用
         if (current != null)
@@ -121,7 +122,11 @@ public class ContractFeeConfigsController : ControllerBase
                 CreatedBy = _currentUser.UserId, Now = ChinaTime.Now
             });
 
-        return Ok(new { id = newId, message = "调价成功" });
+        // 写入变更历史
+	        // 写入变更历史
+            await InsertChangeHistoryAsync(conn, null, request.ContractId, "FEE_ADJUST",
+                "费用调价", "新金额 " + request.NewAmount.ToString("F2") + "，生效 " + request.EffectiveDate, null, request.NewAmount, request.EffectiveDate, _currentUser.UserId);
+            return Ok(new { id = newId, message = "调价成功" });
     }
 
     [HttpGet("history")]
@@ -154,7 +159,23 @@ public class ContractFeeConfigsController : ControllerBase
         return Ok(new { hasOverlap = overlap > 0 });
     }
 
-    private static object MapConfig(dynamic r) => new
+    
+    private async Task InsertChangeHistoryAsync(IDbConnection conn, IDbTransaction? tx,
+        Guid contractId, string changeType, string title, string detail,
+        decimal? oldValue, decimal? newValue, string? effectiveDate, Guid? operatorId, string? operatorName = null)
+    {
+        if (string.IsNullOrEmpty(operatorName) && operatorId.HasValue)
+        {
+            try { operatorName = await conn.QuerySingleOrDefaultAsync<string>(
+                "SELECT DisplayName FROM Users WHERE Id=@Id", new { Id = operatorId }, tx); } catch { }
+        }
+        await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+            new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType,
+                Title = title, Detail = detail, OldValue = oldValue, NewValue = newValue,
+                EffectiveDate = effectiveDate, OperatorId = operatorId, OperatorName = operatorName ?? "" }, tx);
+    }
+
+private static object MapConfig(dynamic r) => new
     {
         id = (Guid)r.Id,
         contractId = (Guid)r.ContractId,

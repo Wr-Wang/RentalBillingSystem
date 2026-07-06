@@ -1,4 +1,4 @@
-import request from './request'
+import request, { handleApiError } from './request'
 
 // Auth
 export function login(data) { return request({ url: '/auth/login', method: 'post', data }) }
@@ -77,6 +77,8 @@ export function getAllowedOperations(id) { return request({ url: `/contracts/${i
 export function suspendContract(id, data) { return request({ url: `/contracts/${id}/suspend`, method: 'post', data }) }
 export function resumeContract(id) { return request({ url: `/contracts/${id}/resume`, method: 'post' }) }
 export function getContractTimeline(id) { return request({ url: `/contracts/${id}/timeline`, method: 'get' }) }
+export function getContractChanges(id) { return request({ url: `/contracts/${id}/changes`, method: 'get' }) }
+export function addSupplementaryFee(id, data) { return request({ url: `/contracts/${id}/supplementaryfee`, method: 'post', data }) }
 
 // Fee Codes
 export function getFeeCodes(params) { return request({ url: '/feecodes', method: 'get', params }) }
@@ -287,8 +289,6 @@ export function deleteLateFeeConfig(id) { return request({ url: `/latefeeconfig/
 export function getAutoRenewConfig(companyId) { return request({ url: '/autorenewconfig', method: 'get', params: { companyId } }) }
 export function saveAutoRenewConfig(data) { return request({ url: '/autorenewconfig', method: 'post', data }) }
 
+export { handleApiError }
+
 // Change Requests
-export function getChangeRequests(params) { return request({ url: '/changerequests', method: 'get', params }) }
-export function getChangeRequest(id) { return request({ url: `/changerequests/${id}`, method: 'get' }) }
-export function createChangeRequest(data) { return request({ url: '/changerequests', method: 'post', data }) }
-export function submitChangeRequest(id) { return request({ url: `/changerequests/${id}/submit`, method: 'post' }) }

@@ -40,8 +40,8 @@ public class ExceptionLoggingMiddleware
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
             {
-                message = "服务器内部错误",
-                errorId = Guid.NewGuid()
+                code = "SYSTEM_ERROR",
+                message = "系统错误，请稍后重试"
             }));
         }
     }

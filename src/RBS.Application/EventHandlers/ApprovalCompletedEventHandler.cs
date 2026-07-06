@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Data;
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
@@ -94,10 +95,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 await HandleContractRenewalAsync(@event, ct);
                 break;
 
-            case "ChangeRequest":
-                await HandleChangeRequestAsync(@event, ct);
-                break;
-
             // ★ 向后兼容：旧审批 TargetEntityType="Contract"（调租或终止）
             case "Contract":
                 await HandleLegacyContractAsync(@event, bizData, ct);
@@ -120,6 +117,13 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 {
                     await _contractDomainService.ExecuteContractTerminationAsync(
                         bizData.ContractId, null, "FULL", request.Description ?? "合同终止", Guid.Empty, ct);
+            try { using (var conn2 = _db.CreateConnection()) { conn2.Open();
+                    await conn2.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+                        new { Id = Guid.NewGuid(), ContractId = bizData.ContractId, ChangeType = "TERMINATE",
+                            Title = "合同终止", Detail = bizData.Reason ?? "",
+                            OldValue = (decimal?)null, NewValue = (decimal?)null,
+                            EffectiveDate = bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
+                            OperatorId = Guid.Empty, OperatorName = "" }); } } catch { }
                 }
                 else
                 {
@@ -191,6 +195,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
                 var expiryDate = DateOnly.Parse(effDateStr).AddDays(-1).ToString("yyyy-MM-dd");
                 rentFeeConfig.ExpireOn(expiryDate);
+                using (var conn2 = _db.CreateConnection()) { conn2.Open();
+                    await InsertChangeHistoryAsync(conn2, null, contract.Id, "RENT_ADJUST",
+                        "租金调整", $"月租金 {contract.RentAmount.Amount:F2} -> {newAmount:F2}",
+                        contract.RentAmount.Amount, newAmount, effDateStr, Guid.Empty); }
 
                 // 旧配置到期 + 新配置
                 await _uow.ExecuteSqlRawAsync(
@@ -259,7 +267,12 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             }
             else
             {
-                // 固定金额：调 Amount（用匿名类型传命名参数，匹配 SQL 中的 @Id/@ContractId 等）
+                using (var conn2 = _db.CreateConnection()) { conn2.Open();
+                    await InsertChangeHistoryAsync(conn2, null, item.ContractId, "FEE_ADJUST",
+                        "费用调价", item.FeeName + ": " + item.OldAmount.ToString("F2") + " -> " + item.NewAmount.ToString("F2"),
+                        item.OldAmount, item.NewAmount, effectiveDate, userId); }
+
+                // 固定金额：调 Amount
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
                     new { Id = Guid.NewGuid(), ContractId = item.ContractId, FeeCodeId = item.FeeCodeId,
@@ -282,6 +295,13 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             bizData.DepositReturn ?? "FULL",
             bizData.Reason ?? "合同终止",
             Guid.Empty, ct);
+        try { using var conn = _db.CreateConnection(); conn.Open();
+            await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+                new { Id = Guid.NewGuid(), ContractId = bizData.ContractId, ChangeType = "TERMINATE",
+                    Title = "合同终止", Detail = bizData.Reason ?? "",
+                    OldValue = (decimal?)null, NewValue = (decimal?)null,
+                    EffectiveDate = bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
+                    OperatorId = Guid.Empty, OperatorName = "" }); } catch { }
     }
 
     // ===== 续签 =====
@@ -289,7 +309,24 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     {
         if (@event.Action == "Approved")
         {
-            await _renewalService.ExecuteRenewalAsync(@event.TargetEntityId, ct);
+            try
+            {
+                await _renewalService.ExecuteRenewalAsync(@event.TargetEntityId, ct);
+            }
+            catch
+            {
+                // 续签执行失败时回滚审批状态为 Pending，允许用户修复后重新审批
+                try
+                {
+                    using var rollbackConn = _db.CreateConnection();
+                    rollbackConn.Open();
+                    await rollbackConn.ExecuteAsync(
+                        _sql.Get("Approval.Update.Request.RollbackToPending"),
+                        new { Id = @event.ApprovalRequestId, UpdatedBy = Guid.Empty });
+                }
+                catch { /* 回滚失败不影响原始异常 */ }
+                throw;
+            }
         }
         else if (@event.Action == "Rejected")
         {
@@ -303,73 +340,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-    // ===== 变更请求 =====
-    private async Task HandleChangeRequestAsync(ApprovalCompletedEvent @event, CancellationToken ct)
-    {
-        if (@event.Action == "Approved")
-        {
-            var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
-            if (changeRequest != null)
-            {
-                changeRequest.Approve();
-                await _uow.CommitAsync(ct);
-                await ApplyChangeRequestAsync(changeRequest, ct);
-            }
-        }
-        else if (@event.Action == "Rejected")
-        {
-            var changeRequest = await _uow.ChangeRequests.GetByIdAsync(@event.TargetEntityId, ct);
-            if (changeRequest != null)
-            {
-                changeRequest.Reject();
-                await _uow.CommitAsync(ct);
-            }
-        }
-    }
-
-    /// <summary>变更请求的 items 逐条应用到合同</summary>
-    private async Task ApplyChangeRequestAsync(ChangeRequest changeRequest, CancellationToken ct)
-    {
-        var contract = await _uow.Contracts.GetByIdAsync(changeRequest.ContractId, ct);
-        if (contract == null) return;
-
-        foreach (var item in changeRequest.Items)
-        {
-            switch (item.TargetType)
-            {
-                case "Contract":
-                    if (item.FieldName == "RentAmount")
-                    {
-                        var amount = item.NewValueDecimal ??
-                            (decimal.TryParse(item.NewValue, out var parsed) ? parsed : 0);
-                        if (amount > 0)
-                        {
-                            contract.SetRentAmount(amount);
-                            await _uow.Contracts.UpdateAsync(contract, ct);
-                        }
-                    }
-                    break;
-
-                case "ContractFeeConfig":
-                    if (item.TargetId.HasValue && item.NewValueDecimal.HasValue)
-                    {
-                        var expiryStr = changeRequest.EffectiveDate?.ToString("yyyy-MM-dd") ??
-                            ChinaTime.Now.ToString("yyyy-MM-dd");
-                        await _uow.ExecuteSqlRawAsync(
-                            _sql.Get("Approval.Update.ContractFeeConfig.ExpireById"),
-                            new object[] { expiryStr, item.TargetId.Value }, ct);
-                        await _uow.ExecuteSqlRawAsync(
-                            _sql.Get("Approval.Insert.ContractFeeConfig.CopyFrom"),
-                            new object[] { changeRequest.ContractId, item.NewValueDecimal.Value, expiryStr,
-                                Guid.Empty, item.TargetId.Value }, ct);
-                    }
-                    break;
-            }
-        }
-        await _uow.CommitAsync(ct);
-    }
-
-    private async Task SendNotificationsAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+        private async Task SendNotificationsAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
         if (request == null) return;
@@ -405,4 +376,20 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         if (overlap > 0)
             throw new InvalidOperationException("费用配置生效日期区间存在交叉，请调整生效日期");
     }
+
+    private async Task InsertChangeHistoryAsync(IDbConnection conn, IDbTransaction? tx,
+        Guid contractId, string changeType, string title, string detail,
+        decimal? oldValue, decimal? newValue, string? effectiveDate, Guid? operatorId, string? operatorName = null)
+    {
+        if (string.IsNullOrEmpty(operatorName) && operatorId.HasValue)
+        {
+            try { operatorName = await conn.QuerySingleOrDefaultAsync<string>(
+                "SELECT DisplayName FROM Users WHERE Id=@Id", new { Id = operatorId }, tx); } catch { }
+        }
+        await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+            new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType,
+                Title = title, Detail = detail, OldValue = oldValue, NewValue = newValue,
+                EffectiveDate = effectiveDate, OperatorId = operatorId, OperatorName = operatorName ?? "" }, tx);
+    }
+
 }

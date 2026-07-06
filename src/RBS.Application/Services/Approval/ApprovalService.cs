@@ -454,29 +454,12 @@ public class ApprovalService : IApprovalService
                 dto.Fields.Add(new BizFieldDto { Label = "原合同号", OldValue = oldContract?.ContractNo, NewValue = renewal.ContractNo, IsChanged = true });
                 dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = oldContract != null ? $"¥{oldContract.RentAmount.Amount:N2}" : "", NewValue = $"¥{renewal.NewRent:N2}", IsChanged = true });
                 dto.Fields.Add(new BizFieldDto { Label = "到期日", OldValue = oldContract?.EndDate.ToString("yyyy-MM-dd"), NewValue = renewal.NewEndDate.ToString("yyyy-MM-dd"), IsChanged = true });
-                dto.Fields.Add(new BizFieldDto { Label = "押金处理", OldValue = null, NewValue = renewal.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取", IsChanged = false });
+                var oldDeposit = oldContract?.DepositAmount.Amount ?? 0;
+                var newDeposit = renewal.DepositHandling == "NEW" ? (renewal.NewDepositAmount ?? oldDeposit) : oldDeposit;
+                dto.Fields.Add(new BizFieldDto { Label = "押金", OldValue = $"¥{oldDeposit:N2}", NewValue = $"¥{newDeposit:N2}", IsChanged = newDeposit != oldDeposit });
+                dto.Fields.Add(new BizFieldDto { Label = "押金处理方式", OldValue = null, NewValue = renewal.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取", IsChanged = false });
                 if (!string.IsNullOrEmpty(renewal.Remark))
                     dto.Fields.Add(new BizFieldDto { Label = "备注", OldValue = null, NewValue = renewal.Remark, IsChanged = true });
-            }
-            return dto.Fields.Count > 0 ? dto : null;
-        }
-
-        // 保留 ChangeRequest 分支
-        if (approval.TargetEntityType == "ChangeRequest" && approval.TargetEntityId != Guid.Empty)
-        {
-            var cr = _uow.ChangeRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
-            if (cr?.Items != null)
-            {
-                foreach (var item in cr.Items)
-                {
-                    dto.Fields.Add(new BizFieldDto
-                    {
-                        Label = item.TargetType == "Contract" ? "租金调整" : "费用调整",
-                        OldValue = item.OldValue,
-                        NewValue = item.NewValue,
-                        IsChanged = true
-                    });
-                }
             }
             return dto.Fields.Count > 0 ? dto : null;
         }

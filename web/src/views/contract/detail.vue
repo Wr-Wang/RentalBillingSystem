@@ -165,39 +165,7 @@
           </el-timeline>
         </el-tab-pane>
 
-        <!-------- 2d. Change Requests ------>
-        <el-tab-pane label="变更请求" name="changeRequests">
-          <div style="margin-bottom:12px;display:flex;gap:8px;">
-            <el-button type="primary" size="small" @click="showNewChangeRequest = true">新建变更请求</el-button>
-          </div>
-          <el-table :data="changeRequestList" stripe v-loading="crLoading" style="width:100%;">
-            <el-table-column label="变更类型" width="120">
-              <template #default="{ row }">
-                {{ {RENT_ADJUST:'租金调整',FEE_ADJUST:'费用调价',TERMS_MODIFY:'条款修改',OTHER:'其他'}[row.changeType] || row.changeType }}
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'Approved' ? 'success' : row.status === 'Rejected' ? 'danger' : row.status === 'PendingApproval' ? 'warning' : 'info'" size="small">
-                  {{ row.statusLabel || row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="reason" label="原因" min-width="150" show-overflow-tooltip />
-            <el-table-column label="生效日期" width="110">
-              <template #default="{ row }">{{ row.effectiveDate ? formatDate(row.effectiveDate) : '-' }}</template>
-            </el-table-column>
-            <el-table-column label="提交时间" width="160">
-              <template #default="{ row }">{{ row.createdAt ? formatDate(row.createdAt) : '-' }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
-              <template #default="{ row }">
-                <el-button v-if="row.status === 'Draft'" text size="small" type="primary" :loading="row._submitting" @click="handleSubmitCR(row)">提交审批</el-button>
-                <el-button v-else text size="small" type="primary" @click="showCRDetail(row)">详情</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
+
       </el-tabs>
     </el-card>
 
@@ -271,6 +239,7 @@
       <el-descriptions :column="2" border style="margin-bottom: 16px;">
         <el-descriptions-item label="合同号">{{ contract.contractNo }}</el-descriptions-item>
         <el-descriptions-item label="当前月租">¥{{ contract.rentAmount?.toLocaleString() }}</el-descriptions-item>
+        <el-descriptions-item label="当前生效日">{{ rentConfigEffectiveDate || '-' }}</el-descriptions-item>
         <el-descriptions-item label="房屋">{{ contract.roomName }}</el-descriptions-item>
         <el-descriptions-item label="租客">{{ contract.tenantName }}</el-descriptions-item>
       </el-descriptions>
@@ -306,7 +275,7 @@
     <!--===============================================================-->
     <!-- MODAL: Fee Price Adjustment                                   -->
     <!--===============================================================-->
-    <el-dialog v-model="showModifyFee" :draggable="true" title="合同费用中途调价" width="700px">
+    <el-dialog v-model="showModifyFee" :draggable="true" title="合同费用中途调价" width="820px">
       <el-alert
         title="费用调价将提交运营主管（1级）审批。按生效日期分段计价：生效日前按原价格，生效日起（含当日）按新价格。"
         type="info"
@@ -321,26 +290,26 @@
       </el-descriptions>
       <el-table :data="feeAdjustItems" stripe>
         <el-table-column type="index" label="#" width="45" />
-        <el-table-column prop="feeName" label="项目" width="90" />
+        <el-table-column prop="feeName" label="项目" width="120" />
         <el-table-column prop="chargeMethod" label="方式" width="80" />
-        <el-table-column label="当前价格" width="100">
+        <el-table-column label="当前价格" width="120">
           <template #default="{ row }">
             <span v-if="row.oldPrice !== undefined">{{ row.oldPrice }}</span>
             <span v-else style="color: #c0c4cc;">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="生效日期" width="130">
+        <el-table-column label="生效日期" width="160">
           <template #default="{ row }">
             <el-date-picker v-model="row.effectiveDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:115px" :disabled-date="d => row._minDate && d.getTime() < row._minDate.getTime()" />
           </template>
         </el-table-column>
-        <el-table-column label="新价格" width="120">
+        <el-table-column label="新价格" width="140">
           <template #default="{ row }">
             <el-input-number v-model="row.newPrice" :min="0" :precision="row.chargeMethod === '按表计量' ? 4 : 2" size="small" :step="row.chargeMethod === '按表计量' ? 0.5 : 50" style="width: 100px;" />
             <span v-if="row.unit" style="margin-left: 2px; font-size: 12px; color: #909399;">{{ row.unit }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="调幅" width="80">
+        <el-table-column label="调幅" width="100">
           <template #default="{ row }">
             <span v-if="row.oldPrice !== undefined && row.oldPrice !== null && row.oldPrice !== 0" :style="{ color: row.newPrice > row.oldPrice ? '#f56c6c' : row.newPrice < row.oldPrice ? '#67c23a' : '#909399' }">
               {{ row.newPrice > row.oldPrice ? '↑' : row.newPrice < row.oldPrice ? '↓' : '→' }}
@@ -388,6 +357,7 @@
       <el-form label-width="100px">
         <el-form-item label="当前价格">
           <span style="font-weight:bold;font-size:16px;">¥{{ (adjustCurrentAmount || 0).toLocaleString() }}</span>
+          <span style="margin-left: 8px; color: #909399; font-size: 12px;">当前生效日: {{ adjustCurrentEffDate || '-' }}</span>
         </el-form-item>
         <el-form-item label="新价格">
           <el-input-number v-model="adjustForm.newAmount" :min="0" :precision="2" style="width:200px" /> 元/月
@@ -478,7 +448,7 @@
             <el-input-number v-model="renewForm.rentAmount" :min="0" :precision="2" style="width: 200px;" />
           </el-form-item>
           <el-form-item label="新到期日期">
-            <el-date-picker v-model="renewForm.endDate" type="date" style="width: 200px;" />
+            <el-date-picker v-model="renewForm.endDate" type="date" value-format="YYYY-MM-DD" style="width: 200px;" />
             <span style="margin-left:8px;color:#909399;font-size:12px;">起租日自动延续：{{ contract.endDate }} 次日</span>
           </el-form-item>
           <el-form-item label="押金处理">
@@ -495,6 +465,20 @@
             <span v-else-if="renewForm.newDeposit < (contract.depositAmount || 0)" style="margin-left:8px;color:#67c23a;">
               退还 ¥{{ ((contract.depositAmount || 0) - renewForm.newDeposit).toLocaleString() }}
             </span>
+          </el-form-item>
+          <!-- 押金处理摘要 -->
+          <el-form-item label=" ">
+            <div v-if="renewForm.depositHandling === 'NEW'" style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
+              <div>押金：¥{{ (contract.depositAmount || 0).toFixed(2) }} → ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}
+                <span v-if="renewForm.newDeposit > (contract.depositAmount || 0)" style="color:#e6a23c;">（上调 ¥{{ (renewForm.newDeposit - (contract.depositAmount || 0)).toFixed(2) }}）</span>
+                <span v-else-if="renewForm.newDeposit < (contract.depositAmount || 0)" style="color:#67c23a;">（下调 ¥{{ ((contract.depositAmount || 0) - renewForm.newDeposit).toFixed(2) }}）</span>
+              </div>
+              <div style="color:#909399;">操作：退还旧押金 ¥{{ (contract.depositAmount || 0).toFixed(2) }} + 收取新押金 ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}</div>
+            </div>
+            <div v-else style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
+              <div>押金：原押金 ¥{{ (contract.depositAmount || 0).toFixed(2) }} 延续至新合同</div>
+              <div style="color:#909399;">说明：旧合同押金转出 → 新合同押金转入</div>
+            </div>
           </el-form-item>
           <el-form-item label="续签备注">
             <el-input v-model="renewForm.remark" type="textarea" :rows="2" placeholder="如有特殊条款或变更说明" />
@@ -545,14 +529,7 @@
       </template>
     </el-dialog>
 
-    <!-- Change Request Dialog -->
-    <ChangeRequestDialog
-      :contract-id="contract.id"
-      :contract="contract"
-      :visible="showNewChangeRequest"
-      @close="showNewChangeRequest = false"
-      @submitted="onCRSubmitted"
-    />
+
 
     <!-- Suspend Confirm -->
     <el-dialog v-model="showSuspend" title="暂停合同" width="400px">
@@ -574,8 +551,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, rentAdjust, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getChangeRequests } from '@/api/index.js'
-import ChangeRequestDialog from './ChangeRequestDialog.vue'
+import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, rentAdjust, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, handleApiError } from '@/api/index.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -609,9 +585,20 @@ const receivableStats = computed(() => {
   const totalReceived = receivableTimeline.value.reduce((s, r) => s + (r.received || 0), 0)
   return { totalAmount, totalDue: totalAmount - totalReceived }
 })
+const rentConfigEffectiveDate = computed(() => {
+  const cfg = feeConfigs.value.find(c => c.isActive && !c.expiryDate)
+  return cfg?.effectiveDate || '-'
+})
+
 const monthlyTotal = computed(() => {
   return feeConfigs.value.filter(f => f.isActive && f.billingMode === 'FixedAmount').reduce((s, f) => s + (f.amount || 0), 0)
 })
+const nowStr = () => {
+  const d = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const changeHistory = ref([])
 
 async function fetchContract() {
@@ -651,7 +638,13 @@ async function fetchContract() {
       const depItems = depRes.items || depRes.data || depRes || []
       depositLogs.value = depItems.map(d => ({
         date: d.createdAt?.split('T')[0] || '',
-        action: d.type === 'Refund' ? '退还' : d.type === 'Deduct' ? '扣款' : '收取',
+        action: d.action === 'Create' ? '收取'
+          : d.action === 'Return' || d.action === 'Refund' ? '退还'
+          : d.action === 'Deduct' ? '扣款'
+          : d.action === 'TransferOut' ? '押金转出'
+          : d.action === 'TransferIn' ? '押金转入'
+          : d.action === 'Collection' ? '收取'
+          : d.action || '收取',
         amount: d.amount || 0,
         balance: d.balance || 0,
         remark: d.remark || ''
@@ -680,6 +673,7 @@ async function fetchContract() {
 
     // 加载费用配置
     await fetchFeeConfigs()
+    await fetchChanges()
   } catch (e) {
     ElMessage.error('加载合同详情失败')
   } finally {
@@ -689,7 +683,6 @@ async function fetchContract() {
 
 onMounted(() => {
   fetchContract()
-  fetchChangeRequests()
 })
 
 const isActive = computed(() => contract.value.status === 'Active')
@@ -714,6 +707,7 @@ const showAdjustDialog = ref(false)
 const adjustFeeConfigId = ref(null)
 const adjustFeeCodeId = ref(null)
 const adjustCurrentAmount = ref(0)
+const adjustCurrentEffDate = ref('')
 const adjustForm = reactive({ newAmount: 0, effectiveDate: '' })
 
 // 当前生效的费用（按 feeCodeId 去重，取最新一条）
@@ -733,6 +727,23 @@ const currentFeeConfigs = computed(() => {
   }
   return [...map.values()]
 })
+
+async function fetchChanges() {
+  try {
+    const res = await getContractChanges(route.params.id)
+    const typeColor = { RENT_ADJUST: 'warning', FEE_ADJUST: 'warning', TERMINATE: 'danger', SUSPEND: 'info', RESUME: 'success', CONTRACT_CREATE: 'primary', SUPPLEMENTARY_FEE: 'primary', DEPOSIT_CHANGE: 'warning' }
+    changeHistory.value = (res || []).map(h => ({
+      date: h.createdAt ? (h.createdAt.split('T')[0] || h.createdAt.substring(0, 10)) + ' ' + (h.createdAt.split('T')[1] ? h.createdAt.split('T')[1].substring(0, 5) : '') : '',
+      title: h.title,
+      detail: h.detail || '',
+      operator: h.operatorName || '系统',
+      type: typeColor[h.changeType] || 'primary',
+      hollow: false,
+      changes: (h.oldValue || h.newValue) ? [{ field: '金额', oldValue: h.oldValue ? '¥' + Number(h.oldValue).toFixed(2) : '-', newValue: h.newValue ? '¥' + Number(h.newValue).toFixed(2) : '-' }] : [],
+      approval: null
+    }))
+  } catch { /* 静默 */ }
+}
 
 async function fetchFeeConfigs() {
   feeConfigLoading.value = true
@@ -818,7 +829,7 @@ async function submitFeeConfig() {
     showFeeConfigDialog.value = false
     await fetchFeeConfigs()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '操作失败')
+    handleApiError(e, '操作失败')
   }
   feeConfigSaving.value = false
 }
@@ -828,6 +839,7 @@ function openAdjustFeeConfig(row) {
   adjustFeeConfigId.value = row.id
   adjustFeeCodeId.value = row.feeCodeId
   adjustCurrentAmount.value = row.amount
+  adjustCurrentEffDate.value = row.effectiveDate || ''
   adjustForm.newAmount = row.amount
   adjustForm.effectiveDate = ''
   showAdjustDialog.value = true
@@ -881,7 +893,7 @@ async function adjustFeeConfig() {
     showAdjustDialog.value = false
     await fetchFeeConfigs()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '调价失败')
+    handleApiError(e, '调价失败')
   }
   feeConfigSaving.value = false
 }
@@ -947,20 +959,25 @@ function disabledFeeDate(time) {
 
 function openFeeAdjust() {
   showModifyFee.value = true
-  feeAdjustEffectiveDate.value = feeAdjustMinDate.value
-    ? feeAdjustMinDate.value.toISOString().split('T')[0]
-    : ''
   const activeConfigs = feeConfigs.value.filter(f => f.isActive)
   if (activeConfigs.length > 0) {
-    feeAdjustItems.splice(0, feeAdjustItems.length, ...activeConfigs.map(f => ({
-      feeCodeId: f.feeCodeId || '',
-      feeName: f.feeName,
-      chargeMethod: f.billingMode === 'MeterBased' ? '按表计量' : '固定金额',
-      oldPrice: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
-      oldPriceVal: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
-      newPrice: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
-      unit: f.unit || ''
-    })))
+    feeAdjustItems.splice(0, feeAdjustItems.length, ...activeConfigs.map(f => {
+      const effDate = f.effectiveDate ? new Date(f.effectiveDate) : null
+      const minDate = effDate ? new Date(effDate.getTime() + 86400000) : null
+      const defaultEff = minDate ? minDate.toISOString().split('T')[0] : ''
+      return {
+        feeCodeId: f.feeCodeId || '',
+        feeName: f.feeName,
+        chargeMethod: f.billingMode === 'MeterBased' ? '按表计量' : '固定金额',
+        oldPrice: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
+        oldPriceVal: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
+        newPrice: typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0,
+        unit: f.unit || '',
+        effectiveDate: defaultEff,
+        _minDate: minDate,
+        _originalEff: f.effectiveDate || ''
+      }
+    }))
   }
 }
 
@@ -1012,6 +1029,17 @@ async function submitRentAdjust() {
 	  if (!rentForm.effectiveDate) { ElMessage.warning('请选择生效日期'); return }
 	  if (!rentForm.reason) { ElMessage.warning('请填写调整原因'); return }
 
+	  // 校验生效日期必须晚于当前房租配置的生效日期
+	  const rentConfig = feeConfigs.value.find(c => c.isActive && !c.expiryDate)
+	  if (rentConfig?.effectiveDate) {
+	    const curEff = new Date(rentConfig.effectiveDate)
+	    const newEff = new Date(rentForm.effectiveDate)
+	    if (newEff <= curEff) {
+	      ElMessage.error('生效日期必须晚于当前房租的生效日期 ' + rentConfig.effectiveDate)
+	      return
+	    }
+	  }
+
 	  submittingRent.value = true
 	  try {
 	    const res = await rentAdjust(toGuidId(contract.value.id), {
@@ -1021,9 +1049,9 @@ async function submitRentAdjust() {
 	    })
 
 	    changeHistory.value.unshift({
-	      date: new Date().toISOString().split('T')[0],
+	      date: nowStr(),
 	      title: '租金调整审批中',
-	      detail: `月租金 ${contract.value.rentAmount?.toLocaleString()} → ${rentForm.newAmount.toLocaleString()}（${rentForm.reason}）`,
+	      detail: `月租金 ${Number(contract.value.rentAmount).toFixed(2)} → ${Number(rentForm.newAmount).toFixed(2)}（${rentForm.reason}）`,
 	      operator: '当前用户',
 	      type: 'warning',
 	      hollow: false,
@@ -1033,8 +1061,9 @@ async function submitRentAdjust() {
 
 	    ElMessage.success(res?.message || '租金调整申请已提交审批')
 	    showModifyRent.value = false
+	    await fetchContract()
 	  } catch (e) {
-	    ElMessage.error(e?.response?.data?.message || e?.message || '提交审批失败，请重试')
+	    handleApiError(e, '提交审批失败')
 	  } finally {
 	    submittingRent.value = false
 	  }
@@ -1099,9 +1128,9 @@ async function submitFeeAdjust() {
         })
       }
       changeHistory.value.unshift({
-        date: new Date().toISOString().split('T')[0],
+        date: nowStr(),
         title: `${item.feeName}调价审批中`,
-        detail: `${item.feeName}: ${item.oldPrice} → ${item.newPrice}（${feeAdjustReason.value}）`,
+        detail: `${item.feeName}: ${Number(item.oldPrice).toFixed(2)} → ${Number(item.newPrice).toFixed(2)}（${feeAdjustReason.value}）`,
         operator: '当前用户',
         type: 'warning',
         hollow: false,
@@ -1114,7 +1143,7 @@ async function submitFeeAdjust() {
     showModifyFee.value = false
     await fetchFeeConfigs()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '提交失败')
+    handleApiError(e, '提交失败')
   }
 }
 
@@ -1147,7 +1176,7 @@ function submitOtherModify() {
 
   if (changes.length > 0) {
     changeHistory.value.unshift({
-      date: new Date().toISOString().split('T')[0],
+      date: nowStr(),
       title: '合同信息修改',
       detail: changes.map(c => `${c.field}: ${c.oldValue} → ${c.newValue}`).join('；'),
       operator: '当前用户',
@@ -1185,7 +1214,7 @@ async function openRenewDialog() {
     renewForm.rentAmount = preview.defaultRenewalInfo?.currentRentAmount || contract.value.rentAmount
     renewForm.endDate = preview.defaultRenewalInfo?.suggestedEndDate || ''
     renewForm.depositHandling = 'TRANSFER'
-    renewForm.newDeposit = contract.value.depositAmount || 0
+    renewForm.newDeposit = (contract.value.depositAmount || 0) + 20
   } catch (e) {
     ElMessage.error('加载续签预览信息失败')
   } finally {
@@ -1222,13 +1251,15 @@ async function submitRenew() {
     // 刷新合同状态
     contract.value.status = 'PendingApproval'
   } catch (e) {
-    ElMessage.error(e?.response?.data?.error || e?.response?.data?.message || '续签提交失败')
+    handleApiError(e, '续签提交失败')
   }
 }
 
 /* ================================================================
  * Terminate (CONTRACT_TERMINATE — AmountBased 1~3级)
  * ================================================================ */
+const showSuspend = ref(false)
+const suspendReason = ref('')
 const showTerminate = ref(false)
 const terminateForm = reactive({
   type: 'EARLY',
@@ -1250,7 +1281,7 @@ async function submitTerminate() {
     })
     if (res?.status === 'Pending' || res?.id) {
       changeHistory.value.unshift({
-        date: new Date().toISOString().split('T')[0],
+        date: nowStr(),
         title: '合同终止审批中',
         detail: `终止原因: ${terminateForm.reason}，搬离日: ${terminateForm.actualEndDate}`,
         operator: '当前用户',
@@ -1261,7 +1292,7 @@ async function submitTerminate() {
     } else {
       contract.value.status = 'Terminated'
       changeHistory.value.unshift({
-        date: new Date().toISOString().split('T')[0],
+        date: nowStr(),
         title: '合同终止',
         detail: `终止原因: ${terminateForm.reason}，搬离日: ${terminateForm.actualEndDate}`,
         operator: '当前用户',
@@ -1272,7 +1303,7 @@ async function submitTerminate() {
     }
     showTerminate.value = false
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '终止失败')
+    handleApiError(e, '终止失败')
   }
 }
 
@@ -1282,7 +1313,7 @@ async function handleSuspend() {
     await suspendContract(toGuidId(contract.value.id), { reason: suspendReason.value })
     contract.value.status = 'Suspended'
     changeHistory.value.unshift({
-      date: new Date().toISOString().split('T')[0],
+      date: nowStr(),
       title: '合同暂停',
       detail: `暂停原因: ${suspendReason.value}`,
       operator: '当前用户',
@@ -1292,7 +1323,7 @@ async function handleSuspend() {
     ElMessage.success('合同已暂停')
     showSuspend.value = false
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '暂停失败')
+    handleApiError(e, '暂停失败')
   }
 }
 
@@ -1313,7 +1344,7 @@ function handleResume() {
       await resumeContract(toGuidId(contract.value.id))
       contract.value.status = 'Active'
       changeHistory.value.unshift({
-        date: new Date().toISOString().split('T')[0],
+        date: nowStr(),
         title: '合同恢复',
         operator: '当前用户',
         type: 'success',
@@ -1321,7 +1352,7 @@ function handleResume() {
       })
       ElMessage.success('合同已恢复')
     } catch (e) {
-      ElMessage.error(e?.response?.data?.message || '恢复失败')
+      handleApiError(e, '恢复失败')
     }
   }).catch(() => {})
 }
@@ -1331,46 +1362,11 @@ async function generateReceivables() {
     await apiGenerateReceivables({ contractId: contract.value.id })
     ElMessage.success('应收已成功生成')
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '生成应收失败')
+    handleApiError(e, '生成应收失败')
   }
 }
 
-// ================================================================
-// Change Requests
-// ================================================================
-const changeRequestList = ref([])
-const crLoading = ref(false)
-const showNewChangeRequest = ref(false)
-
-async function fetchChangeRequests() {
-  crLoading.value = true
-  try {
-    const res = await getChangeRequests({ contractId: route.params.id })
-    changeRequestList.value = Array.isArray(res) ? res : []
-  } catch { /* silent */ }
-  crLoading.value = false
-}
-
-function onCRSubmitted() {
-  showNewChangeRequest.value = false
-  fetchChangeRequests()
-}
-
-async function handleSubmitCR(row) {
-  row._submitting = true
-  try {
-    const res = await submitChangeRequest(row.id)
-    ElMessage.success('已提交审批')
-    fetchChangeRequests()
-  } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '提交失败')
-  }
-  row._submitting = false
-}
-
-function showCRDetail(row) {
-  ElMessage.info(`审批请求ID: ${row.approvalRequestId || '暂无'}`)
-}
+// Change Requests removed
 
 /** 格式化日期（仅日期）为 yyyy-MM-dd，兼容 Date 对象/时间戳/各种字符串 */
 function formatDate(d) {

@@ -167,7 +167,11 @@ public class RenewalService : IRenewalService
                 throw new InvalidOperationException($"该合同有未结清欠费 ¥{outstanding:N2}，请先处理后再续签");
         }
 
-        // 4. 生成新合同号：剥离已有 -R{n} 后缀，基于原始号 + 续签次数
+        // 4.5 押金守卫：NEW 模式必须指定新押金金额
+        if (request.DepositHandling == "NEW" && (!request.NewDepositAmount.HasValue || request.NewDepositAmount.Value <= 0))
+            throw new InvalidOperationException("重新收取押金时，新押金金额必须大于 0");
+
+        // 5. 生成新合同号：剥离已有 -R{n} 后缀，基于原始号 + 续签次数
         var baseNo = oldContract.ContractNo.Split("-R").First();
         var newContractNo = $"{baseNo}-R{oldContract.RenewalCount + 1}";
 
@@ -208,7 +212,8 @@ public class RenewalService : IRenewalService
         approvalRequest.SetContractId(oldContract.Id);
         approvalRequest.AddRecord(userId, "Submitted",
             $"续签：月租 ¥{oldContract.RentAmount.Amount:N2} → ¥{request.NewRentAmount:N2}，" +
-            $"到期日：{request.NewEndDate}，押金处理：{(request.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取")}");
+            $"到期日：{request.NewEndDate}，" +
+            $"押金：¥{oldContract.DepositAmount.Amount:N2} → ¥{(request.DepositHandling == "NEW" ? (request.NewDepositAmount ?? oldContract.DepositAmount.Amount) : oldContract.DepositAmount.Amount):N2}（{(request.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取")}）");
 
         approvalRequest.Submit();
         await _uow.ApprovalRequests.AddAsync(approvalRequest, ct);
@@ -397,7 +402,7 @@ public class RenewalService : IRenewalService
                     {
                         Id = Guid.NewGuid(), ContractId = renewal.OldContractId,
                         Amount = -renewal.OldDepositAmount, Balance = 0m,
-                        Action = "Refund", Remark = $"续签退押金，新押金 ¥{renewal.NewDepositAmount:N2}",
+                        Action = "Refund", Remark = $"续签退押金，新押金 ¥{depositAmount:N2}",
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
 
@@ -407,7 +412,7 @@ public class RenewalService : IRenewalService
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = newId,
-                        Amount = renewal.NewDepositAmount, Balance = renewal.NewDepositAmount,
+                        Amount = depositAmount, Balance = depositAmount,
                         Action = "Collection", Remark = "续签新收押金",
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
@@ -419,6 +424,76 @@ public class RenewalService : IRenewalService
                 new { NewContractId = newId, renewal.Id, Now = now }, tx);
 
             tx.Commit();
+
+            // 7. 写 ChangeHistory（续签完成后记录）
+            try
+            {
+                using var histConn = _db.CreateConnection();
+                histConn.Open();
+
+                var oldDeposit = renewal.OldDepositAmount;
+                var newDeposit = depositAmount;
+                var opName = renewal.CreatedBy != Guid.Empty
+                    ? (histConn.QuerySingleOrDefault<string>(
+                        _sql.Get("Identity.Select.User.DisplayName"), new { Id = renewal.CreatedBy })
+                       ?? "")
+                    : "";
+
+                if (renewal.DepositHandling == "TRANSFER")
+                {
+                    // 押金延续记录
+                    await histConn.ExecuteAsync(
+                        _sql.Get("Contract.Insert.ChangeHistory.Default"),
+                        new
+                        {
+                            Id = Guid.NewGuid(), ContractId = oldContract.Id,
+                            ChangeType = "DEPOSIT_TRANSFER", Title = "续签押金延续",
+                            Detail = $"续签押金延续：¥{oldDeposit:F2}",
+                            OldValue = oldDeposit, NewValue = oldDeposit,
+                            EffectiveDate = startDate.ToString("yyyy-MM-dd"),
+                            OperatorId = renewal.CreatedBy, OperatorName = opName
+                        });
+                }
+                else if (renewal.DepositHandling == "NEW")
+                {
+                    var diff = (renewal.NewDepositAmount ?? 0) - oldDeposit;
+                    var detail = diff > 0
+                        ? $"续签押金调整：¥{oldDeposit:F2} → ¥{newDeposit:F2}（上调 ¥{diff:F2}）"
+                        : diff < 0
+                            ? $"续签押金调整：¥{oldDeposit:F2} → ¥{newDeposit:F2}（下调 ¥{Math.Abs(diff):F2}）"
+                            : $"续签押金调整：¥{oldDeposit:F2} → ¥{newDeposit:F2}";
+
+                    await histConn.ExecuteAsync(
+                        _sql.Get("Contract.Insert.ChangeHistory.Default"),
+                        new
+                        {
+                            Id = Guid.NewGuid(), ContractId = oldContract.Id,
+                            ChangeType = "DEPOSIT_ADJUST", Title = "续签押金调整",
+                            Detail = detail,
+                            OldValue = oldDeposit, NewValue = newDeposit,
+                            EffectiveDate = startDate.ToString("yyyy-MM-dd"),
+                            OperatorId = renewal.CreatedBy, OperatorName = opName
+                        });
+                }
+
+                // 续签整体摘要（写在新合同上）
+                var depositHandlingLabel = renewal.DepositHandling == "NEW" ? "重新收取" : "原押金延续";
+                await histConn.ExecuteAsync(
+                    _sql.Get("Contract.Insert.ChangeHistory.Default"),
+                    new
+                    {
+                        Id = Guid.NewGuid(), ContractId = newId,
+                        ChangeType = "RENEWAL", Title = "合同续签完成",
+                        Detail = $"续签完成：月租 ¥{renewal.PreviousRent:F2} → ¥{renewal.NewRent:F2}，押金 ¥{oldDeposit:F2} → ¥{newDeposit:F2}（{depositHandlingLabel}）",
+                        OldValue = renewal.PreviousRent, NewValue = renewal.NewRent,
+                        EffectiveDate = startDate.ToString("yyyy-MM-dd"),
+                        OperatorId = renewal.CreatedBy, OperatorName = opName
+                    });
+            }
+            catch
+            {
+                // ChangeHistory 写入失败不应影响主流程
+            }
         }
         catch
         {

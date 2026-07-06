@@ -56,7 +56,6 @@ public static class DependencyInjection
         services.AddScoped<IContractTimelineService, ContractTimelineService>();
         services.AddScoped<IAutoVoucherService, AutoVoucherService>();
         services.AddScoped<IReportingService, ReportingService>();
-        services.AddScoped<IChangeRequestService, ChangeRequestAppService>();
 
         // 调度执行监控
         services.AddScoped<ITaskMonitorService, TaskMonitorService>();

@@ -7,6 +7,21 @@ const request = axios.create({
   timeout: 30000
 })
 
+// 统一 API 错误处理：有 code 的业务错误显示 message，500 系统错误不显示详情
+// 每次先关闭已有提示，避免多个弹框叠加
+export function handleApiError(e, defaultMsg = '操作失败') {
+  ElMessage.closeAll()
+  const status = e?.response?.status
+  const data = e?.response?.data
+  if (data?.code) {
+    ElMessage.error(data.message || defaultMsg)
+  } else if (status === 500) {
+    ElMessage.error('系统错误，请稍后重试')
+  } else {
+    ElMessage.error(data?.message || data?.error || defaultMsg)
+  }
+}
+
 // Request interceptor
 request.interceptors.request.use(
   config => {

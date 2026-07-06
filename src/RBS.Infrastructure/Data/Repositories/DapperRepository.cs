@@ -141,6 +141,9 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
     private static bool IsNavProp(System.Reflection.PropertyInfo p)
     {
         var t = p.PropertyType;
+        // 可空值类型 Nullable<T> 不是导航属性，应参与 INSERT/UPDATE
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
+            return false;
         return t == typeof(System.Collections.IList) || t.IsGenericType ||
                p.Name is "DomainEvents" or "RowVersion" or "Records" or "Roles";
     }
