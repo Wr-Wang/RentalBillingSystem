@@ -1,3 +1,4 @@
+using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
@@ -193,18 +194,50 @@ public class ContractsController : ControllerBase
         var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_FEE_CHANGE", ct);
 
         // 无审批配置 → 0 级直接执行
-        if (approvalType == null)
+                if (approvalType == null)
         {
-            var effectiveDate = request.EffectiveDate.HasValue
-                ? DateOnly.FromDateTime(request.EffectiveDate.Value)
-                : (DateOnly?)null;
-            await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Contract.Insert.ApprovalBizData.FeeAdjust"),
-                new { Id = Guid.NewGuid(), ContractId = id, ContractNo = contract.ContractNo,
-                    CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
-                    Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now,
-                    ApprovalRequestId = (Guid?)null });
-            return Ok(new { message = "费用调价已直接执行（无审批配置）" });
+            using var conn2 = _db.CreateConnection(); conn2.Open();
+            using var tx2 = conn2.BeginTransaction();
+            try
+            {
+                foreach (var item in request.Items)
+                {
+                    var effDate = item.EffectiveDate ?? "";
+                    if (string.IsNullOrEmpty(effDate)) continue;
+
+                    var current = await conn2.QuerySingleOrDefaultAsync(
+                        _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
+                        new { ContractId = id, FeeCodeId = item.FeeCodeId }, tx2);
+
+                    var overlap = await conn2.QuerySingleAsync<int>(
+                        _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+                        new { ContractId = id, FeeCodeId = item.FeeCodeId,
+                            EffectiveDate = effDate, ExpiryDate = (string?)null,
+                            ExcludeId = current != null ? (Guid)((dynamic)current).Id : (Guid?)null }, tx2);
+                    if (overlap > 0)
+                        throw new InvalidOperationException("费用项 " + item.FeeName + " 的生效日期与已有记录冲突");
+
+                    var expiryDate = DateTime.Parse(effDate).AddDays(-1).ToString("yyyy-MM-dd");
+                    if (current != null)
+                    {
+                        await conn2.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
+                            new { Id = (Guid)((dynamic)current).Id, ExpiryDate = expiryDate }, tx2);
+                        await conn2.ExecuteAsync(_sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
+                            new { ExpiryDate = expiryDate, ContractId = id, FeeCodeId = item.FeeCodeId }, tx2);
+                    }
+                    await conn2.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
+                        new { Id = Guid.NewGuid(), ContractId = id, FeeCodeId = item.FeeCodeId,
+                            BillingMode = item.BillingMode ?? "FixedAmount", Amount = item.NewAmount,
+                            EffectiveDate = effDate, CreatedBy = userId, Now = ChinaTime.Now }, tx2);
+                }
+                tx2.Commit();
+                return Ok(new { message = "费用调价已直接执行" });
+            }
+            catch (Exception ex)
+            {
+                tx2.Rollback();
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         // 1. 先创建审批，拿到 ApprovalRequestId
@@ -275,6 +308,7 @@ public class ContractsController : ControllerBase
         public decimal NewAmount { get; set; }
         public string BillingMode { get; set; } = "FixedAmount";
         public string? Unit { get; set; }
+        public string? EffectiveDate { get; set; }
     }
 
     // ===================================================================

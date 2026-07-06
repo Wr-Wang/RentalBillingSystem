@@ -481,11 +481,22 @@
 
   <!-- BillJob / SettleJob 查询 -->
   <select id="Lease.Select.FeeConfig.WithFeeNameByContract">
-    <![CDATA[SELECT cf.FeeCodeId, cf.Amount, fc.Name AS FeeName
+    <![CDATA[SELECT cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName
       FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
-      WHERE cf.ContractId=@Id AND cf.IsActive=1
+      WHERE cf.ContractId=@Id
+      AND (cf.IsActive=1 OR (cf.IsActive=0 AND cf.ExpiryDate IS NOT NULL))
       AND (cf.EffectiveDate IS NULL OR cf.EffectiveDate<=@P)
-      AND (cf.ExpiryDate IS NULL OR cf.ExpiryDate>=@P)]]>
+      AND (cf.ExpiryDate IS NULL OR cf.ExpiryDate>=@P)
+      ORDER BY cf.EffectiveDate]]>
+  </select>
+  <select id="Lease.Select.FeeConfig.AllForPeriod">
+    <![CDATA[SELECT cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName
+      FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
+      WHERE cf.ContractId=@ContractId
+      AND (cf.IsActive=1 OR (cf.IsActive=0 AND cf.ExpiryDate IS NOT NULL))
+      AND (cf.EffectiveDate IS NULL OR cf.EffectiveDate <= @PeriodEnd)
+      AND (cf.ExpiryDate IS NULL OR cf.ExpiryDate >= @PeriodStart)
+      ORDER BY cf.EffectiveDate]]>
   </select>
   <select id="Billing.Select.ReceivablePlan.ExistsByKey">
     <![CDATA[SELECT COUNT(1) FROM ReceivablePlans WHERE ContractId=@C AND FeeCodeId=@F AND Period=@P]]>
@@ -494,6 +505,17 @@
     <![CDATA[SELECT ISNULL(SUM(CASE WHEN Direction='Debit' THEN Amount ELSE -Amount END), 0)
       FROM JournalEntries je JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
       WHERE s.Code=@Code AND je.VoucherId IN (SELECT Id FROM Vouchers WHERE SourceEntityId=@SrcId)]]>
+  </select>
+  <select id="Billing.Select.JournalEntry.BalanceByContract">
+    <![CDATA[SELECT ISNULL(SUM(CASE WHEN Direction='Debit' THEN Amount ELSE -Amount END), 0)
+      FROM JournalEntries je JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
+      WHERE s.Code=@Code AND je.VoucherId IN (
+        SELECT Id FROM Vouchers WHERE SourceEntityId=@ContractId
+        UNION
+        SELECT v.Id FROM Vouchers v
+        INNER JOIN Receipts r ON r.Id = v.SourceEntityId
+        WHERE r.ContractId=@ContractId
+      )]]>
   </select>
   <select id="Lease.Select.HousingUnit.RoomCodeByContract">
     <![CDATA[SELECT h.FullCode FROM HousingUnits h JOIN Contracts c ON c.RoomId=h.Id WHERE c.Id=@Id]]>
@@ -513,17 +535,30 @@
       WHERE ContractId=@CId AND Status IN ('Pending','Partial')
       AND (Amount-Received-ISNULL(LateFee,0))>0 AND DueDate<@Today]]>
   </update>
+  <select id="Accounting.Select.Subject.ByCodes">
+    <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1122','6001','6051')]]>
+  </select>
+  <select id="Billing.Select.ReceivablePlan.UnBilled">
+    <![CDATA[SELECT Id, ContractId, FeeCodeId, Period, Amount, DueDate, Status, Received, LateFee, IsBilled, DebitNoteId, BilledAt, EntryType
+      FROM ReceivablePlans WHERE ContractId=@ContractId AND IsBilled=0 ORDER BY Period, FeeCodeId]]>
+  </select>
+  <update id="Billing.Update.ReceivablePlan.MarkBilled">
+    <![CDATA[UPDATE ReceivablePlans SET IsBilled=1, DebitNoteId=@DebitNoteId, BilledAt=GETUTCDATE() WHERE Id=@Id]]>
+  </update>
+  <update id="Billing.Update.ReceivablePlan.MarkBilledByContract">
+    <![CDATA[UPDATE ReceivablePlans SET IsBilled=1, DebitNoteId=@DebitNoteId, BilledAt=GETUTCDATE() WHERE ContractId=@ContractId AND IsBilled=0]]>
+  </update>
   <insert id="Accounting.Insert.Voucher.BillJob">
-    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Description, Status, SourceEntityId, SourceEntityType, CreatedBy, CreatedAt)
-      VALUES (@Id, @No, @Date, @Desc, 'Posted', @SrcId, @Type, @CBy, GETUTCDATE())]]>
+    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Description, Status, SourceEntityId, SourceEntityType, ContractId, CreatedBy, CreatedAt)
+      VALUES (@Id, @No, @Date, @Desc, 'Posted', @SrcId, @Type, @CId, @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Accounting.Insert.JournalEntry.Simple">
     <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @VId, @SId, @Dir, @Amt, @Sum, @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Billing.Insert.ReceivablePlan.Default">
-    <![CDATA[INSERT INTO ReceivablePlans (Id, ContractId, FeeCodeId, Period, Amount, DueDate, Status, Received, LateFee, CreatedBy, CreatedAt)
-      VALUES (@Id, @CId, @FId, @P, @Amt, @Due, 'Pending', 0, 0, @CBy, GETUTCDATE())]]>
+    <![CDATA[INSERT INTO ReceivablePlans (Id, ContractId, FeeCodeId, Period, Amount, DueDate, Status, Received, LateFee, IsBilled, EntryType, CreatedBy, CreatedAt)
+      VALUES (@Id, @CId, @FId, @P, @Amt, @Due, 'Pending', 0, 0, 0, 'Normal', @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Lease.Insert.DebitNote.FromBillJob">
     <![CDATA[INSERT INTO DebitNotes (Id, NoteNo, ContractId, ContractNo, Period, CompanyId,
@@ -626,8 +661,8 @@
       VALUES (@Id, NULL, @ContractId, @ContractNo, @CompanyId, 'SUSPEND', @Reason, 1, @CreatedBy, @CreatedAt)]]>
   </insert>
   <insert id="Contract.Insert.ApprovalFeeItem.ForFeeAdjust">
-    <![CDATA[INSERT INTO ApprovalFeeItems (Id, ApprovalRequestId, ContractId, FeeCodeId, FeeName, OldAmount, NewAmount, BillingMode, Unit, CreatedBy, CreatedAt)
-      VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO ApprovalFeeItems (Id, ApprovalRequestId, ContractId, FeeCodeId, FeeName, OldAmount, NewAmount, BillingMode, Unit, EffectiveDate, CreatedBy, CreatedAt)
+      VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="Contract.Update.ApprovalRequest.SetContractId">
     <![CDATA[UPDATE ApprovalRequests SET ContractId = @ContractId WHERE Id = @Id]]>
@@ -813,7 +848,7 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
     <![CDATA[SELECT COUNT(1) FROM ContractFeeConfigs
             WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
               AND (@ExcludeId IS NULL OR Id != @ExcludeId)
-              AND @EffectiveDate < COALESCE(ExpiryDate, '9999-12-31')
+              AND @EffectiveDate <= COALESCE(ExpiryDate, '9999-12-31')
               AND EffectiveDate < COALESCE(@ExpiryDate, '9999-12-31')]]>
   </select>
   <update id="Lease.Update.ContractFeeConfig.ExpiryDate">
@@ -822,6 +857,14 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
   <insert id="Lease.Insert.ContractFeeConfig.AfterAdjust">
     <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
             VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, NULL, NULL, 1, @EffectiveDate, NULL, @CreatedBy, @Now)]]>
+  </insert>
+  <update id="Contract.Update.ContractFeeConfig.AutoExpire">
+    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate=@ExpiryDate, IsActive=0 WHERE Id=@Id AND ExpiryDate IS NULL]]>
+  </update>
+  <insert id="Lease.Insert.ContractFeeConfig.AutoRenew">
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
+      SELECT @Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, 1, @EffectiveDate, NULL, @CreatedBy, @Now
+      WHERE NOT EXISTS (SELECT 1 FROM ContractFeeConfigs WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId AND EffectiveDate=@EffectiveDate)]]>
   </insert>
   <select id="Lease.Select.ContractFeeConfig.History">
     <![CDATA[SELECT Id, Amount, EffectiveDate, ExpiryDate, IsActive, CreatedAt

@@ -93,4 +93,56 @@ public class BillingDomainService : IBillingDomainService
         if (daysInPeriod <= 0) return 0;
         return Math.Round(monthlyAmount * occupiedDays / daysInPeriod, 2);
     }
+
+    /// <summary>
+    /// 按天分摊生成应收计划 — 同一费用项目在同一个月内有多条配置时逐段分摊后汇总
+    /// </summary>
+    public List<ReceivablePlan> GenerateProratedReceivablePlans(
+        List<(Guid FeeCodeId, decimal Amount, string? EffectiveDate, string? ExpiryDate, string FeeName)> feeConfigs,
+        Guid contractId, string period, DateOnly dueDate)
+    {
+        var periodParts = period.Split('-');
+        var year = int.Parse(periodParts[0]);
+        var month = int.Parse(periodParts[1]);
+        var daysInMonth = DateTime.DaysInMonth(year, month);
+        var periodStart = new DateOnly(year, month, 1);
+        var periodEnd = new DateOnly(year, month, daysInMonth);
+
+        var groups = feeConfigs.GroupBy(f => f.FeeCodeId);
+        var plans = new List<ReceivablePlan>();
+
+        foreach (var group in groups)
+        {
+            decimal totalAmount = 0;
+
+            foreach (var config in group)
+            {
+                var effStart = config.EffectiveDate != null
+                    ? DateOnly.Parse(config.EffectiveDate)
+                    : periodStart;
+                var effEnd = config.ExpiryDate != null
+                    ? DateOnly.Parse(config.ExpiryDate)
+                    : periodEnd;
+
+                var overlapStart = effStart > periodStart ? effStart : periodStart;
+                var overlapEnd = effEnd < periodEnd ? effEnd : periodEnd;
+
+                var coveredDays = overlapStart <= overlapEnd
+                    ? overlapEnd.DayNumber - overlapStart.DayNumber + 1
+                    : 0;
+
+                if (coveredDays > 0)
+                {
+                    var prorated = Math.Round(config.Amount / daysInMonth * coveredDays, 2);
+                    totalAmount += prorated;
+                }
+            }
+
+            totalAmount = Math.Round(totalAmount, 2);
+            var plan = new ReceivablePlan(contractId, group.Key, period, totalAmount, dueDate);
+            plans.Add(plan);
+        }
+
+        return plans;
+    }
 }

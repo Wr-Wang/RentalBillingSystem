@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
@@ -220,12 +221,26 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         var approvalReq = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
         var userId = approvalReq?.CreatedBy ?? Guid.Empty;
 
-        var effectiveDate = bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
-        if (string.IsNullOrEmpty(effectiveDate)) return;
-        var expiryDate = DateOnly.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
-
         foreach (var item in feeItems)
         {
+            var effectiveDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
+            if (string.IsNullOrEmpty(effectiveDate)) continue;
+            var expiryDate = DateOnly.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
+
+            // 校验新生效日必须大于原生效日，否则到期日 < 生效日
+            using var conn = _db.CreateConnection(); conn.Open();
+            var current = await conn.QuerySingleOrDefaultAsync(
+                _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
+                new { ContractId = item.ContractId, FeeCodeId = item.FeeCodeId });
+            if (current != null)
+            {
+                var curEff = (DateTime)((dynamic)current).EffectiveDate;
+                var newEff = DateOnly.Parse(effectiveDate);
+                if (newEff <= DateOnly.FromDateTime(curEff))
+                    throw new InvalidOperationException(
+                        $"费用项 {item.FeeName} 的生效日期 {effectiveDate} 必须晚于当前配置的生效日期 {curEff:yyyy-MM-dd}");
+            }
+
             // 先到期旧配置，再校验区间不交叉（防止异常数据）
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),

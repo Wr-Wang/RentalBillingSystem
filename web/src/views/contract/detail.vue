@@ -67,7 +67,7 @@
                   <el-table-column label="金额" width="100"><template #default="{ row: h }">¥{{ (h.amount || 0).toLocaleString() }}</template></el-table-column>
                   <el-table-column label="生效日期" width="120"><template #default="{ row: h }">{{ h.effectiveDate ? formatDate(h.effectiveDate) : '-' }}</template></el-table-column>
                   <el-table-column label="到期日期" width="120"><template #default="{ row: h }">{{ h.expiryDate ? formatDate(h.expiryDate) : '至今' }}</template></el-table-column>
-                  <el-table-column label="状态" width="70"><template #default="{ row: h }"><el-tag :type="h.isActive ? 'success' : 'info'" size="small">{{ h.isActive ? '生效' : '已过期' }}</el-tag></template></el-table-column>
+                  <el-table-column label="状态" width="70"><template #default="{ row: h }"><el-tag :type="h.isActive ? 'success' : 'info'" size="small">{{ h.isActive ? '已启用' : '已过期' }}</el-tag></template></el-table-column>
                   <el-table-column label="创建时间" min-width="140"><template #default="{ row: h }">{{ h.createdAt ? formatDate(h.createdAt) : '' }}</template></el-table-column>
                 </el-table>
                 <span v-if="!row.history?.length && !row.loadingHistory" style="color:#909399;font-size:13px;padding:8px;">暂无历史记录</span>
@@ -91,7 +91,7 @@
             </el-table-column>
             <el-table-column label="状态" width="65" align="center">
               <template #default="{ row }">
-                <el-tag :type="row.isActive ? 'success' : 'info'" size="small" effect="plain">{{ row.isActive ? '启用' : '停用' }}</el-tag>
+                <span :style="{ color: row.isActive ? '#67c23a' : '#909399', fontSize: '12px' }">{{ row.isActive ? '已启用' : '已停用' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="170" fixed="right">
@@ -260,7 +260,7 @@
     <!--===============================================================-->
     <!-- MODAL: Rent Adjustment                                        -->
     <!--===============================================================-->
-    <el-dialog v-model="showModifyRent" title="合同租金调整" width="580px">
+    <el-dialog v-model="showModifyRent" :draggable="true" title="合同租金调整" width="580px">
       <el-alert
         title="租金调整说明：租金调整将根据调整差额自动路由到对应审批级别（差额≤5000元: 运营主管1级审批；差额>5000元: 部门经理2级审批）。生效日期起按新租金生成应收。"
         type="info"
@@ -290,7 +290,7 @@
           </el-tag>
         </el-form-item>
         <el-form-item label="生效日期（含当日）">
-          <el-date-picker v-model="rentForm.effectiveDate" type="date" style="width: 200px;" />
+          <el-date-picker v-model="rentForm.effectiveDate" type="date" value-format="YYYY-MM-DD" style="width: 200px;" />
           <span style="margin-left: 8px; color: #909399;">此日期起按新租金计费</span>
         </el-form-item>
         <el-form-item label="调整原因">
@@ -306,7 +306,7 @@
     <!--===============================================================-->
     <!-- MODAL: Fee Price Adjustment                                   -->
     <!--===============================================================-->
-    <el-dialog v-model="showModifyFee" title="合同费用中途调价" width="700px">
+    <el-dialog v-model="showModifyFee" :draggable="true" title="合同费用中途调价" width="700px">
       <el-alert
         title="费用调价将提交运营主管（1级）审批。按生效日期分段计价：生效日前按原价格，生效日起（含当日）按新价格。"
         type="info"
@@ -329,6 +329,11 @@
             <span v-else style="color: #c0c4cc;">-</span>
           </template>
         </el-table-column>
+        <el-table-column label="生效日期" width="130">
+          <template #default="{ row }">
+            <el-date-picker v-model="row.effectiveDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:115px" :disabled-date="d => row._minDate && d.getTime() < row._minDate.getTime()" />
+          </template>
+        </el-table-column>
         <el-table-column label="新价格" width="120">
           <template #default="{ row }">
             <el-input-number v-model="row.newPrice" :min="0" :precision="row.chargeMethod === '按表计量' ? 4 : 2" size="small" :step="row.chargeMethod === '按表计量' ? 0.5 : 50" style="width: 100px;" />
@@ -345,10 +350,6 @@
         </el-table-column>
       </el-table>
       <el-form style="margin-top: 16px;">
-        <el-form-item label="生效日期">
-          <el-date-picker v-model="feeAdjustEffectiveDate" type="date" style="width: 200px;"
-    :disabled-date="disabledFeeDate" />
-        </el-form-item>
         <el-form-item label="调价原因">
           <el-input v-model="feeAdjustReason" type="textarea" :rows="2" placeholder="必填" />
         </el-form-item>
@@ -372,7 +373,7 @@
           <el-input-number v-model="feeConfigForm.amount" :min="0" :precision="2" style="width:200px" /> 元
         </el-form-item>
         <el-form-item label="生效日期">
-          <el-date-picker v-model="feeConfigForm.effectiveDate" type="date" style="width:200px" />
+          <el-date-picker v-model="feeConfigForm.effectiveDate" type="date" value-format="YYYY-MM-DD" style="width:200px" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -382,7 +383,7 @@
     </el-dialog>
 
     <!-- MODAL: Adjust Fee Config (版本化调价)                          -->
-    <el-dialog v-model="showAdjustDialog" title="费用调价" width="480px">
+    <el-dialog v-model="showAdjustDialog" :draggable="true" title="费用调价" width="480px">
       <el-alert title="调价后原价格将在生效日前一天自动到期，新价格从生效日起执行。" type="info" show-icon :closable="false" style="margin-bottom:16px;" />
       <el-form label-width="100px">
         <el-form-item label="当前价格">
@@ -392,7 +393,7 @@
           <el-input-number v-model="adjustForm.newAmount" :min="0" :precision="2" style="width:200px" /> 元/月
         </el-form-item>
         <el-form-item label="生效日期">
-          <el-date-picker v-model="adjustForm.effectiveDate" type="date" style="width:200px" />
+          <el-date-picker v-model="adjustForm.effectiveDate" type="date" value-format="YYYY-MM-DD" style="width:200px" />
           <span style="margin-left:8px;color:#909399;font-size:12px;">此日期起按新价计费</span>
         </el-form-item>
       </el-form>
@@ -718,8 +719,15 @@ const adjustForm = reactive({ newAmount: 0, effectiveDate: '' })
 // 当前生效的费用（按 feeCodeId 去重，取最新一条）
 const currentFeeConfigs = computed(() => {
   const map = new Map()
+  // 先取当前生效的配置（IsActive=true && ExpiryDate=null）
   for (const f of feeConfigs.value) {
-    if (!map.has(f.feeCodeId)) {
+    if (f.isActive && !f.expiryDate && f.feeCodeId) {
+      map.set(f.feeCodeId, { ...f, history: [] })
+    }
+  }
+  // 若某个费用项目没有生效中的配置，则取最新的那条
+  for (const f of feeConfigs.value) {
+    if (!map.has(f.feeCodeId) && f.feeCodeId) {
       map.set(f.feeCodeId, { ...f, history: [] })
     }
   }
@@ -832,6 +840,35 @@ async function adjustFeeConfig() {
     ElMessage.warning('新价格与当前价格相同，无需调价')
     return
   }
+
+  // ★ 前端预校验：日期区间冲突检测
+  try {
+    const history = await getContractFeeConfigHistory(contract.value.id, adjustFeeCodeId.value)
+    const newEff = new Date(adjustForm.effectiveDate)
+    const hasConflict = history.some(cfg => {
+      if (cfg.id === adjustFeeConfigId.value) return false
+      if (!cfg.effectiveDate) return false
+      const cfgExp = cfg.expiryDate ? new Date(cfg.expiryDate) : new Date('9999-12-31')
+      return newEff <= cfgExp
+    })
+    if (hasConflict) {
+      ElMessage.error('生效日期与已有费用配置记录冲突，请调整')
+      return
+    }
+    // 生效日期必须晚于当前配置的生效日期
+    const currentEff = feeConfigs.value.find(c => c.feeCodeId === adjustFeeCodeId.value && c.isActive && !c.expiryDate)?.effectiveDate
+    if (currentEff) {
+      const curDate = new Date(currentEff)
+      if (newEff <= curDate) {
+        ElMessage.error('生效日期必须晚于当前配置的生效日期 ' + currentEff)
+        return
+      }
+    }
+  } catch (e) {
+    ElMessage.warning('校验日期冲突失败，请稍后重试')
+    return
+  }
+
   feeConfigSaving.value = true
   try {
     await adjustContractFeeConfig({
@@ -913,8 +950,9 @@ function openFeeAdjust() {
   feeAdjustEffectiveDate.value = feeAdjustMinDate.value
     ? feeAdjustMinDate.value.toISOString().split('T')[0]
     : ''
-  if (feeConfigs.value.length > 0) {
-    feeAdjustItems.splice(0, feeAdjustItems.length, ...feeConfigs.value.map(f => ({
+  const activeConfigs = feeConfigs.value.filter(f => f.isActive)
+  if (activeConfigs.length > 0) {
+    feeAdjustItems.splice(0, feeAdjustItems.length, ...activeConfigs.map(f => ({
       feeCodeId: f.feeCodeId || '',
       feeName: f.feeName,
       chargeMethod: f.billingMode === 'MeterBased' ? '按表计量' : '固定金额',
@@ -1004,10 +1042,36 @@ async function submitRentAdjust() {
 
 async function submitFeeAdjust() {
   if (!feeAdjustReason.value) { ElMessage.warning('请填写调价原因'); return }
-  if (!feeAdjustEffectiveDate.value) { ElMessage.warning('请选择生效日期'); return }
-
   const changedItems = feeAdjustItems.filter(item => item.newPrice !== item.oldPrice)
   if (changedItems.length === 0) { ElMessage.warning('没有费用项目价格发生变化'); return }
+
+  // ★ 前端预校验：日期区间冲突检测（从DB捞取历史配置，前端计算）
+  for (const item of changedItems) {
+    try {
+      const history = await getContractFeeConfigHistory(contract.value.id, item.feeCodeId)
+      const currentActive = feeConfigs.value.find(c => c.feeCodeId === item.feeCodeId && c.isActive && !c.expiryDate)
+      if (!item.effectiveDate) { ElMessage.error(`请选择「${item.feeName}」的生效日期`); return }
+      const newEff = new Date(item.effectiveDate)
+      const hasConflict = history.some(cfg => {
+        if (cfg.id === currentActive?.id) return false
+        if (!cfg.effectiveDate) return false
+        const cfgExp = cfg.expiryDate ? new Date(cfg.expiryDate) : new Date('9999-12-31')
+        return newEff <= cfgExp
+      })
+      if (hasConflict) {
+        ElMessage.error(`「${item.feeName}」的生效日期与已有记录冲突，请调整生效日期`)
+        return
+      }
+      // 生效日期必须晚于当前配置的生效日期
+      if (currentActive?.effectiveDate && newEff <= new Date(currentActive.effectiveDate)) {
+        ElMessage.error(`「${item.feeName}」的生效日期必须晚于当前配置的生效日期 ${currentActive.effectiveDate}`)
+        return
+      }
+    } catch (e) {
+      ElMessage.warning(`「${item.feeName}」校验日期冲突失败，请稍后重试`)
+      return
+    }
+  }
 
   try {
     const items = changedItems.map(i => ({
@@ -1016,11 +1080,11 @@ async function submitFeeAdjust() {
       oldAmount: i.oldPriceVal || i.oldPrice,
       newAmount: i.newPrice,
       billingMode: i.chargeMethod === '按表计量' ? 'MeterBased' : 'FixedAmount',
-      unit: i.unit || ''
+      unit: i.unit || '',
+      effectiveDate: i.effectiveDate || ''
     }))
 
     const res = await feeAdjust(toGuidId(contract.value.id), {
-      effectiveDate: feeAdjustEffectiveDate.value,
       reason: feeAdjustReason.value,
       items
     })
@@ -1031,7 +1095,7 @@ async function submitFeeAdjust() {
         if (!config.history) config.history = []
         config.history.unshift({
           price: (item.chargeMethod === '固定金额' ? '¥' : '') + item.newPrice + (item.unit || ''),
-          date: (feeAdjustEffectiveDate.value || '新') + '生效'
+          date: (item.effectiveDate || '新') + '生效'
         })
       }
       changeHistory.value.unshift({
@@ -1048,6 +1112,7 @@ async function submitFeeAdjust() {
 
     ElMessage.success(res?.message || `费用调价申请已提交审批，涉及 ${changedItems.length} 项费用`)
     showModifyFee.value = false
+    await fetchFeeConfigs()
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '提交失败')
   }

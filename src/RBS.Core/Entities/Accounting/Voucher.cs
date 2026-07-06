@@ -42,6 +42,11 @@ public class Voucher : AggregateRoot
     public string? SourceEntityType { get; private set; }
 
     /// <summary>
+    /// 关联合同标识（按合同维度查询余额时使用）
+    /// </summary>
+    public Guid? ContractId { get; private set; }
+
+    /// <summary>
     /// 乐观并发控制行版本号
     /// </summary>
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
@@ -176,6 +181,14 @@ public class Voucher : AggregateRoot
     {
         SourceEntityId = sourceEntityId;
         SourceEntityType = sourceEntityType?.Trim();
+    }
+
+    /// <summary>
+    /// 设置关联合同标识（用于按合同维度查询余额）
+    /// </summary>
+    public void SetContract(Guid? contractId)
+    {
+        ContractId = contractId;
     }
 
     /// <summary>

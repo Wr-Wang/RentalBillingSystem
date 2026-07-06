@@ -26,58 +26,46 @@ public class AutoVoucherService : IAutoVoucherService
         if (receipt == null || receipt.Status != "Confirmed")
             return null;
 
-        // 查找费用模板，确定会计科目
-        var templates = await _uow.FeeCodeTemplates.GetAllAsync(ct);
-        var receiptContractId = receipt.ContractId;
-        Guid? debitSubjectId = null;
-        Guid? creditSubjectId = null;
+        var allSubjects = await _uow.AccountingSubjects.GetAllAsync(ct);
+        var subject1001 = allSubjects.FirstOrDefault(s => s.Code == "1001")?.Id;
+        var subject1122 = allSubjects.FirstOrDefault(s => s.Code == "1122")?.Id;
+        var subject2203 = allSubjects.FirstOrDefault(s => s.Code == "2203")?.Id;
 
-        // 尝试从 FeeCodeTemplate 获取科目
-        if (receiptContractId.HasValue)
+        if (subject1001 == null || subject1122 == null)
+            return null;
+
+        // 查询该合同的应收余额（通过 Dapper 直查）
+        decimal arBalance = 0;
+        if (receipt.ContractId.HasValue)
         {
-            var plans = await _uow.ReceivablePlans.GetByContractIdAsync(receiptContractId.Value, ct);
-            var feeCodeIds = plans.Select(p => p.FeeCodeId).Distinct().ToList();
-            foreach (var fid in feeCodeIds)
-            {
-                var tpl = templates.FirstOrDefault(t => t.FeeCodeId == fid);
-                if (tpl?.DebitSubjectId != null) debitSubjectId = tpl.DebitSubjectId;
-                if (tpl?.CreditSubjectId != null) creditSubjectId = tpl.CreditSubjectId;
-                if (debitSubjectId != null && creditSubjectId != null) break;
-            }
+            using var conn = _db.CreateConnection(); conn.Open();
+            arBalance = await conn.QuerySingleAsync<decimal>(
+                _sql.Get("Billing.Select.JournalEntry.BalanceBySubject"),
+                new { Code = "1122", SrcId = receipt.ContractId.Value });
         }
 
-        // 若未配置模板科目，使用默认科目编码查找
-        if (debitSubjectId == null || creditSubjectId == null)
-        {
-            var allSubjects = await _uow.AccountingSubjects.GetAllAsync(ct);
-            if (debitSubjectId == null)
-                debitSubjectId = allSubjects.FirstOrDefault(s => s.Code == "1001")?.Id; // 银行存款
-            if (creditSubjectId == null)
-                creditSubjectId = allSubjects.FirstOrDefault(s => s.Code == "1122")?.Id; // 应收账款
-        }
+        // 拆分：offset 冲应收，overflow 进预收
+        var offset = Math.Min(receipt.Amount, Math.Max(0, arBalance));
+        var overflow = receipt.Amount - offset;
 
-        if (debitSubjectId == null || creditSubjectId == null)
-            return null; // 无法确定科目，不生成凭证
-
-        // 创建凭证
         var voucherNo = $"PZ-{DateTime.UtcNow:yyyyMMdd}-{receiptId:N}".Substring(0, 32);
         var voucher = new Voucher(voucherNo, DateOnly.FromDateTime(DateTime.UtcNow),
             $"收款确认：{receipt.ReceiptNo}");
         voucher.SetSource(receiptId, "Receipt");
 
-        voucher.AddEntry(debitSubjectId.Value, "Debit", receipt.Amount, $"收款 {receipt.ReceiptNo}");
-        voucher.AddEntry(creditSubjectId.Value, "Credit", receipt.Amount, $"收款 {receipt.ReceiptNo}");
+        voucher.AddEntry(subject1001.Value, "Debit", receipt.Amount, $"收款 {receipt.ReceiptNo}");
+        if (offset > 0)
+            voucher.AddEntry(subject1122.Value, "Credit", offset, "冲应收");
+        if (overflow > 0 && subject2203 != null)
+            voucher.AddEntry(subject2203.Value, "Credit", overflow, "溢出进预收");
 
-        // 自动过账
         voucher.Post();
-
         await _uow.Vouchers.AddAsync(voucher, ct);
 
-        // 手动持久化分录（Dapper 不自动保存 Voucher 的子实体 JournalEntry）
-        using var conn = _db.CreateConnection(); conn.Open();
+        using var conn2 = _db.CreateConnection(); conn2.Open();
         foreach (var entry in voucher.Entries)
         {
-            await conn.ExecuteAsync(
+            await conn2.ExecuteAsync(
                 _sql.Get("Accounting.Insert.JournalEntry.Default"),
                 new
                 {

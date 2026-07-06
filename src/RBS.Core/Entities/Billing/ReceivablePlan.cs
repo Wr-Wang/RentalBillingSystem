@@ -20,6 +20,15 @@ public class ReceivablePlan : AggregateRoot
     public string Status { get; private set; }
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
+    /// <summary>是否已纳入账单</summary>
+    public bool IsBilled { get; private set; }
+    /// <summary>关联的账单ID（出账后回写）</summary>
+    public Guid? DebitNoteId { get; private set; }
+    /// <summary>出账时间</summary>
+    public DateTime? BilledAt { get; private set; }
+    /// <summary>条目类型：Normal / Deposit / Supplementary</summary>
+    public string EntryType { get; private set; } = "Normal";
+
     private ReceivablePlan() : base()
     {
         Period = string.Empty;
@@ -105,6 +114,14 @@ public class ReceivablePlan : AggregateRoot
         if (Status == "Paid") throw new InvalidOperationException("已结清的应收不能取消");
         if (Status == "Cancelled") return;
         Status = "Cancelled";
+    }
+
+    /// <summary>标记为已出账</summary>
+    public void MarkAsBilled(Guid debitNoteId)
+    {
+        IsBilled = true;
+        DebitNoteId = debitNoteId;
+        BilledAt = ChinaTime.Now;
     }
 
     /// <summary>冻结应收（暂停时调用）</summary>

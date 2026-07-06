@@ -64,20 +64,20 @@ public class SettleJob : ScheduledJobBase
                     $"预收抵应收-{contract.ContractNo}", null, null, token);
 
                 var prepaid = await conn.QuerySingleAsync<decimal>(
-                    _sql.Get("Billing.Select.JournalEntry.BalanceBySubject"),
-                    new { Code = "2203", SrcId = contract.Id }, tx);
+                    _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
+                    new { Code = "2203", ContractId = contract.Id }, tx);
                 var receivable = await conn.QuerySingleAsync<decimal>(
-                    _sql.Get("Billing.Select.JournalEntry.BalanceBySubject"),
-                    new { Code = "1122", SrcId = contract.Id }, tx);
+                    _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
+                    new { Code = "1122", ContractId = contract.Id }, tx);
 
-                if (prepaid > 0 && receivable > 0)
+                if (prepaid < 0 && receivable > 0)
                 {
-                    var amt = Math.Min(prepaid, receivable);
+                    var amt = Math.Min(-prepaid, receivable);
                     var vid = Guid.NewGuid();
                     await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
                         new { Id = vid, No = $"STL-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
                             Date = today, Desc = $"SettleJob {targetMonth} 预收抵应收",
-                            SrcId = contract.Id, Type = "SettleJob", CBy = Guid.Empty }, tx);
+                            SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, CBy = Guid.Empty }, tx);
                     await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
                         new { Id = Guid.NewGuid(), VId = vid, SId = subjects["2203"],
                             Dir = "Debit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
@@ -111,7 +111,7 @@ public class SettleJob : ScheduledJobBase
                     await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
                         new { Id = pvId, No = $"PEN-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
                             Date = today, Desc = $"SettleJob {targetMonth} 滞纳金",
-                            SrcId = contract.Id, Type = "SettleJob", CBy = Guid.Empty }, tx);
+                            SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, CBy = Guid.Empty }, tx);
                     await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
                         new { Id = Guid.NewGuid(), VId = pvId, SId = subjects["1122"],
                             Dir = "Debit", Amt = penalty, Sum = "滞纳金", CBy = Guid.Empty }, tx);

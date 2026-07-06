@@ -76,19 +76,18 @@ public class ContractFeeConfigsController : ControllerBase
     {
         using var conn = _db.CreateConnection(); conn.Open();
 
-        // 查找当前生效记录（含生效日用于校验）
+        // 查找当前生效记录
         var current = await conn.QuerySingleOrDefaultAsync(
             _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
             new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId });
 
-        // 生效日校验：新生效日必须 >= 原生效日 + 2天，确保原配置至少有2天有效期，防止 Eff==Exp
+        // 生效日校验：新生效日必须大于原生效日，否则原配置到期日 < 生效日
         if (current != null)
         {
             var curEff = (DateTime)((dynamic)current).EffectiveDate;
-            var minEffDate = curEff.AddDays(2);
-            var newEff = DateOnly.FromDateTime(DateTime.Parse(request.EffectiveDate));
-            if (newEff < DateOnly.FromDateTime(minEffDate))
-                return BadRequest(new { error = $"生效日期不能早于 {minEffDate:yyyy-MM-dd}（原生效日 {curEff:yyyy-MM-dd} + 2天）" });
+            var newEff = DateOnly.Parse(request.EffectiveDate);
+            if (newEff <= DateOnly.FromDateTime(curEff))
+                return BadRequest(new { error = $"生效日期必须晚于当前配置的生效日期 {curEff:yyyy-MM-dd}" });
         }
 
         // 区间不交叉校验（排除当前生效记录自身）
@@ -143,6 +142,18 @@ public class ContractFeeConfigsController : ControllerBase
         return Ok(list);
     }
 
+    [HttpPost("checkoverlap")]
+    public async Task<IActionResult> CheckOverlap([FromBody] CheckOverlapRequest request, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var overlap = await conn.QuerySingleAsync<int>(
+            _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+            new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                EffectiveDate = request.EffectiveDate, ExpiryDate = (string?)null,
+                ExcludeId = request.ExcludeId });
+        return Ok(new { hasOverlap = overlap > 0 });
+    }
+
     private static object MapConfig(dynamic r) => new
     {
         id = (Guid)r.Id,
@@ -186,4 +197,12 @@ public class AdjustFeeConfigRequest
     public Guid FeeCodeId { get; set; }
     public decimal NewAmount { get; set; }
     public string EffectiveDate { get; set; } = "";
+}
+
+public class CheckOverlapRequest
+{
+    public Guid ContractId { get; set; }
+    public Guid FeeCodeId { get; set; }
+    public string EffectiveDate { get; set; } = "";
+    public Guid? ExcludeId { get; set; }
 }

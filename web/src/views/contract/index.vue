@@ -85,7 +85,7 @@
     </el-dialog>
 
     <!-- Modify Rent Dialog -->
-    <el-dialog v-model="showModifyRentDialog" title="合同租金调整" width="550px">
+    <el-dialog v-model="showModifyRentDialog" :draggable="true" title="合同租金调整" width="550px">
       <el-alert title="租金调整需要经过审批，金额越大审批级别越高。" type="info" show-icon :closable="false" style="margin-bottom: 16px;" />
       <el-form :model="modifyRentForm" label-width="120px">
         <el-descriptions :column="2" border style="margin-bottom: 16px;">
@@ -101,7 +101,7 @@
           </span>
         </el-form-item>
         <el-form-item label="生效日期">
-          <el-date-picker v-model="modifyRentForm.effectiveDate" type="date" />
+          <el-date-picker v-model="modifyRentForm.effectiveDate" type="date" value-format="YYYY-MM-DD" />
         </el-form-item>
         <el-form-item label="调整原因">
           <el-input v-model="modifyRentForm.reason" type="textarea" :rows="3" placeholder="请说明调价原因，如：市场行情变化、合同约定涨幅等" />
@@ -114,7 +114,7 @@
     </el-dialog>
 
     <!-- Modify Fee Dialog -->
-    <el-dialog v-model="showModifyFeeDialog" title="合同费用调价" width="600px">
+    <el-dialog v-model="showModifyFeeDialog" :draggable="true" title="合同费用调价" width="600px">
       <el-alert title="费用中途调价需要运营主管审批。" type="info" show-icon :closable="false" style="margin-bottom: 16px;" />
       <el-descriptions :column="2" border style="margin-bottom: 16px;">
         <el-descriptions-item label="合同号">{{ modifyFeeTarget?.contractNo }}</el-descriptions-item>
@@ -125,6 +125,11 @@
         <el-table-column prop="chargeMethod" label="计费方式" width="90" />
         <el-table-column label="当前价格" width="110">
           <template #default="{ row }">{{ row.oldPrice }}</template>
+        </el-table-column>
+        <el-table-column label="生效日期" width="130">
+          <template #default="{ row }">
+            <el-date-picker v-model="row.effectiveDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:115px" :disabled-date="d => row._minDate && d.getTime() < row._minDate.getTime()" />
+          </template>
         </el-table-column>
         <el-table-column label="新价格" width="120">
           <template #default="{ row }">
@@ -141,10 +146,6 @@
         </el-table-column>
       </el-table>
       <el-form style="margin-top: 12px;">
-        <el-form-item label="生效日期">
-          <el-date-picker v-model="modifyFeeForm.effectiveDate" type="date"
-            :disabled-date="disabledFeeDate" />
-        </el-form-item>
         <el-form-item label="调价原因">
           <el-input v-model="modifyFeeForm.reason" type="textarea" :rows="2" />
         </el-form-item>
@@ -198,7 +199,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, rentAdjust, feeAdjust, getContractFeeConfigs } from '@/api/index.js'
+import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, rentAdjust, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory } from '@/api/index.js'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
@@ -449,20 +450,28 @@ async function showModifyFee(row) {
         feeMinDate.value = min
         modifyFeeForm.effectiveDate = min.toISOString().split('T')[0]
       }
-      modifyFeeForm.items = configs.map(f => {
+      const activeConfigs = configs.filter(f => f.isActive)
+      modifyFeeForm.items = activeConfigs.map(f => {
         const amount = typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0
         const isMeter = f.billingMode === 'MeterBased'
         const priceLabel = isMeter
           ? `${amount.toFixed(2)} 元/${f.unit || '吨'}`
           : `¥${amount.toLocaleString()}`
+        const effDate = f.effectiveDate ? new Date(f.effectiveDate) : null
+        const minDate = effDate ? new Date(effDate.getTime() + 86400000) : null
         return {
+          id: f.id || '',
           feeCodeId: f.feeCodeId || '',
           feeName: f.feeCodeName || f.feeName || '',
           chargeMethod: isMeter ? '按表计量' : '固定金额',
           oldPrice: priceLabel,
           oldPriceVal: amount,
           newPrice: amount,
-          unit: f.unit || ''
+          unit: f.unit || '',
+          _isActive: f.isActive,
+          _expiryDate: f.expiryDate,
+          effectiveDate: minDate ? minDate.toISOString().split('T')[0] : '',
+          _minDate: minDate
         }
       })
     } else {
@@ -478,15 +487,40 @@ async function submitModifyFee() {
     ElMessage.warning('请填写调价原因')
     return
   }
-  if (!modifyFeeForm.effectiveDate) {
-    ElMessage.warning('请选择生效日期')
-    return
-  }
+
 
   const changedItems = modifyFeeForm.items.filter(item => item.newPrice !== item.oldPriceVal)
   if (changedItems.length === 0) {
     ElMessage.warning('没有费用项目价格发生变化')
     return
+  }
+
+  // ★ 前端预校验：日期区间冲突检测
+  for (const item of changedItems) {
+    try {
+      const history = await getContractFeeConfigHistory(toGuidId(modifyFeeTarget.value?.id), item.feeCodeId)
+      const currentActive = modifyFeeForm.items.find(c => c.feeCodeId === item.feeCodeId && c._isActive && !c._expiryDate)
+      if (!item.effectiveDate) { ElMessage.error(`请选择「${item.feeName}」的生效日期`); return }
+      const newEff = new Date(item.effectiveDate)
+      const hasConflict = history.some(cfg => {
+        if (cfg.id === currentActive?.id) return false
+        if (!cfg.effectiveDate) return false
+        const cfgExp = cfg.expiryDate ? new Date(cfg.expiryDate) : new Date('9999-12-31')
+        return newEff <= cfgExp
+      })
+      if (hasConflict) {
+        ElMessage.error(`「${item.feeName}」的生效日期与已有记录冲突，请调整生效日期`)
+        return
+      }
+      // 生效日期必须晚于当前配置的生效日期
+      if (currentActive?.effectiveDate && newEff <= new Date(currentActive.effectiveDate)) {
+        ElMessage.error(`「${item.feeName}」的生效日期必须晚于当前配置的生效日期 ${currentActive.effectiveDate}`)
+        return
+      }
+    } catch (e) {
+      ElMessage.warning(`「${item.feeName}」校验日期冲突失败，请稍后重试`)
+      return
+    }
   }
 
   submittingFee.value = true
@@ -497,11 +531,11 @@ async function submitModifyFee() {
       oldAmount: i.oldPriceVal || 0,
       newAmount: i.newPrice,
       billingMode: i.chargeMethod === '按表计量' ? 'MeterBased' : 'FixedAmount',
-      unit: i.unit || ''
+      unit: i.unit || '',
+      effectiveDate: i.effectiveDate || ''
     }))
 
     const res = await feeAdjust(toGuidId(modifyFeeTarget.value?.id), {
-      effectiveDate: modifyFeeForm.effectiveDate || null,
       reason: modifyFeeForm.reason,
       items
     })

@@ -91,6 +91,7 @@ export function updateContractFeeConfig(id, data) { return request({ url: `/cont
 export function deleteContractFeeConfig(id) { return request({ url: `/contractfeeconfigs/${id}`, method: 'delete' }) }
 export function adjustContractFeeConfig(data) { return request({ url: '/contractfeeconfigs/adjust', method: 'post', data }) }
 export function getContractFeeConfigHistory(contractId, feeCodeId) { return request({ url: `/contractfeeconfigs/history?contractId=${contractId}&feeCodeId=${feeCodeId}`, method: 'get' }) }
+export function checkFeeConfigOverlap(data) { return request({ url: '/contractfeeconfigs/checkoverlap', method: 'post', data }) }
 
 // Meter Readings
 export function getMeterReadings(params) { return request({ url: '/meterreadings', method: 'get', params }) }

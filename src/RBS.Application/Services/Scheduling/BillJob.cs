@@ -4,6 +4,7 @@ using System.Text.Json;
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
+using RBS.Core.DomainServices;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Services;
@@ -66,38 +67,42 @@ public class BillJob : ScheduledJobBase
 
                 var step02 = await _stepLogger.StartStepAsync(taskLogId, "BillStep02",
                     $"加载费用-{contract.ContractNo}", null, null, token);
-                var feeConfigs = (await conn.QueryAsync<(Guid, decimal, string)>(
-                    _sql.Get("Lease.Select.FeeConfig.WithFeeNameByContract"),
-                    new { Id = contract.Id, P = targetMonth }, tx)).ToList();
+                var today = ChinaTime.Now;
+                var lastDay = DateTime.DaysInMonth(today.Year, today.Month);
+                var dueDay = Math.Min(contract.EndDate.Day, lastDay);
+                var dueDate = new DateOnly(today.Year, today.Month, dueDay);
+
+                var feeConfigs = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
+                    _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
+                    new { ContractId = contract.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{lastDay}" }, tx)).ToList();
                 await _stepLogger.CompleteStepAsync(step02, feeConfigs.Count, null, token);
 
                 var step03 = await _stepLogger.StartStepAsync(taskLogId, "BillStep03",
                     $"生成应收-{contract.ContractNo}", null, null, token);
                 int created = 0;
                 decimal totalAmount = 0;
-                foreach (var (feeCodeId, amount, _) in feeConfigs)
+
+                var domain = new BillingDomainService();
+                var plans = domain.GenerateProratedReceivablePlans(
+                    feeConfigs.Select(f => (f.FeeCodeId, f.Amount, f.EffDate, f.ExpDate, f.FeeName)).ToList(),
+                    contract.Id, targetMonth, dueDate);
+
+                foreach (var plan in plans)
                 {
                     var exists = await conn.QuerySingleAsync<int>(
                         _sql.Get("Billing.Select.ReceivablePlan.ExistsByKey"),
-                        new { C = contract.Id, F = feeCodeId, P = targetMonth }, tx);
+                        new { C = contract.Id, F = plan.FeeCodeId, P = targetMonth }, tx);
                     if (exists > 0) continue;
 
-                    var today = ChinaTime.Now;
-                    var lastDay = DateTime.DaysInMonth(today.Year, today.Month);
-                    var dueDay = Math.Min(contract.EndDate.Day, lastDay);
-
                     await conn.ExecuteAsync(_sql.Get("Billing.Insert.ReceivablePlan.Default"),
-                        new
-                        {
-                            Id = Guid.NewGuid(), CId = contract.Id, FId = feeCodeId,
-                            P = targetMonth, Amt = amount,
-                            Due = new DateOnly(today.Year, today.Month, dueDay), CBy = Guid.Empty
-                        }, tx);
+                        new { Id = Guid.NewGuid(), CId = contract.Id, FId = plan.FeeCodeId,
+                            P = targetMonth, Amt = plan.Amount,
+                            Due = dueDate, CBy = Guid.Empty }, tx);
 
-                    await InsertJournalEntriesAsync(conn, contract.Id, amount,
+                    await InsertJournalEntriesAsync(conn, contract.Id, plan.Amount,
                         targetMonth, subjects, tx, token);
                     created++;
-                    totalAmount += amount;
+                    totalAmount += plan.Amount;
                 }
                 await _stepLogger.CompleteStepAsync(step03, created, null, token);
 
@@ -130,7 +135,7 @@ public class BillJob : ScheduledJobBase
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var rows = await conn.QueryAsync<(string Code, Guid Id)>(
-            "SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1122','6001','6051')");
+            _sql.Get("Accounting.Select.Subject.ByCodes"));
         return rows.ToDictionary(r => r.Code, r => r.Id);
     }
 
@@ -148,7 +153,7 @@ public class BillJob : ScheduledJobBase
             {
                 Id = voucherId, No = $"BILL-{period}-{Guid.NewGuid():N}".Substring(0, 32),
                 Date = DateOnly.FromDateTime(DateTime.UtcNow), Desc = $"BillJob {period}",
-                SrcId = contractId, Type = "ReceivablePlan", CBy = Guid.Empty
+                SrcId = contractId, Type = "ReceivablePlan", CId = contractId, CBy = Guid.Empty
             }, tx);
 
         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
@@ -189,8 +194,8 @@ public class BillJob : ScheduledJobBase
         var warnings = new List<string>();
         foreach (var c in matched)
         {
-            var fees = (await conn.QueryAsync(_sql.Get("Lease.Select.FeeConfig.WithFeeNameByContract"),
-                new { Id = c.Id, P = targetMonth })).ToList();
+            var fees = (await conn.QueryAsync(_sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
+                new { ContractId = c.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{DateTime.DaysInMonth(DateTime.Now.Year, DateTime.Now.Month)}" })).ToList();
             totalFees += fees.Count;
             if (fees.Count == 0) warnings.Add($"合同 {c.ContractNo} 无生效费用配置");
         }

@@ -21,6 +21,9 @@ public class ApprovalFeeItem : AuditableEntity
     /// <summary>计量单位（MeterBased 模式使用）</summary>
     public string? Unit { get; private set; }
 
+    /// <summary>生效日期（每条费用独立，yyyy-MM-dd）</summary>
+    public string? EffectiveDate { get; private set; }
+
     private ApprovalFeeItem() : base()
     {
         FeeName = string.Empty;
@@ -28,7 +31,7 @@ public class ApprovalFeeItem : AuditableEntity
     }
 
     public ApprovalFeeItem(Guid approvalRequestId, Guid contractId, Guid feeCodeId, string feeName,
-        decimal oldAmount, decimal newAmount, string billingMode, string? unit) : base()
+        decimal oldAmount, decimal newAmount, string billingMode, string? unit, string? effectiveDate = null) : base()
     {
         ApprovalRequestId = approvalRequestId;
         ContractId = contractId;
@@ -38,5 +41,6 @@ public class ApprovalFeeItem : AuditableEntity
         NewAmount = newAmount;
         BillingMode = billingMode;
         Unit = unit;
+        EffectiveDate = effectiveDate;
     }
 }
