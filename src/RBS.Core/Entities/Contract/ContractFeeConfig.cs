@@ -185,3 +185,4 @@ public class ContractFeeConfig : AuditableEntity
     /// </summary>
     public bool IsMeterBased => BillingMode == BillingMode.MeterBased;
 }
+

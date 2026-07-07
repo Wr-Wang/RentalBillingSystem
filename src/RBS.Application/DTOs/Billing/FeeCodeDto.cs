@@ -5,6 +5,7 @@ public class FeeCodeDto
     public Guid Id { get; set; }
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string ChargeType { get; set; } = "Recurring";
     public string BillingMode { get; set; } = "FixedAmount";
     public string? Unit { get; set; }
     public int SortOrder { get; set; }
@@ -18,6 +19,7 @@ public class CreateFeeCodeRequest
 {
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string ChargeType { get; set; } = "Recurring";
     public string BillingMode { get; set; } = "FixedAmount";
     public string? Unit { get; set; }
     public int SortOrder { get; set; }
@@ -29,6 +31,7 @@ public class UpdateFeeCodeRequest
 {
     public string? Name { get; set; }
     public string? Code { get; set; }
+    public string? ChargeType { get; set; }
     public string? BillingMode { get; set; }
     public string? Unit { get; set; }
     public int? SortOrder { get; set; }

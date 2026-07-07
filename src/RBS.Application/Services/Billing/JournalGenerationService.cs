@@ -1,0 +1,207 @@
+using System.Data;
+using Dapper;
+using RBS.Application.Common.Interfaces;
+using RBS.Core.Common;
+using RBS.Core.Entities.Billing;
+using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Core.DomainServices;
+
+namespace RBS.Application.Services.Billing;
+
+/// <summary>
+/// 日记账生成服务 — 按 FeeConfig 预生成 Voucher + JournalEntry
+/// </summary>
+public class JournalGenerationService : IJournalGenerationService
+{
+    private readonly IUnitOfWork _uow;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
+    private readonly IBillingDomainService _billingDomain;
+
+    public JournalGenerationService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql, IBillingDomainService billingDomain)
+    {
+        _uow = uow;
+        _db = db;
+        _sql = sql;
+        _billingDomain = billingDomain;
+    }
+
+    /// <summary>
+    /// 生成 OneTime 费用的 JE（合同签署时调用，如押金）
+    /// </summary>
+    public async Task GenerateOneTimeAsync(Guid contractId, Guid feeConfigId, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+
+        // 获取 FeeConfig + FeeCode
+        var config = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            _sql.Get("Journal.Select.OneTimeFeeConfig.WithFeeCode"),
+            new { Id = feeConfigId, Cid = contractId });
+
+        if (config == null) return;
+        if (config.ChargeType != "OneTime") return; // 只处理一次性费用
+
+        // 查会计科目
+        var subjects = await conn.QueryAsync<(string Code, Guid Id)>(
+            _sql.Get("Accounting.Select.Subject.ByCodes"));
+        var subjectMap = subjects.ToDictionary(x => x.Code, x => x.Id);
+        var receivableId = subjectMap.GetValueOrDefault("1122", Guid.Empty);
+        var depositArId = subjectMap.GetValueOrDefault("112202", Guid.Empty);
+        var depositLiabilityId = subjectMap.GetValueOrDefault("2241", Guid.Empty);
+        var revenueId = subjectMap.GetValueOrDefault("6001", subjectMap.GetValueOrDefault("6051", Guid.Empty));
+
+        var now = ChinaTime.Now;
+        var period = DateOnly.FromDateTime(now).ToString("yyyy-MM");
+        var voucherId = Guid.NewGuid();
+        var voucherNo = $"OT-{now:yyyyMMdd}-{voucherId:N}".Truncate(32);
+
+        // 插入 Voucher（含 Period）
+        await conn.ExecuteAsync(
+            _sql.Get("Accounting.Insert.Voucher.WithPeriod"),
+            new
+            {
+                Id = voucherId,
+                No = voucherNo,
+                Date = DateOnly.FromDateTime(now),
+                Desc = $"{config.FeeName}（一次性）",
+                SrcId = contractId,
+                Type = "ContractFee.Immediate",
+                CId = contractId,
+                Period = period,
+                CBy = Guid.Empty
+            });
+
+        // 押金：DEBIT 112202（应收押金）/ CREDIT 2241（其他应付款-押金）
+        if (config.Code == "DEPOSIT" && depositArId != Guid.Empty && depositLiabilityId != Guid.Empty)
+        {
+            await conn.ExecuteAsync(
+                _sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                new { Id = Guid.NewGuid(), VId = voucherId, SId = depositArId, Dir = "Debit", Amt = (decimal)config.Amount, Sum = $"{config.FeeName}", CBy = Guid.Empty });
+            await conn.ExecuteAsync(
+                _sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                new { Id = Guid.NewGuid(), VId = voucherId, SId = depositLiabilityId, Dir = "Credit", Amt = (decimal)config.Amount, Sum = $"{config.FeeName}", CBy = Guid.Empty });
+        }
+    }
+
+    /// <summary>
+    /// BillJob：生成下一个月的 JE（由 BillJob 调用）
+    /// </summary>
+    public async Task GenerateNextMonthAsync(Guid companyId, string targetMonth, CancellationToken ct)
+    {
+        // 由 BillJob 自身实现，此处留空
+        // BillJob 保留原有的分摊计算逻辑 + 插入 Voucher/JE
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 生成补差 Supplementary JE（费用调价账单已出时调用，独立连接）
+    /// </summary>
+    public async Task GenerateSupplementaryAsync(Guid contractId, Guid feeCodeId,
+        decimal newAmount, decimal oldAmount, string effectiveDate, string period, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            await GenerateSupplementaryCoreAsync(conn, tx, contractId, feeCodeId, newAmount, oldAmount, effectiveDate, period, ct);
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 生成补差 Supplementary JE（事务内重载，与调用方共享连接）
+    /// </summary>
+    public async Task GenerateSupplementaryAsync(IDbConnection conn, IDbTransaction tx,
+        Guid contractId, Guid feeCodeId, decimal newAmount, decimal oldAmount, string effectiveDate, string period, CancellationToken ct)
+    {
+        await GenerateSupplementaryCoreAsync(conn, tx, contractId, feeCodeId, newAmount, oldAmount, effectiveDate, period, ct);
+    }
+
+    /// <summary>核心逻辑：计算差价并插入 Voucher + JournalEntry（共享连接/事务）</summary>
+    private async Task GenerateSupplementaryCoreAsync(IDbConnection conn, IDbTransaction tx,
+        Guid contractId, Guid feeCodeId, decimal newAmount, decimal oldAmount, string effectiveDate, string period, CancellationToken ct)
+    {
+        // 查会计科目
+        var subjects = await conn.QueryAsync<(string Code, Guid Id)>(
+            _sql.Get("Accounting.Select.Subject.ByCodes"), tx);
+        var subjectMap = subjects.ToDictionary(x => x.Code, x => x.Id);
+        var receivableId = subjectMap.GetValueOrDefault("1122", Guid.Empty);
+        var revenueId = subjectMap.GetValueOrDefault("6001", subjectMap.GetValueOrDefault("6051", Guid.Empty));
+
+        if (receivableId == Guid.Empty || revenueId == Guid.Empty) return;
+
+        // 获取 FeeConfig 信息
+        var config = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            _sql.Get("Journal.Select.SupplementaryFeeConfig.ByContractAndFee"),
+            new { Cid = contractId, Fid = feeCodeId }, tx);
+
+        if (config == null) return;
+
+        // 判断是否需要分摊
+        decimal diffAmount;
+        var currentMonth = DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM");
+
+        if (period == currentMonth)
+        {
+            // 当月：分摊计算
+            var monthStart = DateOnly.Parse($"{period}-01");
+            var daysInMonth = DateTime.DaysInMonth(monthStart.Year, monthStart.Month);
+            var effDate = DateOnly.Parse(effectiveDate);
+            var coveredDays = daysInMonth - effDate.Day + 1;
+
+            var oldPortion = oldAmount / daysInMonth * (effDate.Day - 1);
+            var newPortion = newAmount / daysInMonth * coveredDays;
+            diffAmount = Math.Round(oldPortion + newPortion - oldAmount, 2);
+        }
+        else
+        {
+            // 整月全额差价
+            diffAmount = newAmount - oldAmount;
+        }
+
+        if (diffAmount == 0) return;
+
+        var now = ChinaTime.Now;
+        var voucherId = Guid.NewGuid();
+        var voucherNo = $"SUP-{now:yyyyMMdd}-{voucherId:N}".Truncate(32);
+
+        // 插入 Voucher（含 Period）
+        await conn.ExecuteAsync(
+            _sql.Get("Accounting.Insert.Voucher.WithPeriod"),
+            new
+            {
+                Id = voucherId,
+                No = voucherNo,
+                Date = DateOnly.FromDateTime(now),
+                Desc = $"{config.FeeName}调价补差（{period}）",
+                SrcId = contractId,
+                Type = "ContractFee.Supplementary",
+                CId = contractId,
+                Period = period,
+                CBy = Guid.Empty
+            }, tx);
+
+        // DEBIT 1122 / CREDIT 6001(或6051)
+        await conn.ExecuteAsync(
+            _sql.Get("Accounting.Insert.JournalEntry.Simple"),
+            new { Id = Guid.NewGuid(), VId = voucherId, SId = receivableId, Dir = "Debit", Amt = diffAmount, Sum = $"{config.FeeName}补差", CBy = Guid.Empty }, tx);
+        await conn.ExecuteAsync(
+            _sql.Get("Accounting.Insert.JournalEntry.Simple"),
+            new { Id = Guid.NewGuid(), VId = voucherId, SId = revenueId, Dir = "Credit", Amt = diffAmount, Sum = $"{config.FeeName}补差", CBy = Guid.Empty }, tx);
+    }
+}
+
+/// <summary>字符串扩展</summary>
+internal static class StringExtensions
+{
+    public static string Truncate(this string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength];
+}

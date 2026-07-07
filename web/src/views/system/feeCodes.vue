@@ -14,7 +14,12 @@
           <template #default="{ row }">{{ row.billingMode === 'MeterBased' ? '按表计量' : '固定金额' }}</template>
         </el-table-column>
         <el-table-column prop="unit" label="单位" width="80" />
-        <el-table-column prop="category" label="类别" width="80" />
+        <el-table-column prop="category" label="类别" width="100" />
+        <el-table-column label="收费类型" width="100">
+          <template #default="{ row }">
+            {{ row.chargeType === 'OneTime' ? '一次计费' : '多次计费' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="sortOrder" label="排序" width="60" />
         <el-table-column label="状态" width="70">
           <template #default="{ row }">
@@ -45,6 +50,12 @@
           <el-select v-model="form.billingMode" style="width:100%">
             <el-option label="固定金额" value="FixedAmount" />
             <el-option label="按表计量" value="MeterBased" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="收费类型">
+          <el-select v-model="form.chargeType" style="width:100%">
+            <el-option label="多次计费" value="Recurring" />
+            <el-option label="一次计费" value="OneTime" />
           </el-select>
         </el-form-item>
         <el-form-item label="计量单位">
@@ -84,7 +95,7 @@ const showDialog = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
 const formRef = ref(null)
-const form = ref({ id: null, code: '', name: '', billingMode: 'FixedAmount', unit: '', sortOrder: 0, category: 'Other', isRequired: false })
+const form = ref({ id: null, code: '', name: '', billingMode: 'FixedAmount', chargeType: 'Recurring', unit: '', sortOrder: 0, category: 'Other', isRequired: false })
 const rules = {
   code: [{ required: true, message: '请输入编码', trigger: 'blur' }],
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }]
@@ -99,7 +110,7 @@ async function fetchList() {
 
 function openCreate() {
   isEdit.value = false
-  form.value = { id: null, code: '', name: '', billingMode: 'FixedAmount', unit: '', sortOrder: 0, category: 'Other', isRequired: false }
+  form.value = { id: null, code: '', name: '', billingMode: 'FixedAmount', chargeType: 'Recurring', unit: '', sortOrder: 0, category: 'Other', isRequired: false }
   showDialog.value = true
 }
 
@@ -107,7 +118,8 @@ function openEdit(row) {
   isEdit.value = true
   form.value = {
     id: row.id, code: row.code, name: row.name, billingMode: row.billingMode || 'FixedAmount',
-    unit: row.unit || '', sortOrder: row.sortOrder || 0, category: row.category || 'Other', isRequired: row.isRequired || false
+    chargeType: row.chargeType || 'Recurring', unit: row.unit || '',
+    sortOrder: row.sortOrder || 0, category: row.category || 'Other', isRequired: row.isRequired || false
   }
   showDialog.value = true
 }
@@ -120,13 +132,14 @@ async function save() {
   try {
     if (isEdit.value) {
       await updateFeeCode(form.value.id, {
-        name: form.value.name, billingMode: form.value.billingMode, unit: form.value.unit || undefined,
+        name: form.value.name, billingMode: form.value.billingMode, chargeType: form.value.chargeType,
+        unit: form.value.unit || undefined,
         sortOrder: form.value.sortOrder, category: form.value.category, isRequired: form.value.isRequired
       })
       ElMessage.success('已更新')
     } else {
       await createFeeCode({
-        code: form.value.code, name: form.value.name, billingMode: form.value.billingMode,
+        code: form.value.code, name: form.value.name, billingMode: form.value.billingMode, chargeType: form.value.chargeType,
         unit: form.value.unit || undefined, sortOrder: form.value.sortOrder, category: form.value.category, isRequired: form.value.isRequired
       })
       ElMessage.success('已创建')

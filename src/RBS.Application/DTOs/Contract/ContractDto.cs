@@ -6,8 +6,6 @@ public class ContractDto
     public string ContractNo { get; set; } = string.Empty;
     public Guid RoomId { get; set; }
     public string? RoomFullCode { get; set; }
-    public decimal RentAmount { get; set; }
-    public decimal DepositAmount { get; set; }
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public string PaymentCycle { get; set; } = "Monthly";
@@ -40,6 +38,8 @@ public class ContractFeeConfigDto
     public Guid ContractId { get; set; }
     public Guid FeeCodeId { get; set; }
     public string? FeeCodeName { get; set; }
+    public string? FeeCode { get; set; }           // RENT / DEPOSIT / ...
+    public string? ChargeType { get; set; }         // Recurring / OneTime
     public decimal Amount { get; set; }
     public string BillingMode { get; set; } = "FixedAmount";
     public string? Unit { get; set; }
@@ -53,8 +53,6 @@ public class CreateContractRequest
 {
     public string? ContractNo { get; set; }
     public Guid RoomId { get; set; }
-    public decimal RentAmount { get; set; }
-    public decimal DepositAmount { get; set; }
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public string PaymentCycle { get; set; } = "Monthly";

@@ -104,6 +104,27 @@ public class BillJob : ScheduledJobBase
                     created++;
                     totalAmount += plan.Amount;
                 }
+
+                // Step03b: 汇总未结清的 Supplementary JE（仅包含尚未被任何 ReceivablePlan 覆盖的）
+                var suppEntries = (await conn.QueryAsync<(Guid VoucherId, decimal Amount)>(
+                    @"SELECT je.VoucherId, je.Amount FROM JournalEntries je
+                      JOIN Vouchers v ON v.Id = je.VoucherId
+                      WHERE v.SourceEntityType='ContractFee.Supplementary'
+                        AND v.SourceEntityId=@Cid
+                        AND je.Direction='Debit'
+                        AND NOT EXISTS (
+                          SELECT 1 FROM ReceivablePlans rp
+                          WHERE rp.ContractId=v.SourceEntityId
+                            AND rp.Period=v.Period
+                        )",
+                    new { Cid = contract.Id }, tx)).ToList();
+
+                foreach (var (vId, amt) in suppEntries)
+                {
+                    totalAmount += amt;
+                    created++;
+                }
+
                 await _stepLogger.CompleteStepAsync(step03, created, null, token);
 
                 if (created > 0 || feeConfigs.Count > 0)

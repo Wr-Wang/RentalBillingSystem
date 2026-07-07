@@ -64,7 +64,6 @@ export function getContract(id) { return request({ url: `/contracts/${id}`, meth
 export function createContract(data) { return request({ url: '/contracts', method: 'post', data }) }
 export function updateContract(id, data) { return request({ url: `/contracts/${id}`, method: 'put', data }) }
 export function terminateContract(id, data) { return request({ url: `/contracts/${id}/terminate`, method: 'post', data }) }
-export function rentAdjust(id, data) { return request({ url: `/contracts/${id}/rentadjust`, method: 'post', data }) }
 export function feeAdjust(id, data) { return request({ url: `/contracts/${id}/feeadjust`, method: 'post', data }) }
 export function renewContract(id, data) { return request({ url: `/contracts/${id}/renew`, method: 'post', data }) }
 export function previewRenewal(id) { return request({ url: `/contracts/${id}/renewal/preview`, method: 'get' }) }

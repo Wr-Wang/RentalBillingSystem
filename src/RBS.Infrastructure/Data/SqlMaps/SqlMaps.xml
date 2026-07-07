@@ -484,7 +484,7 @@
 
   <!-- BillJob / SettleJob 查询 -->
   <select id="Lease.Select.FeeConfig.WithFeeNameByContract">
-    <![CDATA[SELECT cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName
+    <![CDATA[SELECT cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName, fc.ChargeType
       FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
       WHERE cf.ContractId=@Id
       AND (cf.IsActive=1 OR (cf.IsActive=0 AND cf.ExpiryDate IS NOT NULL))
@@ -496,6 +496,7 @@
     <![CDATA[SELECT cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName
       FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
       WHERE cf.ContractId=@ContractId
+      AND fc.ChargeType = 'Recurring'
       AND (cf.IsActive=1 OR (cf.IsActive=0 AND cf.ExpiryDate IS NOT NULL))
       AND (cf.EffectiveDate IS NULL OR cf.EffectiveDate <= @PeriodEnd)
       AND (cf.ExpiryDate IS NULL OR cf.ExpiryDate >= @PeriodStart)
@@ -539,7 +540,7 @@
       AND (Amount-Received-ISNULL(LateFee,0))>0 AND DueDate<@Today]]>
   </update>
   <select id="Accounting.Select.Subject.ByCodes">
-    <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1122','6001','6051')]]>
+    <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1122','112202','2241','6001','6051')]]>
   </select>
   <select id="Billing.Select.ReceivablePlan.UnBilled">
     <![CDATA[SELECT Id, ContractId, FeeCodeId, Period, Amount, DueDate, Status, Received, LateFee, IsBilled, DebitNoteId, BilledAt, EntryType
@@ -554,6 +555,10 @@
   <insert id="Accounting.Insert.Voucher.BillJob">
     <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Description, Status, SourceEntityId, SourceEntityType, ContractId, CreatedBy, CreatedAt)
       VALUES (@Id, @No, @Date, @Desc, 'Posted', @SrcId, @Type, @CId, @CBy, GETUTCDATE())]]>
+  </insert>
+  <insert id="Accounting.Insert.Voucher.WithPeriod">
+    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Description, Status, SourceEntityId, SourceEntityType, ContractId, Period, CreatedBy, CreatedAt)
+      VALUES (@Id, @No, @Date, @Desc, 'Posted', @SrcId, @Type, @CId, @Period, @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Accounting.Insert.JournalEntry.Simple">
     <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
@@ -694,6 +699,12 @@
   <update id="Contract.Update.ContractFeeConfig.ExpireByContract">
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @ExpiryDate, IsActive = 0 WHERE ContractId = @ContractId AND IsActive = 1]]>
   </update>
+  <select id="Contract.Select.DepositConfig.AmountByContract">
+    <![CDATA[SELECT cfc.Amount FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId WHERE cfc.ContractId=@Cid AND fc.Code='DEPOSIT' AND cfc.IsActive=1]]>
+  </select>
+  <select id="Contract.Select.FeeConfig.AmountByCode">
+    <![CDATA[SELECT TOP 1 cfc.Amount FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId WHERE cfc.ContractId=@Cid AND fc.Code=@Code AND cfc.IsActive=1 ORDER BY cfc.EffectiveDate DESC]]>
+  </select>
   <insert id="Contract.Insert.ContractFeeConfig.MeterBased">
     <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt)
       VALUES (@Id, @ContractId, @FeeCodeId, 'MeterBased', @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
@@ -718,7 +729,9 @@
   <select id="Lease.Select.Contract.DetailMulti">
     <![CDATA[SELECT c.*, r.FullCode AS RoomFullCode FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
 SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id;
-SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id]]>
+SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, fc.Code AS FeeCode, fc.ChargeType,
+       cf.BillingMode, cf.Amount, cf.Unit, cf.UnitPrice, cf.IsActive, cf.EffectiveDate, cf.ExpiryDate
+FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id]]>
   </select>
   <insert id="Lease.Insert.ContractFeeConfig.CopyFromRenewal">
     <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt)
@@ -729,14 +742,16 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
        模块：Renewal（续签—应用服务用 SQL）
        ================================================================ -->
   <select id="Lease.Select.Contract.RenewalPreview">
-    <![CDATA[SELECT c.Id, c.ContractNo, c.RentAmount, c.DepositAmount, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.RenewalCount,
+    <![CDATA[SELECT c.Id, c.ContractNo, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.RenewalCount,
+      (SELECT TOP 1 cfc.Amount FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id=cfc.FeeCodeId WHERE cfc.ContractId=c.Id AND fc.Code='RENT' AND cfc.IsActive=1 ORDER BY cfc.EffectiveDate DESC) AS RentAmount,
+      (SELECT TOP 1 cfc.Amount FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id=cfc.FeeCodeId WHERE cfc.ContractId=c.Id AND fc.Code='DEPOSIT' AND cfc.IsActive=1 ORDER BY cfc.EffectiveDate DESC) AS DepositAmount,
       r.FullCode AS RoomFullCode FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id]]>
   </select>
   <select id="Lease.Select.ContractTenant.WithNameByContract">
     <![CDATA[SELECT ct.TenantId, t.Name AS TenantName, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id]]>
   </select>
   <select id="Lease.Select.ContractFeeConfig.ActiveWithFeeName">
-    <![CDATA[SELECT cf.FeeCodeId, fc.Name AS FeeName, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice
+    <![CDATA[SELECT cf.FeeCodeId, fc.Name AS FeeName, fc.Code AS FeeCode, fc.ChargeType, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice
       FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id AND cf.IsActive = 1]]>
   </select>
   <select id="Lease.Select.Contract.ByPreviousContractId">
@@ -747,11 +762,13 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
   </select>
   <select id="Lease.Select.Contract.RenewalChain">
     <![CDATA[WITH ContractChain AS (
-      SELECT Id, ContractNo, Status, RentAmount, StartDate, EndDate, RenewalCount FROM Contracts WHERE Id = @RootId
+      SELECT Id, ContractNo, Status, StartDate, EndDate, RenewalCount FROM Contracts WHERE Id = @RootId
       UNION ALL
-      SELECT c.Id, c.ContractNo, c.Status, c.RentAmount, c.StartDate, c.EndDate, c.RenewalCount
+      SELECT c.Id, c.ContractNo, c.Status, c.StartDate, c.EndDate, c.RenewalCount
       FROM Contracts c INNER JOIN ContractChain cc ON cc.Id = c.PreviousContractId)
-      SELECT Id AS ContractId, ContractNo, Status, RentAmount, CONVERT(NVARCHAR(10), StartDate, 23) AS StartDate,
+      SELECT Id AS ContractId, ContractNo, Status,
+      (SELECT TOP 1 cfc.Amount FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id=cfc.FeeCodeId WHERE cfc.ContractId=ContractChain.Id AND fc.Code='RENT' AND cfc.IsActive=1 ORDER BY cfc.EffectiveDate DESC) AS RentAmount,
+      CONVERT(NVARCHAR(10), StartDate, 23) AS StartDate,
       CONVERT(NVARCHAR(10), EndDate, 23) AS EndDate, RenewalCount,
       CASE WHEN Id = @TargetId THEN 1 ELSE 0 END AS IsCurrent FROM ContractChain ORDER BY RenewalCount]]>
   </select>
@@ -787,9 +804,9 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
     <![CDATA[UPDATE Contracts SET Status = 'Active' WHERE Id = @Id AND Status = 'Active']]>
   </update>
   <insert id="Lease.Insert.Contract.FromRenewal">
-    <![CDATA[INSERT INTO Contracts (Id, ContractNo, RoomId, RentAmount, DepositAmount, StartDate, EndDate, PaymentCycle, Status, CompanyId,
+    <![CDATA[INSERT INTO Contracts (Id, ContractNo, RoomId, StartDate, EndDate, PaymentCycle, Status, CompanyId,
       PreviousContractId, RenewalCount, OriginalContractId, MarketPriceAtRenewal, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractNo, @RoomId, @RentAmount, @DepositAmount, @StartDate, @EndDate, @PaymentCycle, 'Active', @CompanyId,
+      VALUES (@Id, @ContractNo, @RoomId, @StartDate, @EndDate, @PaymentCycle, 'Active', @CompanyId,
       @PreviousContractId, @RenewalCount, @OriginalContractId, @MarketPrice, @CreatedBy, @CreatedAt)]]>
   </insert>
   <select id="Lease.Select.ContractTenant.PrimaryByIds">
@@ -815,8 +832,8 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
        模块：Contract（合同—SQL 更新语句，用于 ContractAppService）
        ================================================================ -->
   <insert id="Lease.Insert.Contract.Default">
-    <![CDATA[INSERT INTO Contracts (Id,ContractNo,RoomId,RentAmount,DepositAmount,StartDate,EndDate,PaymentCycle,Status,CompanyId,CreatedBy,CreatedAt)
-      VALUES(@Id,@ContractNo,@RoomId,@RentAmount,@DepositAmount,@StartDate,@EndDate,@PaymentCycle,@Status,@CompanyId,@CreatedBy,@CreatedAt)]]>
+    <![CDATA[INSERT INTO Contracts (Id,ContractNo,RoomId,StartDate,EndDate,PaymentCycle,Status,CompanyId,CreatedBy,CreatedAt)
+      VALUES(@Id,@ContractNo,@RoomId,@StartDate,@EndDate,@PaymentCycle,@Status,@CompanyId,@CreatedBy,@CreatedAt)]]>
   </insert>
   <update id="Lease.Update.Contract.Status">
     <![CDATA[UPDATE Contracts SET Status=@Status WHERE Id=@Id]]>
@@ -824,9 +841,7 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
   <update id="Lease.Update.Contract.Terminate">
     <![CDATA[UPDATE Contracts SET Status='Terminated', TerminationReason=@Reason WHERE Id=@Id]]>
   </update>
-  <update id="Lease.Update.Contract.RentAmount">
-    <![CDATA[UPDATE Contracts SET RentAmount=@NewAmount WHERE Id=@Id]]>
-  </update>
+
   <delete id="Lease.Delete.ReceiptAllocation.ByReceiptId">
     <![CDATA[DELETE FROM ReceiptAllocations WHERE ReceiptId=@Id]]>
   </delete>
@@ -841,7 +856,7 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
        模块：ContractFeeConfig — 合同费用配置（Contract 子实体）
        ================================================================ -->
   <select id="Lease.Select.ContractFeeConfig.ByContractId">
-    <![CDATA[SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, fc.Code AS FeeCode,
+    <![CDATA[SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, fc.Code AS FeeCode, fc.ChargeType,
                    cf.BillingMode, cf.Amount, cf.Unit, cf.UnitPrice, cf.IsActive,
                    cf.EffectiveDate, cf.ExpiryDate
             FROM ContractFeeConfigs cf
@@ -1090,5 +1105,75 @@ SELECT cf.*, fc.Name AS FeeCodeName FROM ContractFeeConfigs cf LEFT JOIN FeeCode
       SELECT COUNT(1) FROM Vouchers
       WHERE SourceEntityType = 'ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End;
     ]]>
+  </select>
+  <select id="Contract.Select.FeeConfig.IdByContractAndCode">
+    <![CDATA[SELECT TOP 1 cfc.Id FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id=cfc.FeeCodeId WHERE cfc.ContractId=@Cid AND fc.Code=@Code AND cfc.IsActive=1]]>
+  </select>
+  <select id="Journal.Select.OneTimeFeeConfig.WithFeeCode">
+    <![CDATA[SELECT cfc.Amount, fc.Code, fc.ChargeType, fc.Name AS FeeName, c.CompanyId, c.StartDate
+      FROM ContractFeeConfigs cfc
+      JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId
+      JOIN Contracts c ON c.Id = cfc.ContractId
+      WHERE cfc.Id = @Id AND cfc.ContractId = @Cid]]>
+  </select>
+  <select id="Journal.Select.SupplementaryFeeConfig.ByContractAndFee">
+    <![CDATA[SELECT fc.Name AS FeeName, c.CompanyId
+      FROM ContractFeeConfigs cfc
+      JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId
+      JOIN Contracts c ON c.Id = cfc.ContractId
+      WHERE cfc.ContractId = @Cid AND cfc.FeeCodeId = @Fid AND cfc.IsActive = 1]]>
+  </select>
+
+  <!-- Missing SQLs added by audit fix -->
+  <select id="Utility.Select.MeterReading.Latest">
+    <![CDATA[SELECT TOP 1 * FROM MeterReadings WHERE ContractFeeConfigId=@Id ORDER BY ReadingDate DESC]]>
+  </select>
+  <select id="Utility.Select.MeterReading.History">
+    <![CDATA[SELECT * FROM MeterReadings WHERE ContractFeeConfigId=@Id AND YEAR(ReadingDate)=@Y AND MONTH(ReadingDate)=@M ORDER BY ReadingDate DESC]]>
+  </select>
+  <select id="Utility.Select.MeterReading.Exists">
+    <![CDATA[SELECT COUNT(1) FROM MeterReadings WHERE ContractFeeConfigId=@Id AND YEAR(ReadingDate)=@Y AND MONTH(ReadingDate)=@M]]>
+  </select>
+  <select id="Utility.Select.MeterReading.ByCompanyMonth">
+    <![CDATA[SELECT mr.*, cfc.FeeCodeId FROM MeterReadings mr INNER JOIN ContractFeeConfigs cfc ON cfc.Id=mr.ContractFeeConfigId WHERE cfc.ContractId IN (SELECT Id FROM Contracts WHERE CompanyId=@CompanyId) AND YEAR(mr.ReadingDate)=@Year AND MONTH(mr.ReadingDate)=@Month ORDER BY mr.ReadingDate DESC]]>
+  </select>
+  <select id="Lease.Select.Contract.Expiring">
+    <![CDATA[SELECT * FROM Contracts WHERE EndDate=@Date AND Status='Active']]>
+  </select>
+  <select id="Lease.Select.Contract.HasActiveForHousingUnit">
+    <![CDATA[SELECT COUNT(1) FROM Contracts WHERE RoomId=@Id AND Status='Active']]>
+  </select>
+  <select id="Lease.Select.RenewalRequest.ByOldContractId">
+    <![CDATA[SELECT * FROM RenewalRequests WHERE OldContractId=@Id ORDER BY CreatedAt DESC]]>
+  </select>
+  <select id="Lease.Select.RenewalRequest.PendingByContractId">
+    <![CDATA[SELECT TOP 1 * FROM RenewalRequests WHERE OldContractId=@Id AND Status='PendingApproval' ORDER BY CreatedAt DESC]]>
+  </select>
+  <select id="Lease.Select.RenewalRequest.HasPendingForContract">
+    <![CDATA[SELECT COUNT(1) FROM RenewalRequests WHERE OldContractId=@Id AND Status='PendingApproval']]>
+  </select>
+  <update id="Accounting.Update.Voucher.Post">
+    <![CDATA[UPDATE Vouchers SET Status=@Status, UpdatedBy=@UpdatedBy, UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
+  </update>
+  <select id="Accounting.Select.Entry.ByVoucherId">
+    <![CDATA[SELECT * FROM JournalEntries WHERE VoucherId=@Id]]>
+  </select>
+
+  <select id="Lease.Select.Contract.ListByCompany">
+    <![CDATA[SELECT c.Id, c.ContractNo, c.RoomId, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.CompanyId, c.AutoRenew, c.RenewalCount, c.MarketPriceAtRenewal, c.PreviousContractId, c.OriginalContractId
+      FROM Contracts c WHERE c.CompanyId = @Id ORDER BY c.CreatedAt DESC]]>
+  </select>
+  <select id="Lease.Select.Contract.ByTenantId">
+    <![CDATA[SELECT c.Id, c.ContractNo, c.RoomId, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.CompanyId, c.AutoRenew, c.RenewalCount, c.MarketPriceAtRenewal, c.PreviousContractId, c.OriginalContractId
+      FROM Contracts c INNER JOIN ContractTenants ct ON ct.ContractId=c.Id WHERE ct.TenantId=@TenantId ORDER BY c.CreatedAt DESC]]>
+  </select>
+  <select id="Lease.Select.Contract.CreatedAt">
+    <![CDATA[SELECT CreatedAt FROM Contracts WHERE Id=@Id]]>
+  </select>
+  <select id="Identity.Select.UserRoles.ByUserId">
+    <![CDATA[SELECT r.Id AS RoleId, r.Name FROM UserRoles ur INNER JOIN Roles r ON r.Id=ur.RoleId WHERE ur.UserId=@UserId]]>
+  </select>
+  <select id="Organization.Select.Company.NameById">
+    <![CDATA[SELECT Name FROM Companies WHERE Id=@Id]]>
   </select>
 </sqlMap>

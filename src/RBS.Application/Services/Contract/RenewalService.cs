@@ -176,12 +176,20 @@ public class RenewalService : IRenewalService
         var newContractNo = $"{baseNo}-R{oldContract.RenewalCount + 1}";
 
         // 5. 创建 RenewalRequest
+        using var rentConn = _db.CreateConnection(); rentConn.Open();
+        var oldRentAmount = await rentConn.QuerySingleOrDefaultAsync<decimal>(
+            _sql.Get("Contract.Select.FeeConfig.AmountByCode"),
+            new { Cid = oldContract.Id, Code = "RENT" });
+        var oldDepositAmount = await rentConn.QuerySingleOrDefaultAsync<decimal>(
+            _sql.Get("Contract.Select.DepositConfig.AmountByContract"),
+            new { Cid = oldContract.Id });
+
         var renewal = new RenewalRequest(
-            oldContract.Id, newContractNo, oldContract.RentAmount,
+            oldContract.Id, newContractNo, oldRentAmount,
             request.NewRentAmount, DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture)));
 
         renewal.SetDepositInfo(
-            request.DepositHandling, oldContract.DepositAmount, request.NewDepositAmount);
+            request.DepositHandling, oldDepositAmount, request.NewDepositAmount);
         renewal.SetMarketPrice(request.MarketReferencePrice);
         renewal.SetPaymentStatusCheck(true);
         renewal.SetRemark(request.Remark);
@@ -211,9 +219,9 @@ public class RenewalService : IRenewalService
         approvalRequest.SetCreated(userId, ChinaTime.Now, null, null);
         approvalRequest.SetContractId(oldContract.Id);
         approvalRequest.AddRecord(userId, "Submitted",
-            $"续签：月租 ¥{oldContract.RentAmount.Amount:N2} → ¥{request.NewRentAmount:N2}，" +
+            $"续签：月租 ¥{renewal.PreviousRent:N2} → ¥{request.NewRentAmount:N2}，" +
             $"到期日：{request.NewEndDate}，" +
-            $"押金：¥{oldContract.DepositAmount.Amount:N2} → ¥{(request.DepositHandling == "NEW" ? (request.NewDepositAmount ?? oldContract.DepositAmount.Amount) : oldContract.DepositAmount.Amount):N2}（{(request.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取")}）");
+            $"押金：¥{renewal.OldDepositAmount:N2} → ¥{(request.DepositHandling == "NEW" ? (request.NewDepositAmount ?? renewal.OldDepositAmount) : renewal.OldDepositAmount):N2}（{(request.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取")}）");
 
         approvalRequest.Submit();
         await _uow.ApprovalRequests.AddAsync(approvalRequest, ct);
@@ -325,8 +333,8 @@ public class RenewalService : IRenewalService
                 new
                 {
                     Id = newId, ContractNo = renewal.ContractNo,
-                    RoomId = oldContract.RoomId, RentAmount = renewal.NewRent,
-                    DepositAmount = depositAmount, StartDate = startDate,
+                    RoomId = oldContract.RoomId,
+                    StartDate = startDate,
                     EndDate = renewal.NewEndDate, PaymentCycle = oldContract.PaymentCycle,
                     CompanyId = oldContract.CompanyId,
                     PreviousContractId = oldContract.Id,
@@ -424,6 +432,26 @@ public class RenewalService : IRenewalService
                 new { NewContractId = newId, renewal.Id, Now = now }, tx);
 
             tx.Commit();
+
+            // 6.5 ★ 为新合同押金生成一次性 JE（Commit 后执行，不影响续签主流程）
+            try
+            {
+                if (depositAmount > 0)
+                {
+                    var depositFeeConfigId = await conn.QuerySingleOrDefaultAsync<Guid>(
+                        _sql.Get("Contract.Select.FeeConfig.IdByContractAndCode"),
+                        new { Cid = newId, Code = "DEPOSIT" });
+                    if (depositFeeConfigId != Guid.Empty)
+                    {
+                        var journalGen = _serviceProvider.GetRequiredService<IJournalGenerationService>();
+                        await journalGen.GenerateOneTimeAsync(newId, depositFeeConfigId, ct);
+                    }
+                }
+            }
+            catch
+            {
+                // JE 生成失败不影响续签完成，可后续通过 Job 重试
+            }
 
             // 7. 写 ChangeHistory（续签完成后记录）
             try

@@ -89,7 +89,6 @@ public static class DependencyInjection
         services.AddScoped<IEventHandler<ApprovalLevelAdvancedEvent>, ApprovalLevelAdvancedEventHandler>();
         services.AddScoped<IEventHandler<ContractSuspendedEvent>, ContractSuspendedEventHandler>();
         services.AddScoped<IEventHandler<ContractResumedEvent>, ContractResumedEventHandler>();
-        services.AddScoped<IEventHandler<ContractRentAdjustedEvent>, ContractRentAdjustedEventHandler>();
         services.AddScoped<IBillingDomainService, BillingDomainService>();
         services.AddScoped<IApprovalDomainService, ApprovalDomainService>();
 

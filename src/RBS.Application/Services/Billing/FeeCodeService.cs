@@ -29,6 +29,7 @@ public class FeeCodeService : IFeeCodeService
     public async Task<FeeCodeDto> CreateAsync(CreateFeeCodeRequest request, CancellationToken ct = default)
     {
         var entity = new FeeCode(request.Code, request.Name, CompanyId);
+        if (!string.IsNullOrEmpty(request.ChargeType)) entity.SetChargeType(request.ChargeType);
         entity.SetBillingMode(request.BillingMode);
         entity.SetUnit(request.Unit);
         entity.SetSortOrder(request.SortOrder);
@@ -45,6 +46,7 @@ public class FeeCodeService : IFeeCodeService
             ?? throw new KeyNotFoundException("收费项目不存在");
         if (request.Name != null) entity.Rename(request.Name);
         if (request.Code != null) entity.SetCode(request.Code);
+        if (request.ChargeType != null) entity.SetChargeType(request.ChargeType);
         if (request.BillingMode != null) entity.SetBillingMode(request.BillingMode);
         if (request.Unit != null) entity.SetUnit(request.Unit);
         if (request.SortOrder.HasValue) entity.SetSortOrder(request.SortOrder.Value);
@@ -64,7 +66,8 @@ public class FeeCodeService : IFeeCodeService
 
     private static FeeCodeDto MapToDto(FeeCode f) => new()
     {
-        Id = f.Id, Code = f.Code, Name = f.Name, BillingMode = f.BillingMode,
+        Id = f.Id, Code = f.Code, Name = f.Name, ChargeType = f.ChargeType,
+        BillingMode = f.BillingMode,
         Unit = f.Unit, SortOrder = f.SortOrder, IsActive = f.IsActive,
         Category = f.Category, IsRequired = f.IsRequired, CompanyId = f.CompanyId
     };

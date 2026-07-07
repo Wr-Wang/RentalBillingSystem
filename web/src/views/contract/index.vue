@@ -28,12 +28,6 @@
       <el-table-column prop="contractNo" label="合同号" width="150" />
       <el-table-column prop="roomName" label="房屋" width="100" />
       <el-table-column prop="tenantName" label="租客" width="100" />
-      <el-table-column prop="rentAmount" label="月租金" width="100">
-        <template #default="{ row }">¥{{ row.rentAmount?.toLocaleString() }}</template>
-      </el-table-column>
-      <el-table-column prop="depositAmount" label="押金" width="100">
-        <template #default="{ row }">¥{{ (row.depositAmount || 0).toLocaleString() }}</template>
-      </el-table-column>
       <el-table-column prop="startDate" label="起租" width="95" />
       <el-table-column prop="endDate" label="到期" width="95" />
       <el-table-column prop="status" label="状态" width="95">
@@ -50,7 +44,6 @@
         <template #default="{ row }">
           <div style="display: flex; gap: 2px; flex-wrap: wrap;">
             <el-button text size="small" type="primary" @click="$router.push('/contracts/' + row.id)">详情</el-button>
-            <el-button v-if="row.status === 'Active' || row.status === 'Suspended'" text size="small" type="warning" @click="showModifyRent(row)">调租</el-button>
             <el-button v-if="row.status === 'Active' || row.status === 'Suspended'" text size="small" type="warning" @click="showModifyFee(row)">调价</el-button>
             <el-button v-if="(row.status === 'Active' || row.status === 'Expired') && !row.hasRenewalContract" text size="small" type="primary" @click="handleRenew(row)">续签</el-button>
             <el-button v-if="row.status === 'Active'" text size="small" type="danger" @click="handleTerminate(row)">终止</el-button>
@@ -84,36 +77,6 @@
       <template #footer>
         <el-button @click="showTerminate = false">取消</el-button>
         <el-button type="primary" @click="submitTerminate">提交审批</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Modify Rent Dialog -->
-    <el-dialog v-model="showModifyRentDialog" :draggable="true" title="合同租金调整" width="550px">
-      <el-alert title="租金调整需要经过审批，金额越大审批级别越高。" type="info" show-icon :closable="false" style="margin-bottom: 16px;" />
-      <el-form :model="modifyRentForm" label-width="120px">
-        <el-descriptions :column="2" border style="margin-bottom: 16px;">
-          <el-descriptions-item label="合同号">{{ modifyRentTarget?.contractNo }}</el-descriptions-item>
-          <el-descriptions-item label="当前月租">¥{{ modifyRentTarget?.rentAmount?.toLocaleString() }}</el-descriptions-item>
-        <el-descriptions-item label="当前生效日">{{ modifyRentTarget?.rentEffDate || '-' }}</el-descriptions-item>
-        </el-descriptions>
-        <el-form-item label="新租金 (元/月)">
-          <el-input-number v-model="modifyRentForm.newRentAmount" :min="0" :precision="2" style="width: 200px;" />
-        </el-form-item>
-        <el-form-item label="调整差额">
-          <span :style="{ color: rentDiff >= 0 ? '#f56c6c' : '#67c23a', fontWeight: 'bold', fontSize: '16px' }">
-            {{ rentDiff >= 0 ? '+' : '' }}¥{{ rentDiff.toLocaleString() }}
-          </span>
-        </el-form-item>
-        <el-form-item label="生效日期">
-          <el-date-picker v-model="modifyRentForm.effectiveDate" type="date" value-format="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="调整原因">
-          <el-input v-model="modifyRentForm.reason" type="textarea" :rows="3" placeholder="请说明调价原因，如：市场行情变化、合同约定涨幅等" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showModifyRentDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submittingRent" @click="submitModifyRent">提交审批</el-button>
       </template>
     </el-dialog>
 
@@ -166,9 +129,7 @@
       <el-alert v-else title="续签将创建新合同，原合同标记为已续签。审批通过后自动执行。" type="success" show-icon :closable="false" style="margin-bottom: 16px;" />
       <el-descriptions :column="2" border style="margin-bottom: 16px;">
         <el-descriptions-item label="原合同号">{{ renewTarget?.contractNo }}</el-descriptions-item>
-        <el-descriptions-item label="当前月租">¥{{ renewTarget?.rentAmount?.toLocaleString() }}</el-descriptions-item>
         <el-descriptions-item label="原到期日">{{ renewTarget?.endDate }}</el-descriptions-item>
-        <el-descriptions-item label="当前押金">¥{{ renewTarget?.depositAmount?.toLocaleString() || 0 }}</el-descriptions-item>
       </el-descriptions>
       <el-form :model="renewForm" label-width="120px">
         <el-form-item label="新合同月租">
@@ -180,7 +141,7 @@
         </el-form-item>
         <el-form-item label="押金处理">
           <el-radio-group v-model="renewForm.depositHandling">
-            <el-radio label="TRANSFER">原押金延续（¥{{ renewTarget?.depositAmount?.toLocaleString() || 0 }}）</el-radio>
+            <el-radio label="TRANSFER">原押金延续</el-radio>
             <el-radio label="NEW">重新收取</el-radio>
           </el-radio-group>
         </el-form-item>
@@ -190,14 +151,11 @@
         <!-- 押金处理摘要 -->
         <el-form-item label=" ">
           <div v-if="renewForm.depositHandling === 'NEW'" style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
-            <div>押金：¥{{ (renewTarget?.depositAmount || 0).toFixed(2) }} → ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}
-              <span v-if="renewForm.newDeposit > (renewTarget?.depositAmount || 0)" style="color:#e6a23c;">（上调 ¥{{ (renewForm.newDeposit - (renewTarget?.depositAmount || 0)).toFixed(2) }}）</span>
-              <span v-else-if="renewForm.newDeposit < (renewTarget?.depositAmount || 0)" style="color:#67c23a;">（下调 ¥{{ ((renewTarget?.depositAmount || 0) - renewForm.newDeposit).toFixed(2) }}）</span>
-            </div>
-            <div style="color:#909399;">操作：退还旧押金 ¥{{ (renewTarget?.depositAmount || 0).toFixed(2) }} + 收取新押金 ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}</div>
+
+
           </div>
           <div v-else style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
-            <div>押金：原押金 ¥{{ (renewTarget?.depositAmount || 0).toFixed(2) }} 延续至新合同</div>
+            <div>押金：原押金延续至新合同</div>
             <div style="color:#909399;">说明：旧合同押金转出 → 新合同押金转入</div>
           </div>
         </el-form-item>
@@ -217,7 +175,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, rentAdjust, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory, handleApiError } from '@/api/index.js'
+import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory, handleApiError } from '@/api/index.js'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
@@ -256,8 +214,7 @@ async function fetchContracts() {
       roomName: c.roomFullCode || '',
       tenantName: c.tenants?.length > 0 ? c.tenants[0].tenantName : '',
       tenantPhone: c.tenants?.length > 0 ? c.tenants[0].tenantPhone : '',
-      rentAmount: c.rentAmount,
-      depositAmount: c.depositAmount,
+
       startDate: c.startDate,
       endDate: c.endDate,
       status: c.status,
@@ -289,61 +246,6 @@ onMounted(fetchContracts)
 const showTerminate = ref(false)
 const terminateForm = reactive({ type: 'EARLY', actualEndDate: '', reason: '' })
 const currentContract = ref(null)
-
-// === Modify Rent ===
-const showModifyRentDialog = ref(false)
-const modifyRentTarget = ref(null)
-const modifyRentForm = reactive({ newRentAmount: 0, effectiveDate: '', reason: '' })
-const contractModifyTypeId = ref(null)
-const submittingRent = ref(false)
-
-// 将字符串 ID 转为 GUID 格式（模拟数据使用，已有 GUID 则直接返回）
-function toGuidId(id) {
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return id
-  const hex = Array.from(String(id)).reduce((h, c) => { const n = c.charCodeAt(0).toString(16); return h + (n.length < 2 ? '0' + n : n) }, '').padEnd(32, '0').slice(0, 32)
-  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`
-}
-
-// 获取 CONTRACT_MODIFY 审批类型 ID（带缓存，不存在则自动创建）
-async function ensureContractModifyTypeId() {
-  if (contractModifyTypeId.value) return contractModifyTypeId.value
-  try {
-    const types = await getApprovalTypes()
-    let found = types.find(t => t.code === 'CONTRACT_MODIFY')
-
-    if (!found) {
-      // 自动创建 CONTRACT_MODIFY 审批类型
-      found = await createApprovalType({
-        name: '修改合同租金',
-        code: 'CONTRACT_MODIFY',
-        description: '修改合同租金需要审批，金额越大审批级别越高。'
-      })
-
-      // 查找角色 ID
-      const roles = await getRoles()
-      const opsSup = roles.find(r => r.code === 'OpsSupervisor')
-      const deptMgr = roles.find(r => r.code === 'DeptManager')
-
-      // 创建 2 级审批配置
-      if (opsSup) {
-        await createApprovalLevel(found.id, { level: 1, roleId: opsSup.id, minAmount: 0, maxAmount: 5000 })
-      }
-      if (deptMgr) {
-        await createApprovalLevel(found.id, { level: 2, roleId: deptMgr.id, minAmount: 5000, maxAmount: 99999999 })
-      }
-    }
-
-    contractModifyTypeId.value = found?.id || null
-    return contractModifyTypeId.value
-  } catch {
-    return null
-  }
-}
-
-const rentDiff = computed(() => {
-  const old = modifyRentTarget.value?.rentAmount || 0
-  return modifyRentForm.newRentAmount - old
-})
 
 // === Modify Fee ===
 const showModifyFeeDialog = ref(false)
@@ -401,43 +303,6 @@ function handleResume(row) {
   }).catch(() => {})
 }
 
-// === Modify Rent ===
-function showModifyRent(row) {
-  modifyRentTarget.value = row
-  modifyRentForm.newRentAmount = row.rentAmount
-  modifyRentForm.effectiveDate = ''
-  modifyRentForm.reason = ''
-  showModifyRentDialog.value = true
-}
-async function submitModifyRent() {
-  if (!modifyRentForm.newRentAmount || modifyRentForm.newRentAmount <= 0) {
-    ElMessage.warning('请输入有效的租金金额')
-    return
-  }
-  if (!modifyRentForm.reason) {
-    ElMessage.warning('请填写调整原因')
-    return
-  }
-
-  submittingRent.value = true
-  try {
-    const diff = modifyRentForm.newRentAmount - (modifyRentTarget.value?.rentAmount || 0)
-    const approvalLevel = Math.abs(diff) > 5000 ? '2级(部门经理)' : '1级(运营主管)'
-
-    await rentAdjust(toGuidId(modifyRentTarget.value?.id), {
-      newAmount: modifyRentForm.newRentAmount,
-      effectiveDate: modifyRentForm.effectiveDate || null,
-      reason: modifyRentForm.reason
-    })
-
-    ElMessage.success(`租金调整申请已提交${approvalLevel}审批，等待审批人处理`)
-    showModifyRentDialog.value = false
-  } catch (e) {
-    handleApiError(e, '提交审批失败')
-  } finally {
-    submittingRent.value = false
-  }
-}
 // === Modify Fee ===
 const feeConfigLoading = ref(false)
 const submittingFee = ref(false)
@@ -468,7 +333,7 @@ async function showModifyFee(row) {
         feeMinDate.value = min
         modifyFeeForm.effectiveDate = min.toISOString().split('T')[0]
       }
-      const activeConfigs = configs.filter(f => f.isActive)
+      const activeConfigs = (configs || []).filter(f => f.isActive && f.chargeType === 'Recurring')
       modifyFeeForm.items = activeConfigs.map(f => {
         const amount = typeof f.amount === 'number' ? f.amount : parseFloat(f.amount) || 0
         const isMeter = f.billingMode === 'MeterBased'
@@ -574,9 +439,9 @@ async function handleRenew(row) {
     return
   }
   renewTarget.value = row
-  renewForm.rentAmount = row.rentAmount
+  renewForm.rentAmount = 0
   renewForm.depositHandling = 'TRANSFER'
-  renewForm.newDeposit = (row.depositAmount || 0) + 20
+  renewForm.newDeposit = 20
   renewForm.remark = ''
   // 有被驳回的续签 → 预填上次数据
   renewFromRejected.value = false
@@ -584,7 +449,7 @@ async function handleRenew(row) {
     try {
       const rejected = await getLastRejectedRenewal(row.id)
       if (rejected) {
-        renewForm.rentAmount = rejected.newRentAmount || row.rentAmount
+        renewForm.rentAmount = rejected.newRentAmount || 0
         if (rejected.depositHandling) renewForm.depositHandling = rejected.depositHandling
         if (rejected.newEndDate) renewForm.endDate = rejected.newEndDate
         renewFromRejected.value = true

@@ -17,5 +17,4 @@ public interface IContractService
     Task TerminateAsync(Guid id, string reason, CancellationToken ct = default);
     Task SuspendAsync(Guid id, CancellationToken ct = default);
     Task ResumeAsync(Guid id, CancellationToken ct = default);
-    Task AdjustRentAsync(Guid id, decimal newAmount, CancellationToken ct = default);
 }

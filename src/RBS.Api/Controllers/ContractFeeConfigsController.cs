@@ -182,6 +182,7 @@ private static object MapConfig(dynamic r) => new
         feeCodeId = (Guid)r.FeeCodeId,
         feeCodeName = (string?)r.FeeCodeName,
         feeCode = (string?)r.FeeCode,
+        chargeType = (string?)r.ChargeType ?? "Recurring",
         billingMode = (string)r.BillingMode,
         amount = (decimal)r.Amount,
         unit = (string?)r.Unit,

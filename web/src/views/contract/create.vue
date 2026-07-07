@@ -54,7 +54,7 @@
       </el-table>
       <div style="text-align: right; margin-top: 16px;">
         <el-button @click="step = 0">上一步</el-button>
-        <el-button type="primary" :disabled="!selectedTenant" @click="step = 2">下一步</el-button>
+        <el-button type="primary" :disabled="!selectedTenant" @click="step = 1">下一步</el-button>
       </div>
     </el-card>
 
@@ -63,11 +63,11 @@
       <template #header>租金与押金</template>
       <el-form :model="contractForm" label-width="120px">
         <el-form-item label="月租金 (元)">
-          <el-input-number v-model="contractForm.rentAmount" :min="0" :precision="2" style="width: 200px;" />
+
           <span style="margin-left: 8px; color: #909399;">建议价: ¥{{ selectedRoom?.standardRent || 0 }}</span>
         </el-form-item>
         <el-form-item label="押金 (元)">
-          <el-input-number v-model="contractForm.depositAmount" :min="0" :precision="2" style="width: 200px;" />
+
         </el-form-item>
         <el-form-item label="起租日期">
           <el-date-picker v-model="contractForm.startDate" type="date" />
@@ -91,7 +91,7 @@
     </el-card>
 
     <!-- Step 4: Fee Config -->
-    <el-card v-show="step === 3">
+    <el-card v-show="step === 2">
       <template #header>费用配置</template>
       <p style="color: #909399; margin-bottom: 16px;">
         配置合同绑定的收费项目和金额/单价
@@ -113,19 +113,17 @@
         </el-table-column>
       </el-table>
       <div style="text-align: right; margin-top: 16px;">
-        <el-button @click="step = 2">上一步</el-button>
-        <el-button type="primary" @click="step = 4">下一步</el-button>
+        <el-button @click="step = 1">上一步</el-button>
+        <el-button type="primary" @click="step = 3">下一步</el-button>
       </div>
     </el-card>
 
     <!-- Step 5: Confirm -->
-    <el-card v-show="step === 4">
+    <el-card v-show="step === 3">
       <template #header>确认信息</template>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="房屋">{{ selectedRoom?.fullCode }}</el-descriptions-item>
         <el-descriptions-item label="租客">{{ selectedTenant?.name }}</el-descriptions-item>
-        <el-descriptions-item label="月租金">¥{{ contractForm.rentAmount }}</el-descriptions-item>
-        <el-descriptions-item label="押金">¥{{ contractForm.depositAmount }}</el-descriptions-item>
         <el-descriptions-item label="起租日期">{{ contractForm.startDate }}</el-descriptions-item>
         <el-descriptions-item label="到期日期">{{ contractForm.endDate }}</el-descriptions-item>
       </el-descriptions>
@@ -195,7 +193,6 @@ const allTenants = ref([])
 const feeCodesList = ref([])
 
 const contractForm = reactive({
-  rentAmount: 0, depositAmount: 0,
   startDate: '', endDate: '', paymentDueDay: 5,
   allowDepositAsLastRent: false
 })
@@ -232,7 +229,7 @@ async function loadRooms() {
       roomNo: u.roomNo || '',
       roomTypeName: u.roomTypeName || '',
       area: u.area || 0,
-      standardRent: u.standardRent || u.rentAmount || 0
+      standardRent: u.standardRent || 0
     }))
   } catch { ElMessage.error('加载房屋数据失败') }
   roomsLoading.value = false
@@ -270,7 +267,7 @@ async function loadFeeCodes() {
   } catch { /* 静默 */ }
 }
 
-function selectRoom(row) { selectedRoom.value = row; contractForm.rentAmount = row.standardRent }
+function selectRoom(row) { selectedRoom.value = row }
 function selectTenant(row) { selectedTenant.value = row }
 
 async function addNewTenant() {
@@ -310,8 +307,6 @@ async function submitContract() {
       roomId: selectedRoom.value.id,
       tenantIds: [selectedTenant.value.id],
       companyId,
-      rentAmount: contractForm.rentAmount,
-      depositAmount: contractForm.depositAmount,
       startDate: contractForm.startDate,
       endDate: contractForm.endDate,
       paymentCycle: 'MONTHLY',

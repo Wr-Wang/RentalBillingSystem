@@ -21,7 +21,7 @@ public interface IContractDomainService
     Task ResumeContractAsync(Contract contract, CancellationToken ct = default);
 
     /// <summary>续签合同：创建新合同，关联旧合同</summary>
-    Task<Contract> RenewContractAsync(Contract oldContract, DateOnly newEndDate, decimal? newRentAmount, CancellationToken ct = default);
+    Task<Contract> RenewContractAsync(Contract oldContract, DateOnly newEndDate, CancellationToken ct = default);
 
     /// <summary>按天分摊计算应收金额</summary>
     decimal CalculateProratedAmount(decimal monthlyAmount, DateOnly startDate, DateOnly endDate, DateOnly periodStart, DateOnly periodEnd);

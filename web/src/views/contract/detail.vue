@@ -3,7 +3,6 @@
     <div class="page-header">
       <h2>合同详情</h2>
       <div class="table-actions">
-        <el-button v-if="isActive" type="warning" @click="showModifyRent = true">租金调整</el-button>
         <el-button v-if="isActive || contract.status === 'Suspended'" type="warning" @click="openFeeAdjust">费用调价</el-button>
         <el-button v-if="isActive && !contract.hasRenewalContract" type="primary" @click="openRenewDialog">续签</el-button>
         <el-button v-if="isActive" type="danger" @click="showTerminate = true">终止合同</el-button>
@@ -27,10 +26,6 @@
         <el-descriptions-item label="合同号">{{ contract.contractNo }}</el-descriptions-item>
         <el-descriptions-item label="房屋">{{ contract.roomName }}</el-descriptions-item>
         <el-descriptions-item label="租客">{{ contract.tenantName }}</el-descriptions-item>
-        <el-descriptions-item label="月租金">
-          <span style="font-weight: bold; font-size: 16px; color: #409eff;">¥{{ contract.rentAmount?.toLocaleString() }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="押金">¥{{ contract.depositAmount?.toLocaleString() }}</el-descriptions-item>
         <el-descriptions-item label="付款到期日">每月{{ contract.paymentDueDay || 5 }}日</el-descriptions-item>
         <el-descriptions-item label="起租日期">{{ contract.startDate }}</el-descriptions-item>
         <el-descriptions-item label="到期日期">{{ contract.endDate }}</el-descriptions-item>
@@ -49,8 +44,8 @@
     <!--===============================================================-->
     <el-card style="margin-bottom: 16px;">
       <el-tabs v-model="activeTab">
-        <!-------- 2a. Fee Config ------>
-        <el-tab-pane label="费用配置" name="fee">
+        <!-------- 2a. Recurring Fee Config ------>
+        <el-tab-pane label="周期费用" name="recurring">
           <div style="margin-bottom: 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <el-button type="primary" size="small" @click="openFeeAdjust">批量调价</el-button>
             <el-button size="small" @click="openAddFeeConfig">添加费用</el-button>
@@ -60,7 +55,7 @@
             </el-tag>
             <span style="color: #909399; font-size: 13px; margin-left:auto;">修改后需提交审批，按生效日期分段计价</span>
           </div>
-          <el-table :data="currentFeeConfigs" v-loading="feeConfigLoading" stripe style="width:100%;" @expand-change="onFeeConfigExpand">
+          <el-table :data="recurringConfigs" v-loading="feeConfigLoading" stripe style="width:100%;" @expand-change="onFeeConfigExpand">
             <el-table-column type="expand" width="30">
               <template #default="{ row }">
                 <el-table :data="row.history" size="small" stripe v-loading="row.loadingHistory" style="margin:8px 0;">
@@ -104,28 +99,52 @@
           <el-empty v-if="!feeConfigLoading && feeConfigs.length === 0" description="暂无费用配置，点击「添加费用」新增" :image-size="60" style="padding:20px 0;" />
         </el-tab-pane>
 
-        <!-------- 2b. Deposit Records ------>
-        <el-tab-pane label="押金记录" name="deposit">
-          <el-table :data="depositLogs" stripe>
-            <el-table-column type="index" label="#" width="50" />
-            <el-table-column prop="date" label="日期" width="110" />
-            <el-table-column prop="action" label="操作" width="100">
+        <!-------- 2b. OneTime Fee Config ------>
+        <el-tab-pane label="一次性收费" name="onetime">
+          <div style="margin-bottom: 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <el-button size="small" @click="fetchFeeConfigs" :loading="feeConfigLoading">刷新</el-button>
+          </div>
+          <el-table :data="oneTimeConfigs" stripe style="width:100%;" @expand-change="onOneTimeExpand">
+            <el-table-column type="expand" width="30">
               <template #default="{ row }">
-                <el-tag :type="row.action === '收取' ? 'success' : row.action === '退还' ? 'danger' : row.action === '扣款' ? 'warning' : ''" size="small">{{ row.action }}</el-tag>
+                <!-- DEPOSIT 行展开后显示押金流水 -->
+                <div v-if="row.feeCode === 'DEPOSIT'">
+                  <el-table :data="row._depositLogs || []" size="small" stripe v-loading="row._loadingLogs" style="margin:8px 0;">
+                    <el-table-column label="日期" width="100"><template #default="{ row: h }">{{ h.date || '-' }}</template></el-table-column>
+                    <el-table-column label="操作" width="80"><template #default="{ row: h }"><el-tag :type="h.action === '收取' ? 'success' : h.action === '退还' ? 'danger' : 'warning'" size="small">{{ h.action }}</el-tag></template></el-table-column>
+                    <el-table-column label="金额" width="100"><template #default="{ row: h }"><span :style="{ color: h.amount > 0 && h.action === '收取' ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }">{{ h.amount > 0 ? '+' : '' }}¥{{ h.amount?.toLocaleString() }}</span></template></el-table-column>
+                    <el-table-column label="余额" width="100"><template #default="{ row: h }">¥{{ h.balance?.toLocaleString() }}</template></el-table-column>
+                    <el-table-column label="备注" min-width="150"><template #default="{ row: h }">{{ h.remark || '-' }}</template></el-table-column>
+                  </el-table>
+                  <span v-if="!row._depositLogs?.length && !row._loadingLogs" style="color:#909399;font-size:13px;padding:8px;">暂无押金流水记录</span>
+                </div>
+                <!-- 其他 OneTime 费用展开显示空状态 -->
+                <div v-else style="padding:8px;color:#909399;font-size:13px;">暂无明细记录</div>
               </template>
             </el-table-column>
-            <el-table-column prop="amount" label="金额" width="120">
+            <el-table-column label="收费项目" min-width="120">
               <template #default="{ row }">
-                <span :style="{ color: row.amount > 0 && row.action === '收取' ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }">
-                  {{ row.amount > 0 ? '+' : '' }}¥{{ row.amount?.toLocaleString() }}
-                </span>
+                <span :style="{ color: row.isActive ? '#303133' : '#c0c4cc' }">{{ row.feeName }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="balance" label="余额" width="120">
-              <template #default="{ row }">¥{{ row.balance?.toLocaleString() }}</template>
+            <el-table-column label="金额" min-width="120">
+              <template #default="{ row }">
+                <span v-if="row.isActive" style="font-weight:bold;font-size:14px;">¥{{ (row.amount || 0).toLocaleString() }}</span>
+                <span v-else style="color:#c0c4cc;text-decoration:line-through;">¥{{ (row.amount || 0).toLocaleString() }}</span>
+              </template>
             </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="150" />
+            <el-table-column label="生效期" min-width="200">
+              <template #default="{ row }">
+                <span style="font-size:13px;">{{ row.effectiveDate ? formatDate(row.effectiveDate) : '-' }} ~ {{ row.expiryDate ? formatDate(row.expiryDate) : '至今' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="65" align="center">
+              <template #default="{ row }">
+                <span :style="{ color: row.isActive ? '#67c23a' : '#909399', fontSize: '12px' }">{{ row.isActive ? '已启用' : '已停用' }}</span>
+              </template>
+            </el-table-column>
           </el-table>
+          <el-empty v-if="!feeConfigLoading && oneTimeConfigs.length === 0" description="暂无一次性收费配置" :image-size="60" style="padding:20px 0;" />
         </el-tab-pane>
 
         <!-------- 2c. Change History ------>
@@ -160,7 +179,7 @@
 
             <el-timeline-item timestamp="合同创建" type="primary">
               <h4>合同签订</h4>
-              <p style="color: #606266;">初始月租 ¥{{ contract.rentAmount?.toLocaleString() }}，押金 ¥{{ contract.depositAmount?.toLocaleString() }}</p>
+              
             </el-timeline-item>
           </el-timeline>
         </el-tab-pane>
@@ -225,52 +244,7 @@
     </el-card>
       <el-empty v-if="!receivableLoading && receivableTimeline.length === 0" description="暂无应收数据，点击「生成应收」创建" :image-size="60" style="padding:20px 0;" />
 
-    <!--===============================================================-->
-    <!-- MODAL: Rent Adjustment                                        -->
-    <!--===============================================================-->
-    <el-dialog v-model="showModifyRent" :draggable="true" title="合同租金调整" width="580px">
-      <el-alert
-        title="租金调整说明：租金调整将根据调整差额自动路由到对应审批级别（差额≤5000元: 运营主管1级审批；差额>5000元: 部门经理2级审批）。生效日期起按新租金生成应收。"
-        type="info"
-        show-icon
-        :closable="false"
-        style="margin-bottom: 16px;"
-      />
-      <el-descriptions :column="2" border style="margin-bottom: 16px;">
-        <el-descriptions-item label="合同号">{{ contract.contractNo }}</el-descriptions-item>
-        <el-descriptions-item label="当前月租">¥{{ contract.rentAmount?.toLocaleString() }}</el-descriptions-item>
-        <el-descriptions-item label="当前生效日">{{ rentConfigEffectiveDate || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="房屋">{{ contract.roomName }}</el-descriptions-item>
-        <el-descriptions-item label="租客">{{ contract.tenantName }}</el-descriptions-item>
-      </el-descriptions>
-      <el-form :model="rentForm" label-width="110px">
-        <el-form-item label="新月租金 (元)">
-          <el-input-number v-model="rentForm.newAmount" :min="0" :precision="2" style="width: 200px;" />
-        </el-form-item>
-        <el-form-item label="调整差额">
-          <span :style="{ color: rentDiff >= 0 ? '#f56c6c' : '#67c23a', fontWeight: 'bold', fontSize: '18px' }">
-            {{ rentDiff >= 0 ? '↑ 涨' : '↓ 降' }} ¥{{ Math.abs(rentDiff).toLocaleString() }}
-            ({{ contract.rentAmount ? (rentDiff / contract.rentAmount * 100).toFixed(1) : 0 }}%)
-          </span>
-        </el-form-item>
-        <el-form-item label="审批级别">
-          <el-tag :type="rentApprovalLevel === '1级(运营主管)' ? 'warning' : 'danger'">
-            {{ rentApprovalLevel }}
-          </el-tag>
-        </el-form-item>
-        <el-form-item label="生效日期（含当日）">
-          <el-date-picker v-model="rentForm.effectiveDate" type="date" value-format="YYYY-MM-DD" style="width: 200px;" />
-          <span style="margin-left: 8px; color: #909399;">此日期起按新租金计费</span>
-        </el-form-item>
-        <el-form-item label="调整原因">
-          <el-input v-model="rentForm.reason" type="textarea" :rows="3" placeholder="必填：如市场行情变化、合同约定年度涨幅、租客协商等" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showModifyRent = false">取消</el-button>
-        <el-button type="primary" :loading="submittingRent" @click="submitRentAdjust">提交审批</el-button>
-      </template>
-    </el-dialog>
+
 
     <!--===============================================================-->
     <!-- MODAL: Fee Price Adjustment                                   -->
@@ -440,8 +414,7 @@
         <el-descriptions :column="2" border style="margin-bottom: 16px;">
           <el-descriptions-item label="原合同号">{{ contract.contractNo }}</el-descriptions-item>
           <el-descriptions-item label="原到期日">{{ contract.endDate }}</el-descriptions-item>
-          <el-descriptions-item label="当前月租">¥{{ contract.rentAmount?.toLocaleString() }}</el-descriptions-item>
-          <el-descriptions-item label="当前押金">¥{{ contract.depositAmount?.toLocaleString() }}</el-descriptions-item>
+
         </el-descriptions>
         <el-form :model="renewForm" label-width="120px">
           <el-form-item label="新月租金 (元)">
@@ -453,30 +426,22 @@
           </el-form-item>
           <el-form-item label="押金处理">
             <el-radio-group v-model="renewForm.depositHandling">
-              <el-radio label="TRANSFER">原押金延续（¥{{ contract.depositAmount?.toLocaleString() }}）</el-radio>
+              <el-radio label="TRANSFER">原押金延续</el-radio>
               <el-radio label="NEW">重新收取押金</el-radio>
             </el-radio-group>
           </el-form-item>
           <el-form-item v-if="renewForm.depositHandling === 'NEW'" label="新押金金额">
             <el-input-number v-model="renewForm.newDeposit" :min="0" :precision="2" style="width: 200px;" />
-            <span v-if="renewForm.newDeposit > (contract.depositAmount || 0)" style="margin-left:8px;color:#e6a23c;">
-              需补交 ¥{{ (renewForm.newDeposit - (contract.depositAmount || 0)).toLocaleString() }}
-            </span>
-            <span v-else-if="renewForm.newDeposit < (contract.depositAmount || 0)" style="margin-left:8px;color:#67c23a;">
-              退还 ¥{{ ((contract.depositAmount || 0) - renewForm.newDeposit).toLocaleString() }}
-            </span>
+
           </el-form-item>
           <!-- 押金处理摘要 -->
           <el-form-item label=" ">
             <div v-if="renewForm.depositHandling === 'NEW'" style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
-              <div>押金：¥{{ (contract.depositAmount || 0).toFixed(2) }} → ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}
-                <span v-if="renewForm.newDeposit > (contract.depositAmount || 0)" style="color:#e6a23c;">（上调 ¥{{ (renewForm.newDeposit - (contract.depositAmount || 0)).toFixed(2) }}）</span>
-                <span v-else-if="renewForm.newDeposit < (contract.depositAmount || 0)" style="color:#67c23a;">（下调 ¥{{ ((contract.depositAmount || 0) - renewForm.newDeposit).toFixed(2) }}）</span>
-              </div>
-              <div style="color:#909399;">操作：退还旧押金 ¥{{ (contract.depositAmount || 0).toFixed(2) }} + 收取新押金 ¥{{ (renewForm.newDeposit || 0).toFixed(2) }}</div>
+
+
             </div>
             <div v-else style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
-              <div>押金：原押金 ¥{{ (contract.depositAmount || 0).toFixed(2) }} 延续至新合同</div>
+              <div>押金：原押金延续至新合同</div>
               <div style="color:#909399;">说明：旧合同押金转出 → 新合同押金转入</div>
             </div>
           </el-form-item>
@@ -551,11 +516,11 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, rentAdjust, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, handleApiError } from '@/api/index.js'
+import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, handleApiError } from '@/api/index.js'
 
 const route = useRoute()
 const router = useRouter()
-const activeTab = ref('fee')
+const activeTab = ref('recurring')
 
 /* ================================================================
  * Real Data: Contract from API
@@ -566,8 +531,7 @@ const contract = ref({
   roomName: '',
   tenantName: '',
   tenantPhone: '',
-  rentAmount: 0,
-  depositAmount: 0,
+
   startDate: '',
   endDate: '',
   status: '',
@@ -585,13 +549,36 @@ const receivableStats = computed(() => {
   const totalReceived = receivableTimeline.value.reduce((s, r) => s + (r.received || 0), 0)
   return { totalAmount, totalDue: totalAmount - totalReceived }
 })
-const rentConfigEffectiveDate = computed(() => {
-  const cfg = feeConfigs.value.find(c => c.isActive && !c.expiryDate)
-  return cfg?.effectiveDate || '-'
+const recurringConfigs = computed(() => {
+  const map = new Map()
+  for (const f of feeConfigs.value) {
+    if (f.chargeType === 'Recurring' && f.isActive && !f.expiryDate && f.feeCodeId) {
+      map.set(f.feeCodeId, { ...f, history: [] })
+    }
+  }
+  for (const f of feeConfigs.value) {
+    if (f.chargeType === 'Recurring' && !map.has(f.feeCodeId) && f.feeCodeId) {
+      map.set(f.feeCodeId, { ...f, history: [] })
+    }
+  }
+  return [...map.values()]
 })
-
+const oneTimeConfigs = computed(() => {
+  const map = new Map()
+  for (const f of feeConfigs.value) {
+    if (f.chargeType === 'OneTime' && f.isActive && !f.expiryDate && f.feeCodeId) {
+      map.set(f.feeCodeId, { ...f, history: [], _depositLogs: [], _loadingLogs: false })
+    }
+  }
+  for (const f of feeConfigs.value) {
+    if (f.chargeType === 'OneTime' && !map.has(f.feeCodeId) && f.feeCodeId) {
+      map.set(f.feeCodeId, { ...f, history: [], _depositLogs: [], _loadingLogs: false })
+    }
+  }
+  return [...map.values()]
+})
 const monthlyTotal = computed(() => {
-  return feeConfigs.value.filter(f => f.isActive && f.billingMode === 'FixedAmount').reduce((s, f) => s + (f.amount || 0), 0)
+  return recurringConfigs.value.filter(f => f.isActive && f.billingMode === 'FixedAmount').reduce((s, f) => s + (f.amount || 0), 0)
 })
 const nowStr = () => {
   const d = new Date()
@@ -612,8 +599,8 @@ async function fetchContract() {
         roomName: c.roomFullCode || '',
         tenantName: c.tenants?.length > 0 ? c.tenants[0].tenantName : '',
         tenantPhone: c.tenants?.length > 0 ? c.tenants[0].tenantPhone : '',
-        rentAmount: c.rentAmount || 0,
-        depositAmount: c.depositAmount || 0,
+        rentAmount: (c.feeConfigs || []).find(f => f.feeCodeName === '房租费' || f.feeCodeName === 'RENT')?.amount || 0,
+        depositAmount: (c.feeConfigs || []).find(f => f.feeCodeName === '押金' || f.feeCodeName === 'DEPOSIT')?.amount || 0,
         startDate: c.startDate || '',
         endDate: c.endDate || '',
         status: c.status || '',
@@ -711,6 +698,8 @@ const adjustCurrentEffDate = ref('')
 const adjustForm = reactive({ newAmount: 0, effectiveDate: '' })
 
 // 当前生效的费用（按 feeCodeId 去重，取最新一条）
+// 当前生效的费用（按 feeCodeId 去重，取最新一条）已由 recurringConfigs / oneTimeConfigs 替代
+// 保留此 computed 仅用于 fee adjust 弹窗中的冲突校验
 const currentFeeConfigs = computed(() => {
   const map = new Map()
   // 先取当前生效的配置（IsActive=true && ExpiryDate=null）
@@ -756,6 +745,8 @@ async function fetchFeeConfigs() {
       id: f.id,
       contractId: f.contractId,
       feeCodeId: f.feeCodeId,
+      feeCode: f.feeCode || '',
+      chargeType: f.chargeType || 'Recurring',
       feeName: f.feeCodeName || f.feeCode,
       billingMode: f.billingMode,
       amount: f.amount,
@@ -778,7 +769,31 @@ function updateAvailableFeeCodes() {
     }).catch(() => {})
   }
   const usedIds = new Set(feeConfigs.value.filter(f => f.isActive).map(f => f.feeCodeId))
-  availableFeeCodes.value = feeCodeList.value.filter(f => !usedIds.has(f.id))
+  availableFeeCodes.value = feeCodeList.value.filter(f => !usedIds.has(f.id) && f.chargeType === 'Recurring')
+}
+
+// 展开一次性收费行时加载押金流水
+async function onOneTimeExpand(row) {
+  if (row.feeCode === 'DEPOSIT' && !row._depositLogs?.length && !row._loadingLogs) {
+    row._loadingLogs = true
+    try {
+      const depRes = await getDeposits({ contractId: contract.value?.id || route.params.id })
+      const depItems = depRes.items || depRes.data || depRes || []
+      row._depositLogs = depItems.map(d => ({
+        date: d.createdAt?.split('T')[0] || '',
+        action: d.action === 'Create' ? '收取'
+          : d.action === 'Return' || d.action === 'Refund' ? '退还'
+          : d.action === 'Deduct' ? '扣款'
+          : d.action === 'TransferOut' ? '押金转出'
+          : d.action === 'TransferIn' ? '押金转入'
+          : d.action || '收取',
+        amount: d.amount || 0,
+        balance: d.balance || 0,
+        remark: d.remark || ''
+      }))
+    } catch { row._depositLogs = [] }
+    row._loadingLogs = false
+  }
 }
 
 function onFeeCodeChange(feeCodeId) {
@@ -919,13 +934,6 @@ async function toggleFeeConfig(row) {
  * Suspend / Resume (API connected)
  * ================================================================ */
 
-/* ================================================================
- * Rent Adjustment (CONTRACT_MODIFY — AmountBased 1~2级)
- * ================================================================ */
-const showModifyRent = ref(false)
-const rentForm = reactive({ newAmount: 5200, effectiveDate: '', reason: '' })
-const contractModifyTypeId = ref(null)
-const submittingRent = ref(false)
 
 // 将字符串 ID 转为 GUID 格式（模拟数据使用，已有 GUID 则直接返回）
 function toGuidId(id) {
@@ -959,7 +967,7 @@ function disabledFeeDate(time) {
 
 function openFeeAdjust() {
   showModifyFee.value = true
-  const activeConfigs = feeConfigs.value.filter(f => f.isActive)
+  const activeConfigs = feeConfigs.value.filter(f => f.isActive && f.chargeType === 'Recurring')
   if (activeConfigs.length > 0) {
     feeAdjustItems.splice(0, feeAdjustItems.length, ...activeConfigs.map(f => {
       const effDate = f.effectiveDate ? new Date(f.effectiveDate) : null
@@ -1016,58 +1024,6 @@ async function ensureContractModifyTypeId() {
     return null
   }
 }
-
-const rentDiff = computed(() => rentForm.newAmount - (contract.value.rentAmount || 0))
-const rentApprovalLevel = computed(() => {
-  const absDiff = Math.abs(rentDiff.value)
-  if (absDiff <= 5000) return '1级(运营主管)'
-  return '2级(部门经理)'
-})
-
-async function submitRentAdjust() {
-	  if (!rentForm.newAmount || rentForm.newAmount <= 0) { ElMessage.warning('请输入有效的新租金'); return }
-	  if (!rentForm.effectiveDate) { ElMessage.warning('请选择生效日期'); return }
-	  if (!rentForm.reason) { ElMessage.warning('请填写调整原因'); return }
-
-	  // 校验生效日期必须晚于当前房租配置的生效日期
-	  const rentConfig = feeConfigs.value.find(c => c.isActive && !c.expiryDate)
-	  if (rentConfig?.effectiveDate) {
-	    const curEff = new Date(rentConfig.effectiveDate)
-	    const newEff = new Date(rentForm.effectiveDate)
-	    if (newEff <= curEff) {
-	      ElMessage.error('生效日期必须晚于当前房租的生效日期 ' + rentConfig.effectiveDate)
-	      return
-	    }
-	  }
-
-	  submittingRent.value = true
-	  try {
-	    const res = await rentAdjust(toGuidId(contract.value.id), {
-	      newAmount: rentForm.newAmount,
-	      effectiveDate: rentForm.effectiveDate,
-	      reason: rentForm.reason
-	    })
-
-	    changeHistory.value.unshift({
-	      date: nowStr(),
-	      title: '租金调整审批中',
-	      detail: `月租金 ${Number(contract.value.rentAmount).toFixed(2)} → ${Number(rentForm.newAmount).toFixed(2)}（${rentForm.reason}）`,
-	      operator: '当前用户',
-	      type: 'warning',
-	      hollow: false,
-	      changes: [{ field: '月租金', oldValue: '¥' + contract.value.rentAmount?.toLocaleString(), newValue: '¥' + rentForm.newAmount.toLocaleString() }],
-	      approval: { status: '审批中', level: rentApprovalLevel.value }
-	    })
-
-	    ElMessage.success(res?.message || '租金调整申请已提交审批')
-	    showModifyRent.value = false
-	    await fetchContract()
-	  } catch (e) {
-	    handleApiError(e, '提交审批失败')
-	  } finally {
-	    submittingRent.value = false
-	  }
-	}
 
 async function submitFeeAdjust() {
   if (!feeAdjustReason.value) { ElMessage.warning('请填写调价原因'); return }
@@ -1211,10 +1167,10 @@ async function openRenewDialog() {
     const preview = await previewRenewal(route.params.id)
     renewPreview.value = preview
     renewChecks.value = preview.checks || {}
-    renewForm.rentAmount = preview.defaultRenewalInfo?.currentRentAmount || contract.value.rentAmount
+    renewForm.rentAmount = preview.defaultRenewalInfo?.currentRentAmount || 0
     renewForm.endDate = preview.defaultRenewalInfo?.suggestedEndDate || ''
     renewForm.depositHandling = 'TRANSFER'
-    renewForm.newDeposit = (contract.value.depositAmount || 0) + 20
+    renewForm.newDeposit = 20
   } catch (e) {
     ElMessage.error('加载续签预览信息失败')
   } finally {

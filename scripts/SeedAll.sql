@@ -258,36 +258,93 @@ DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
 DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'RENT')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'RENT',N'房租费','FixedAmount',1,'Rent',1,1,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'RENT',N'房租费','FixedAmount',1,'Rent','Recurring',1,1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'WATER')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[Unit],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'WATER',N'水费','MeterBased',N'元/吨',2,'Utility',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[Unit],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'WATER',N'水费','MeterBased',N'元/吨',2,'Utility','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'ELECTRIC')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[Unit],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'ELECTRIC',N'电费','MeterBased',N'元/度',3,'Utility',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[Unit],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'ELECTRIC',N'电费','MeterBased',N'元/度',3,'Utility','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'GAS')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[Unit],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'GAS',N'燃气费','MeterBased',N'元/方',4,'Utility',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[Unit],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'GAS',N'燃气费','MeterBased',N'元/方',4,'Utility','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'MANAGEMENT')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'MANAGEMENT',N'物业管理费','FixedAmount',5,'Property',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'MANAGEMENT',N'物业管理费','FixedAmount',5,'Property','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'SANITATION')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'SANITATION',N'卫生费','FixedAmount',6,'Property',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'SANITATION',N'卫生费','FixedAmount',6,'Property','Recurring',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'SECURITY')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'SECURITY',N'安保费','FixedAmount',7,'Property','Recurring',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'GARBAGE')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'GARBAGE',N'垃圾清运费','FixedAmount',8,'Property','Recurring',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'HEATING')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'HEATING',N'取暖费','FixedAmount',9,'Utility','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'INTERNET')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'INTERNET',N'网费','FixedAmount',7,'Other',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'INTERNET',N'网费','FixedAmount',10,'Other','Recurring',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'TV')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'TV',N'电视费','FixedAmount',11,'Other','Recurring',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'PARKING')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'PARKING',N'停车费','FixedAmount',12,'Other','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'LATE_FEE')
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'LATE_FEE',N'滞纳金','FixedAmount',99,'Other',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'LATE_FEE',N'滞纳金','FixedAmount',99,'Other','Recurring',1,0,@Cid,@SysUserId,@Now);
+
+-- ===== 一次性收费 (OneTime) =====
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'DEPOSIT')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'DEPOSIT',N'押金','FixedAmount',1,'Property','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'DECORATION_DEPOSIT')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'DECORATION_DEPOSIT',N'装修押金','FixedAmount',2,'Property','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'KEY_DEPOSIT')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'KEY_DEPOSIT',N'钥匙押金','FixedAmount',3,'Other','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'CLEANING')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'CLEANING',N'清洁费','FixedAmount',4,'Other','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'MOVING')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'MOVING',N'搬运费','FixedAmount',5,'Other','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'PENALTY')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'PENALTY',N'违约金','FixedAmount',6,'Other','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'COMPENSATION')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'COMPENSATION',N'赔偿金','FixedAmount',7,'Other','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'AC_OVERTIME')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'AC_OVERTIME',N'空调加时费','FixedAmount',9,'Other','OneTime',1,0,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'AIR_CONDITIONING')
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'AIR_CONDITIONING',N'空调移机费','FixedAmount',8,'Other','OneTime',1,0,@Cid,@SysUserId,@Now);
 
 PRINT N'收费项目数据初始化完成！';
 GO
@@ -1740,12 +1797,12 @@ DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] 
 DECLARE @ZhangsanUserId uniqueidentifier; SELECT @ZhangsanUserId = [Id] FROM [Users] WHERE [Username] = 'zhangsan';
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code]='RENT' AND [CompanyId]=@Cid)
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'RENT',N'房租费','FixedAmount',1,'Rent',1,1,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'RENT',N'房租费','FixedAmount',1,'Rent','Recurring',1,1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code]='MANAGEMENT' AND [CompanyId]=@Cid)
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'MANAGEMENT',N'物业管理费','FixedAmount',5,'Property',1,0,@Cid,@SysUserId,@Now);
+    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'MANAGEMENT',N'物业管理费','FixedAmount',5,'Property','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 DECLARE @TenantZS uniqueidentifier;
 DECLARE @TenantLS uniqueidentifier;
@@ -1778,23 +1835,23 @@ DECLARE @Contract3 uniqueidentifier;
 DECLARE @Contract4 uniqueidentifier;
 
 SET @Contract1 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[RentAmount],[DepositAmount],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract1,'HT-2026-001',Id,5200,10400,'2026-01-01','2027-12-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
+SELECT @Contract1,'HT-2026-001',Id,'2026-01-01','2027-12-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='101' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 SET @Contract2 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[RentAmount],[DepositAmount],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract2,'HT-2026-002',Id,3800,7600,'2026-02-01','2027-01-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
+SELECT @Contract2,'HT-2026-002',Id,'2026-02-01','2027-01-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='102' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 SET @Contract3 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[RentAmount],[DepositAmount],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract3,'HT-2026-003',Id,6800,13600,'2026-03-15','2027-03-14','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
+SELECT @Contract3,'HT-2026-003',Id,'2026-03-15','2027-03-14','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='201' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 SET @Contract4 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[RentAmount],[DepositAmount],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract4,'HT-2026-004',Id,5000,10000,'2026-01-01','2026-06-30','Monthly','Expired',@Cid,@ZhangsanUserId,@Now
+INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
+SELECT @Contract4,'HT-2026-004',Id,'2026-01-01','2026-06-30','Monthly','Expired',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='101' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 IF @Contract1 IS NOT NULL AND @TenantZS IS NOT NULL
@@ -1830,6 +1887,25 @@ IF @Contract3 IS NOT NULL AND @RentFeeCodeId IS NOT NULL
 IF @Contract4 IS NOT NULL AND @RentFeeCodeId IS NOT NULL
     INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@Contract4,@RentFeeCodeId,'FixedAmount',5000,1,@SysUserId,@Now);
+
+-- ===== 押金配置（一次性收费）=====
+DECLARE @DepositFeeCodeId uniqueidentifier; SELECT @DepositFeeCodeId=[Id] FROM [FeeCodes] WHERE [Code]='DEPOSIT' AND [CompanyId]=@Cid;
+
+IF @Contract1 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
+    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@Contract1,@DepositFeeCodeId,'FixedAmount',10400,1,@SysUserId,@Now);
+
+IF @Contract2 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
+    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@Contract2,@DepositFeeCodeId,'FixedAmount',7600,1,@SysUserId,@Now);
+
+IF @Contract3 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
+    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@Contract3,@DepositFeeCodeId,'FixedAmount',13600,1,@SysUserId,@Now);
+
+IF @Contract4 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
+    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@Contract4,@DepositFeeCodeId,'FixedAmount',10000,1,@SysUserId,@Now);
 
 PRINT 'SeedAll.sql 全量种子数据执行完成！';
 GO

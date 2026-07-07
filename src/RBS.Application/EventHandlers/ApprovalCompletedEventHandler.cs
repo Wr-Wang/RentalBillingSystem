@@ -26,6 +26,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly INotificationService _notificationService;
     private readonly ISqlLoader _sql;
     private readonly IDbConnectionFactory _db;
+    private readonly IJournalGenerationService _journalGen;
 
     public ApprovalCompletedEventHandler(
         IImportService importService,
@@ -35,7 +36,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         IUnitOfWork uow,
         INotificationService notificationService,
         ISqlLoader sql,
-        IDbConnectionFactory db)
+        IDbConnectionFactory db,
+        IJournalGenerationService journalGen)
     {
         _importService = importService;
         _contractService = contractService;
@@ -45,6 +47,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _notificationService = notificationService;
         _sql = sql;
         _db = db;
+        _journalGen = journalGen;
     }
 
     public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
@@ -77,10 +80,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         {
             case "Import":
                 await HandleImportAsync(@event, ct);
-                break;
-
-            case "ContractRent":
-                await HandleContractRentAsync(@event, bizData, ct);
                 break;
 
             case "ContractFeeAdjust":
@@ -136,16 +135,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     }
                 }
             }
-            else
-            {
-                // 旧租金调整：从 Description 正则解析
-                var match = System.Text.RegularExpressions.Regex.Match(request.Description ?? "", @"→\s*¥([\d,]+)");
-                if (match.Success)
-                {
-                    var newAmount = decimal.Parse(match.Groups[1].Value.Replace(",", ""));
-                    await _contractService.AdjustRentAsync(@event.TargetEntityId, newAmount, ct);
-                }
-            }
+            // else 旧租金调整分支已移除（v3 改为 FeeConfig 模式）
+            // 旧审批记录（TargetEntityType='Contract'）中的租金调整数据不再处理
         }
     }
 
@@ -165,57 +156,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 await _uow.CommitAsync(ct);
             }
         }
-    }
-
-    // ===== 租金调整 =====
-    private async Task HandleContractRentAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
-    {
-        if (@event.Action != "Approved" || bizData == null) return;
-        var contractId = bizData.ContractId;
-        var newAmount = bizData.NewAmount ?? 0;
-        var effectiveDate = bizData.EffectiveDate;
-
-        var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
-        if (contract == null) return;
-
-        // 调整租金（走领域模型）
-        contract.AdjustRent(newAmount, effectiveDate);
-
-        // 同步更新房租费 FeeConfig
-        var rentFeeConfig = contract.FeeConfigs
-            .FirstOrDefault(f => f.IsActive);
-        if (rentFeeConfig != null)
-        {
-            var effDateStr = effectiveDate?.ToString("yyyy-MM-dd") ?? "";
-            if (!string.IsNullOrEmpty(effDateStr))
-            {
-                // 区间不交叉校验（排除当前配置自身）
-                await EnsureNoOverlappingFeeConfigAsync(contract.Id, rentFeeConfig.FeeCodeId,
-                    effDateStr, null, rentFeeConfig.Id, ct);
-
-                var expiryDate = DateOnly.Parse(effDateStr).AddDays(-1).ToString("yyyy-MM-dd");
-                rentFeeConfig.ExpireOn(expiryDate);
-                using (var conn2 = _db.CreateConnection()) { conn2.Open();
-                    await InsertChangeHistoryAsync(conn2, null, contract.Id, "RENT_ADJUST",
-                        "租金调整", $"月租金 {contract.RentAmount.Amount:F2} -> {newAmount:F2}",
-                        contract.RentAmount.Amount, newAmount, effDateStr, Guid.Empty); }
-
-                // 旧配置到期 + 新配置
-                await _uow.ExecuteSqlRawAsync(
-                    _sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
-                    new { ExpiryDate = expiryDate, Id = rentFeeConfig.Id }, ct);
-                await _uow.ExecuteSqlRawAsync(
-                    _sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
-                    new { Id = Guid.NewGuid(), ContractId = contract.Id, FeeCodeId = rentFeeConfig.FeeCodeId,
-                        BillingMode = "FixedAmount", Amount = newAmount,
-                        EffectiveDate = effDateStr, CreatedBy = contract.CreatedBy, Now = ChinaTime.Now }, ct);
-            }
-        }
-
-        await _uow.ExecuteSqlRawAsync(
-            _sql.Get("Lease.Update.Contract.RentAmount"),
-            new { Id = contractId, NewAmount = newAmount }, ct);
-        await _uow.CommitAsync(ct);
     }
 
     // ===== 费用调价 =====
@@ -282,6 +222,25 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
 
         await _uow.CommitAsync(ct);
+
+        // ★ Commit 之后再生成补差 Supplementary JE（FeeConfig 已落库，
+        //    补差 JE 生成失败不影响 FeeConfig 变更，可手动重试）
+        var currentMonth = DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM");
+        foreach (var item in feeItems)
+        {
+            var effDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
+            if (string.IsNullOrEmpty(effDate)) continue;
+            var effMonth = effDate.Substring(0, 7);
+
+            // 生效月 M ≤ 当前月+1 → 已出账单范围 → 生成补差
+            if (string.Compare(effMonth, currentMonth, StringComparison.Ordinal) <= 0 ||
+                effMonth == DateOnly.FromDateTime(ChinaTime.Now).AddMonths(1).ToString("yyyy-MM"))
+            {
+                await _journalGen.GenerateSupplementaryAsync(
+                    item.ContractId, item.FeeCodeId, item.NewAmount, item.OldAmount,
+                    effDate, effMonth, ct);
+            }
+        }
     }
 
     // ===== 合同终止 =====

@@ -10,8 +10,6 @@ public class Contract : AggregateRoot, IHasCompany
     // ===== 基本属性 =====
     public string ContractNo { get; private set; }
     public Guid RoomId { get; private set; }
-    public Money RentAmount { get; private set; } = Money.Zero;
-    public Money DepositAmount { get; private set; } = Money.Zero;
     public DateOnly StartDate { get; private set; }
     public DateOnly EndDate { get; private set; }
     public string PaymentCycle { get; private set; }
@@ -61,31 +59,6 @@ public class Contract : AggregateRoot, IHasCompany
     }
 
     // ===== 设置器（草稿状态可修改）=====
-
-    public void SetRentAmount(decimal amount)
-    {
-        if (amount < 0) throw new ArgumentException("租金不能为负数");
-        AssertIsDraft();
-        RentAmount = amount;
-    }
-
-    /// <summary>调租 — 非 Draft 状态也可调整租金（审批通过后回调调用）</summary>
-    public void AdjustRent(decimal newAmount, DateOnly? effectiveDate = null)
-    {
-        if (newAmount < 0) throw new ArgumentException("租金不能为负数");
-        if (Status != "Active" && Status != "Suspended")
-            throw new InvalidOperationException("只有生效中或已暂停的合同可以调整租金");
-        var oldAmount = RentAmount;
-        RentAmount = newAmount;
-        AddDomainEvent(new ContractRentAdjustedEvent(Id, oldAmount, newAmount, effectiveDate));
-    }
-
-    public void SetDepositAmount(decimal amount)
-    {
-        if (amount < 0) throw new ArgumentException("押金不能为负数");
-        AssertIsDraft();
-        DepositAmount = amount;
-    }
 
     public void SetPeriod(DateOnly start, DateOnly end)
     {
@@ -246,6 +219,11 @@ public class Contract : AggregateRoot, IHasCompany
         return period.StartDate <= EndDate && period.EndDate >= StartDate;
     }
 
+    /// <summary>获取活跃的 FeeConfigs 集合</summary>
+    /// <remarks>ChargeType 过滤在应用层/SQL 层处理（Entity 无 FeeCode 导航属性）</remarks>
+    public IEnumerable<ContractFeeConfig> GetActiveFeeConfigs()
+        => _feeConfigs.Where(f => f.IsActive);
+
     /// <summary>获取已过天数</summary>
     public int ElapsedDaysSinceStart()
     {
@@ -270,7 +248,7 @@ public class Contract : AggregateRoot, IHasCompany
 
     private void ValidateForSubmission()
     {
-        if (RentAmount <= 0) throw new InvalidOperationException("租金金额未设置");
+        if (!_feeConfigs.Any(f => f.IsActive)) throw new InvalidOperationException("合同必须至少有一个费用配置");
         if (_contractTenants.Count == 0) throw new InvalidOperationException("合同必须至少有一个租客");
         if (StartDate == default) throw new InvalidOperationException("合同起租日期未设置");
         if (EndDate == default) throw new InvalidOperationException("合同结束日期未设置");

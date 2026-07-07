@@ -47,6 +47,11 @@ public class Voucher : AggregateRoot
     public Guid? ContractId { get; private set; }
 
     /// <summary>
+    /// 会计期间（yyyy-MM），用于区分 JE 归属月份
+    /// </summary>
+    public string? Period { get; private set; }
+
+    /// <summary>
     /// 乐观并发控制行版本号
     /// </summary>
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();

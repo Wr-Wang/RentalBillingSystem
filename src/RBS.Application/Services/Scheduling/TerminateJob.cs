@@ -41,9 +41,15 @@ public class TerminateJob
             // Step01: 查询合同和当前账期
             var step01 = await _stepLogger.StartStepAsync(taskLogId, "TermStep01", "查询合同信息", null, null, ct);
             var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                "SELECT Id, ContractNo, StartDate, EndDate, DepositAmount, CompanyId FROM Contracts WHERE Id=@Id",
+                "SELECT Id, ContractNo, StartDate, EndDate, CompanyId FROM Contracts WHERE Id=@Id",
                 new { Id = contractId }, tx);
             if (contract == null) throw new InvalidOperationException("合同不存在");
+
+            // 从 FeeConfig 查询押金金额（Contracts.DepositAmount 列已移除）
+            var depositAmount = await conn.QuerySingleOrDefaultAsync<decimal>(
+                _sql.Get("Contract.Select.DepositConfig.AmountByContract"),
+                new { Cid = contractId }, tx);
+
             var curPeriod = $"{DateTime.UtcNow.Year}-{DateTime.UtcNow.Month:D2}";
             await _stepLogger.CompleteStepAsync(step01, 1, null, ct);
 
@@ -54,7 +60,6 @@ public class TerminateJob
 
             // Step03: 扣款处理
             var step03 = await _stepLogger.StartStepAsync(taskLogId, "TermStep03", "押金扣款处理", null, null, ct);
-            var depositAmount = (decimal)contract.DepositAmount;
             if (depositAmount > 0)
             {
                 var deduction = 0m;

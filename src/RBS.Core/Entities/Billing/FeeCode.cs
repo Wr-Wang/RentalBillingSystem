@@ -11,7 +11,10 @@ public class FeeCode : AuditableEntity, IHasCompany
     public bool IsActive { get; private set; } = true;
     public string Category { get; private set; } = "Other";
     public bool IsRequired { get; private set; }
+    public string ChargeType { get; private set; } = "Recurring"; // OneTime / Recurring
     public Guid CompanyId { get; private set; }
+    public bool IsOneTime => ChargeType == "OneTime";
+    public bool IsRecurring => ChargeType == "Recurring";
     private FeeCode() { }
     public FeeCode(string code, string name, Guid companyId) { Code = code; Name = name; CompanyId = companyId; }
 
@@ -22,6 +25,7 @@ public class FeeCode : AuditableEntity, IHasCompany
     public void SetSortOrder(int order) => SortOrder = order;
     public void SetCategory(string category) => Category = category;
     public void SetRequired(bool required) => IsRequired = required;
+    public void SetChargeType(string chargeType) => ChargeType = chargeType;
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
 }

@@ -14,7 +14,7 @@ public class ApprovalBizData : AuditableEntity
     public string? ContractNo { get; private set; }
     public Guid CompanyId { get; private set; }
 
-    /// <summary>变更类型：RENT_ADJUST / FEE_ADJUST / TERMINATE / SUSPEND</summary>
+    /// <summary>变更类型：FEE_ADJUST / TERMINATE / SUSPEND</summary>
     public string ChangeType { get; private set; }
 
     /// <summary>生效日期（调租/调价使用）</summary>
@@ -65,14 +65,6 @@ public class ApprovalBizData : AuditableEntity
     // ===== 领域行为 =====
 
     public void SetApprovalRequestId(Guid approvalRequestId) => ApprovalRequestId = approvalRequestId;
-
-    public void SetRentAdjustData(decimal oldAmount, decimal newAmount, DateOnly? effectiveDate, string? reason)
-    {
-        OldAmount = oldAmount;
-        NewAmount = newAmount;
-        EffectiveDate = effectiveDate;
-        Reason = reason;
-    }
 
     public void SetFeeAdjustData(DateOnly? effectiveDate, string? reason)
     {

@@ -452,9 +452,9 @@ public class ApprovalService : IApprovalService
             {
                 var oldContract = _uow.Contracts.GetByIdAsync(renewal.OldContractId, CancellationToken.None).GetAwaiter().GetResult();
                 dto.Fields.Add(new BizFieldDto { Label = "原合同号", OldValue = oldContract?.ContractNo, NewValue = renewal.ContractNo, IsChanged = true });
-                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = oldContract != null ? $"¥{oldContract.RentAmount.Amount:N2}" : "", NewValue = $"¥{renewal.NewRent:N2}", IsChanged = true });
+                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = $"¥{renewal.PreviousRent:N2}", NewValue = $"¥{renewal.NewRent:N2}", IsChanged = true });
                 dto.Fields.Add(new BizFieldDto { Label = "到期日", OldValue = oldContract?.EndDate.ToString("yyyy-MM-dd"), NewValue = renewal.NewEndDate.ToString("yyyy-MM-dd"), IsChanged = true });
-                var oldDeposit = oldContract?.DepositAmount.Amount ?? 0;
+                var oldDeposit = renewal.OldDepositAmount;
                 var newDeposit = renewal.DepositHandling == "NEW" ? (renewal.NewDepositAmount ?? oldDeposit) : oldDeposit;
                 dto.Fields.Add(new BizFieldDto { Label = "押金", OldValue = $"¥{oldDeposit:N2}", NewValue = $"¥{newDeposit:N2}", IsChanged = newDeposit != oldDeposit });
                 dto.Fields.Add(new BizFieldDto { Label = "押金处理方式", OldValue = null, NewValue = renewal.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取", IsChanged = false });
@@ -472,7 +472,7 @@ public class ApprovalService : IApprovalService
             {
                 var newAmount = match.Groups[1].Value;
                 var contract = _uow.Contracts.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
-                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = contract != null ? $"¥{contract.RentAmount.Amount:N2}" : "", NewValue = $"¥{newAmount}", IsChanged = true });
+                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = newAmount, NewValue = $"¥{newAmount}", IsChanged = true });
 
                 var dateMatch = System.Text.RegularExpressions.Regex.Match(desc, @"生效日期[：:](\S+)");
                 if (dateMatch.Success)

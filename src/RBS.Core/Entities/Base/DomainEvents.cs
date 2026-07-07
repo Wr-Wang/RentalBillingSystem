@@ -203,28 +203,7 @@ public sealed record MeterReadingConfirmedEvent : IDomainEvent
     }
 }
 
-// ===== 合同租金调整领域事件（合同操作闭环 v3）=====
-
-/// <summary>合同租金已调整</summary>
-public sealed record ContractRentAdjustedEvent : IDomainEvent
-{
-    public Guid ContractId { get; }
-    public decimal OldAmount { get; }
-    public decimal NewAmount { get; }
-    public DateOnly? EffectiveDate { get; }
-    public DateTime OccurredAt { get; }
-
-    public ContractRentAdjustedEvent(Guid contractId, decimal oldAmount, decimal newAmount, DateOnly? effectiveDate)
-    {
-        ContractId = contractId;
-        OldAmount = oldAmount;
-        NewAmount = newAmount;
-        EffectiveDate = effectiveDate;
-        OccurredAt = ChinaTime.Now;
-    }
-}
-
-/// <summary>合同已恢复</summary>
+// ===== 合同已恢复 =====
 public sealed record ContractResumedEvent : IDomainEvent
 {
     public Guid ContractId { get; }

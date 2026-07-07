@@ -44,7 +44,7 @@ public class ContractDomainService : IContractDomainService
         contract.Resume();
     }
 
-    public async Task<Contract> RenewContractAsync(Contract oldContract, DateOnly newEndDate, decimal? newRentAmount, CancellationToken ct = default)
+    public async Task<Contract> RenewContractAsync(Contract oldContract, DateOnly newEndDate, CancellationToken ct = default)
     {
         if (oldContract.Status != "Active" && oldContract.Status != "Expired")
             throw new InvalidOperationException("只有生效中或已到期的合同可以续签");
@@ -53,8 +53,6 @@ public class ContractDomainService : IContractDomainService
             $"{oldContract.ContractNo}-R{new Random().Next(1, 99)}",
             oldContract.RoomId,
             oldContract.CompanyId);
-        newContract.SetRentAmount(newRentAmount ?? oldContract.RentAmount);
-        newContract.SetDepositAmount(oldContract.DepositAmount);
         newContract.SetPeriod(oldContract.EndDate.AddDays(1), newEndDate);
         newContract.SetPaymentCycle(oldContract.PaymentCycle);
         return newContract;
@@ -88,14 +86,7 @@ public class ContractDomainService : IContractDomainService
             _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
             new { ExpiryDate = effectiveEnd, ContractId = contractId }, ct);
 
-        // 4. 押金处理
-        if (depositReturn == "FULL" && contract.DepositAmount > 0)
-        {
-            await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Contract.Insert.DepositLog.Refund"),
-                new { Id = Guid.NewGuid(), ContractId = contractId, Amount = -contract.DepositAmount.Amount,
-                      Remark = $"合同终止全额退还押金", CreatedBy = userId, CreatedAt = ChinaTime.Now });
-        }
+        // 4. 押金处理（TODO: 后续改为从 FeeConfig 查询并生成押金退款 JE）
 
         await _uow.CommitAsync(ct);
     }

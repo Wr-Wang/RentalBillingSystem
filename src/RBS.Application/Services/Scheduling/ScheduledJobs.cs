@@ -103,11 +103,15 @@ public class AutoRenewJob : IScheduledJob
     public string JobName => "AutoRenew";
     private readonly IUnitOfWork _uow;
     private readonly IRenewalService _renewalService;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
-    public AutoRenewJob(IUnitOfWork uow, IRenewalService renewalService)
+    public AutoRenewJob(IUnitOfWork uow, IRenewalService renewalService, IDbConnectionFactory db, ISqlLoader sql)
     {
         _uow = uow;
         _renewalService = renewalService;
+        _db = db;
+        _sql = sql;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
@@ -132,11 +136,15 @@ public class AutoRenewJob : IScheduledJob
             {
                 // 使用现有的续签预览和提交逻辑
                 // 提交续签审批（自动续签使用默认参数）
+                using var conn = _db.CreateConnection(); conn.Open();
+                var rentAmount = await conn.QuerySingleOrDefaultAsync<decimal>(
+                    _sql.Get("Contract.Select.FeeConfig.AmountByCode"),
+                    new { Cid = contract.Id, Code = "RENT" });
                 var result = await _renewalService.SubmitAsync(
                     new RBS.Application.DTOs.Contract.SubmitRenewalRequest
                     {
                         ContractId = contract.Id,
-                        NewRentAmount = contract.RentAmount,
+                        NewRentAmount = rentAmount,
                         NewEndDate = contract.EndDate.AddMonths(12).ToString("yyyy-MM-dd"),
                         DepositHandling = "TRANSFER"
                     }, Guid.Empty, ct);

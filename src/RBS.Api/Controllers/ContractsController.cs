@@ -30,11 +30,13 @@ public class ContractsController : ControllerBase
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
     private readonly ICurrentUserService _currentUser;
+    private readonly IJournalGenerationService _journalGen;
 
     public ContractsController(IContractService contractService, IRenewalService renewalService,
         IContractDomainService contractDomainService, IApprovalService approvalService,
         IContractTimelineService timelineService, IUnitOfWork uow,
-        IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser)
+        IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser,
+        IJournalGenerationService journalGen)
     {
         _contractService = contractService;
         _renewalService = renewalService;
@@ -45,6 +47,7 @@ public class ContractsController : ControllerBase
         _db = db;
         _sql = sql;
         _currentUser = currentUser;
+        _journalGen = journalGen;
     }
 
     [HttpGet]
@@ -80,8 +83,8 @@ public class ContractsController : ControllerBase
         var dto = await _contractService.CreateAsync(request, ct);
         try { using var conn = _db.CreateConnection(); conn.Open();
             await InsertChangeHistoryAsync(conn, null, dto.Id, "CONTRACT_CREATE",
-                "合同签订", "新建合同，月租金 " + request.RentAmount.ToString("F2") + "，起租 " + request.StartDate,
-                null, request.RentAmount, request.StartDate.ToString("yyyy-MM-dd"), null); } catch { }
+                "合同签订", "新建合同，起租 " + request.StartDate,
+                null, null, request.StartDate.ToString("yyyy-MM-dd"), null); } catch { }
         return Ok(dto);
     }
 
@@ -91,8 +94,6 @@ public class ContractsController : ControllerBase
         var entity = await _uow.Contracts.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
 
-        if (request.RentAmount.HasValue) entity.SetRentAmount(request.RentAmount.Value);
-        if (request.DepositAmount.HasValue) entity.SetDepositAmount(request.DepositAmount.Value);
         if (request.StartDate.HasValue && request.EndDate.HasValue)
             entity.SetPeriod(request.StartDate.Value, request.EndDate.Value);
         if (!string.IsNullOrEmpty(request.PaymentCycle)) entity.SetPaymentCycle(request.PaymentCycle);
@@ -104,8 +105,6 @@ public class ContractsController : ControllerBase
 
     public class ContractUpdateRequest
     {
-        public decimal? RentAmount { get; set; }
-        public decimal? DepositAmount { get; set; }
         public DateOnly? StartDate { get; set; }
         public DateOnly? EndDate { get; set; }
         public string? PaymentCycle { get; set; }
@@ -115,76 +114,6 @@ public class ContractsController : ControllerBase
     // ===================================================================
     // 租金调整（★ v3 改造 — 审批驱动）
     // ===================================================================
-    [HttpPost("{id}/rentadjust")]
-    public async Task<IActionResult> RentAdjust(Guid id, [FromBody] RentAdjustRequest request, CancellationToken ct)
-    {
-        var contract = await _uow.Contracts.GetByIdAsync(id, ct);
-        if (contract == null) return NotFound();
-
-        var userId = GetCurrentUserId();
-
-        // 并发守卫
-        var conflict = await EnsureNoPendingForContractAsync(id, ct);
-        if (conflict != null) return conflict;
-
-        // 找审批类型
-        var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_MODIFY", ct);
-        if (approvalType == null)
-            return BadRequest(new { code = "NO_APPROVAL_TYPE", message = "未配置合同租金调整审批类型，请联系管理员" });
-
-        using var tx = await _uow.BeginTransactionAsync(ct);
-        try
-        {
-            // 1. 写业务数据
-            var bizDataId = Guid.NewGuid();
-            var effectiveDate = request.EffectiveDate.HasValue
-                ? DateOnly.FromDateTime(request.EffectiveDate.Value)
-                : (DateOnly?)null;
-            await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Contract.Insert.ApprovalBizData.RentAdjust"),
-                new { Id = bizDataId, ContractId = id, ContractNo = contract.ContractNo,
-                    CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
-                    OldAmount = contract.RentAmount.Amount, NewAmount = request.NewAmount,
-                    Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now });
-
-            // 2. 提交审批
-            var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
-            {
-                ApprovalTypeId = approvalType.Id,
-                Title = $"合同租金调整 - {contract.ContractNo}",
-                Description = "",
-                TargetEntityId = id,
-                TargetEntityType = "ContractRent"
-            }, ct);
-
-            // 3. 回写 ApprovalRequestId + ContractId
-            await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Contract.Update.ApprovalBizData.SetApprovalRequestId"),
-                new { Id = bizDataId, ApprovalRequestId = approvalResult.Id });
-            await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Contract.Update.ApprovalRequest.SetContractId"),
-                new { Id = approvalResult.Id, ContractId = id });
-
-            await tx.CommitAsync(ct);
-                        var effStr = effectiveDate?.ToString("yyyy-MM-dd") ?? "";
-            await InsertChangeHistoryAsync(_db.CreateConnection(), null, id, "RENT_ADJUST",
-                "租金调整", $"月租金 {contract.RentAmount.Amount:F2} -> {request.NewAmount:F2}，生效 {effStr}，原因 {request.Reason}",
-                contract.RentAmount.Amount, request.NewAmount, effStr, userId);
-return Ok(new { id = approvalResult.Id, status = approvalResult.Status, message = "租金调整申请已提交审批" });
-        }
-        catch
-        {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
-    }
-
-    public class RentAdjustRequest
-    {
-        public decimal NewAmount { get; set; }
-        public DateTime? EffectiveDate { get; set; }
-        public string? Reason { get; set; }
-    }
 
     // ===================================================================
     // 费用调价（★ v3 改造 — 审批驱动）
@@ -250,6 +179,25 @@ return Ok(new { id = approvalResult.Id, status = approvalResult.Status, message 
                             "费用调价", item.FeeName + ": " + item.OldAmount.ToString("F2") + " -> " + item.NewAmount.ToString("F2") + "，生效 " + effDate2,
                             item.OldAmount, item.NewAmount, effDate2, userId);
                 }
+
+                // ★ 非审批路径也生成补差 JE（与审批路径行为一致）
+                var currentMonth = DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM");
+                foreach (var item in request.Items)
+                {
+                    var effDate2 = item.EffectiveDate ?? "";
+                    if (!string.IsNullOrEmpty(effDate2))
+                    {
+                        var effMonth = effDate2.Substring(0, 7);
+                        if (string.Compare(effMonth, currentMonth, StringComparison.Ordinal) <= 0 ||
+                            effMonth == DateOnly.FromDateTime(ChinaTime.Now).AddMonths(1).ToString("yyyy-MM"))
+                        {
+                            await _journalGen.GenerateSupplementaryAsync(
+                                id, item.FeeCodeId, item.NewAmount, item.OldAmount,
+                                effDate2, effMonth, ct);
+                        }
+                    }
+                }
+
                 return Ok(new { message = "费用调价已直接执行" });
             }
             catch (Exception ex)
