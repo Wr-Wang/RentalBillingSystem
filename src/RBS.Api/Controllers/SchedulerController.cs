@@ -4,7 +4,12 @@ using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.SystemConfig;
 using RBS.Application.Services.Scheduling;
 using Dapper;
+using RBS.Core.Common;
+using RBS.Core.Entities.Scheduling;
+using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Core.Interfaces.Services;
 
 namespace RBS.Api.Controllers;
 
@@ -19,6 +24,10 @@ public class SchedulerController : ControllerBase
     private readonly IEnumerable<IScheduledJob> _jobs;
     private readonly ITaskLogRepository _taskLogRepo;
     private readonly ITaskStepLogRepository _stepLogRepo;
+    private readonly ISqlLoader _sql;
+    private readonly IDbConnectionFactory _db;
+    private readonly ITaskStepLogger _stepLogger;
+    private readonly JobExecutionContext _jobContext;
 
     public SchedulerController(
         ISchedulerService jobService,
@@ -26,7 +35,11 @@ public class SchedulerController : ControllerBase
         IJobScheduleExecutionService executionService,
         IEnumerable<IScheduledJob> jobs,
         ITaskLogRepository taskLogRepo,
-        ITaskStepLogRepository stepLogRepo)
+        ITaskStepLogRepository stepLogRepo,
+        ISqlLoader sql,
+        IDbConnectionFactory db,
+        ITaskStepLogger stepLogger,
+        JobExecutionContext jobContext)
     {
         _jobService = jobService;
         _templateService = templateService;
@@ -34,6 +47,10 @@ public class SchedulerController : ControllerBase
         _jobs = jobs;
         _taskLogRepo = taskLogRepo;
         _stepLogRepo = stepLogRepo;
+        _sql = sql;
+        _db = db;
+        _stepLogger = stepLogger;
+        _jobContext = jobContext;
     }
 
     // ===== 模板 =====
@@ -105,6 +122,144 @@ public class SchedulerController : ControllerBase
     {
         var result = await _executionService.GenerateAsync(jobId, ct);
         return Ok(new { generated = result.Count, items = result });
+    }
+
+    /// <summary>重试失败排期：同步执行完整闭环（重置→抢占→执行→更新状态→记录日志）</summary>
+    [HttpPost("jobs/{jobId}/executions/{id}/retry")]
+    public async Task<IActionResult> RetryExecution(Guid jobId, Guid id, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+
+        // 1. 加载排期
+        var execution = await Dapper.SqlMapper.QuerySingleOrDefaultAsync<JobScheduleExecution>(conn,
+            "SELECT * FROM [JobScheduleExecutions] WHERE [Id]=@Id AND [Status]='Failed'",
+            new { Id = id });
+        if (execution == null)
+            return NotFound(new { error = "排期不存在或状态不是 Failed" });
+
+        // 2. 加载任务定义
+        var schedule = await Dapper.SqlMapper.QuerySingleOrDefaultAsync<JobSchedule>(conn,
+            "SELECT * FROM [JobSchedules] WHERE [Id]=@Id AND [IsActive]=1",
+            new { Id = jobId });
+        if (schedule == null)
+            return NotFound(new { error = "任务不存在或已停用" });
+
+        // 3. 查找作业实现
+        var jobDict = _jobs.ToDictionary(j => j.JobName, StringComparer.OrdinalIgnoreCase);
+        if (!jobDict.TryGetValue(schedule.JobName, out var job))
+            return BadRequest(new { error = $"未找到作业实现: {schedule.JobName}" });
+
+        // 4. 原子抢占
+        var claimed = await Dapper.SqlMapper.ExecuteAsync(conn,
+            _sql.Get("Scheduling.Update.Execution.Claim"),
+            new { Id = execution.Id });
+        if (claimed == 0)
+            return Conflict(new { error = "排期已被其他进程抢占" });
+
+        // 5. 创建任务日志（TriggerType=Retry）
+        var taskLogId = Guid.NewGuid();
+        await Dapper.SqlMapper.ExecuteAsync(conn,
+            _sql.Get("Scheduling.Insert.TaskLog.Default"),
+            new
+            {
+                Id = taskLogId,
+                TaskName = schedule.JobName,
+                CompanyId = execution.CompanyId,
+                ContractId = (Guid?)null,
+                TargetMonth = execution.Month,
+                TriggerType = "Retry",
+                RunMode = "Execute",
+                Status = "Running",
+                StartedAt = ChinaTime.Now,
+                CreatedBy = Guid.Empty
+            });
+        _jobContext.TaskLogId = taskLogId;
+
+        // 6. 步骤日志
+        Guid? stepId = null;
+        try { stepId = await _stepLogger.StartStepAsync(taskLogId, "Schedule.Execute", $"重试 {schedule.JobName}", null, null, ct); }
+        catch { /* 步骤日志失败不影响 */ }
+
+        try
+        {
+            // 7. 执行任务
+            var result = await job.ExecuteAsync(execution.CompanyId, execution.Month, ct);
+
+            if (stepId.HasValue)
+                try { await _stepLogger.CompleteStepAsync(stepId.Value, 1, null, ct); } catch { }
+
+            // 8. 更新排期状态
+            await Dapper.SqlMapper.ExecuteAsync(conn,
+                _sql.Get("Scheduling.Update.Execution.Complete"),
+                new { Id = execution.Id });
+
+            // 9. 更新任务日志（直接 Dapper 更新，与调度引擎风格一致）
+            await Dapper.SqlMapper.ExecuteAsync(conn,
+                _sql.Get("Scheduling.Update.TaskLog.CompleteByName"),
+                new { Status = "Completed", Now = ChinaTime.Now, Name = schedule.JobName, Cid = execution.CompanyId, Month = execution.Month });
+
+            return Ok(new { status = "Completed", message = result });
+        }
+        catch (Exception ex)
+        {
+            if (stepId.HasValue)
+                try { await _stepLogger.FailStepAsync(stepId.Value, ex.Message, null, ct); } catch { }
+
+            await Dapper.SqlMapper.ExecuteAsync(conn,
+                _sql.Get("Scheduling.Update.Execution.Fail"),
+                new { Id = execution.Id, Reason = ex.Message });
+
+            await Dapper.SqlMapper.ExecuteAsync(conn,
+                _sql.Get("Scheduling.Update.TaskLog.FailByName"),
+                new { Status = "Failed", Now = ChinaTime.Now, Error = ex.Message, Name = schedule.JobName, Cid = execution.CompanyId, Month = execution.Month });
+
+            return Ok(new { status = "Failed", error = ex.Message });
+        }
+    }
+
+    /// <summary>跳过排期（Failed/Pending → Skipped）</summary>
+    [HttpPost("jobs/{jobId}/executions/{id}/skip")]
+    public async Task<IActionResult> SkipExecution(Guid jobId, Guid id, [FromBody] Dictionary<string, string>? body, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await Dapper.SqlMapper.ExecuteAsync(conn,
+            _sql.Get("Scheduling.Update.Execution.Skip"),
+            new { Id = id, Reason = body?.GetValueOrDefault("reason") ?? "手动跳过" });
+        return affected > 0 ? Ok(new { status = "Skipped" }) : NotFound(new { error = "操作失败，状态不允许跳过" });
+    }
+
+    /// <summary>暂停排期（Pending → Paused）</summary>
+    [HttpPost("jobs/{jobId}/executions/{id}/pause")]
+    public async Task<IActionResult> PauseExecution(Guid jobId, Guid id, [FromBody] Dictionary<string, string>? body, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await Dapper.SqlMapper.ExecuteAsync(conn,
+            _sql.Get("Scheduling.Update.Execution.Pause"),
+            new { Id = id, Reason = body?.GetValueOrDefault("reason") ?? "手动暂停" });
+        return affected > 0 ? Ok(new { status = "Paused" }) : NotFound(new { error = "操作失败，状态不允许暂停" });
+    }
+
+    /// <summary>取消排期（Pending/Skipped/Paused → Cancelled）</summary>
+    [HttpPost("jobs/{jobId}/executions/{id}/cancel")]
+    public async Task<IActionResult> CancelExecution(Guid jobId, Guid id, [FromBody] Dictionary<string, string>? body, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await Dapper.SqlMapper.ExecuteAsync(conn,
+            _sql.Get("Scheduling.Update.Execution.Cancel"),
+            new { Id = id, Reason = body?.GetValueOrDefault("reason") ?? "手动取消" });
+        return affected > 0 ? Ok(new { status = "Cancelled" }) : NotFound(new { error = "操作失败，状态不允许取消" });
+    }
+
+    /// <summary>恢复排期（Paused/Skipped → Pending）</summary>
+    [HttpPost("jobs/{jobId}/executions/{id}/resume")]
+    public async Task<IActionResult> ResumeExecution(Guid jobId, Guid id, [FromBody] Dictionary<string, string>? body, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await Dapper.SqlMapper.ExecuteAsync(conn,
+            _sql.Get("Scheduling.Update.Execution.Resume"),
+            new { Id = id, Reason = body?.GetValueOrDefault("reason") ?? "手动恢复" });
+        return affected > 0 ? Ok(new { status = "Pending" }) : NotFound(new { error = "操作失败，状态不允许恢复" });
     }
 
     // ===== 任务执行（★新增）=====
@@ -258,6 +413,17 @@ public class SchedulerController : ControllerBase
             s.ParentId, s.Status, s.StartedAt, s.CompletedAt,
             s.DurationMs, s.AffectedCount, s.Message, s.ErrorMessage
         }));
+    }
+
+    /// <summary>获取排期心跳日志</summary>
+    [HttpGet("executions/{id}/heartbeats")]
+    public async Task<IActionResult> GetExecutionHeartbeats(Guid id, [FromQuery] int take = 50, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var beats = await Dapper.SqlMapper.QueryAsync(conn,
+            _sql.Get("Scheduling.Select.ExecutionHeartbeat.ByExecutionId"),
+            new { Id = id, Take = take });
+        return Ok(beats);
     }
 }
 

@@ -19,8 +19,9 @@ public class SettleJob : ScheduledJobBase
 
     public SettleJob(
         ITaskLogRepository taskLogRepo, ITaskStepLogger stepLogger, IUnitOfWork uow,
-        IDbConnectionFactory db, ISqlLoader sql)
-        : base(taskLogRepo, stepLogger, uow)
+        IDbConnectionFactory db, ISqlLoader sql,
+        JobExecutionContext jobContext)
+        : base(taskLogRepo, stepLogger, uow, jobContext)
     {
         _db = db;
         _sql = sql;
@@ -59,34 +60,45 @@ public class SettleJob : ScheduledJobBase
                 using var tx = conn.BeginTransaction();
                 var today = DateOnly.FromDateTime(ChinaTime.Now);
 
-                // Step02: 预收抵应收
-                var step02 = await _stepLogger.StartStepAsync(taskLogId, "SettleStep02",
-                    $"预收抵应收-{contract.ContractNo}", null, null, token);
-
-                var prepaid = await conn.QuerySingleAsync<decimal>(
-                    _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
-                    new { Code = "2203", ContractId = contract.Id }, tx);
-                var receivable = await conn.QuerySingleAsync<decimal>(
-                    _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
-                    new { Code = "1122", ContractId = contract.Id }, tx);
-
-                if (prepaid < 0 && receivable > 0)
+                // Step02: 预收抵应收（基于合同独立预存金额字段）
+                if (contract.PrepaidBalance <= 0)
                 {
-                    var amt = Math.Min(-prepaid, receivable);
-                    var vid = Guid.NewGuid();
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
-                        new { Id = vid, No = $"STL-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
-                            Date = today, Desc = $"SettleJob {targetMonth} 预收抵应收",
-                            SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, CBy = Guid.Empty }, tx);
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = vid, SId = subjects["2203"],
-                            Dir = "Debit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = vid, SId = subjects["1122"],
-                            Dir = "Credit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
-                    counters[0]++;
+                    await _stepLogger.SkipStepAsync(
+                        await _stepLogger.StartStepAsync(taskLogId, "SettleStep02",
+                            $"预收抵应收-{contract.ContractNo}", null, null, token),
+                        "无预存金额，跳过", null, token);
                 }
-                await _stepLogger.CompleteStepAsync(step02, counters[0], null, token);
+                else
+                {
+                    var step02 = await _stepLogger.StartStepAsync(taskLogId, "SettleStep02",
+                        $"预收抵应收-{contract.ContractNo}", null, null, token);
+
+                    var receivable = await conn.QuerySingleAsync<decimal>(
+                        _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
+                        new { Code = "1122", ContractId = contract.Id }, tx);
+
+                    if (receivable > 0)
+                    {
+                        var amt = Math.Min(contract.PrepaidBalance, receivable);
+                        var vid = Guid.NewGuid();
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
+                            new { Id = vid, No = $"STL-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
+                                Date = today, Desc = $"SettleJob {targetMonth} 预收抵应收",
+                                SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, CBy = Guid.Empty }, tx);
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                            new { Id = Guid.NewGuid(), VId = vid, SId = subjects["2203"],
+                                Dir = "Debit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                            new { Id = Guid.NewGuid(), VId = vid, SId = subjects["1122"],
+                                Dir = "Credit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
+                        // 扣减合同预存金额（闭合：预存金额 = 原值 - 本次抵扣）
+                        await conn.ExecuteAsync(
+                            "UPDATE Contracts SET PrepaidBalance = PrepaidBalance - @Amt WHERE Id = @Id",
+                            new { Amt = amt, Id = contract.Id }, tx);
+                        counters[0]++;
+                    }
+                    await _stepLogger.CompleteStepAsync(step02, counters[0], null, token);
+                }
 
                 // Step03: 滞纳金
                 var step03 = await _stepLogger.StartStepAsync(taskLogId, "SettleStep03",

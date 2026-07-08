@@ -1,3 +1,4 @@
+using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Scheduling;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Services;
@@ -5,7 +6,7 @@ using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Scheduling;
 
-public abstract class ScheduledJobBase : RBS.Application.Common.Interfaces.IScheduledJob
+public abstract class ScheduledJobBase : IScheduledJob
 {
     private static readonly SemaphoreSlim _companySemaphore = new(2, 2);
     protected const int ContractParallelism = 20;
@@ -13,17 +14,20 @@ public abstract class ScheduledJobBase : RBS.Application.Common.Interfaces.ISche
     protected readonly ITaskLogRepository _taskLogRepo;
     protected readonly ITaskStepLogger _stepLogger;
     protected readonly IUnitOfWork _uow;
+    protected readonly JobExecutionContext _jobContext;
 
     public abstract string JobName { get; }
 
     protected ScheduledJobBase(
         ITaskLogRepository taskLogRepo,
         ITaskStepLogger stepLogger,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        JobExecutionContext jobContext)
     {
         _taskLogRepo = taskLogRepo;
         _stepLogger = stepLogger;
         _uow = uow;
+        _jobContext = jobContext;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct = default)
@@ -68,6 +72,10 @@ public abstract class ScheduledJobBase : RBS.Application.Common.Interfaces.ISche
     protected async Task<Guid> BeginTaskLogAsync(string taskName, Guid companyId,
         string targetMonth, string triggerType, string runMode, string? paramsJson, CancellationToken ct)
     {
+        // 宿主已创建 TaskLog 时复用（调度引擎执行），避免唯一索引冲突
+        if (_jobContext.TaskLogId != Guid.Empty)
+            return _jobContext.TaskLogId;
+
         var taskLog = new TaskLog(taskName, companyId, targetMonth, triggerType, runMode);
         if (paramsJson != null)
         {

@@ -396,18 +396,18 @@
     <![CDATA[SELECT COUNT(1) FROM TaskLogs WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
   </select>
   <insert id="Scheduling.Insert.TaskLog.Default">
-    <![CDATA[INSERT INTO TaskLogs (Id, TaskName, CompanyId, ContractId, TargetMonth, TriggerType, RunMode, Status, StartedAt, HeartbeatAt, CreatedAt)
-      VALUES (@Id, @TaskName, @CompanyId, @ContractId, @TargetMonth, @TriggerType, @RunMode, @Status, @StartedAt, @StartedAt, GETUTCDATE())]]>
+    <![CDATA[INSERT INTO TaskLogs (Id, TaskName, CompanyId, ContractId, TargetMonth, TriggerType, RunMode, Status, StartedAt, HeartbeatAt, CreatedBy, CreatedAt)
+      VALUES (@Id, @TaskName, @CompanyId, @ContractId, @TargetMonth, @TriggerType, @RunMode, @Status, @StartedAt, @StartedAt, @CreatedBy, GETUTCDATE())]]>
   </insert>
   <update id="Scheduling.Update.TaskLog.Complete">
-    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=GETUTCDATE(),
-      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()),
+    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=GETDATE(),
+      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, GETDATE()),
       TotalCount=@Total, SuccessCount=@Success, FailCount=@Fail, WarningCount=@Warn, Summary=@Summary
       WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskLog.Fail">
-    <![CDATA[UPDATE TaskLogs SET Status='Failed', CompletedAt=GETUTCDATE(),
-      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()), ErrorMessage=@Error
+    <![CDATA[UPDATE TaskLogs SET Status='Failed', CompletedAt=GETDATE(),
+      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, GETDATE()), ErrorMessage=@Error
       WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskLog.Heartbeat">
@@ -429,19 +429,116 @@
   <select id="Scheduling.Select.TaskLog.ById">
     <![CDATA[SELECT * FROM TaskLogs WHERE Id=@Id]]>
   </select>
+  <update id="Scheduling.Update.TaskLog.CompleteByName">
+    <![CDATA[UPDATE TaskLogs SET Status=@Status, CompletedAt=@Now
+      WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
+  </update>
+  <update id="Scheduling.Update.TaskLog.FailByName">
+    <![CDATA[UPDATE TaskLogs SET Status=@Status, CompletedAt=@Now, ErrorMessage=@Error
+      WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
+  </update>
+
+  <!-- JobScheduleExecutions 执行排期 -->
+  <select id="Scheduling.Select.Execution.PendingDue">
+    <![CDATA[SELECT * FROM [JobScheduleExecutions]
+      WHERE [Status]='Pending' AND [TargetDate] <= @Now
+      ORDER BY [CompanyId], [TargetDate]]]>
+  </select>
+  <update id="Scheduling.Update.Execution.Claim">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Processing'
+      WHERE [Id]=@Id AND [Status]='Pending']]>
+  </update>
+  <update id="Scheduling.Update.Execution.Complete">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Completed', [IsAdjusted]=1
+      WHERE [Id]=@Id AND [Status]='Processing']]>
+  </update>
+  <update id="Scheduling.Update.Execution.Fail">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Failed', [Reason]=@Reason
+      WHERE [Id]=@Id AND [Status]='Processing']]>
+  </update>
+  <update id="Scheduling.Update.Execution.Retry">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Pending'
+      WHERE [Id]=@Id AND [Status]='Processing']]>
+  </update>
+  <update id="Scheduling.Update.Execution.Skip">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Skipped', [Reason]=@Reason
+      WHERE [Id]=@Id AND [Status]='Pending']]>
+  </update>
+  <update id="Scheduling.Update.Execution.Pause">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Paused', [Reason]=@Reason
+      WHERE [Id]=@Id AND [Status]='Pending']]>
+  </update>
+  <update id="Scheduling.Update.Execution.Cancel">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Cancelled', [Reason]=@Reason
+      WHERE [Id]=@Id AND [Status] IN ('Pending','Skipped','Paused')]]>
+  </update>
+  <update id="Scheduling.Update.Execution.Resume">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Pending', [Reason]=@Reason
+      WHERE [Id]=@Id AND [Status] IN ('Paused','Skipped')]]>
+  </update>
+  <insert id="Scheduling.Insert.ExecutionHeartbeat.Default">
+    <![CDATA[INSERT INTO [ExecutionHeartbeats] ([ExecutionId],[JobScheduleId],[JobName],[CompanyId],[TargetMonth],[HeartbeatAt])
+      VALUES (@ExecutionId, @JobScheduleId, @JobName, @CompanyId, @TargetMonth, @HeartbeatAt)]]>
+  </insert>
+  <select id="Scheduling.Select.ExecutionHeartbeat.ByExecutionId">
+    <![CDATA[SELECT TOP (@Take) [HeartbeatAt], [CreatedAt]
+      FROM [ExecutionHeartbeats]
+      WHERE [ExecutionId]=@Id
+      ORDER BY [HeartbeatAt] DESC]]>
+  </select>
+  <update id="Scheduling.Update.Execution.ResetStale">
+    <![CDATA[UPDATE e SET [Status]='Pending'
+      FROM [JobScheduleExecutions] e
+      JOIN [JobSchedules] s ON s.[Id]=e.[JobScheduleId]
+      WHERE e.[Status]='Processing'
+        AND EXISTS (
+          SELECT 1 FROM [TaskLogs] t
+          WHERE t.[TaskName]=s.[JobName]
+            AND t.[CompanyId]=e.[CompanyId]
+            AND t.[TargetMonth]=e.[Month]
+            AND t.[Status]='Stale'
+        )]]>
+  </update>
+  <update id="Scheduling.Update.Execution.ResetOrphaned">
+    <![CDATA[UPDATE e SET [Status]='Pending'
+      FROM [JobScheduleExecutions] e
+      JOIN [JobSchedules] s ON s.[Id]=e.[JobScheduleId]
+      WHERE e.[Status]='Processing'
+        AND e.[TargetDate] <= @Threshold
+        AND NOT EXISTS (
+          SELECT 1 FROM [TaskLogs] t
+          WHERE t.[TaskName]=s.[JobName]
+            AND t.[CompanyId]=e.[CompanyId]
+            AND t.[TargetMonth]=e.[Month]
+            AND t.[Status] IN ('Running','Stale')
+        )]]>
+  </update>
+  <select id="Scheduling.Select.Execution.BlockedByUpstream">
+    <![CDATA[SELECT COUNT(1) FROM [JobScheduleExecutions]
+      WHERE [CompanyId]=@Cid
+        AND [TargetDate] < @TargetDate
+        AND [Status] IN ('Failed','Processing')]]>
+  </select>
+  <update id="Scheduling.Update.Execution.ResetToPending">
+    <![CDATA[UPDATE [JobScheduleExecutions] SET [Status]='Pending'
+      WHERE [Id]=@Id AND [Status]='Failed']]>
+  </update>
 
   <!-- TaskStepLogs -->
   <insert id="Scheduling.Insert.TaskStepLog.Default">
     <![CDATA[INSERT INTO TaskStepLogs (Id, TaskLogId, StepName, StepDisplayName, ParentId, SortOrder, Status, StartedAt)
-      VALUES (@Id, @TaskLogId, @StepName, @StepDisplayName, @ParentId, @SortOrder, 'Running', GETUTCDATE())]]>
+      VALUES (@Id, @TaskLogId, @StepName, @StepDisplayName, @ParentId, @SortOrder, 'Running', GETDATE())]]>
   </insert>
   <update id="Scheduling.Update.TaskStepLog.Complete">
-    <![CDATA[UPDATE TaskStepLogs SET Status='Completed', CompletedAt=GETUTCDATE(),
-      DurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()), AffectedCount=@Count WHERE Id=@Id]]>
+    <![CDATA[UPDATE TaskStepLogs SET Status='Completed', CompletedAt=GETDATE(),
+      DurationMs=DATEDIFF(MILLISECOND, StartedAt, GETDATE()), AffectedCount=@Count WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskStepLog.Fail">
-    <![CDATA[UPDATE TaskStepLogs SET Status='Failed', CompletedAt=GETUTCDATE(),
-      DurationMs=DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()), ErrorMessage=@Error WHERE Id=@Id]]>
+    <![CDATA[UPDATE TaskStepLogs SET Status='Failed', CompletedAt=GETDATE(),
+      DurationMs=DATEDIFF(MILLISECOND, StartedAt, GETDATE()), ErrorMessage=@Error WHERE Id=@Id]]>
+  </update>
+  <update id="Scheduling.Update.TaskStepLog.Skip">
+    <![CDATA[UPDATE TaskStepLogs SET Status='Skipped', Message=@Reason WHERE Id=@Id]]>
   </update>
   <select id="Scheduling.Select.TaskStepLog.ByTaskLogId">
     <![CDATA[SELECT * FROM TaskStepLogs WHERE TaskLogId=@Id ORDER BY SortOrder, StartedAt]]>

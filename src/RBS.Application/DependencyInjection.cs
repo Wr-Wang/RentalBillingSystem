@@ -64,6 +64,9 @@ public static class DependencyInjection
         // 任务步骤日志
         services.AddScoped<ITaskStepLogger, TaskStepLogger>();
 
+        // 作业执行上下文（宿主→Job 通信通道）
+        services.AddScoped<JobExecutionContext>();
+
         // 定时作业
         services.AddTransient<IScheduledJob, BillJob>();
         services.AddTransient<IScheduledJob, SettleJob>();

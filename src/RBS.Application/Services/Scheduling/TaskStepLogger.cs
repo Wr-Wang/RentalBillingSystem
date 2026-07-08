@@ -14,11 +14,13 @@ public class TaskStepLogger : ITaskStepLogger
 {
     private readonly ITaskStepLogRepository _stepRepo;
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
-    public TaskStepLogger(ITaskStepLogRepository stepRepo, IDbConnectionFactory db)
+    public TaskStepLogger(ITaskStepLogRepository stepRepo, IDbConnectionFactory db, ISqlLoader sql)
     {
         _stepRepo = stepRepo;
         _db = db;
+        _sql = sql;
     }
 
     public async Task<Guid> StartStepAsync(Guid taskLogId, string stepName, string displayName,
@@ -28,10 +30,7 @@ public class TaskStepLogger : ITaskStepLogger
         if (tx?.Connection != null)
         {
             await tx.Connection.ExecuteAsync(
-                @"INSERT INTO TaskStepLogs (Id, TaskLogId, StepName, StepDisplayName,
-                  ParentId, SortOrder, Status, StartedAt)
-                  VALUES (@Id, @TaskLogId, @StepName, @StepDisplayName,
-                  @ParentId, @SortOrder, @Status, @StartedAt)", log, tx);
+                _sql.Get("Scheduling.Insert.TaskStepLog.Default"), log, tx);
         }
         else
         {
@@ -43,12 +42,10 @@ public class TaskStepLogger : ITaskStepLogger
     public async Task CompleteStepAsync(Guid stepLogId, int affectedCount,
         IDbTransaction? tx = null, CancellationToken ct = default)
     {
-        var sql = @"UPDATE TaskStepLogs SET Status = 'Completed', CompletedAt = GETUTCDATE(),
-            DurationMs = DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()),
-            AffectedCount = @Count WHERE Id = @Id";
-
         if (tx?.Connection != null)
-            await tx.Connection.ExecuteAsync(sql, new { Id = stepLogId, Count = affectedCount }, tx);
+            await tx.Connection.ExecuteAsync(
+                _sql.Get("Scheduling.Update.TaskStepLog.Complete"),
+                new { Id = stepLogId, Count = affectedCount }, tx);
         else
             await _stepRepo.CompleteAsync(stepLogId, affectedCount, ct);
     }
@@ -56,12 +53,10 @@ public class TaskStepLogger : ITaskStepLogger
     public async Task FailStepAsync(Guid stepLogId, string error,
         IDbTransaction? tx = null, CancellationToken ct = default)
     {
-        var sql = @"UPDATE TaskStepLogs SET Status = 'Failed', CompletedAt = GETUTCDATE(),
-            DurationMs = DATEDIFF(MILLISECOND, StartedAt, GETUTCDATE()),
-            ErrorMessage = @Error WHERE Id = @Id";
-
         if (tx?.Connection != null)
-            await tx.Connection.ExecuteAsync(sql, new { Id = stepLogId, Error = error }, tx);
+            await tx.Connection.ExecuteAsync(
+                _sql.Get("Scheduling.Update.TaskStepLog.Fail"),
+                new { Id = stepLogId, Error = error }, tx);
         else
             await _stepRepo.FailAsync(stepLogId, error, ct);
     }
@@ -69,14 +64,16 @@ public class TaskStepLogger : ITaskStepLogger
     public async Task SkipStepAsync(Guid stepLogId, string reason,
         IDbTransaction? tx = null, CancellationToken ct = default)
     {
-        var sql = "UPDATE TaskStepLogs SET Status = 'Skipped', Message = @Reason WHERE Id = @Id";
-
         if (tx?.Connection != null)
-            await tx.Connection.ExecuteAsync(sql, new { Id = stepLogId, Reason = reason }, tx);
+            await tx.Connection.ExecuteAsync(
+                _sql.Get("Scheduling.Update.TaskStepLog.Skip"),
+                new { Id = stepLogId, Reason = reason }, tx);
         else
         {
             using var conn = _db.CreateConnection(); conn.Open();
-            await conn.ExecuteAsync(sql, new { Id = stepLogId, Reason = reason });
+            await conn.ExecuteAsync(
+                _sql.Get("Scheduling.Update.TaskStepLog.Skip"),
+                new { Id = stepLogId, Reason = reason });
         }
     }
 }

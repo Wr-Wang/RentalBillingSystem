@@ -21,8 +21,9 @@ public class BillJob : ScheduledJobBase
 
     public BillJob(
         ITaskLogRepository taskLogRepo, ITaskStepLogger stepLogger, IUnitOfWork uow,
-        IDbConnectionFactory db, ISqlLoader sql)
-        : base(taskLogRepo, stepLogger, uow)
+        IDbConnectionFactory db, ISqlLoader sql,
+        JobExecutionContext jobContext)
+        : base(taskLogRepo, stepLogger, uow, jobContext)
     {
         _db = db;
         _sql = sql;

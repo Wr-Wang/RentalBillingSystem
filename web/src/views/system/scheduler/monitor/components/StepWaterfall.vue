@@ -53,7 +53,7 @@
             :style="{ width: barWidth(step), backgroundColor: barColor(step) }"
           >
             <span v-if="step.durationMs && maxDuration > 0 && (step.durationMs / maxDuration) > 0.15" class="bar-text">
-              {{ (step.durationMs / 1000).toFixed(1) }}s
+              {{ (step.durationMs / 1000).toFixed(3) }}s
             </span>
           </span>
         </span>
@@ -62,7 +62,7 @@
             {{ step.status === 'Completed' ? '✅' : step.status === 'Failed' ? '❌' : step.status === 'Skipped' ? '⏭️' : '🔄' }}
           </el-tag>
         </span>
-        <span class="wf-duration">{{ step.durationMs != null ? (step.durationMs / 1000).toFixed(1) + 's' : '-' }}</span>
+        <span class="wf-duration">{{ step.durationMs != null ? (step.durationMs / 1000).toFixed(3) + 's' : '-' }}</span>
         <span class="wf-impact">
           <el-tag v-if="step.affectedCount != null" size="small">{{ step.affectedCount }} 条</el-tag>
           <span v-else>-</span>
@@ -146,7 +146,7 @@ function statusLabel(status) {
 function formatDuration(ms) {
   if (!ms) return '-'
   if (ms < 1000) return ms + 'ms'
-  return (ms / 1000).toFixed(1) + 's'
+  return (ms / 1000).toFixed(3) + 's'
 }
 </script>
 

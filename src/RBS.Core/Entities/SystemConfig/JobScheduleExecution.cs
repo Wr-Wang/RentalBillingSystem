@@ -41,4 +41,20 @@ public class JobScheduleExecution : AuditableEntity, IHasCompany
     }
 
     public void MarkAdjusted() => IsAdjusted = true;
+
+    public void MarkProcessing() => Status = "Processing";
+    public void MarkCompleted() { Status = "Completed"; IsAdjusted = true; }
+    public void MarkFailed(string? reason) { Status = "Failed"; Reason = reason; }
+
+    /// <summary>跳过（上游失败阻断或管理员手动跳过）</summary>
+    public void MarkSkipped(string? reason) { Status = "Skipped"; Reason = reason; }
+
+    /// <summary>暂停（管理员手动暂停，调度引擎不会拾取）</summary>
+    public void MarkPaused(string? reason) { Status = "Paused"; Reason = reason; }
+
+    /// <summary>取消（管理员手动取消，终态不可逆转）</summary>
+    public void MarkCancelled(string? reason) { Status = "Cancelled"; Reason = reason; }
+
+    /// <summary>重置为待执行（从 Skipped/Paused/Failed 恢复）</summary>
+    public void ResetToPending(string? reason = null) { Status = "Pending"; Reason = reason; }
 }

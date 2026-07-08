@@ -84,12 +84,18 @@ public class ReceiptJob
                     new { Id = Guid.NewGuid(), VId = vid, SId = subjects["1122"],
                         Dir = "Credit", Amt = offset, Sum = "冲应收", CBy = Guid.Empty }, tx);
             }
-            // 溢出部分 → 预收账款
+            // 溢出部分 → 预收账款（同时增加合同预存金额，供 SettleJob 抵扣使用）
             if (overflow > 0)
             {
                 await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
                     new { Id = Guid.NewGuid(), VId = vid, SId = subjects["2203"],
                         Dir = "Credit", Amt = overflow, Sum = "溢出进预收", CBy = Guid.Empty }, tx);
+                if (contractId.HasValue)
+                {
+                    await conn.ExecuteAsync(
+                        "UPDATE Contracts SET PrepaidBalance = PrepaidBalance + @Amt WHERE Id = @Id",
+                        new { Amt = overflow, Id = contractId.Value }, tx);
+                }
             }
             await _stepLogger.CompleteStepAsync(step02, 1, null, ct);
 

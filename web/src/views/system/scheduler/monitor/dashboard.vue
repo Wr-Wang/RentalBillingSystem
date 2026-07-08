@@ -265,7 +265,7 @@ function formatDate(d) {
 
 function formatDuration(ms) {
   if (!ms) return '-'
-  return (ms / 1000).toFixed(1) + 's'
+  return (ms / 1000).toFixed(3) + 's'
 }
 
 onMounted(fetchAll)

@@ -4,8 +4,26 @@
     <template v-if="!selectedJob">
       <div class="page-header">
         <h2>调度任务管理</h2>
-        <!-- 新建任务: 需求不明确，暂隐藏；现有模板任务由种子数据预置 -->
-        <!-- <el-button type="primary" size="small" v-permission="'system:schedulercreate'" @click="openCreateWizard">+ 新建任务</el-button> -->
+        <div style="display:flex;gap:8px;align-items:center;">
+          <el-popover placement="bottom" :width="280" trigger="hover">
+            <template #reference>
+              <el-button text size="small" style="font-size:12px;">📋 状态说明</el-button>
+            </template>
+            <div style="font-size:12px;line-height:2.1;">
+              <div><el-tag :color="statusColor('Pending')" style="color:#fff;border:0;margin-right:6px;" size="small">待执行</el-tag> 未到执行时间或等待上游</div>
+              <div><el-tag :color="statusColor('Processing')" style="color:#fff;border:0;margin-right:6px;" size="small">处理中</el-tag> 已被调度引擎抢占</div>
+              <div><el-tag :color="statusColor('Running')" style="color:#fff;border:0;margin-right:6px;" size="small">执行中</el-tag> 任务正在执行（心跳30s）</div>
+              <div><el-tag :color="statusColor('Completed')" style="color:#fff;border:0;margin-right:6px;" size="small">已完成</el-tag> 执行成功</div>
+              <div><el-tag :color="statusColor('Failed')" style="color:#fff;border:0;margin-right:6px;" size="small">失败</el-tag> 执行失败，阻断下游任务</div>
+              <div><el-tag :color="statusColor('Skipped')" style="color:#fff;border:0;margin-right:6px;" size="small">已跳过</el-tag> 被上游阻断或手动跳过</div>
+              <div><el-tag :color="statusColor('Paused')" style="color:#fff;border:0;margin-right:6px;" size="small">已暂停</el-tag> 手动暂停，调度引擎忽略</div>
+              <div><el-tag :color="statusColor('Cancelled')" style="color:#fff;border:0;margin-right:6px;" size="small">已取消</el-tag> 手动取消（终态）</div>
+              <div style="border-top:1px solid #eee;margin:6px 0 4px;padding-top:4px;"></div>
+              <div><el-tag :color="statusColor('Stale')" style="color:#fff;border:0;margin-right:6px;" size="small">僵死</el-tag> 进程崩溃，等待恢复</div>
+              <div><el-tag :color="statusColor('Reversed')" style="color:#fff;border:0;margin-right:6px;" size="small">已撤销</el-tag> 被管理员反转</div>
+            </div>
+          </el-popover>
+        </div>
       </div>
       <el-row :gutter="16">
         <el-col v-for="job in jobs" :key="job.id" :span="8" style="margin-bottom:16px;">
@@ -24,13 +42,22 @@
                     {{ String(job.hour).padStart(2,'0') }}:{{ String(job.minute).padStart(2,'0') }}
                   </el-tag>
                 </div>
-                <div style="margin-top:6px;font-size:12px;color:#606266;line-height:1.9;">
+                <div style="margin-top:6px;font-size:12px;color:#606266;line-height:2;">
                   <div><span style="color:#909399;display:inline-block;width:64px;">⏱ 上次:</span>
-                    <span v-if="job._lastRun" :style="{color:job.lastRunStatus==='Success'?'#67c23a':'#f56c6c'}">{{ job._lastRun }}</span>
+                    <template v-if="job._lastRun">
+                      <el-tag :color="statusColor(job.lastRunStatus)" style="color:#fff;border:0;margin-right:4px;" size="small">{{ statusLabel(job.lastRunStatus) }}</el-tag>
+                      <span>{{ job._lastRun }}</span>
+                    </template>
                     <span v-else style="color:#c0c4cc;">暂无执行记录</span>
                   </div>
                   <div><span style="color:#909399;display:inline-block;width:64px;">📌 下次:</span>
-                    <span v-if="job._nextRun" style="color:#409eff;">{{ job._nextRun }}</span>
+                    <template v-if="job._nextRun">
+                      <el-tag :color="statusColor('Pending')" style="color:#fff;border:0;margin-right:4px;" size="small">待执行</el-tag>
+                      <span style="color:#409eff;">{{ job._nextRun }}</span>
+                    </template>
+                    <template v-else-if="job._pendingCount">
+                      <el-tag :color="statusColor('Pending')" style="color:#fff;border:0;margin-right:4px;" size="small">{{ job._pendingCount }}条待执行</el-tag>
+                    </template>
                     <span v-else-if="!job.isActive" style="color:#c0c4cc;">任务已停用</span>
                     <span v-else style="color:#c0c4cc;">暂无排期，请先生成</span>
                   </div>
@@ -84,9 +111,19 @@
               <el-table-column label="计划时间" width="200"><template #default="{row}">{{ formatDate(row.targetDate) }}<el-tag v-if="row.isAdjusted" type="warning" size="small" style="margin-left:4px;">调整</el-tag><el-tag v-if="row.isCustom" type="info" size="small" style="margin-left:4px;">自定义</el-tag></template></el-table-column>
               <el-table-column label="状态" width="80"><template #default="{row}"><el-tag :color="statusColor(row.status)" style="color:#fff;border:0" size="small">{{ statusLabel(row.status) }}</el-tag></template></el-table-column>
               <el-table-column prop="reason" label="说明" min-width="160" />
-              <el-table-column label="操作" width="160" fixed="right"><template #default="{row}">
+              <el-table-column label="操作" width="220" fixed="right"><template #default="{row}">
+                <!-- Failed: 只能重试，不可跳过（闭合依赖链） -->
+                <el-button v-if="row.status==='Failed'" text type="primary" size="small" @click="handleRetryExec(row)">重试</el-button>
+                <!-- Pending: 可暂停或取消 -->
+                <el-button v-if="row.status==='Pending'" text size="small" @click="handlePauseExec(row)">暂停</el-button>
+                <el-button v-if="row.status==='Pending'" text type="danger" size="small" @click="handleCancelExec(row)">取消</el-button>
+                <!-- Skipped/Paused: 可恢复 -->
+                <el-button v-if="row.status==='Skipped'||row.status==='Paused'" text type="primary" size="small" @click="handleResumeExec(row)">恢复</el-button>
+                <!-- Completed/Processing: 无操作 -->
+                <el-button v-if="row.status==='Processing'||row.status==='Running'" text disabled size="small">执行中</el-button>
+                <!-- 通用 -->
                 <el-button text size="small" v-permission="'system:schedulerexcedit'" @click="openEditExec(row)">编辑</el-button>
-                <el-button text type="danger" size="small" v-permission="'system:schedulerexecdelete'" @click="confirmDeleteExec(row)">删除</el-button>
+                <el-button v-if="row.status!=='Processing'&&row.status!=='Running'" text type="danger" size="small" v-permission="'system:schedulerexecdelete'" @click="confirmDeleteExec(row)">删除</el-button>
               </template></el-table-column>
             </el-table>
           </el-tab-pane>
@@ -109,7 +146,7 @@
     <!-- 排期编辑 -->
     <el-drawer v-model="execDrawerVisible" :title="isAddingExec?'添加排期':'调整排期'" :size="400">
       <el-form label-width="100px">
-        <el-form-item label="执行时间"><el-date-picker v-model="execForm.targetDate" type="datetime" value-format="YYYY-MM-DD HH:mm" style="width:100%" /></el-form-item>
+        <el-form-item label="执行时间"><el-date-picker v-model="execForm.targetDate" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" style="width:100%" /></el-form-item>
         <el-form-item label="状态"><el-select v-model="execForm.status" style="width:100%"><el-option label="待执行" value="Pending" /><el-option label="成功" value="Success" /><el-option label="失败" value="Failed" /></el-select></el-form-item>
         <el-form-item label="原因"><el-input v-model="execForm.reason" type="textarea" :rows="2" /></el-form-item>
       </el-form>
@@ -143,17 +180,18 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSchedulerJobs, getSchedulerTemplates, createSchedulerJob, updateSchedulerJob, deleteSchedulerJob,
   getExecutions, createExecution, updateExecution, deleteExecution, generateExecutions,
-  executeJob, deleteFutureExecutions } from '../../../api/index'
+  executeJob, deleteFutureExecutions, retryExecution,
+  skipExecution, pauseExecution, cancelExecution, resumeExecution } from '../../../api/index'
 
 const jobs = ref([]); const templates = ref([])
 const selectedJob = ref(null); const activeTab = ref('schedule')
 const executions = ref([]); const execLoading = ref(false)
 
-const JOB_ICONS = { MonthlyFeeBill:'📅', LateFeeCalc:'💰', AutoRenew:'🔄', Collection:'📢', RenewalReminder:'🔔' }
+const JOB_ICONS = { BillJob:'📅', SettleJob:'💰', AutoRenewJob:'🔄', CollectionJob:'📢', RenewalReminderJob:'🔔' }
 function getTemplateIcon(c) { return JOB_ICONS[c]||'⚙️' }
 
 // 任务中文显示名
-const JOB_DISPLAY = { BillJob:'月度应收生成', SettleJob:'月度结算', AutoRenewJob:'自动续签', CollectionJob:'催缴任务', RenewalReminderJob:'续签提醒' }
+const JOB_DISPLAY = { BillJob:'月度应收生成(BillJob)', SettleJob:'月度结算(SettleJob)', AutoRenewJob:'自动续签(AutoRenewJob)', CollectionJob:'催缴任务(CollectionJob)', RenewalReminderJob:'续签提醒(RenewalReminderJob)' }
 function getJobDisplayName(job) { return JOB_DISPLAY[job.jobName] || job.jobName }
 
 async function fetchJobs() {
@@ -165,11 +203,14 @@ async function fetchJobs() {
       try {
         const execs = await getExecutions(job.id, { months: 6 })
         const list = Array.isArray(execs) ? execs : (execs.items || [])
+        const pending = list.filter(e => e.status === 'Pending')
         // 下次执行（最近的 Pending）
-        const next = list.filter(e => e.status === 'Pending').sort((a,b) => new Date(a.targetDate)-new Date(b.targetDate))[0]
+        const next = pending.sort((a,b) => new Date(a.targetDate)-new Date(b.targetDate))[0]
         job._nextRun = next ? formatDate(next.targetDate) : null
-        // 上次执行（最近的 Completed/Failed）
-        const last = list.filter(e => e.status !== 'Pending').sort((a,b) => new Date(b.targetDate)-new Date(a.targetDate))[0]
+        job._pendingCount = pending.length
+        // 上次执行（最近的 Completed/Failed/Processing）
+        const done = list.filter(e => e.status !== 'Pending')
+        const last = done.sort((a,b) => new Date(b.targetDate)-new Date(a.targetDate))[0]
         job._lastRun = last ? formatDate(last.targetDate) : null
         if (last) job.lastRunStatus = last.status
       } catch { job._nextRun = null; job._lastRun = null }
@@ -271,6 +312,20 @@ async function saveExec(){
     ElMessage.success(isAddingExec.value?'已添加':'已更新');execDrawerVisible.value=false;await fetchExecutions()
   }catch{ElMessage.error('操作失败')}
 }
+async function handleRetryExec(r){
+  try {
+    await ElMessageBox.confirm(`确认重试此排期？将立即执行，成功后自动触发下游任务。`,'确认重试',{type:'info'})
+    const res = await retryExecution(selectedJob.value.id, r.id)
+    if (res.status === 'Completed') {
+      ElMessage.success(`✅ 重试成功：${res.message}`)
+    } else {
+      ElMessage.error(`❌ 重试失败：${res.error}`)
+    }
+    await fetchExecutions()
+    // 刷新任务卡片状态
+    await fetchJobs()
+  } catch {}
+}
 async function confirmDeleteExec(r){
   try {
     await ElMessageBox.confirm('确定删除此排期？','提示',{type:'warning'})
@@ -285,13 +340,44 @@ async function confirmDeleteExec(r){
     }
   } catch {}
 }
+async function handleSkipExec(r){
+  try {
+    await ElMessageBox.confirm(`确认跳过此排期？跳过后的任务将不再执行。`,'确认跳过',{type:'warning'})
+    await skipExecution(selectedJob.value.id, r.id, { reason: '手动跳过' })
+    ElMessage.success('已跳过')
+    await fetchExecutions(); await fetchJobs()
+  } catch {}
+}
+async function handlePauseExec(r){
+  try {
+    await ElMessageBox.confirm(`确认暂停此排期？暂停后调度引擎将忽略此排期。`,'确认暂停',{type:'info'})
+    await pauseExecution(selectedJob.value.id, r.id, { reason: '手动暂停' })
+    ElMessage.success('已暂停')
+    await fetchExecutions(); await fetchJobs()
+  } catch {}
+}
+async function handleCancelExec(r){
+  try {
+    await ElMessageBox.confirm(`确认取消此排期？取消后不可恢复。`,'确认取消',{type:'warning',confirmButtonText:'确认取消',confirmButtonClass:'el-button--danger'})
+    await cancelExecution(selectedJob.value.id, r.id, { reason: '手动取消' })
+    ElMessage.success('已取消')
+    await fetchExecutions(); await fetchJobs()
+  } catch {}
+}
+async function handleResumeExec(r){
+  try {
+    await resumeExecution(selectedJob.value.id, r.id, { reason: '手动恢复' })
+    ElMessage.success('已恢复为待执行')
+    await fetchExecutions(); await fetchJobs()
+  } catch {}
+}
 async function handleGenerate(){
   try{genLoading.value=true;const r=await generateExecutions(selectedJob.value.id);ElMessage.success(`生成 ${r.generated||0} 条`);await fetchExecutions()}
   catch{ElMessage.error('生成失败')}finally{genLoading.value=false}
 }
 
-function statusColor(s){return {Success:'#67c23a',Failed:'#f56c6c',Running:'#409eff',Pending:'#607d8b',Skipped:'#9e9e9e'}[s]||'#909399'}
-function statusLabel(s){return {Pending:'待执行',Running:'执行中',Success:'成功',Failed:'失败',Skipped:'跳过'}[s]||s}
+function statusColor(s){return {Completed:'#67c23a',Success:'#67c23a',Failed:'#f56c6c',Processing:'#409eff',Running:'#409eff',Pending:'#909399',Skipped:'#e6a23c',Paused:'#d4a017',Cancelled:'#b0b0b0',Stale:'#e6a23c',Reversed:'#9e9e9e'}[s]||'#909399'}
+function statusLabel(s){return {Pending:'待执行',Processing:'处理中',Running:'执行中',Completed:'已完成',Success:'成功',Failed:'失败',Skipped:'已跳过',Paused:'已暂停',Cancelled:'已取消',Stale:'僵死',Reversed:'已撤销'}[s]||s}
 function formatDate(d){
   if(!d)return '';const dt=new Date(d)
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`

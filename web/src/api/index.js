@@ -226,6 +226,11 @@ export function getTaskLogs(taskName, params) { return request({ url: `/schedule
 export function getTaskLog(id) { return request({ url: `/scheduler/tasklogs/${id}`, method: 'get' }) }
 export function getTaskSteps(id) { return request({ url: `/scheduler/tasklogs/${id}/steps`, method: 'get' }) }
 export function reverseTask(taskLogId, data) { return request({ url: `/scheduler/reverse/${taskLogId}`, method: 'post', data }) }
+export function retryExecution(jobId, id) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}/retry`, method: 'post' }) }
+export function skipExecution(jobId, id, data) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}/skip`, method: 'post', data }) }
+export function pauseExecution(jobId, id, data) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}/pause`, method: 'post', data }) }
+export function cancelExecution(jobId, id, data) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}/cancel`, method: 'post', data }) }
+export function resumeExecution(jobId, id, data) { return request({ url: `/scheduler/jobs/${jobId}/executions/${id}/resume`, method: 'post', data }) }
 
 // Scheduler — Monitor
 export function getMonitorDashboard() { return request({ url: '/monitor/dashboard', method: 'get' }) }

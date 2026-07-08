@@ -1780,6 +1780,7 @@ CREATE TABLE [Contracts] (
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Draft') , -- 合同状态,
     [PreviousContractId] UNIQUEIDENTIFIER , -- 上一份合同ID,
     [RenewalCount] INT NOT NULL DEFAULT (0) , -- 续签次数,
+    [PrepaidBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 预存金额,
     [OriginalContractId] UNIQUEIDENTIFIER , -- 原始合同ID,
     [MarketPriceAtRenewal] DECIMAL(18,2) , -- 续签市场价,
     [TerminatedAt] DATETIME2 , -- 终止时间,
@@ -1819,6 +1820,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'实际搬�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'Status'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上一份合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'PreviousContractId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'续签次数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'RenewalCount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'预存金额（独立于日记账）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'PrepaidBalance'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'原始合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'OriginalContractId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'续签市场价', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'MarketPriceAtRenewal'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'终止时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'TerminatedAt'
@@ -4268,6 +4270,38 @@ CREATE INDEX [IX_Executions_JobScheduleId] ON [JobScheduleExecutions]([JobSchedu
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[JobScheduleExecutions]') AND name=N'IX_Executions_TargetDate')
 CREATE INDEX [IX_Executions_TargetDate] ON [JobScheduleExecutions]([TargetDate])
 
+-- ===================================================================
+-- 53a. ExecutionHeartbeats 表：排期心跳日志表（独立于 TaskLog，仅用于进程探活）
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ExecutionHeartbeats]'))
+CREATE TABLE [ExecutionHeartbeats] (
+    [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY ,
+    [ExecutionId] UNIQUEIDENTIFIER NOT NULL , -- 排期ID,
+    [JobScheduleId] UNIQUEIDENTIFIER NOT NULL , -- 任务定义ID,
+    [JobName] NVARCHAR(200) NOT NULL , -- 任务名称,
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 公司ID,
+    [TargetMonth] NVARCHAR(7) NOT NULL , -- 目标月份,
+    [HeartbeatAt] DATETIME2 NOT NULL , -- 心跳时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 记录时间
+)
+GO
+
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'排期心跳日志表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats'
+GO
+
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'排期ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats', @level2type = N'COLUMN', @level2name = N'ExecutionId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'任务定义ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats', @level2type = N'COLUMN', @level2name = N'JobScheduleId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'任务名称', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats', @level2type = N'COLUMN', @level2name = N'JobName'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'目标月份', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats', @level2type = N'COLUMN', @level2name = N'TargetMonth'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'心跳时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats', @level2type = N'COLUMN', @level2name = N'HeartbeatAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'记录时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ExecutionHeartbeats', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+GO
+
+-- 按排期+时间查询心跳
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ExecutionHeartbeats]') AND name=N'IX_ExecutionHeartbeats_ExecutionId')
+CREATE INDEX [IX_ExecutionHeartbeats_ExecutionId] ON [ExecutionHeartbeats]([ExecutionId], [HeartbeatAt] DESC)
+
 -- 54. JobTemplates 表：任务模板表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JobTemplates]'))
@@ -4486,12 +4520,54 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'执行结�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskLogs', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskLogs', @level2type = N'COLUMN', @level2name = N'CreatedAt'
 GO
--- 同公司同月同一任务执行锁
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[TaskLogs]') AND name=N'IX_TaskLogs_Lock')
-CREATE UNIQUE INDEX [IX_TaskLogs_Lock] ON [TaskLogs]([TaskName],[CompanyId],[TargetMonth]) WHERE [TargetMonth] IS NOT NULL
 -- 按开始时间降序查询
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[TaskLogs]') AND name=N'IX_TaskLogs_StartedAt')
 CREATE INDEX [IX_TaskLogs_StartedAt] ON [TaskLogs]([StartedAt] DESC)
+
+-- ===================================================================
+-- 57a. TaskStepLogs 表：任务步骤执行日志表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TaskStepLogs]'))
+CREATE TABLE [TaskStepLogs] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY ,
+    [TaskLogId] UNIQUEIDENTIFIER NOT NULL , -- 归属任务ID,
+    [StepName] NVARCHAR(50) NOT NULL , -- 步骤名称,
+    [StepDisplayName] NVARCHAR(100) , -- 步骤显示名,
+    [ParentId] UNIQUEIDENTIFIER , -- 父步骤ID,
+    [SortOrder] INT NOT NULL DEFAULT (0) , -- 排序,
+    [Status] NVARCHAR(20) NOT NULL DEFAULT ('Running') , -- 状态,
+    [StartedAt] DATETIME2 NOT NULL , -- 开始时间,
+    [CompletedAt] DATETIME2 , -- 完成时间,
+    [DurationMs] INT , -- 耗时(毫秒),
+    [AffectedCount] INT , -- 影响数,
+    [Message] NVARCHAR(500) , -- 消息,
+    [ErrorMessage] NVARCHAR(2000) -- 错误信息
+)
+GO
+
+-- 表说明：任务步骤执行日志表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'任务步骤执行日志表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs'
+GO
+
+-- TaskStepLogs 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'归属任务ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'TaskLogId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'步骤名称', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'StepName'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'步骤显示名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'StepDisplayName'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'父步骤ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'ParentId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'排序', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'SortOrder'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'Status'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'开始时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'StartedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'完成时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'CompletedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'耗时(毫秒)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'DurationMs'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'影响数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'AffectedCount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'消息', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'Message'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'错误信息', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'TaskStepLogs', @level2type = N'COLUMN', @level2name = N'ErrorMessage'
+GO
+
+-- 按 TaskLogId 查询步骤
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[TaskStepLogs]') AND name=N'IX_TaskStepLogs_TaskLogId')
+CREATE INDEX [IX_TaskStepLogs_TaskLogId] ON [TaskStepLogs]([TaskLogId])
 
 -- ===================================================================
 -- 57. SystemLogs 表：系统日志表

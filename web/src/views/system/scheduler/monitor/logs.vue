@@ -156,7 +156,7 @@ const loading = ref(false)
 const logs = ref([])
 const total = ref(0)
 const selectedIds = ref([])
-const taskNames = ['MonthlyFeeBill', 'LateFeeCalc', 'AutoRenew', 'Collection', 'RenewalReminder', 'BillJob', 'SettleJob']
+const taskNames = ['BillJob', 'SettleJob', 'AutoRenewJob', 'CollectionJob', 'RenewalReminderJob']
 
 const query = reactive({
   taskName: '', status: '', triggerType: '', runMode: '',
@@ -314,7 +314,7 @@ function formatDate(d) {
 }
 function formatDuration(ms) {
   if (!ms) return '-'
-  return (ms / 1000).toFixed(1) + 's'
+  return (ms / 1000).toFixed(3) + 's'
 }
 
 onMounted(fetchLogs)

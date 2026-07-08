@@ -20,6 +20,8 @@ public class Contract : AggregateRoot, IHasCompany
     // ===== 续签链字段 =====
     public Guid? PreviousContractId { get; private set; }
     public int RenewalCount { get; private set; }
+    /// <summary>预存金额（独立于日记账，用于 SettleJob 预收抵应收的判断和扣减）</summary>
+    public decimal PrepaidBalance { get; private set; }
     public Guid? OriginalContractId { get; private set; }
     public decimal? MarketPriceAtRenewal { get; private set; }
 

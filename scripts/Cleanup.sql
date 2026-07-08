@@ -314,6 +314,10 @@ IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JobScheduleExe
     DELETE FROM [JobScheduleExecutions]
 GO
 
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ExecutionHeartbeats]'))
+    DELETE FROM [ExecutionHeartbeats]
+GO
+
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JobTemplates]'))
     DELETE FROM [JobTemplates]
 GO
@@ -324,6 +328,10 @@ GO
 
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TaskLogs]'))
     DELETE FROM [TaskLogs]
+GO
+
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TaskStepLogs]'))
+    DELETE FROM [TaskStepLogs]
 GO
 
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[SystemLogs]'))
