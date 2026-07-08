@@ -13,7 +13,7 @@
             <div style="display:flex;justify-content:space-between;">
               <div style="flex:1;">
                 <div style="font-weight:600;font-size:15px;">
-                  {{ getTemplateIcon(job.templateCode) }} {{ job.jobName }}
+                  {{ getTemplateIcon(job.templateCode) }} {{ getJobDisplayName(job) }}
                   <el-tag :type="job.isActive?'success':'info'" size="small" effect="dark" round style="margin-left:6px;">{{ job.isActive?'已启用':'已停用' }}</el-tag>
                 </div>
                 <div style="font-size:12px;color:#909399;margin-top:2px;">{{ job.description||'-' }}</div>
@@ -51,7 +51,7 @@
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
             <span>
               <el-button text @click="selectedJob=null">◀ 返回</el-button>
-              <strong>{{ getTemplateIcon(selectedJob.templateCode) }} {{ selectedJob.jobName }}</strong>
+              <strong>{{ getTemplateIcon(selectedJob.templateCode) }} {{ getJobDisplayName(selectedJob) }}</strong>
               <el-tag size="small" effect="plain" style="margin-left:6px;">
                 {{ selectedJob.scheduleType==='Daily'?'每日':`每月${selectedJob.dayOfMonth||1}日` }} {{ String(selectedJob.hour).padStart(2,'0') }}:{{ String(selectedJob.minute).padStart(2,'0') }}
               </el-tag>
@@ -149,8 +149,12 @@ const jobs = ref([]); const templates = ref([])
 const selectedJob = ref(null); const activeTab = ref('schedule')
 const executions = ref([]); const execLoading = ref(false)
 
-const JOB_ICONS = { MonthlyFeeBill:'📅', LateFeeCalc:'💰', AutoRenew:'🔄', Collection:'📢' }
+const JOB_ICONS = { MonthlyFeeBill:'📅', LateFeeCalc:'💰', AutoRenew:'🔄', Collection:'📢', RenewalReminder:'🔔' }
 function getTemplateIcon(c) { return JOB_ICONS[c]||'⚙️' }
+
+// 任务中文显示名
+const JOB_DISPLAY = { BillJob:'月度应收生成', SettleJob:'月度结算', AutoRenewJob:'自动续签', CollectionJob:'催缴任务', RenewalReminderJob:'续签提醒' }
+function getJobDisplayName(job) { return JOB_DISPLAY[job.jobName] || job.jobName }
 
 async function fetchJobs() {
   try {

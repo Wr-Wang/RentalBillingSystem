@@ -12,7 +12,7 @@ public class PricingStandardService : IPricingStandardService
     private readonly ITenantService _tenant;
     public PricingStandardService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
 
-    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.HomeCompanyId ?? Guid.Empty;
+    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<PricingStandardDto>> GetListAsync(CancellationToken ct = default)
     {

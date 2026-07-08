@@ -5,7 +5,7 @@ using RBS.Core.Entities.Base;
 /// 续签请求实体 — 存储待审批的续签数据
 /// 审批通过前不触碰 Contracts 主表
 /// </summary>
-public class RenewalRequest : AuditableEntity
+public class RenewalRequest : AuditableEntity, IHasCompany
 {
     public Guid OldContractId { get; private set; }
     public Guid? NewContractId { get; private set; }
@@ -21,16 +21,18 @@ public class RenewalRequest : AuditableEntity
     public bool PaymentStatusCheck { get; private set; }
     public string Status { get; private set; } = "Draft";
     public string? Remark { get; private set; }
+    public Guid CompanyId { get; private set; }
 
     private RenewalRequest() { }
 
-    public RenewalRequest(Guid oldContractId, string contractNo, decimal previousRent, decimal newRent, DateOnly newEndDate)
+    public RenewalRequest(Guid oldContractId, string contractNo, decimal previousRent, decimal newRent, DateOnly newEndDate, Guid companyId)
     {
         OldContractId = oldContractId;
         ContractNo = contractNo;
         PreviousRent = previousRent;
         NewRent = newRent;
         NewEndDate = newEndDate;
+        CompanyId = companyId;
         Status = "Draft";
     }
 

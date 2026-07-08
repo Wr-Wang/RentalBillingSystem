@@ -11,6 +11,7 @@ public class MenuDto
     public int SortOrder { get; set; }
     public bool IsActive { get; set; }
     public string Scope { get; set; } = "Company";
+    public Guid? CompanyId { get; set; }
     public List<MenuDto> Children { get; set; } = new();
 }
 

@@ -6,7 +6,7 @@ namespace RBS.Core.Interfaces.Services;
 public interface ITenantService
 {
     /// <summary>当前用户的所属公司ID</summary>
-    Guid? HomeCompanyId { get; }
+    Guid? CompanyId { get; }
 
     /// <summary>当前用户是否为超级管理员</summary>
     bool IsSuperAdmin { get; }
@@ -14,7 +14,7 @@ public interface ITenantService
     /// <summary>视角切换——当前生效的CompanyId</summary>
     Guid? EffectiveCompanyId { get; }
 
-    /// <summary>默认公司（用于写入操作：取 EffectiveCompanyId → CompanyScope[0] → HomeCompanyId）</summary>
+    /// <summary>默认公司（用于写入操作：取 EffectiveCompanyId → CompanyScope[0] → CompanyId）</summary>
     Guid DefaultCompanyId { get; }
 
     /// <summary>是否正在查看全部数据（超管专用）</summary>

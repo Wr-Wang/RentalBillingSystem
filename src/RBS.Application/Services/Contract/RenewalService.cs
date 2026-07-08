@@ -186,7 +186,7 @@ public class RenewalService : IRenewalService
 
         var renewal = new RenewalRequest(
             oldContract.Id, newContractNo, oldRentAmount,
-            request.NewRentAmount, DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture)));
+            request.NewRentAmount, DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture)), oldContract.CompanyId);
 
         renewal.SetDepositInfo(
             request.DepositHandling, oldDepositAmount, request.NewDepositAmount);

@@ -7,6 +7,7 @@ public class FloorLevelBandDto
     public int MinLevel { get; set; }
     public int MaxLevel { get; set; }
     public string? Description { get; set; }
+    public Guid CompanyId { get; set; }
 }
 
 public class CreateFloorLevelBandRequest

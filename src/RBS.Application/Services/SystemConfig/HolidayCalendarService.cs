@@ -19,7 +19,7 @@ public class HolidayCalendarService : IHolidayCalendarService
         _tenant = tenant;
     }
 
-    private Guid CurrentCompanyId => _tenant.EffectiveCompanyId ?? _tenant.HomeCompanyId ?? Guid.Empty;
+    private Guid CurrentCompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<HolidayCalendarDto>> GetByYearAsync(int year, CancellationToken ct = default)
     {

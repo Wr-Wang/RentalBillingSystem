@@ -352,7 +352,7 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
 public class DapperFeeCodeRepository : DapperRepository<FeeCode>, IFeeCodeRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperFeeCodeRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, "FeeCodes", tracker)
+    public DapperFeeCodeRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, "FeeCodes", tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -366,7 +366,7 @@ public class DapperFeeCodeRepository : DapperRepository<FeeCode>, IFeeCodeReposi
 public class DapperPaymentChannelRepository : DapperRepository<PaymentChannel>, IPaymentChannelRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperPaymentChannelRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, "PaymentChannels", tracker)
+    public DapperPaymentChannelRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, "PaymentChannels", tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -378,7 +378,7 @@ public class DapperPaymentChannelRepository : DapperRepository<PaymentChannel>, 
 public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>, IHolidayCalendarRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperHolidayCalendarRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, "HolidayCalendars", tracker)
+    public DapperHolidayCalendarRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, "HolidayCalendars", tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -391,7 +391,7 @@ public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>
 public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperTenantRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, tracker: tracker)
+    public DapperTenantRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, tracker: tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -404,7 +404,7 @@ public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepositor
 public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperReceiptRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, tracker: tracker)
+    public DapperReceiptRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, tracker: tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -419,7 +419,7 @@ public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptReposi
 public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, IReceivablePlanRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperReceivablePlanRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, tracker: tracker)
+    public DapperReceivablePlanRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, tracker: tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -434,7 +434,7 @@ public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, 
 public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMeterReadingRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperMeterReadingRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, tracker: tracker)
+    public DapperMeterReadingRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, tracker: tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -449,7 +449,7 @@ public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMet
 public class DapperContractRepository : DapperRepository<Contract>, IContractRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperContractRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, tracker: tracker)
+    public DapperContractRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, tracker: tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -466,7 +466,7 @@ public class DapperContractRepository : DapperRepository<Contract>, IContractRep
 public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, IRenewalRequestRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperRenewalRequestRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, tracker: tracker)
+    public DapperRenewalRequestRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, tracker: tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -485,7 +485,7 @@ public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, 
 public class DapperApprovalBizDataRepository : DapperRepository<ApprovalBizData>, IApprovalBizDataRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperApprovalBizDataRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, "ApprovalBizData", tracker)
+    public DapperApprovalBizDataRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, "ApprovalBizData", tracker, tenant: tenant)
     {
         _sql = sql;
     }
@@ -501,7 +501,7 @@ public class DapperApprovalBizDataRepository : DapperRepository<ApprovalBizData>
 public class DapperApprovalFeeItemRepository : DapperRepository<ApprovalFeeItem>, IApprovalFeeItemRepository
 {
     private readonly ISqlLoader _sql;
-    public DapperApprovalFeeItemRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null) : base(db, auditWriter, "ApprovalFeeItems", tracker)
+    public DapperApprovalFeeItemRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, "ApprovalFeeItems", tracker, tenant: tenant)
     {
         _sql = sql;
     }

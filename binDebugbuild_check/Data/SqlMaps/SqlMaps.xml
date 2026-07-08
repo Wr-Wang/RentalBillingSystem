@@ -34,12 +34,12 @@
     <![CDATA[SELECT COUNT(1) FROM Users WHERE Username=@Username AND Id!=@Id]]>
   </select>
   <insert id="Identity.Insert.User.Default">
-    <![CDATA[INSERT INTO Users (Id,Username,PasswordHash,DisplayName,Phone,Email,IsActive,HomeCompanyId,IsSuperAdmin,CreatedBy,CreatedAt)
-      VALUES(@Id,@Username,@PasswordHash,@DisplayName,@Phone,@Email,@IsActive,@HomeCompanyId,@IsSuperAdmin,@CreatedBy,@CreatedAt)]]>
+    <![CDATA[INSERT INTO Users (Id,Username,PasswordHash,DisplayName,Phone,Email,IsActive,CompanyId,IsSuperAdmin,CreatedBy,CreatedAt)
+      VALUES(@Id,@Username,@PasswordHash,@DisplayName,@Phone,@Email,@IsActive,@CompanyId,@IsSuperAdmin,@CreatedBy,@CreatedAt)]]>
   </insert>
   <update id="Identity.Update.User.Default">
     <![CDATA[UPDATE Users SET DisplayName=@DisplayName,PasswordHash=@PasswordHash,Phone=@Phone,Email=@Email,
-      IsActive=@IsActive,HomeCompanyId=@HomeCompanyId,IsSuperAdmin=@IsSuperAdmin,
+      IsActive=@IsActive,CompanyId=@CompanyId,IsSuperAdmin=@IsSuperAdmin,
       UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
   </update>
   <update id="Identity.Update.User.DefaultCompanyId">

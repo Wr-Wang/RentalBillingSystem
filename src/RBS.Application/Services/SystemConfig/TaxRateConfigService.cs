@@ -11,7 +11,7 @@ public class TaxRateConfigService : ITaxRateConfigService
     private readonly IUnitOfWork _uow;
     private readonly ITenantService _tenant;
     public TaxRateConfigService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
-    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.HomeCompanyId ?? Guid.Empty;
+    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<TaxRateConfigDto>> GetListAsync(CancellationToken ct = default)
         => (await _uow.TaxRateConfigs.GetAllAsync(ct)).Select(MapToDto).ToList();

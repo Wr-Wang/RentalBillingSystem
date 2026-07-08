@@ -1,6 +1,8 @@
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Property;
 using RBS.Core.Entities.Property;
+using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Property;
@@ -8,14 +10,17 @@ namespace RBS.Application.Services.Property;
 public class FloorLevelBandService : IFloorLevelBandService
 {
     private readonly IUnitOfWork _uow;
-    public FloorLevelBandService(IUnitOfWork uow) => _uow = uow;
+    private readonly ITenantService _tenant;
+    public FloorLevelBandService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
+
+    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<FloorLevelBandDto>> GetListAsync(CancellationToken ct = default)
         => (await _uow.FloorLevelBands.GetAllAsync(ct)).Select(MapToDto).ToList();
 
     public async Task<FloorLevelBandDto> CreateAsync(CreateFloorLevelBandRequest request, CancellationToken ct = default)
     {
-        var entity = new FloorLevelBand(request.Name, request.MinLevel, request.MaxLevel);
+        var entity = new FloorLevelBand(request.Name, request.MinLevel, request.MaxLevel, CompanyId);
         await _uow.FloorLevelBands.AddAsync(entity, ct);
         await _uow.CommitAsync(ct);
         return MapToDto(entity);
@@ -41,5 +46,5 @@ public class FloorLevelBandService : IFloorLevelBandService
     }
 
     private static FloorLevelBandDto MapToDto(FloorLevelBand f) => new()
-    { Id = f.Id, Name = f.Name, MinLevel = f.MinLevel, MaxLevel = f.MaxLevel, Description = f.Description };
+    { Id = f.Id, Name = f.Name, MinLevel = f.MinLevel, MaxLevel = f.MaxLevel, Description = f.Description, CompanyId = f.CompanyId };
 }

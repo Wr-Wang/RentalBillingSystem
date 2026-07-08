@@ -43,7 +43,7 @@ public class User : AggregateRoot
     /// <summary>
     /// 所属公司标识（为空表示平台级用户）
     /// </summary>
-    public Guid? HomeCompanyId { get; private set; }
+    public Guid? CompanyId { get; private set; }
 
     /// <summary>
     /// 默认公司（用于写入操作，超管切换公司时持久化到数据库）
@@ -204,9 +204,9 @@ public class User : AggregateRoot
     /// 设置所属公司
     /// </summary>
     /// <param name="companyId">公司标识</param>
-    public void SetHomeCompany(Guid? companyId)
+    public void SetCompany(Guid? companyId)
     {
-        HomeCompanyId = companyId;
+        CompanyId = companyId;
     }
 
     public void SetDefaultCompany(Guid? companyId)

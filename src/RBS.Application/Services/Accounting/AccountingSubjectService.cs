@@ -11,7 +11,7 @@ public class AccountingSubjectService : IAccountingSubjectService
     private readonly IUnitOfWork _uow;
     private readonly ITenantService _tenant;
     public AccountingSubjectService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
-    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.HomeCompanyId ?? Guid.Empty;
+    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<AccountingSubjectDto>> GetTreeAsync(CancellationToken ct = default)
     {

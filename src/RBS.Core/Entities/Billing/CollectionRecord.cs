@@ -1,17 +1,32 @@
 namespace RBS.Core.Entities.Billing;
+using RBS.Core.Common;
 using RBS.Core.Entities.Base;
 
-public class CollectionRecord : AuditableEntity
+/// <summary>
+/// 催缴记录 — 每次催缴动作的记录
+/// </summary>
+public class CollectionRecord : AuditableEntity, IHasCompany
 {
     public Guid ContractId { get; private set; }
-    public Guid CollectionStageId { get; private set; }
-    public string? ContactResult { get; private set; }
-    public string? Remark { get; private set; }
+    public int StageNo { get; private set; }
+    public string Channel { get; private set; } = string.Empty;
+    public string Content { get; private set; } = string.Empty;
+    public string Status { get; private set; } = string.Empty;
+    public DateTime SentAt { get; private set; }
+    public Guid? OperatedBy { get; private set; }
+    public Guid CompanyId { get; private set; }
+
     private CollectionRecord() { }
-    public CollectionRecord(Guid contractId, Guid collectionStageId)
+
+    public CollectionRecord(Guid contractId, int stageNo, string channel, string content, Guid companyId)
     {
         if (contractId == Guid.Empty) throw new ArgumentException("合同ID不能为空", nameof(contractId));
-        if (collectionStageId == Guid.Empty) throw new ArgumentException("催缴阶段ID不能为空", nameof(collectionStageId));
-        ContractId = contractId; CollectionStageId = collectionStageId;
+        ContractId = contractId;
+        StageNo = stageNo;
+        Channel = channel ?? throw new ArgumentNullException(nameof(channel));
+        Content = content ?? throw new ArgumentNullException(nameof(content));
+        Status = "Pending";
+        SentAt = ChinaTime.Now;
+        CompanyId = companyId;
     }
 }

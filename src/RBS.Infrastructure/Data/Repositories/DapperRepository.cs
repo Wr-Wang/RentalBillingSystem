@@ -1,29 +1,47 @@
 using Dapper;
+using RBS.Core.Entities.Base;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Services;
 
 namespace RBS.Infrastructure.Data.Repositories;
 
-public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Base.AuditableEntity
+public class DapperRepository<T> : IRepository<T> where T : AuditableEntity
 {
     protected readonly IDbConnectionFactory _db;
     protected readonly string _tableName;
     protected readonly IAuditLogWriter _auditWriter;
     protected readonly IChangeTracker? _tracker;
+    protected readonly ITenantService? _tenant;
 
-    public DapperRepository(IDbConnectionFactory db, IAuditLogWriter auditWriter, string? tableName = null, IChangeTracker? tracker = null)
+    public DapperRepository(IDbConnectionFactory db, IAuditLogWriter auditWriter, string? tableName = null, IChangeTracker? tracker = null, ITenantService? tenant = null)
     {
         _db = db;
         _auditWriter = auditWriter;
         _tracker = tracker;
         _tableName = tableName ?? InferTableName();
+        _tenant = tenant;
+    }
+
+    private bool HasCompanyFilter([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Guid companyId)
+    {
+        companyId = Guid.Empty;
+        if (_tenant == null) return false;
+        var cid = _tenant.EffectiveCompanyId;
+        if (cid == null) return false;
+        if (!typeof(IHasCompany).IsAssignableFrom(typeof(T))) return false;
+        companyId = cid.Value;
+        return true;
     }
 
     public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var entity = await conn.QuerySingleOrDefaultAsync<T>($"SELECT * FROM [{_tableName}] WHERE Id=@Id", new { Id = id });
+        T? entity;
+        if (HasCompanyFilter(out var cid))
+            entity = await conn.QuerySingleOrDefaultAsync<T>($"SELECT * FROM [{_tableName}] WHERE Id=@Id AND CompanyId=@CompanyId", new { Id = id, CompanyId = cid });
+        else
+            entity = await conn.QuerySingleOrDefaultAsync<T>($"SELECT * FROM [{_tableName}] WHERE Id=@Id", new { Id = id });
         if (entity != null) _tracker?.Track(entity, _tableName);
         return entity;
     }
@@ -31,7 +49,11 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
     public async Task<List<T>> GetAllAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var list = (await conn.QueryAsync<T>($"SELECT * FROM [{_tableName}]")).ToList();
+        List<T> list;
+        if (HasCompanyFilter(out var cid))
+            list = (await conn.QueryAsync<T>($"SELECT * FROM [{_tableName}] WHERE CompanyId=@CompanyId", new { CompanyId = cid })).ToList();
+        else
+            list = (await conn.QueryAsync<T>($"SELECT * FROM [{_tableName}]")).ToList();
         foreach (var entity in list) _tracker?.Track(entity, _tableName);
         return list;
     }
@@ -94,6 +116,8 @@ public class DapperRepository<T> : IRepository<T> where T : RBS.Core.Entities.Ba
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
+        if (HasCompanyFilter(out var cid))
+            return await conn.QuerySingleAsync<int>($"SELECT COUNT(1) FROM [{_tableName}] WHERE Id=@Id AND CompanyId=@CompanyId", new { Id = id, CompanyId = cid }) > 0;
         return await conn.QuerySingleAsync<int>($"SELECT COUNT(1) FROM [{_tableName}] WHERE Id=@Id", new { Id = id }) > 0;
     }
 

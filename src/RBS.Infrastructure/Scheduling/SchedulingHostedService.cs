@@ -135,16 +135,38 @@ public class SchedulingHostedService : BackgroundService
         using var conn = db.CreateConnection(); conn.Open();
         await Dapper.SqlMapper.ExecuteAsync(conn,
             sql.Get("Scheduling.Insert.TaskLog.Default"),
-            new { Id = Guid.NewGuid(), Name = taskName, Cid = companyId, Month = month, Status = status, Now = ChinaTime.Now, Empty = Guid.Empty });
+            new
+            {
+                Id = Guid.NewGuid(),
+                TaskName = taskName,
+                CompanyId = companyId,
+                ContractId = (Guid?)null,
+                TargetMonth = month,
+                TriggerType = "Schedule",
+                RunMode = "Execute",
+                Status = status,
+                StartedAt = ChinaTime.Now
+            });
     }
 
     private async Task UpdateTaskLogAsync(IDbConnectionFactory db, string taskName, Guid companyId, string month, string status, string? error, CancellationToken ct)
     {
         var sql = ResolveSql();
         using var conn = db.CreateConnection(); conn.Open();
-        await Dapper.SqlMapper.ExecuteAsync(conn,
-            sql.Get("Scheduling.Update.TaskLog.Complete"),
-            new { Status = status, Now = ChinaTime.Now, Error = error, Name = taskName, Cid = companyId, Month = month });
+        if (status == "Failed")
+        {
+            await conn.ExecuteAsync(
+                @"UPDATE TaskLogs SET Status=@Status, CompletedAt=@Now, ErrorMessage=@Error
+                  WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running'",
+                new { Status = status, Now = ChinaTime.Now, Error = error, Name = taskName, Cid = companyId, Month = month });
+        }
+        else
+        {
+            await conn.ExecuteAsync(
+                @"UPDATE TaskLogs SET Status=@Status, CompletedAt=@Now
+                  WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running'",
+                new { Status = status, Now = ChinaTime.Now, Name = taskName, Cid = companyId, Month = month });
+        }
     }
 
     private async Task DetectStaleTasksAsync(CancellationToken ct)

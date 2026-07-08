@@ -18,7 +18,7 @@ public class UserInfo
     public string DisplayName { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public string? Email { get; set; }
-    public Guid? HomeCompanyId { get; set; }
+    public Guid? CompanyId { get; set; }
     public bool IsSuperAdmin { get; set; }
     public Guid? DefaultCompanyId { get; set; }
     public List<CompanyInfo> CompanyList { get; set; } = new();

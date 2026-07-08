@@ -2,6 +2,7 @@ using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Organization;
 using RBS.Core.Entities.Organization;
 using RBS.Core.Interfaces.UnitOfWork;
+using BCryptNet = BCrypt.Net.BCrypt;
 
 namespace RBS.Application.Services.Organization;
 
@@ -22,7 +23,10 @@ public class AuthService : IAuthService
     public async Task<LoginResponse> LoginAsync(string username, string password, CancellationToken ct = default)
     {
         var user = await _uow.Users.GetByUsernameAsync(username, ct);
-        if (user == null || user.PasswordHash != password || !user.IsActive)
+        if (user == null || !user.IsActive)
+            throw new UnauthorizedAccessException("用户名或密码错误");
+
+        if (!BCryptNet.Verify(password, user.PasswordHash))
             throw new UnauthorizedAccessException("用户名或密码错误");
 
         var permissions = await _uow.Users.GetUserPermissionsAsync(user.Id, ct);
@@ -46,7 +50,7 @@ public class AuthService : IAuthService
                 DisplayName = user.DisplayName,
                 Phone = user.Phone,
                 Email = user.Email,
-                HomeCompanyId = user.HomeCompanyId,
+                CompanyId = user.CompanyId,
                 IsSuperAdmin = user.IsSuperAdmin,
                 DefaultCompanyId = user.DefaultCompanyId,
                 CompanyList = companyList
@@ -68,7 +72,7 @@ public class AuthService : IAuthService
             DisplayName = user.DisplayName,
             Phone = user.Phone,
             Email = user.Email,
-            HomeCompanyId = user.HomeCompanyId,
+            CompanyId = user.CompanyId,
             IsSuperAdmin = user.IsSuperAdmin
         };
     }

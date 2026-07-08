@@ -33,7 +33,7 @@ public class TokenService : ITokenService
             new(ClaimTypes.Name, user.Username),
             new("DisplayName", user.DisplayName),
             new("IsSuperAdmin", user.IsSuperAdmin.ToString()),
-            new("HomeCompanyId", user.HomeCompanyId?.ToString() ?? ""),
+            new("CompanyId", user.CompanyId?.ToString() ?? ""),
             new("DefaultCompanyId", user.DefaultCompanyId?.ToString() ?? "")
         };
 

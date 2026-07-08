@@ -7,7 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using RBS.Core.Interfaces.Services;
 using UserEntity = RBS.Core.Entities.Organization.User;
 using RBS.Core.Interfaces.UnitOfWork;
-using BCrypt.Net;
+using BCryptNet = BCrypt.Net.BCrypt;
 
 namespace RBS.Api.Controllers;
 
@@ -42,7 +42,7 @@ public class AuthController : ControllerBase
             return Unauthorized(new { Message = "用户名或密码错误" });
 
         // BCrypt 验证密码
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (!BCryptNet.Verify(request.Password, user.PasswordHash))
             return Unauthorized(new { Message = "用户名或密码错误" });
 
         if (!user.IsActive)
@@ -62,8 +62,8 @@ public class AuthController : ControllerBase
                 user.DisplayName,
                 user.Phone,
                 user.Email,
-                user.HomeCompanyId,
-                DefaultCompanyId = user.DefaultCompanyId ?? user.HomeCompanyId,
+                user.CompanyId,
+                DefaultCompanyId = user.DefaultCompanyId ?? user.CompanyId,
                 user.IsSuperAdmin
             },
             Roles = roles.Select(r => new { r.Id, r.Name, r.Code }),
@@ -96,8 +96,8 @@ public class AuthController : ControllerBase
             user.DisplayName,
             user.Phone,
             user.Email,
-            user.HomeCompanyId,
-            DefaultCompanyId = user.DefaultCompanyId ?? user.HomeCompanyId,
+            user.CompanyId,
+            DefaultCompanyId = user.DefaultCompanyId ?? user.CompanyId,
             user.IsSuperAdmin,
             Roles = roles.Select(r => new { r.Id, r.Name, r.Code }),
             Permissions = permissions
@@ -123,10 +123,10 @@ public class AuthController : ControllerBase
             return NotFound(new { message = "用户不存在" });
 
         // BCrypt 验证原密码
-        if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash))
+        if (!BCryptNet.Verify(request.OldPassword, user.PasswordHash))
             return BadRequest(new { message = "原密码不正确" });
 
-        user.ChangePassword(BCrypt.Net.BCrypt.HashPassword(request.NewPassword));
+        user.ChangePassword(BCryptNet.HashPassword(request.NewPassword));
         await _uow.Users.UpdateAsync(user, ct);
         await _uow.CommitAsync(ct);
 
@@ -147,8 +147,8 @@ public class AuthController : ControllerBase
             new(ClaimTypes.Name, user.Username),
             new("DisplayName", user.DisplayName),
             new("IsSuperAdmin", user.IsSuperAdmin.ToString()),
-            new("HomeCompanyId", user.HomeCompanyId?.ToString() ?? ""),
-            new("DefaultCompanyId", (user.DefaultCompanyId ?? user.HomeCompanyId)?.ToString() ?? "")
+            new("CompanyId", user.CompanyId?.ToString() ?? ""),
+            new("DefaultCompanyId", (user.DefaultCompanyId ?? user.CompanyId)?.ToString() ?? "")
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));

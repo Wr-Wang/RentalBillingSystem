@@ -15,7 +15,7 @@ public interface ICurrentUserService
     bool IsSuperAdmin { get; }
 
     /// <summary>用户所属公司 ID</summary>
-    Guid? HomeCompanyId { get; }
+    Guid? CompanyId { get; }
 
     /// <summary>用户拥有的角色 ID 列表</summary>
     List<Guid> RoleIds { get; }

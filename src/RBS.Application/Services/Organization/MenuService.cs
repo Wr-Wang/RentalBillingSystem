@@ -67,7 +67,8 @@ public class MenuService : IMenuService
         ParentId = menu.ParentId,
         SortOrder = menu.SortOrder,
         IsActive = menu.IsActive,
-        Scope = menu.Scope
+        Scope = menu.Scope,
+        CompanyId = menu.CompanyId
     };
 
     private static List<MenuDto> BuildTree(List<MenuDto> flatList, Guid? parentId)

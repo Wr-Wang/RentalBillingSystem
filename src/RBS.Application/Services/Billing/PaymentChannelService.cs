@@ -12,7 +12,7 @@ public class PaymentChannelService : IPaymentChannelService
     private readonly ITenantService _tenant;
     public PaymentChannelService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
 
-    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.HomeCompanyId ?? Guid.Empty;
+    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<PaymentChannelDto>> GetListAsync(CancellationToken ct = default)
         => (await _uow.PaymentChannels.GetAllAsync(ct)).Select(MapToDto).ToList();

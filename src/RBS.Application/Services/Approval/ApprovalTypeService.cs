@@ -12,7 +12,7 @@ public class ApprovalTypeService : IApprovalTypeService
     private readonly ITenantService _tenant;
     public ApprovalTypeService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
 
-    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.HomeCompanyId ?? Guid.Empty;
+    private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<ApprovalTypeDto>> GetListAsync(CancellationToken ct = default)
     {

@@ -17,7 +17,7 @@ public class CollectionStagesController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
         var list = await _uow.CollectionStages.GetAllAsync(ct);
-        return Ok(list.OrderBy(s => s.DaysOverdue));
+        return Ok(list.OrderBy(s => s.StageNo));
     }
 
     [HttpPost]

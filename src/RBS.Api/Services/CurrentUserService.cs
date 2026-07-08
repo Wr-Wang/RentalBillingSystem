@@ -38,12 +38,12 @@ public class CurrentUserService : ICurrentUserService
         }
     }
 
-    public Guid? HomeCompanyId
+    public Guid? CompanyId
     {
         get
         {
             var claim = _httpContextAccessor.HttpContext?.User
-                ?.FindFirst("HomeCompanyId")?.Value;
+                ?.FindFirst("CompanyId")?.Value;
             return claim != null && Guid.TryParse(claim, out var id) ? id : null;
         }
     }

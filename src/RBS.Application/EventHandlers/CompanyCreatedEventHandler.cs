@@ -23,19 +23,30 @@ public class CompanyCreatedEventHandler : IEventHandler<CompanyCreatedEvent>
         using var conn = _db.CreateConnection();
         conn.Open();
 
-        // 查询全局模板（CompanyId IS NULL）
+        // 从全局模板（CompanyId IS NULL）复制任务调度配置到新公司
         var templates = await conn.QueryAsync<dynamic>(
-            "SELECT JobName, CronExpression, Description FROM JobSchedules WHERE CompanyId IS NULL AND IsActive = 1");
+            @"SELECT JobName, ScheduleType, Hour, Minute, DayOfMonth, TemplateCode,
+                     IsActive, Description
+              FROM JobSchedules WHERE CompanyId IS NULL AND IsActive = 1");
 
         foreach (var t in templates)
         {
             await conn.ExecuteAsync(
-                @"INSERT INTO JobSchedules (Id, JobName, CronExpression, IsActive, CompanyId, Description, CreatedBy, CreatedAt)
-                  VALUES (NEWID(), @Name, @Cron, 1, @Cid, @Desc, @CBy, GETUTCDATE())",
+                @"INSERT INTO JobSchedules
+                    (Id, JobName, ScheduleType, Hour, Minute, DayOfMonth,
+                     TemplateCode, IsActive, CompanyId, Description, CreatedBy, CreatedAt)
+                  VALUES
+                    (NEWID(), @JobName, @ScheduleType, @Hour, @Minute, @DayOfMonth,
+                     @TemplateCode, @IsActive, @Cid, @Desc, @CBy, GETUTCDATE())",
                 new
                 {
-                    Name = (string)t.JobName,
-                    Cron = (string)t.CronExpression,
+                    JobName = (string)t.JobName,
+                    ScheduleType = (string)t.ScheduleType,
+                    Hour = (int)t.Hour,
+                    Minute = (int)t.Minute,
+                    DayOfMonth = (int?)t.DayOfMonth,
+                    TemplateCode = (string?)t.TemplateCode,
+                    IsActive = (bool)t.IsActive,
                     Desc = (string?)t.Description ?? "",
                     Cid = @event.CompanyId,
                     CBy = Guid.Empty

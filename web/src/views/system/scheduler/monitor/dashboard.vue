@@ -11,8 +11,8 @@
 
     <!-- 统计卡片 -->
     <el-row :gutter="16" style="margin-bottom:16px;">
-      <el-col :span="4" v-for="card in statCards" :key="card.label">
-        <el-card shadow="hover" :body-style="{ padding: '14px' }">
+      <el-col :span="6" v-for="card in statCards" :key="card.label">
+        <el-card shadow="hover" :body-style="{ padding: '16px' }">
           <div class="stat-card">
             <div class="stat-label">{{ card.label }}</div>
             <div class="stat-value" :style="{ color: card.color }">
@@ -27,18 +27,18 @@
 
     <el-row :gutter="16" style="margin-bottom:16px;">
       <!-- 成功率趋势 -->
-      <el-col :span="14">
+      <el-col :span="12">
         <el-card shadow="hover">
           <template #header><span>📈 近30天成功率趋势</span></template>
-          <div ref="trendChartRef" style="width:100%;height:260px;"></div>
+          <div ref="trendChartRef" style="width:100%;height:280px;"></div>
           <div v-if="trendLoading" class="chart-placeholder">加载中...</div>
         </el-card>
       </el-col>
       <!-- 各任务耗时 -->
-      <el-col :span="10">
+      <el-col :span="12">
         <el-card shadow="hover">
           <template #header><span>⏱ 各任务平均耗时</span></template>
-          <div ref="durationChartRef" style="width:100%;height:260px;"></div>
+          <div ref="durationChartRef" style="width:100%;height:280px;"></div>
           <div v-if="durationLoading" class="chart-placeholder">加载中...</div>
         </el-card>
       </el-col>
@@ -46,14 +46,14 @@
 
     <el-row :gutter="16">
       <!-- 今日异常任务 -->
-      <el-col :span="14">
+      <el-col :span="12">
         <el-card shadow="hover">
           <template #header>
             <span>⚠️ 今日异常任务</span>
             <el-button text type="primary" size="small" style="float:right;" @click="$router.push('/system/scheduler/monitor/logs')">查看更多 →</el-button>
           </template>
-          <el-table :data="errorLogs" stripe size="small" v-loading="logsLoading" empty-text="今日暂无异常" @row-click="openStepDrawer" style="cursor:pointer;">
-            <el-table-column label="任务" width="140">
+          <el-table :data="errorLogs" stripe size="small" v-loading="logsLoading" empty-text="今日暂无异常" @row-click="openStepDrawer" style="cursor:pointer;" max-height="320">
+            <el-table-column label="任务" min-width="130">
               <template #default="{row}">{{ row.taskName }}</template>
             </el-table-column>
             <el-table-column label="时间" width="140">
@@ -69,15 +69,15 @@
             <el-table-column label="耗时" width="60">
               <template #default="{row}">{{ formatDuration(row.totalDurationMs) }}</template>
             </el-table-column>
-            <el-table-column label="错误信息" min-width="180">
+            <el-table-column label="错误信息" min-width="160">
               <template #default="{row}">{{ row.errorMessage || row.summary || '-' }}</template>
             </el-table-column>
           </el-table>
         </el-card>
       </el-col>
       <!-- 失败原因聚合 -->
-      <el-col :span="10">
-        <el-card shadow="hover">
+      <el-col :span="12">
+        <el-card shadow="hover" style="height:100%;">
           <template #header><span>📊 失败原因 Top-N（近30天）</span></template>
           <div v-if="failures.length > 0" class="failure-list">
             <div v-for="(f, i) in failures.slice(0, 5)" :key="i" class="failure-item">

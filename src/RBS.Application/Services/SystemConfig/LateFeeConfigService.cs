@@ -24,7 +24,7 @@ public class LateFeeConfigService : ILateFeeConfigService
         var list = await _uow.LateFeeConfigs.GetAllAsync(ct);
         var active = list.FirstOrDefault(x => x.IsActive && x.CompanyId == CompanyId);
         if (active == null && list.Count > 0)
-            active = list.OrderByDescending(x => x.EffectiveDate).First(x => x.CompanyId == CompanyId);
+            active = list.OrderByDescending(x => x.EffectiveDate).FirstOrDefault(x => x.CompanyId == CompanyId);
         return active != null ? Map(active) : new LateFeeConfigDto
         {
             DailyRate = 0.0005m, GraceDays = 3, MaxRate = 100, MinAmount = 1,

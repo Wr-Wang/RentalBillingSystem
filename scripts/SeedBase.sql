@@ -1,7 +1,12 @@
 -- ===================================================================
--- SeedAll.sql - 全量种子数据（动态 GUID 版本）
+-- SeedBase.sql - 基础种子数据（公司、角色、用户、字典、配置）
 -- 合并自所有独立种子文件，按数据依赖关系排列
--- 所有 GUID 均通过 NEWID() 动态生成，无任何硬编码 GUID 字符串
+-- 仅保留 GS001 公司，其余公司数据已移除
+-- ===================================================================
+
+-- SeedBase.sql - 基础种子数据（单公司精简版）
+-- 合并自所有独立种子文件，按数据依赖关系排列
+-- 仅保留 GS001 公司，其余公司数据已移除
 -- ===================================================================
 
 -- ===================================================================
@@ -12,29 +17,15 @@ DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
 
 -- ======== 1. 公司 ========
 DECLARE @GS001Id uniqueidentifier;
-DECLARE @GS002Id uniqueidentifier;
-DECLARE @GS003Id uniqueidentifier;
-DECLARE @GS004Id uniqueidentifier;
+
 
 IF NOT EXISTS (SELECT 1 FROM [Companies] WHERE [Code] = 'GS001')
     INSERT INTO [Companies] ([Id],[Name],[Code],[ContactPerson],[Phone],[Address],[IsActive],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),N'上海茂源置业有限公司','GS001',N'张建国','13912345678',N'上海市浦东新区陆家嘴金融中心A座',1,@SysUserId,@Now);
 SELECT @GS001Id = [Id] FROM [Companies] WHERE [Code] = 'GS001';
 
-IF NOT EXISTS (SELECT 1 FROM [Companies] WHERE [Code] = 'GS002')
-    INSERT INTO [Companies] ([Id],[Name],[Code],[ContactPerson],[Phone],[Address],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'南京恒达物业管理有限公司','GS002',N'李春华','13898765432',N'南京市鼓楼区新街口广场B座',1,@SysUserId,@Now);
-SELECT @GS002Id = [Id] FROM [Companies] WHERE [Code] = 'GS002';
 
-IF NOT EXISTS (SELECT 1 FROM [Companies] WHERE [Code] = 'GS003')
-    INSERT INTO [Companies] ([Id],[Name],[Code],[ContactPerson],[Phone],[Address],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'深圳万方投资发展有限公司','GS003',N'王芳','13655556666',N'深圳市南山区科技园C栋',1,@SysUserId,@Now);
-SELECT @GS003Id = [Id] FROM [Companies] WHERE [Code] = 'GS003';
 
-IF NOT EXISTS (SELECT 1 FROM [Companies] WHERE [Code] = 'GS004')
-    INSERT INTO [Companies] ([Id],[Name],[Code],[ContactPerson],[Phone],[Address],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'广州天恒物业管理有限公司','GS004',N'赵德明','13777778888',N'广州市天河区珠江新城D栋',0,@SysUserId,@Now);
-SELECT @GS004Id = [Id] FROM [Companies] WHERE [Code] = 'GS004';
 
 PRINT N'公司数据初始化完成';
 
@@ -115,7 +106,7 @@ IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'admin')
 BEGIN
     SET @U_AdminId = NEWID();
     INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[CreatedBy],[CreatedAt])
-    VALUES (@U_AdminId,'admin','123456',N'系统管理员','13800138000','admin@rental.com',1,1,@SysUserId,@Now);
+    VALUES (@U_AdminId,'admin','$2b$12$ZnELF2QgBXIilzbMir2uh.RWwIZYXExVvq4camCr.tNfzPH7SShk.',N'系统管理员','13800138000','admin@rental.com',1,1,@SysUserId,@Now);
     IF @R_AdminId IS NOT NULL
         INSERT INTO [UserRoles] ([Id],[UserId],[RoleId],[CreatedBy],[CreatedAt])
         VALUES (NEWID(),@U_AdminId,@R_AdminId,@SysUserId,@Now);
@@ -127,8 +118,8 @@ ELSE
 IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'zhangsan')
 BEGIN
     SET @U_ZhangsanId = NEWID();
-    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[HomeCompanyId],[CreatedBy],[CreatedAt])
-    VALUES (@U_ZhangsanId,'zhangsan','123456',N'张山','13800138001','zhangsan@rental.com',1,0,@GS001Id,@SysUserId,@Now);
+    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (@U_ZhangsanId,'zhangsan','$2b$12$ZnELF2QgBXIilzbMir2uh.RWwIZYXExVvq4camCr.tNfzPH7SShk.',N'张山','13800138001','zhangsan@rental.com',1,0,@GS001Id,@SysUserId,@Now);
     IF @R_OpsSupId IS NOT NULL
         INSERT INTO [UserRoles] ([Id],[UserId],[RoleId],[CreatedBy],[CreatedAt])
         VALUES (NEWID(),@U_ZhangsanId,@R_OpsSupId,@SysUserId,@Now);
@@ -140,8 +131,8 @@ ELSE
 IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'lisi')
 BEGIN
     SET @U_LisiId = NEWID();
-    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[HomeCompanyId],[CreatedBy],[CreatedAt])
-    VALUES (@U_LisiId,'lisi','123456',N'李思','13800138002','lisi@rental.com',1,0,@GS002Id,@SysUserId,@Now);
+    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (@U_LisiId,'lisi','$2b$12$ZnELF2QgBXIilzbMir2uh.RWwIZYXExVvq4camCr.tNfzPH7SShk.',N'李思','13800138002','lisi@rental.com',1,0,@GS001Id,@SysUserId,@Now);
     IF @R_OperId IS NOT NULL
         INSERT INTO [UserRoles] ([Id],[UserId],[RoleId],[CreatedBy],[CreatedAt])
         VALUES (NEWID(),@U_LisiId,@R_OperId,@SysUserId,@Now);
@@ -153,8 +144,8 @@ ELSE
 IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'wangwu')
 BEGIN
     SET @U_WangwuId = NEWID();
-    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[HomeCompanyId],[CreatedBy],[CreatedAt])
-    VALUES (@U_WangwuId,'wangwu','123456',N'王武','13800138003','wangwu@rental.com',1,0,@GS001Id,@SysUserId,@Now);
+    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (@U_WangwuId,'wangwu','$2b$12$ZnELF2QgBXIilzbMir2uh.RWwIZYXExVvq4camCr.tNfzPH7SShk.',N'王武','13800138003','wangwu@rental.com',1,0,@GS001Id,@SysUserId,@Now);
     IF @R_FinSupId IS NOT NULL
         INSERT INTO [UserRoles] ([Id],[UserId],[RoleId],[CreatedBy],[CreatedAt])
         VALUES (NEWID(),@U_WangwuId,@R_FinSupId,@SysUserId,@Now);
@@ -166,8 +157,8 @@ ELSE
 IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'zhaoliu')
 BEGIN
     SET @U_ZhaoliuId = NEWID();
-    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[HomeCompanyId],[CreatedBy],[CreatedAt])
-    VALUES (@U_ZhaoliuId,'zhaoliu','123456',N'赵柳','13800138004','zhaoliu@rental.com',1,0,@GS003Id,@SysUserId,@Now);
+    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (@U_ZhaoliuId,'zhaoliu','$2b$12$ZnELF2QgBXIilzbMir2uh.RWwIZYXExVvq4camCr.tNfzPH7SShk.',N'赵柳','13800138004','zhaoliu@rental.com',1,0,@GS001Id,@SysUserId,@Now);
     IF @R_AccId IS NOT NULL
         INSERT INTO [UserRoles] ([Id],[UserId],[RoleId],[CreatedBy],[CreatedAt])
         VALUES (NEWID(),@U_ZhaoliuId,@R_AccId,@SysUserId,@Now);
@@ -179,8 +170,8 @@ ELSE
 IF NOT EXISTS (SELECT 1 FROM [Users] WHERE [Username] = 'company_a')
 BEGIN
     SET @U_CompanyAId = NEWID();
-    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[HomeCompanyId],[CreatedBy],[CreatedAt])
-    VALUES (@U_CompanyAId,'company_a','123456',N'张建国（茂源）','13912345678','company_a@rental.com',1,0,@GS001Id,@SysUserId,@Now);
+    INSERT INTO [Users] ([Id],[Username],[PasswordHash],[DisplayName],[Phone],[Email],[IsActive],[IsSuperAdmin],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (@U_CompanyAId,'company_a','$2b$12$ZnELF2QgBXIilzbMir2uh.RWwIZYXExVvq4camCr.tNfzPH7SShk.',N'张建国（茂源）','13912345678','company_a@rental.com',1,0,@GS001Id,@SysUserId,@Now);
     IF @R_LandlordId IS NOT NULL
         INSERT INTO [UserRoles] ([Id],[UserId],[RoleId],[CreatedBy],[CreatedAt])
         VALUES (NEWID(),@U_CompanyAId,@R_LandlordId,@SysUserId,@Now);
@@ -203,44 +194,44 @@ DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
 DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'开间/单间')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'开间/单间',N'开放式一体的居住空间',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','Studio',N'开间/单间',N'开放式一体的居住空间',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'一室一厅')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'一室一厅',N'一间卧室加独立客厅',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','1BR1L',N'一室一厅',N'一间卧室加独立客厅',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'两室一厅')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'两室一厅',N'两间卧室加独立客厅',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','2BR1L',N'两室一厅',N'两间卧室加独立客厅',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'两室两厅')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'两室两厅',N'两间卧室加独立客厅和餐厅',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','2BR2L',N'两室两厅',N'两间卧室加独立客厅和餐厅',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'三室一厅')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'三室一厅',N'三间卧室加独立客厅',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','3BR1L',N'三室一厅',N'三间卧室加独立客厅',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'三室两厅')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'三室两厅',N'三间卧室加独立客厅和餐厅',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','3BR2L',N'三室两厅',N'三间卧室加独立客厅和餐厅',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'四室及以上')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'四室及以上',N'四间及以上卧室',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','4BR',N'四室及以上',N'四间及以上卧室',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'主卧')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'主卧',N'合租主卧（带独立卫生间）',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'合租','Master',N'主卧',N'合租主卧（带独立卫生间）',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'次卧')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'次卧',N'合租次卧（共用卫生间）',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'合租','Secondary',N'次卧',N'合租次卧（共用卫生间）',1,@Cid,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [RoomTypes] WHERE [Name] = N'公寓')
-    INSERT INTO [RoomTypes] ([Id],[Name],[Description],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'公寓',N'酒店式公寓/服务式公寓',1,@SysUserId,@Now);
+    INSERT INTO [RoomTypes] ([Id],[Category],[Code],[Name],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),'整租','Apartment',N'公寓',N'酒店式公寓/服务式公寓',1,@Cid,@SysUserId,@Now);
 
 DECLARE @StudioId uniqueidentifier; SELECT @StudioId = [Id] FROM [RoomTypes] WHERE [Name] = N'开间/单间';
 DECLARE @OneBrId uniqueidentifier; SELECT @OneBrId = [Id] FROM [RoomTypes] WHERE [Name] = N'一室一厅';
@@ -362,14 +353,14 @@ DECLARE @ThreeBrId uniqueidentifier; SELECT @ThreeBrId = [Id] FROM [RoomTypes] W
 
 IF NOT EXISTS (SELECT 1 FROM [FloorLevelBands])
 BEGIN
-    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'低层',1,5,N'低层',@SysUserId,@Now);
-    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'中层',6,12,N'中层',@SysUserId,@Now);
-    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'高层',13,17,N'高层',@SysUserId,@Now);
-    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'顶层',18,99,N'顶层',@SysUserId,@Now);
+    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'低层',1,5,N'低层',@Cid,@SysUserId,@Now);
+    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'中层',6,12,N'中层',@Cid,@SysUserId,@Now);
+    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'高层',13,17,N'高层',@Cid,@SysUserId,@Now);
+    INSERT INTO [FloorLevelBands] ([Id],[Name],[MinLevel],[MaxLevel],[Description],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'顶层',18,99,N'顶层',@Cid,@SysUserId,@Now);
 END
 
 DECLARE @LowId uniqueidentifier; SELECT @LowId = [Id] FROM [FloorLevelBands] WHERE [Name] = N'低层';
@@ -579,88 +570,88 @@ DECLARE @R_FinSup uniqueidentifier; SELECT @R_FinSup = [Id] FROM [Roles] WHERE [
 DECLARE @R_FinDir uniqueidentifier; SELECT @R_FinDir = [Id] FROM [Roles] WHERE [Code] = 'FinanceDirector';
 DECLARE @R_GenMgr uniqueidentifier; SELECT @R_GenMgr = [Id] FROM [Roles] WHERE [Code] = 'GeneralManager';
 
-IF @AT_BatchImport IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_BatchImport IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_BatchImport,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_BatchImport IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [Level] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_BatchImport IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [LevelNo] = 2)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_BatchImport,2,@R_DeptMgr,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_BatchImport IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [Level] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_BatchImport IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [LevelNo] = 3)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_BatchImport,3,@R_GenMgr,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractCreate IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractCreate IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractCreate,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractCreate IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [Level] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractCreate IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [LevelNo] = 2)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractCreate,2,@R_DeptMgr,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractCreate IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [Level] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractCreate IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [LevelNo] = 3)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractCreate,3,@R_GenMgr,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractTerminate IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractTerminate IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractTerminate,1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractTerminate IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [Level] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractTerminate IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [LevelNo] = 2)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractTerminate,2,@R_DeptMgr,5000,50000,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractTerminate IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [Level] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractTerminate IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [LevelNo] = 3)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractTerminate,3,@R_GenMgr,50000,99999999,@Cid,@SysUserId,@Now);
 
-IF @AT_ReceiptReverse IS NOT NULL AND @R_FinSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ReceiptReverse IS NOT NULL AND @R_FinSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ReceiptReverse,1,@R_FinSup,0,50000,@Cid,@SysUserId,@Now);
 
-IF @AT_ReceiptReverse IS NOT NULL AND @R_FinDir IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [Level] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ReceiptReverse IS NOT NULL AND @R_FinDir IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [LevelNo] = 2)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ReceiptReverse,2,@R_FinDir,50000,99999999,@Cid,@SysUserId,@Now);
 
-IF @AT_ReceiptReverse IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [Level] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ReceiptReverse IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [LevelNo] = 3)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ReceiptReverse,3,@R_GenMgr,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_Discount IS NOT NULL AND @R_FinSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_Discount IS NOT NULL AND @R_FinSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_Discount,1,@R_FinSup,0,5000,@Cid,@SysUserId,@Now);
 
-IF @AT_Discount IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [Level] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_Discount IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [LevelNo] = 2)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_Discount,2,@R_DeptMgr,5000,50000,@Cid,@SysUserId,@Now);
 
-IF @AT_Discount IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [Level] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_Discount IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [LevelNo] = 3)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_Discount,3,@R_GenMgr,50000,99999999,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractModify IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModify AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractModify IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModify AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractModify,1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractModify IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModify AND [Level] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractModify IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModify AND [LevelNo] = 2)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractModify,2,@R_DeptMgr,5000,99999999,@Cid,@SysUserId,@Now);
 
-IF @AT_ChangeRequest IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ChangeRequest AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ChangeRequest IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ChangeRequest AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ChangeRequest,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractRenew IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [Level] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractRenew IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractRenew,1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractRenew IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [Level] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractRenew IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [LevelNo] = 2)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractRenew,2,@R_DeptMgr,5000,50000,@Cid,@SysUserId,@Now);
 
-IF @AT_ContractRenew IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [Level] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[Level],[RoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+IF @AT_ContractRenew IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [LevelNo] = 3)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractRenew,3,@R_GenMgr,50000,99999999,@Cid,@SysUserId,@Now);
 
 PRINT N'审批类型及级别数据初始化完成！';
@@ -1416,6 +1407,7 @@ FROM RoleMenus WHERE RoleId = @FinSup;
 SELECT r.Name AS RoleName, r.Code, COUNT(rm.MenuId) AS MenuCount
 FROM Roles r JOIN RoleMenus rm ON rm.RoleId = r.Id
 WHERE r.Code IN ('OpsSupervisor','DeptManager','GeneralManager','FinanceSupervisor','FinanceDirector')
+GROUP BY r.Name, r.Code ORDER BY r.Name;
 -- Accountant（会计）
 INSERT INTO RoleMenus (Id, RoleId, MenuId, CreatedBy, CreatedAt)
 SELECT NEWID(), (SELECT Id FROM Roles WHERE Code='Accountant'), M.Id, @SysUserId, @Now
@@ -1481,431 +1473,7 @@ SELECT r.Name AS RoleName, r.Code, COUNT(rm.MenuId) AS MenuCount
 FROM Roles r JOIN RoleMenus rm ON rm.RoleId = r.Id
 WHERE r.Code IN ('Accountant','Operator','Legal','Landlord')
 GROUP BY r.Name, r.Code ORDER BY r.Name;
-
-GROUP BY r.Name, r.Code ORDER BY r.Name;
 GO
-
 -- ===================================================================
--- 13. 任务模板（Cron 表达式版本）
+-- SeedBase.sql - 结束
 -- ===================================================================
-DECLARE @Now datetime2 = GETUTCDATE(); DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'MonthlyFeeBill')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultCronExpression],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'MonthlyFeeBill',N'月度应收生成',N'月度应收','0 0 8 25 * ?',N'每月25日 08:00 生成月度应收账单','Calendar','Billing',1,1,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'LateFeeCalc')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultCronExpression],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'LateFeeCalc',N'滞纳金计算',N'滞纳金','0 0 2 * * ?',N'每天 02:00 计算滞纳金','Money','Billing',2,1,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'AutoRenew')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultCronExpression],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'AutoRenew',N'自动续签',N'续签','0 0 0 * * ?',N'每天 00:00 自动续签到期的合同','RefreshRight','Contract',3,1,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'Collection')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultCronExpression],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'Collection',N'催缴任务',N'催缴','0 0 9 * * ?',N'每天 09:00 执行催缴任务','Bell','Collection',4,1,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'RenewalReminder')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultCronExpression],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'RenewalReminder',N'续签提醒',N'续签提醒','0 0 8 * * ?',N'每天 08:00 提醒运营人员合同即将到期','Notifications','Renewal',5,1,@SysUserId,@Now);
-
-PRINT N'任务模板种子数据初始化完成！';
-GO
-
--- ===================================================================
--- 14. 调度任务 + 公司实例
--- ===================================================================
-DECLARE @Now datetime2 = GETUTCDATE(); DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
-DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'MonthlyFeeBill')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultScheduleType],[DefaultHour],[DefaultMinute],[DefaultDayOfMonth],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'MonthlyFeeBill',N'月度应收生成',N'月度应收','Monthly',8,0,25,N'每月25日 08:00 生成月度应收账单','Calendar','Billing',1,1,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'LateFeeCalc')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultScheduleType],[DefaultHour],[DefaultMinute],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'LateFeeCalc',N'滞纳金计算',N'滞纳金','Daily',2,0,N'每天 02:00 计算滞纳金','Money','Billing',2,1,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'AutoRenew')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultScheduleType],[DefaultHour],[DefaultMinute],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'AutoRenew',N'自动续签',N'续签','Daily',0,0,N'每天 00:00 自动续签到期的合同','RefreshRight','Contract',3,1,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'Collection')
-    INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultScheduleType],[DefaultHour],[DefaultMinute],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'Collection',N'催缴任务',N'催缴','Daily',9,0,N'每天 09:00 执行催缴任务','Bell','Collection',4,1,@SysUserId,@Now);
-
-DELETE FROM [JobSchedules] WHERE [CompanyId] = @Cid AND [JobName] IN (
-  N'📅 月度应收生成', N'💰 滞纳金计算', N'🔄 自动续签', N'📢 催缴任务', N'🔔 续签提醒');
-
-IF NOT EXISTS (SELECT 1 FROM [JobSchedules] WHERE [JobName] = N'📅 月度应收生成' AND [CompanyId] = @Cid)
-    INSERT INTO [JobSchedules] ([Id],[JobName],[ScheduleType],[Hour],[Minute],[DayOfMonth],[Description],[IsActive],[CompanyId],[TemplateCode],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'📅 月度应收生成','Monthly',8,0,25,N'每月25日 08:00 生成月度应收账单',1,@Cid,'MonthlyFeeBill',@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobSchedules] WHERE [JobName] = N'💰 滞纳金计算' AND [CompanyId] = @Cid)
-    INSERT INTO [JobSchedules] ([Id],[JobName],[ScheduleType],[Hour],[Minute],[Description],[IsActive],[CompanyId],[TemplateCode],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'💰 滞纳金计算','Daily',2,0,N'每天 02:00 计算滞纳金',1,@Cid,'LateFeeCalc',@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobSchedules] WHERE [JobName] = N'🔄 自动续签' AND [CompanyId] = @Cid)
-    INSERT INTO [JobSchedules] ([Id],[JobName],[ScheduleType],[Hour],[Minute],[Description],[IsActive],[CompanyId],[TemplateCode],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'🔄 自动续签','Daily',0,0,N'每天 00:00 自动续签到期的合同',1,@Cid,'AutoRenew',@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobSchedules] WHERE [JobName] = N'📢 催缴任务' AND [CompanyId] = @Cid)
-    INSERT INTO [JobSchedules] ([Id],[JobName],[ScheduleType],[Hour],[Minute],[Description],[IsActive],[CompanyId],[TemplateCode],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'📢 催缴任务','Daily',9,0,N'每天 09:00 执行催缴任务',1,@Cid,'Collection',@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobSchedules] WHERE [JobName] = N'🔔 续签提醒' AND [CompanyId] = @Cid)
-    INSERT INTO [JobSchedules] ([Id],[JobName],[ScheduleType],[Hour],[Minute],[Description],[IsActive],[CompanyId],[TemplateCode],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'🔔 续签提醒','Daily',8,0,N'每天 08:00 提醒运营',1,@Cid,'RenewalReminder',@SysUserId,@Now);
-
-PRINT N'调度任务初始化完成！';
-GO
-
--- ===================================================================
--- 15. 排期执行实例
--- ===================================================================
-DECLARE @Now datetime2 = GETUTCDATE(); DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
-DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
-
-DECLARE @BillJobId  uniqueidentifier; SELECT @BillJobId  = [Id] FROM [JobSchedules] WHERE [JobName]=N'BillJob' AND [CompanyId]=@Cid;
-DECLARE @SettleJobId     uniqueidentifier; SELECT @SettleJobId     = [Id] FROM [JobSchedules] WHERE [JobName]=N'SettleJob' AND [CompanyId]=@Cid;
-DECLARE @AutoRenewJobId       uniqueidentifier; SELECT @AutoRenewJobId       = [Id] FROM [JobSchedules] WHERE [JobName]=N'AutoRenewJob' AND [CompanyId]=@Cid;
-DECLARE @CollectionJobId      uniqueidentifier; SELECT @CollectionJobId      = [Id] FROM [JobSchedules] WHERE [JobName]=N'CollectionJob' AND [CompanyId]=@Cid;
-DECLARE @RenewalReminderJobId uniqueidentifier; SELECT @RenewalReminderJobId = [Id] FROM [JobSchedules] WHERE [JobName]=N'RenewalReminderJob' AND [CompanyId]=@Cid;
-
-IF @BillJobId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-07' AND [IsCustom]=0)
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@BillJobId,@Cid,'2026-07-24T08:00:00','2026-07-25T08:00:00','2026-07','Pending',N'25日逢周六，提前至24日',1,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-08' AND [IsCustom]=0)
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@BillJobId,@Cid,'2026-08-25T08:00:00','2026-08-25T08:00:00','2026-08','Pending',N'默认',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-09' AND [IsCustom]=0)
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@BillJobId,@Cid,'2026-09-25T08:00:00','2026-09-25T08:00:00','2026-09','Pending',N'默认',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@BillJobId AND [Month]='2026-07' AND [IsCustom]=1)
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@BillJobId,@Cid,'2026-07-15T14:30:00',NULL,'2026-07','Pending',N'月中临时加跑一次核对',1,1,@SysUserId,@Now);
-
-END
-
-IF @SettleJobId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@SettleJobId AND [Month]='2026-07')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@SettleJobId,@Cid,'2026-07-01T02:00:00','2026-07-01T02:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@SettleJobId AND [Month]='2026-08')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@SettleJobId,@Cid,'2026-08-01T02:00:00','2026-08-01T02:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@SettleJobId AND [Month]='2026-09')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@SettleJobId,@Cid,'2026-09-01T02:00:00','2026-09-01T02:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-END
-
-IF @AutoRenewJobId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewJobId AND [Month]='2026-07')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AutoRenewJobId,@Cid,'2026-07-01T00:00:00','2026-07-01T00:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewJobId AND [Month]='2026-08')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AutoRenewJobId,@Cid,'2026-08-01T00:00:00','2026-08-01T00:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@AutoRenewJobId AND [Month]='2026-09')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AutoRenewJobId,@Cid,'2026-09-01T00:00:00','2026-09-01T00:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-END
-
-IF @CollectionJobId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-06')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-06-01T09:00:00','2026-06-01T09:00:00','2026-06','Success',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-07')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-07-01T09:00:00','2026-07-01T09:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-08')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-08-01T09:00:00','2026-08-01T09:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@CollectionJobId AND [Month]='2026-09')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@CollectionJobId,@Cid,'2026-09-01T09:00:00','2026-09-01T09:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-END
-
-IF @RenewalReminderJobId IS NOT NULL BEGIN
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderJobId AND [Month]='2026-07')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@RenewalReminderJobId,@Cid,'2026-07-01T08:00:00','2026-07-01T08:00:00','2026-07','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderJobId AND [Month]='2026-08')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@RenewalReminderJobId,@Cid,'2026-08-01T08:00:00','2026-08-01T08:00:00','2026-08','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [JobScheduleExecutions] WHERE [JobScheduleId]=@RenewalReminderJobId AND [Month]='2026-09')
-    INSERT INTO [JobScheduleExecutions] ([Id],[JobScheduleId],[CompanyId],[TargetDate],[OriginalDate],[Month],[Status],[Reason],[IsAdjusted],[IsCustom],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@RenewalReminderJobId,@Cid,'2026-09-01T08:00:00','2026-09-01T08:00:00','2026-09','Pending',N'每日执行',0,0,@SysUserId,@Now);
-
-END
-
-PRINT N'排期种子数据初始化完成！';
-GO
-
--- ===================================================================
--- 16. 催缴阶段
--- ===================================================================
-DECLARE @Now datetime2 = GETUTCDATE(); DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
-DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
-
-IF NOT EXISTS (SELECT 1 FROM [CollectionStages] WHERE [Name]=N'逾期提醒' AND [CompanyId]=@Cid)
-    INSERT INTO [CollectionStages] ([Id],[Name],[DaysOverdue],[Action],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'逾期提醒',7,N'SMS',1,@Cid,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [CollectionStages] WHERE [Name]=N'电话催缴' AND [CompanyId]=@Cid)
-    INSERT INTO [CollectionStages] ([Id],[Name],[DaysOverdue],[Action],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'电话催缴',15,N'CALL',1,@Cid,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [CollectionStages] WHERE [Name]=N'上门催缴' AND [CompanyId]=@Cid)
-    INSERT INTO [CollectionStages] ([Id],[Name],[DaysOverdue],[Action],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'上门催缴',30,N'VISIT',1,@Cid,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [CollectionStages] WHERE [Name]=N'律师函' AND [CompanyId]=@Cid)
-    INSERT INTO [CollectionStages] ([Id],[Name],[DaysOverdue],[Action],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'律师函',60,N'LEGAL',1,@Cid,@SysUserId,@Now);
-
-PRINT N'催缴阶段种子数据初始化完成！';
-GO
-
--- ===================================================================
--- 17. 滞纳金配置
--- ===================================================================
-DECLARE @Now datetime2 = GETUTCDATE(); DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
-DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
-
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('LateFeeConfigs') AND name='LandlordId')
-    EXEC sp_rename 'LateFeeConfigs.LandlordId', 'CompanyId', 'COLUMN';
-
-IF NOT EXISTS (SELECT 1 FROM [LateFeeConfigs] WHERE [CompanyId]=@Cid AND [IsActive]=1)
-INSERT INTO [LateFeeConfigs] ([Id],[DailyRate],[GraceDays],[MaxRate],[MinAmount],[EffectiveDate],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
-VALUES (NEWID(),0.0005,3,100.00,1.00,'2026-01-01',1,@Cid,@SysUserId,@Now);
-GO
-
--- ===================================================================
--- 18. 房源（含完整属性：面积、朝向、基础租金、房型）
--- ===================================================================
-DECLARE @Sys uniqueidentifier = '00000000-0000-0000-0000-000000000000';
-DECLARE @Now datetime2 = GETDATE();
-DECLARE @GS001Id uniqueidentifier; SELECT @GS001Id = [Id] FROM [Companies] WHERE [Code] = 'GS001';
-DECLARE @GS002Id uniqueidentifier; SELECT @GS002Id = [Id] FROM [Companies] WHERE [Code] = 'GS002';
-DECLARE @GS003Id uniqueidentifier; SELECT @GS003Id = [Id] FROM [Companies] WHERE [Code] = 'GS003';
-DECLARE @Studio uniqueidentifier; SELECT @Studio = [Id] FROM [RoomTypes] WHERE [Name] = N'一室一厅';
-DECLARE @TwoBr uniqueidentifier; SELECT @TwoBr = [Id] FROM [RoomTypes] WHERE [Name] = N'两室一厅';
-DECLARE @ThreeBr uniqueidentifier; SELECT @ThreeBr = [Id] FROM [RoomTypes] WHERE [Name] = N'三室一厅';
-DECLARE @ThreeBrTwo uniqueidentifier; SELECT @ThreeBrTwo = [Id] FROM [RoomTypes] WHERE [Name] = N'三室两厅';
-
-DELETE FROM HousingUnits;
-
--- A栋（6层×2户=12套）- 上海浦东 GS001
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'1层',1,N'101',N'A栋-1层-101',@TwoBr,85,N'南',5500,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'1层',1,N'102',N'A栋-1层-102',@Studio,65,N'北',4200,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'2层',2,N'201',N'A栋-2层-201',@TwoBr,95,N'南',6000,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'2层',2,N'202',N'A栋-2层-202',@Studio,70,N'东',4500,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'3层',3,N'301',N'A栋-3层-301',@ThreeBr,125,N'南',7800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'3层',3,N'302',N'A栋-3层-302',@TwoBr,90,N'西',5800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'4层',4,N'401',N'A栋-4层-401',@ThreeBrTwo,145,N'南',8800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'4层',4,N'402',N'A栋-4层-402',@TwoBr,95,N'北',6200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'5层',5,N'501',N'A栋-5层-501',@ThreeBr,130,N'南',8200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'5层',5,N'502',N'A栋-5层-502',@TwoBr,100,N'东',6500,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'6层',6,N'601',N'A栋-6层-601',@ThreeBrTwo,150,N'南',9500,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'A栋',N'A',N'上海市浦东新区陆家嘴金融中心A座',@GS001Id,N'6层',6,N'602',N'A栋-6层-602',@ThreeBr,120,N'西',7500,'Vacant',@Sys,@Now);
-
--- B栋（12套）- 上海浦东 GS001
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'1层',1,N'101',N'B栋-1层-101',@Studio,60,N'南',4000,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'1层',1,N'102',N'B栋-1层-102',@TwoBr,85,N'北',5300,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'2层',2,N'201',N'B栋-2层-201',@TwoBr,95,N'南',6200,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'2层',2,N'202',N'B栋-2层-202',@Studio,65,N'东',4300,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'3层',3,N'301',N'B栋-3层-301',@ThreeBr,128,N'南',7900,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'3层',3,N'302',N'B栋-3层-302',@TwoBr,88,N'西',5600,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'4层',4,N'401',N'B栋-4层-401',@ThreeBrTwo,140,N'南',8500,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'4层',4,N'402',N'B栋-4层-402',@TwoBr,92,N'北',6000,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'5层',5,N'501',N'B栋-5层-501',@ThreeBr,135,N'南',8600,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'5层',5,N'502',N'B栋-5层-502',@TwoBr,105,N'东',6800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'6层',6,N'601',N'B栋-6层-601',@ThreeBrTwo,155,N'南',9800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'B栋',N'B',N'上海市浦东新区陆家嘴金融中心B座',@GS001Id,N'6层',6,N'602',N'B栋-6层-602',@ThreeBr,125,N'西',7800,'Vacant',@Sys,@Now);
-
--- C栋（12套）- 上海浦东 GS001
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'1层',1,N'101',N'C栋-1层-101',@Studio,65,N'南',4200,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'1层',1,N'102',N'C栋-1层-102',@TwoBr,82,N'北',5200,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'2层',2,N'201',N'C栋-2层-201',@TwoBr,92,N'南',6000,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'2层',2,N'202',N'C栋-2层-202',@Studio,68,N'东',4400,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'3层',3,N'301',N'C栋-3层-301',@ThreeBr,122,N'南',7600,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'3层',3,N'302',N'C栋-3层-302',@TwoBr,90,N'西',5800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'4层',4,N'401',N'C栋-4层-401',@ThreeBrTwo,138,N'南',8400,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'4层',4,N'402',N'C栋-4层-402',@TwoBr,95,N'北',6200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'5层',5,N'501',N'C栋-5层-501',@ThreeBr,130,N'南',8100,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'5层',5,N'502',N'C栋-5层-502',@TwoBr,100,N'东',6500,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'6层',6,N'601',N'C栋-6层-601',@ThreeBrTwo,148,N'南',9200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'C栋',N'C',N'上海市浦东新区陆家嘴金融中心C座',@GS001Id,N'6层',6,N'602',N'C栋-6层-602',@ThreeBr,125,N'西',7800,'Vacant',@Sys,@Now);
-
--- D栋（8套）- 南京鼓楼 GS002
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'1层',1,N'101',N'D栋-1层-101',@Studio,60,N'南',3200,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'1层',1,N'102',N'D栋-1层-102',@TwoBr,80,N'北',4200,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'2层',2,N'201',N'D栋-2层-201',@TwoBr,88,N'南',4800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'2层',2,N'202',N'D栋-2层-202',@Studio,62,N'东',3500,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'3层',3,N'301',N'D栋-3层-301',@ThreeBr,118,N'南',6200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'3层',3,N'302',N'D栋-3层-302',@TwoBr,85,N'西',4600,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'4层',4,N'401',N'D栋-4层-401',@ThreeBrTwo,135,N'南',7200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'D栋',N'D',N'南京市鼓楼区新街口广场D座',@GS002Id,N'4层',4,N'402',N'D栋-4层-402',@TwoBr,90,N'北',5000,'Vacant',@Sys,@Now);
-
--- E栋（8套）- 深圳南山 GS003
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'1层',1,N'101',N'E栋-1层-101',@Studio,65,N'南',3800,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'1层',1,N'102',N'E栋-1层-102',@TwoBr,82,N'北',4800,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'2层',2,N'201',N'E栋-2层-201',@TwoBr,90,N'南',5400,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'2层',2,N'202',N'E栋-2层-202',@Studio,68,N'东',4000,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'3层',3,N'301',N'E栋-3层-301',@ThreeBr,120,N'南',6800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'3层',3,N'302',N'E栋-3层-302',@TwoBr,88,N'西',5200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'4层',4,N'401',N'E栋-4层-401',@ThreeBrTwo,132,N'南',7600,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'E栋',N'E',N'深圳市南山区科技园E栋',@GS003Id,N'4层',4,N'402',N'E栋-4层-402',@TwoBr,92,N'北',5600,'Vacant',@Sys,@Now);
-
--- F栋（8套）- 深圳南山 GS003
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'1层',1,N'101',N'F栋-1层-101',@Studio,60,N'南',3600,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'1层',1,N'102',N'F栋-1层-102',@TwoBr,78,N'北',4600,'Rented',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'2层',2,N'201',N'F栋-2层-201',@TwoBr,88,N'南',5200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'2层',2,N'202',N'F栋-2层-202',@Studio,65,N'东',3800,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'3层',3,N'301',N'F栋-3层-301',@ThreeBr,118,N'南',6500,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'3层',3,N'302',N'F栋-3层-302',@TwoBr,85,N'西',5000,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'4层',4,N'401',N'F栋-4层-401',@ThreeBrTwo,130,N'南',7200,'Vacant',@Sys,@Now);
-INSERT INTO HousingUnits (Id,BuildingName,BuildingCode,BuildingAddress,CompanyId,FloorName,FloorSortOrder,UnitNo,FullCode,RoomTypeId,Area,Orientation,BaseRentAmount,Status,CreatedBy,CreatedAt) VALUES (NEWID(),N'F栋',N'F',N'深圳市南山区科技园F栋',@GS003Id,N'4层',4,N'402',N'F栋-4层-402',@TwoBr,90,N'北',5400,'Vacant',@Sys,@Now);
-
-SELECT COUNT(*) AS TotalHousingUnits FROM HousingUnits;
-GO
-
--- ===================================================================
--- 19. 合同（依赖房源 + 租客 + 收费项目）
--- ===================================================================
-DECLARE @Now datetime2 = GETDATE();
-DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
-DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
-DECLARE @ZhangsanUserId uniqueidentifier; SELECT @ZhangsanUserId = [Id] FROM [Users] WHERE [Username] = 'zhangsan';
-
-IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code]='RENT' AND [CompanyId]=@Cid)
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'RENT',N'房租费','FixedAmount',1,'Rent','Recurring',1,1,@Cid,@SysUserId,@Now);
-
-IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code]='MANAGEMENT' AND [CompanyId]=@Cid)
-    INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'MANAGEMENT',N'物业管理费','FixedAmount',5,'Property','Recurring',1,0,@Cid,@SysUserId,@Now);
-
-DECLARE @TenantZS uniqueidentifier;
-DECLARE @TenantLS uniqueidentifier;
-DECLARE @TenantWW uniqueidentifier;
-DECLARE @TenantZL uniqueidentifier;
-
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'张三')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'张三','13800138001',N'310101199001011234',@Cid,1,@SysUserId,@Now);
-SELECT @TenantZS = [Id] FROM [Tenants] WHERE [Name]=N'张三';
-
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'李四')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'李四','13900139002',N'310101199002022345',@Cid,1,@SysUserId,@Now);
-SELECT @TenantLS = [Id] FROM [Tenants] WHERE [Name]=N'李四';
-
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'王五')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'王五','13700137003',N'310101199003033456',@Cid,1,@SysUserId,@Now);
-SELECT @TenantWW = [Id] FROM [Tenants] WHERE [Name]=N'王五';
-
-IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'赵六')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),N'赵六','13600136004',N'310101199004044567',@Cid,1,@SysUserId,@Now);
-SELECT @TenantZL = [Id] FROM [Tenants] WHERE [Name]=N'赵六';
-
-DECLARE @Contract1 uniqueidentifier;
-DECLARE @Contract2 uniqueidentifier;
-DECLARE @Contract3 uniqueidentifier;
-DECLARE @Contract4 uniqueidentifier;
-
-SET @Contract1 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract1,'HT-2026-001',Id,'2026-01-01','2027-12-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
-FROM HousingUnits WHERE UnitNo='101' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
-
-SET @Contract2 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract2,'HT-2026-002',Id,'2026-02-01','2027-01-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
-FROM HousingUnits WHERE UnitNo='102' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
-
-SET @Contract3 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract3,'HT-2026-003',Id,'2026-03-15','2027-03-14','Monthly','Active',@Cid,@ZhangsanUserId,@Now
-FROM HousingUnits WHERE UnitNo='201' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
-
-SET @Contract4 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract4,'HT-2026-004',Id,'2026-01-01','2026-06-30','Monthly','Expired',@Cid,@ZhangsanUserId,@Now
-FROM HousingUnits WHERE UnitNo='101' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
-
-IF @Contract1 IS NOT NULL AND @TenantZS IS NOT NULL
-    INSERT INTO [ContractTenants] ([Id],[ContractId],[TenantId],[IsPrimary],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract1,@TenantZS,1,@SysUserId,@Now);
-
-IF @Contract2 IS NOT NULL AND @TenantLS IS NOT NULL
-    INSERT INTO [ContractTenants] ([Id],[ContractId],[TenantId],[IsPrimary],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract2,@TenantLS,1,@SysUserId,@Now);
-
-IF @Contract3 IS NOT NULL AND @TenantWW IS NOT NULL
-    INSERT INTO [ContractTenants] ([Id],[ContractId],[TenantId],[IsPrimary],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract3,@TenantWW,1,@SysUserId,@Now);
-
-IF @Contract4 IS NOT NULL AND @TenantZL IS NOT NULL
-    INSERT INTO [ContractTenants] ([Id],[ContractId],[TenantId],[IsPrimary],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract4,@TenantZL,1,@SysUserId,@Now);
-
-DECLARE @RentFeeCodeId uniqueidentifier; SELECT @RentFeeCodeId=[Id] FROM [FeeCodes] WHERE [Code]='RENT' AND [CompanyId]=@Cid;
-
-IF @Contract1 IS NOT NULL AND @RentFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract1,@RentFeeCodeId,'FixedAmount',5200,1,@SysUserId,@Now);
-
-IF @Contract2 IS NOT NULL AND @RentFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract2,@RentFeeCodeId,'FixedAmount',3800,1,@SysUserId,@Now);
-
-IF @Contract3 IS NOT NULL AND @RentFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract3,@RentFeeCodeId,'FixedAmount',6800,1,@SysUserId,@Now);
-
-IF @Contract4 IS NOT NULL AND @RentFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract4,@RentFeeCodeId,'FixedAmount',5000,1,@SysUserId,@Now);
-
--- ===== 押金配置（一次性收费）=====
-DECLARE @DepositFeeCodeId uniqueidentifier; SELECT @DepositFeeCodeId=[Id] FROM [FeeCodes] WHERE [Code]='DEPOSIT' AND [CompanyId]=@Cid;
-
-IF @Contract1 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract1,@DepositFeeCodeId,'FixedAmount',10400,1,@SysUserId,@Now);
-
-IF @Contract2 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract2,@DepositFeeCodeId,'FixedAmount',7600,1,@SysUserId,@Now);
-
-IF @Contract3 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract3,@DepositFeeCodeId,'FixedAmount',13600,1,@SysUserId,@Now);
-
-IF @Contract4 IS NOT NULL AND @DepositFeeCodeId IS NOT NULL
-    INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@Contract4,@DepositFeeCodeId,'FixedAmount',10000,1,@SysUserId,@Now);
-
-PRINT 'SeedAll.sql 全量种子数据执行完成！';
-GO

@@ -15,12 +15,12 @@ public class TenantService : ITenantService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public Guid? HomeCompanyId
+    public Guid? CompanyId
     {
         get
         {
             var claim = _httpContextAccessor.HttpContext?.User
-                ?.FindFirst("HomeCompanyId");
+                ?.FindFirst("CompanyId");
             return claim != null && Guid.TryParse(claim.Value, out var id) ? id : null;
         }
     }
@@ -52,7 +52,7 @@ public class TenantService : ITenantService
                 return Guid.Parse(currentId);
             }
 
-            return HomeCompanyId;
+            return CompanyId;
         }
     }
 
@@ -70,7 +70,7 @@ public class TenantService : ITenantService
 
     /// <summary>
     /// 默认公司（用于写入操作）
-    /// 优先级：EffectiveCompanyId → DefaultCompanyId(DB持久化) → HomeCompanyId
+    /// 优先级：EffectiveCompanyId → DefaultCompanyId(DB持久化) → CompanyId
     /// </summary>
-    public Guid DefaultCompanyId => EffectiveCompanyId ?? DefaultCompanyIdFromClaim ?? HomeCompanyId ?? Guid.Empty;
+    public Guid DefaultCompanyId => EffectiveCompanyId ?? DefaultCompanyIdFromClaim ?? CompanyId ?? Guid.Empty;
 }

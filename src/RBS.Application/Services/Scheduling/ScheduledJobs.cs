@@ -7,100 +7,17 @@ using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Interfaces.UnitOfWork;
 
+// 注意：BillJob 和 SettleJob 已迁移到独立的 BillJob.cs / SettleJob.cs，
+//       继承自 ScheduledJobBase，JobName 与数据库一致。
+
 namespace RBS.Application.Services.Scheduling;
-
-/// <summary>
-/// 月账单生成 Job — 为所有生效合同生成当月应收计划
-/// </summary>
-public class MonthlyFeeBillJob : IScheduledJob
-{
-    public string JobName => "MonthlyFeeBill";
-    private readonly IUnitOfWork _uow;
-    private readonly IReceivableGenerationService _generationService;
-
-    public MonthlyFeeBillJob(IUnitOfWork uow, IReceivableGenerationService generationService)
-    {
-        _uow = uow;
-        _generationService = generationService;
-    }
-
-    public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
-    {
-        var contracts = await _uow.Contracts.GetAllAsync(ct);
-        var activeContracts = contracts.Where(c => c.Status == "Active" && c.CompanyId == companyId).ToList();
-        if (activeContracts.Count == 0) return "无生效合同";
-
-        int total = 0;
-        foreach (var contract in activeContracts)
-        {
-            if (!contract.ShouldGenerateReceivableFor(targetMonth)) continue;
-            try
-            {
-                var count = await _generationService.GenerateAsync(contract.Id, targetMonth, targetMonth, ct);
-                total += count;
-            }
-            catch { /* 单个合同失败不影响其他合同 */ }
-        }
-
-        return $"已为 {total} 条费用配置生成应收计划";
-    }
-}
-
-/// <summary>
-/// 滞纳金计算 Job — 每日计算逾期应收的滞纳金
-/// </summary>
-public class LateFeeCalcJob : IScheduledJob
-{
-    public string JobName => "LateFeeCalc";
-    private readonly IUnitOfWork _uow;
-    private readonly IBillingDomainService _billingDomain;
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
-
-    public LateFeeCalcJob(IUnitOfWork uow, IBillingDomainService billingDomain, IDbConnectionFactory db, ISqlLoader sql)
-    {
-        _uow = uow;
-        _billingDomain = billingDomain;
-        _db = db;
-        _sql = sql;
-    }
-
-    public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
-    {
-        var configs = await _uow.LateFeeConfigs.GetAllAsync(ct);
-        var config = configs.FirstOrDefault(c => c.CompanyId == companyId);
-        if (config == null) return "未配置滞纳金规则";
-
-        var overduePlans = await _uow.ReceivablePlans.GetOverdueAsync(companyId, ct);
-        if (overduePlans.Count == 0) return "无逾期应收";
-
-        var asOfDate = DateOnly.FromDateTime(ChinaTime.Now);
-        int count = 0;
-
-        foreach (var plan in overduePlans)
-        {
-            var fee = _billingDomain.CalculateLateFee(plan, config, asOfDate);
-            if (fee > 0)
-            {
-                plan.SetLateFee(fee);
-                using var conn = _db.CreateConnection(); conn.Open();
-                await conn.ExecuteAsync(
-                    _sql.Get("Billing.Update.ReceivablePlan.LateFee"),
-                    new { Fee = fee, Id = plan.Id });
-                count++;
-            }
-        }
-
-        return $"已处理 {count} 条逾期应收的滞纳金";
-    }
-}
 
 /// <summary>
 /// 自动续签 Job — 检查到期前 N 天且 AutoRenew=true 的合同
 /// </summary>
 public class AutoRenewJob : IScheduledJob
 {
-    public string JobName => "AutoRenew";
+    public string JobName => "AutoRenewJob";
     private readonly IUnitOfWork _uow;
     private readonly IRenewalService _renewalService;
     private readonly IDbConnectionFactory _db;
@@ -162,7 +79,7 @@ public class AutoRenewJob : IScheduledJob
 /// </summary>
 public class CollectionJob : IScheduledJob
 {
-    public string JobName => "Collection";
+    public string JobName => "CollectionJob";
     private readonly IUnitOfWork _uow;
 
     public CollectionJob(IUnitOfWork uow) => _uow = uow;
@@ -180,9 +97,11 @@ public class CollectionJob : IScheduledJob
         foreach (var plan in overduePlans)
         {
             var daysOverdue = today.DayNumber - plan.DueDate.DayNumber;
+
+            // 按逾期天数范围匹配催缴阶段
             var stage = stages
-                .Where(s => s.IsActive && daysOverdue >= s.DaysOverdue)
-                .OrderByDescending(s => s.DaysOverdue)
+                .Where(s => s.IsAuto && daysOverdue >= s.OverdueDaysFrom && daysOverdue <= s.OverdueDaysTo)
+                .OrderBy(s => s.StageNo)
                 .FirstOrDefault();
 
             if (stage == null) continue;
@@ -190,11 +109,20 @@ public class CollectionJob : IScheduledJob
             // 检查是否已有该阶段的催缴记录
             var existingRecords = await _uow.CollectionRecords.GetAllAsync(ct);
             var alreadyExists = existingRecords.Any(r =>
-                r.ContractId == plan.ContractId && r.CollectionStageId == stage.Id);
+                r.ContractId == plan.ContractId && r.StageNo == stage.StageNo);
 
             if (!alreadyExists)
             {
-                var record = new CollectionRecord(plan.ContractId, stage.Id);
+                var channel = stage.ActionType switch
+                {
+                    "SMS" => "SMS",
+                    "CALL" => "PHONE",
+                    "VISIT" => "VISIT",
+                    "LEGAL" => "LEGAL",
+                    _ => "SMS"
+                };
+                var content = $"{stage.StageName} - 逾期{daysOverdue}天";
+                var record = new CollectionRecord(plan.ContractId, stage.StageNo, channel, content, companyId);
                 await _uow.CollectionRecords.AddAsync(record, ct);
                 created++;
             }
@@ -210,7 +138,7 @@ public class CollectionJob : IScheduledJob
 /// </summary>
 public class RenewalReminderJob : IScheduledJob
 {
-    public string JobName => "RenewalReminder";
+    public string JobName => "RenewalReminderJob";
     private readonly IUnitOfWork _uow;
 
     public RenewalReminderJob(IUnitOfWork uow) => _uow = uow;
