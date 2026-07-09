@@ -179,14 +179,14 @@
   </select>
   <select id="Approval.Select.Request.ByApprover">
     <![CDATA[SELECT a.* FROM ApprovalRequests a
-      WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.ApprovalRequestId=a.Id AND r.ApproverId=@UserId AND r.Action='Submitted')
+      WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.RequestId=a.Id AND r.ApproverId=@UserId AND r.Action='Submitted')
       ORDER BY a.CreatedAt DESC]]>
   </select>
   <select id="Approval.Select.Request.PendingByTypeLevel">
     <![CDATA[SELECT * FROM ApprovalRequests WHERE Status='Pending' AND ApprovalTypeId=@TypeId AND CurrentLevel=@Level ORDER BY CreatedAt DESC]]>
   </select>
   <select id="Approval.Select.LevelConfigs.ByApprovalType">
-    <![CDATA[SELECT DISTINCT ApprovalTypeId, [Level] FROM ApprovalLevelConfigs WHERE RoleId IN @Ids]]>
+    <![CDATA[SELECT DISTINCT ApprovalTypeId, LevelNo AS [Level] FROM ApprovalLevelConfigs WHERE ApproverRoleId IN @Ids]]>
   </select>
   <insert id="Approval.Insert.Request.Default">
     <![CDATA[INSERT INTO ApprovalRequests (Id, ApprovalTypeId, Title, Description, TargetEntityId, TargetEntityType,
@@ -203,7 +203,7 @@
 
   <!-- 审批多表查询 -->
   <select id="Approval.Select.Request.ByIdWithRecords">
-    <![CDATA[SELECT * FROM ApprovalRequests WHERE Id=@Id; SELECT * FROM ApprovalRecords WHERE ApprovalRequestId=@Id ORDER BY CreatedAt]]>
+    <![CDATA[SELECT * FROM ApprovalRequests WHERE Id=@Id; SELECT * FROM ApprovalRecords WHERE RequestId=@Id ORDER BY CreatedAt]]>
   </select>
   <select id="Approval.Select.Request.ByTargetWithRecords">
     <![CDATA[SELECT * FROM ApprovalRequests WHERE TargetEntityId=@Id AND TargetEntityType=@Type ORDER BY CreatedAt DESC]]>
@@ -211,27 +211,27 @@
 
   <!-- 审批记录 -->
   <insert id="Approval.Insert.Record.Default">
-    <![CDATA[INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
+    <![CDATA[INSERT INTO ApprovalRecords (Id, RequestId, LevelNo, ApproverId, Action, Comment, CreatedBy, CreatedAt)
       VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)]]>
   </insert>
   <insert id="Approval.Insert.Record.Raw">
-    <![CDATA[INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
+    <![CDATA[INSERT INTO ApprovalRecords (Id, RequestId, LevelNo, ApproverId, Action, Comment, CreatedBy, CreatedAt)
       VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)]]>
   </insert>
   <select id="Approval.Select.Record.ByApprovalRequestId">
-    <![CDATA[SELECT * FROM ApprovalRecords WHERE ApprovalRequestId=@Id ORDER BY CreatedAt]]>
+    <![CDATA[SELECT * FROM ApprovalRecords WHERE RequestId=@Id ORDER BY CreatedAt]]>
   </select>
 
   <!-- 审批历史 -->
   <select id="Approval.Select.History.ByUserId">
     <![CDATA[SELECT * FROM ApprovalRequests a
-      WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.ApprovalRequestId=a.Id AND r.ApproverId=@UserId
+      WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.RequestId=a.Id AND r.ApproverId=@UserId
         AND (r.Action='Approved' OR r.Action='Rejected'))
       {0} ORDER BY a.CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
   </select>
   <select id="Approval.Select.History.CountByUserId">
     <![CDATA[SELECT COUNT(*) FROM ApprovalRequests a
-      WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.ApprovalRequestId=a.Id AND r.ApproverId=@UserId
+      WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.RequestId=a.Id AND r.ApproverId=@UserId
         AND (r.Action='Approved' OR r.Action='Rejected'))
       {0}]]>
   </select>
@@ -716,8 +716,8 @@
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0, UpdatedAt = GETUTCDATE() WHERE Id = @p1 AND IsActive = 1]]>
   </update>
   <insert id="Approval.Insert.ContractFeeConfig.CopyFrom">
-    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
-      SELECT NEWID(), @p0, FeeCodeId, @p1, BillingMode, 1, @p2, NULL, @p3, GETUTCDATE()
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt, CompanyId)
+      SELECT NEWID(), @p0, FeeCodeId, @p1, BillingMode, 1, @p2, NULL, @p3, GETUTCDATE(), CompanyId
       FROM ContractFeeConfigs WHERE Id = @p4]]>
   </insert>
   <select id="Approval.Select.Request.PendingCount">
@@ -811,8 +811,8 @@
     <![CDATA[SELECT TOP 1 cfc.Amount FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId WHERE cfc.ContractId=@Cid AND fc.Code=@Code AND cfc.IsActive=1 ORDER BY cfc.EffectiveDate DESC]]>
   </select>
   <insert id="Contract.Insert.ContractFeeConfig.MeterBased">
-    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractId, @FeeCodeId, 'MeterBased', @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt, CompanyId)
+      VALUES (@Id, @ContractId, @FeeCodeId, 'MeterBased', @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, @CreatedBy, @CreatedAt, (SELECT CompanyId FROM Contracts WHERE Id = @ContractId))]]>
   </insert>
   <update id="Contract.Update.ReceivablePlan.FreezeByContract">
     <![CDATA[UPDATE ReceivablePlans SET Status = 'Frozen' WHERE ContractId = @ContractId AND Status = 'Pending' AND Period >= @Period]]>
@@ -829,7 +829,9 @@
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0 WHERE ContractId = @p1 AND ExpiryDate IS NULL]]>
   </update>
   <select id="Lease.Select.ContractFeeConfig.ActiveByContract">
-    <![CDATA[SELECT FeeCodeId, BillingMode, Amount, Unit, UnitPrice FROM ContractFeeConfigs WHERE ContractId = @Id AND IsActive = 1]]>
+    <![CDATA[SELECT cf.FeeCodeId, cf.BillingMode, cf.Amount, cf.Unit, cf.UnitPrice, fc.Code AS FeeCode
+      FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
+      WHERE cf.ContractId = @Id AND cf.IsActive = 1]]>
   </select>
   <select id="Lease.Select.Contract.DetailMulti">
     <![CDATA[SELECT c.*, r.FullCode AS RoomFullCode FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
@@ -839,8 +841,8 @@ SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, fc.Code AS Fe
 FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id]]>
   </select>
   <insert id="Lease.Insert.ContractFeeConfig.CopyFromRenewal">
-    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, CreatedBy, CreatedAt, CompanyId)
+      VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, @CreatedBy, @CreatedAt, (SELECT CompanyId FROM Contracts WHERE Id = @ContractId))]]>
   </insert>
 
   <!-- ================================================================
@@ -890,7 +892,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
 
   <!-- 续签写操作 -->
   <insert id="Lease.Insert.RenewalRequest.ApprovalRecord">
-    <![CDATA[INSERT INTO ApprovalRecords (Id, ApprovalRequestId, Level, ApproverId, Action, Comment, CreatedBy, CreatedAt)
+    <![CDATA[INSERT INTO ApprovalRecords (Id, RequestId, LevelNo, ApproverId, Action, Comment, CreatedBy, CreatedAt)
       VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="Lease.Update.ApprovalRequest.StatusAndContract">
@@ -922,12 +924,12 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT TenantId, IsPrimary FROM ContractTenants WHERE ContractId = @Id]]>
   </select>
   <insert id="Lease.Insert.ContractTenant.Default">
-    <![CDATA[INSERT INTO ContractTenants (Id, ContractId, TenantId, IsPrimary, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractId, @TenantId, @IsPrimary, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO ContractTenants (ContractId, TenantId, IsPrimary, CreatedBy, CreatedAt)
+      VALUES (@ContractId, @TenantId, @IsPrimary, @CreatedBy, @CreatedAt)]]>
   </insert>
   <insert id="Lease.Insert.DepositLog.Default">
-    <![CDATA[INSERT INTO DepositLogs (Id, ContractId, Amount, Balance, Action, Remark, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractId, @Amount, @Balance, @Action, @Remark, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO DepositLogs (Id, ContractId, ActionType, Amount, BalanceAfter, Remarks, OperatedBy, OperatedAt, CompanyId, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractId, @ActionType, @Amount, @BalanceAfter, @Remarks, @OperatedBy, GETUTCDATE(), @CompanyId, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="Lease.Update.RenewalRequest.Complete">
     <![CDATA[UPDATE RenewalRequests SET NewContractId = @NewContractId, Status = 'Completed', UpdatedAt = @Now WHERE Id = @Id]]>
@@ -953,8 +955,8 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
 
   <!-- DepositLog（押金日志） -->
   <insert id="Contract.Insert.DepositLog.Refund">
-    <![CDATA[INSERT INTO DepositLogs (Id, ContractId, Amount, Balance, Action, Remark, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractId, @Amount, 0, 'Refund', @Remark, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO DepositLogs (Id, ContractId, ActionType, Amount, BalanceAfter, Remarks, OperatedBy, OperatedAt, CompanyId, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractId, 'Refund', @Amount, @BalanceAfter, @Remarks, @OperatedBy, GETUTCDATE(), @CompanyId, @CreatedBy, @CreatedAt)]]>
   </insert>
 
   <!-- ================================================================
@@ -970,8 +972,8 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
             ORDER BY cf.FeeCodeId, cf.EffectiveDate DESC]]>
   </select>
   <insert id="Lease.Insert.ContractFeeConfig.Default">
-    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
-            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, NULL, @CreatedBy, @Now)]]>
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt, CompanyId)
+            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, NULL, @CreatedBy, @Now, (SELECT CompanyId FROM Contracts WHERE Id = @ContractId))]]>
   </insert>
   <update id="Lease.Update.ContractFeeConfig.Default">
     <![CDATA[UPDATE ContractFeeConfigs SET Amount=@Amount, BillingMode=@BillingMode, Unit=@Unit, UnitPrice=@UnitPrice, IsActive=@IsActive
@@ -993,15 +995,15 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate=@ExpiryDate WHERE Id=@Id]]>
   </update>
   <insert id="Lease.Insert.ContractFeeConfig.AfterAdjust">
-    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
-            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, NULL, NULL, 1, @EffectiveDate, NULL, @CreatedBy, @Now)]]>
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt, CompanyId)
+            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, NULL, NULL, 1, @EffectiveDate, NULL, @CreatedBy, @Now, (SELECT CompanyId FROM Contracts WHERE Id = @ContractId))]]>
   </insert>
   <update id="Contract.Update.ContractFeeConfig.AutoExpire">
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate=@ExpiryDate, IsActive=0 WHERE Id=@Id AND ExpiryDate IS NULL]]>
   </update>
   <insert id="Lease.Insert.ContractFeeConfig.AutoRenew">
-    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt)
-      SELECT @Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, 1, @EffectiveDate, NULL, @CreatedBy, @Now
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt, CompanyId)
+      SELECT @Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, 1, @EffectiveDate, NULL, @CreatedBy, @Now, (SELECT CompanyId FROM Contracts WHERE Id = @ContractId)
       WHERE NOT EXISTS (SELECT 1 FROM ContractFeeConfigs WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId AND EffectiveDate=@EffectiveDate)]]>
   </insert>
   <select id="Lease.Select.ContractFeeConfig.History">
@@ -1352,7 +1354,8 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       VALUES (@Id, @RequestId, @FeeCodeId, @Amount, @BillingMode, @ChargeType, @Unit, @UnitPrice, @EffectiveDate)]]>
   </insert>
   <select id="ContractCreate.Select.Fees.ByRequestId">
-    <![CDATA[SELECT * FROM ContractCreateRequestFees WHERE RequestId=@RequestId]]>
+    <![CDATA[SELECT cf.*, fc.Code AS FeeCode FROM ContractCreateRequestFees cf
+      LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.RequestId = @RequestId]]>
   </select>
 
   <!-- ===== ContractModifyRequests (合同修改暂存) ===== -->

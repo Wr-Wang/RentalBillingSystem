@@ -367,7 +367,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	        {
 	            await _uow.ExecuteSqlRawAsync(
 	                _sql.Get("Lease.Insert.ContractTenant.Default"),
-	                new { Id = Guid.NewGuid(), ContractId = contractId,
+	                new { ContractId = contractId,
 	                    TenantId = t.TenantId, IsPrimary = t.IsPrimary,
 	                    CreatedBy = request.CreatedBy, CreatedAt = now }, ct);
 	        }

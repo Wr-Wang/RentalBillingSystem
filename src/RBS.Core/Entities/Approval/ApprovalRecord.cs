@@ -16,7 +16,7 @@ public class ApprovalRecord : AssociationEntity
     /// <summary>
     /// 当前审批级别序号（从 1 开始）
     /// </summary>
-    public int Level { get; private set; }
+    public int LevelNo { get; private set; }
 
     /// <summary>
     /// 审批人标识
@@ -50,7 +50,7 @@ public class ApprovalRecord : AssociationEntity
     internal ApprovalRecord(Guid approvalRequestId, int level, Guid approverId, string action, string? comment = null)
     {
         ApprovalRequestId = approvalRequestId;
-        Level = level;
+        LevelNo = level;
         ApproverId = approverId;
         Action = action;
         Comment = comment?.Trim();

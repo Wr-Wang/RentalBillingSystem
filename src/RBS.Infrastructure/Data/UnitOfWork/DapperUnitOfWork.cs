@@ -271,7 +271,11 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         _sharedConnection = _db.CreateConnection();
         _sharedConnection.Open();
         _sharedTransaction = _sharedConnection.BeginTransaction();
-        return new DapperTransaction(_sharedTransaction);
+        return new DapperTransaction(_sharedTransaction, () => {
+            _sharedTransaction = null;
+            _sharedConnection?.Dispose();
+            _sharedConnection = null;
+        });
     }
 
     public Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default) => Task.FromResult(0);

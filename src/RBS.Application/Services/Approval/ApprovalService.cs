@@ -85,7 +85,7 @@ public class ApprovalService : IApprovalService
             // 插入审批记录（Submitted），与状态更新共用同一连接
             await Dapper.SqlMapper.ExecuteAsync(updateConn,
                 _sql.Get("Approval.Insert.Record.Default"),
-                new { record.Id, ApprovalRequestId = entity.Id, record.Level, record.ApproverId, record.Action, Comment = record.Comment ?? "", record.CreatedBy, record.CreatedAt });
+                new { record.Id, ApprovalRequestId = entity.Id, Level = record.LevelNo, record.ApproverId, record.Action, Comment = record.Comment ?? "", record.CreatedBy, record.CreatedAt });
 
             await Dapper.SqlMapper.ExecuteAsync(updateConn,
                 _sql.Get("Approval.Update.Request.SetStatus"),
@@ -569,7 +569,7 @@ public class ApprovalService : IApprovalService
         {
             var role = await _uow.Roles.GetByIdAsync(lc.RoleId, ct);
             var roleName = role?.Name ?? "未知角色";
-            var approvedRecord = entity.Records.FirstOrDefault(r => r.Level == lc.Level && r.Action != "Submitted");
+            var approvedRecord = entity.Records.FirstOrDefault(r => r.LevelNo == lc.Level && r.Action != "Submitted");
 
             string status;
             if (approvedRecord != null)
@@ -623,7 +623,7 @@ public class ApprovalService : IApprovalService
                 return new ApprovalRecordDto
                 {
                     Id = r.Id,
-                    Level = r.Level,
+                    Level = r.LevelNo,
                     ApproverId = r.ApproverId,
                     ApproverName = info.Name ?? r.ApproverId.ToString(),
                     ApproverAccount = info.Account ?? "",

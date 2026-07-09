@@ -210,7 +210,7 @@ public class ContractsController : ControllerBase
                 CreatedBy = userId, CreatedAt = now }, ct);
         foreach (var t in tenants)
             await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.ContractTenant.Default"),
-                new { Id = Guid.NewGuid(), ContractId = contractId, t.TenantId, t.IsPrimary,
+                new { ContractId = contractId, t.TenantId, t.IsPrimary,
                     CreatedBy = userId, CreatedAt = now }, ct);
         foreach (var f in feeList)
             await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
@@ -285,6 +285,16 @@ public class ContractsController : ControllerBase
                             EffectiveDate = effDate, CreatedBy = userId, Now = ChinaTime.Now }, tx2);
                 }
                 tx2.Commit();
+            }
+            catch (Exception ex)
+            {
+                tx2.Rollback();
+                return BadRequest(new { error = "[Tx] " + ex.Message });
+            }
+
+            // 以下为 Commit 后的操作（独立 try，失败不影响调价）
+            try
+            {
                 foreach (var item in request.Items)
                 {
                     var effDate2 = item.EffectiveDate ?? "";
@@ -294,7 +304,6 @@ public class ContractsController : ControllerBase
                             item.OldAmount, item.NewAmount, effDate2, userId);
                 }
 
-                // ★ 非审批路径也生成补差 JE（与审批路径行为一致）
                 var currentMonth = DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM");
                 foreach (var item in request.Items)
                 {
@@ -311,15 +320,12 @@ public class ContractsController : ControllerBase
                         }
                     }
                 }
+            }
+            catch { }
 
-                return Ok(new { message = "费用调价已直接执行" });
-            }
-            catch (Exception ex)
-            {
-                tx2.Rollback();
-                return BadRequest(new { error = ex.Message });
-            }
+            return Ok(new { message = "费用调价已直接执行" });
         }
+
 
         // 1. 先创建审批，拿到 ApprovalRequestId
         var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest

@@ -989,6 +989,9 @@ function close() {
 .line-pending {
   background: #dcdfe6;
 }
+.line-skipped {
+  background: #dcdfe6;
+}
 .step-body {
   flex: 1;
   padding-bottom: 16px;

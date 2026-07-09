@@ -248,7 +248,7 @@ public class RenewalService : IRenewalService
                 new
                 {
                     firstRecord.Id, ApprovalRequestId = approvalRequest.Id,
-                    firstRecord.Level, firstRecord.ApproverId, firstRecord.Action,
+                    Level = firstRecord.LevelNo, firstRecord.ApproverId, firstRecord.Action,
                     Comment = firstRecord.Comment ?? "", firstRecord.CreatedBy, firstRecord.CreatedAt
                 });
 
@@ -353,7 +353,7 @@ public class RenewalService : IRenewalService
             {
                 await conn.ExecuteAsync(
                     _sql.Get("Lease.Insert.ContractTenant.Default"),
-                    new { Id = Guid.NewGuid(), ContractId = newId, t.TenantId, t.IsPrimary, CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
+                    new { ContractId = newId, t.TenantId, t.IsPrimary, CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
             }
 
             // 4. 复制费用配置（生效日期设为新合同起租日）
@@ -361,13 +361,15 @@ public class RenewalService : IRenewalService
                 _sql.Get("Lease.Select.ContractFeeConfig.ActiveByContract"),
                 new { Id = renewal.OldContractId }, tx);
 
-            foreach (var f in fees)
-            {
-                await conn.ExecuteAsync(
-                    _sql.Get("Lease.Insert.ContractFeeConfig.CopyFromRenewal"),
-                    new { Id = Guid.NewGuid(), ContractId = newId, f.FeeCodeId, f.BillingMode, f.Amount, f.Unit, f.UnitPrice,
-                        EffectiveDate = startDate.ToString("yyyy-MM-dd"), CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
-            }
+		    foreach (var f in fees)
+		    {
+		        // 房租费用项使用续签约定的新租金金额
+		        var amount = f.FeeCode == "RENT" ? renewal.NewRent : (decimal)f.Amount;
+		        await conn.ExecuteAsync(
+		            _sql.Get("Lease.Insert.ContractFeeConfig.CopyFromRenewal"),
+		            new { Id = Guid.NewGuid(), ContractId = newId, f.FeeCodeId, f.BillingMode, Amount = amount, f.Unit, f.UnitPrice,
+		                EffectiveDate = startDate.ToString("yyyy-MM-dd"), CreatedBy = renewal.CreatedBy, CreatedAt = now }, tx);
+		    }
 
             // 4.5 原合同费用配置到期（在复制之后执行，避免 SELECT 查不到数据）
             var oldEndDate = oldContract.EndDate.ToString("yyyy-MM-dd");
@@ -384,8 +386,9 @@ public class RenewalService : IRenewalService
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = renewal.OldContractId,
-                        Amount = -renewal.OldDepositAmount, Balance = 0m,
-                        Action = "TransferOut", Remark = "续签押金转出新合同",
+                        Amount = -renewal.OldDepositAmount, BalanceAfter = 0m,
+                        ActionType = "TransferOut", Remarks = "续签押金转出新合同",
+                        OperatedBy = renewal.CreatedBy, CompanyId = oldContract.CompanyId,
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
 
@@ -394,8 +397,9 @@ public class RenewalService : IRenewalService
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = newId,
-                        Amount = renewal.OldDepositAmount, Balance = renewal.OldDepositAmount,
-                        Action = "TransferIn", Remark = "续签押金转入",
+                        Amount = renewal.OldDepositAmount, BalanceAfter = renewal.OldDepositAmount,
+                        ActionType = "TransferIn", Remarks = "续签押金转入",
+                        OperatedBy = renewal.CreatedBy, CompanyId = oldContract.CompanyId,
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
             }
@@ -409,8 +413,9 @@ public class RenewalService : IRenewalService
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = renewal.OldContractId,
-                        Amount = -renewal.OldDepositAmount, Balance = 0m,
-                        Action = "Refund", Remark = $"续签退押金，新押金 ¥{depositAmount:N2}",
+                        Amount = -renewal.OldDepositAmount, BalanceAfter = 0m,
+                        ActionType = "Refund", Remarks = $"续签退押金，新押金 ¥{depositAmount:N2}",
+                        OperatedBy = renewal.CreatedBy, CompanyId = oldContract.CompanyId,
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
 
@@ -420,8 +425,9 @@ public class RenewalService : IRenewalService
                     new
                     {
                         Id = Guid.NewGuid(), ContractId = newId,
-                        Amount = depositAmount, Balance = depositAmount,
-                        Action = "Collection", Remark = "续签新收押金",
+                        Amount = depositAmount, BalanceAfter = depositAmount,
+                        ActionType = "Collection", Remarks = "续签新收押金",
+                        OperatedBy = renewal.CreatedBy, CompanyId = oldContract.CompanyId,
                         CreatedBy = renewal.CreatedBy, CreatedAt = now
                     }, tx);
             }

@@ -291,18 +291,18 @@ DECLARE @Contract2 uniqueidentifier;
 DECLARE @Contract3 uniqueidentifier;
 
 SET @Contract1 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[RentAmount],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract1,'HT-2026-001',Id,BaseRentAmount,'2026-01-01','2027-12-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
+SELECT @Contract1,'HT-2026-001',Id,'2026-01-01','2027-12-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='101' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 SET @Contract2 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[RentAmount],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract2,'HT-2026-002',Id,BaseRentAmount,'2026-02-01','2027-01-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
+SELECT @Contract2,'HT-2026-002',Id,'2026-02-01','2027-01-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='102' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 SET @Contract3 = NEWID();
-INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[RentAmount],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract3,'HT-2026-003',Id,BaseRentAmount,'2026-03-15','2027-03-14','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
+SELECT @Contract3,'HT-2026-003',Id,'2026-03-15','2027-03-14','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='201' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 
@@ -321,9 +321,9 @@ IF @Contract3 IS NOT NULL AND @TenantWW IS NOT NULL
 
 DECLARE @RentFeeCodeId uniqueidentifier; SELECT @RentFeeCodeId=[Id] FROM [FeeCodes] WHERE [Code]='RENT' AND [CompanyId]=@Cid;
 
-DECLARE @RentAmount1 DECIMAL(18,2); SELECT @RentAmount1 = RentAmount FROM [Contracts] WHERE [Id] = @Contract1;
-DECLARE @RentAmount2 DECIMAL(18,2); SELECT @RentAmount2 = RentAmount FROM [Contracts] WHERE [Id] = @Contract2;
-DECLARE @RentAmount3 DECIMAL(18,2); SELECT @RentAmount3 = RentAmount FROM [Contracts] WHERE [Id] = @Contract3;
+DECLARE @RentAmount1 DECIMAL(18,2); SELECT @RentAmount1 = hu.BaseRentAmount FROM [Contracts] c JOIN [HousingUnits] hu ON hu.Id = c.RoomId WHERE c.[Id] = @Contract1;
+DECLARE @RentAmount2 DECIMAL(18,2); SELECT @RentAmount2 = hu.BaseRentAmount FROM [Contracts] c JOIN [HousingUnits] hu ON hu.Id = c.RoomId WHERE c.[Id] = @Contract2;
+DECLARE @RentAmount3 DECIMAL(18,2); SELECT @RentAmount3 = hu.BaseRentAmount FROM [Contracts] c JOIN [HousingUnits] hu ON hu.Id = c.RoomId WHERE c.[Id] = @Contract3;
 
 IF @Contract1 IS NOT NULL AND @RentFeeCodeId IS NOT NULL AND @RentAmount1 IS NOT NULL
     INSERT INTO [ContractFeeConfigs] ([Id],[ContractId],[FeeCodeId],[BillingMode],[Amount],[EffectiveDate],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])

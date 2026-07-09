@@ -688,8 +688,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ApprovalLe
 CREATE TABLE [ApprovalLevelConfigs] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
     [ApprovalTypeId] UNIQUEIDENTIFIER NOT NULL , -- 审批类型ID,
-    [LevelNo] INT NOT NULL , -- 审批级别序号,
-    [ApproverRoleId] UNIQUEIDENTIFIER NOT NULL , -- 审批角色ID,
+    [LevelNo] INT NOT NULL , -- 审批级别序号(旧),
+    [ApproverRoleId] UNIQUEIDENTIFIER NOT NULL , -- 审批角色ID(旧),
+    [Level] INT NOT NULL DEFAULT (0) , -- 审批级别序号,
+    [RoleId] UNIQUEIDENTIFIER NOT NULL , -- 审批角色ID,
     [ApprovalMode] VARCHAR(20) NOT NULL DEFAULT ('AnyOne') , -- 审批模式,
     [MinAmount] DECIMAL(18,2) , -- 金额下限,
     [MaxAmount] DECIMAL(18,2) , -- 金额上限,
@@ -809,16 +811,21 @@ CREATE UNIQUE INDEX [IX_ApprovalLevelConfigs_Audit_Id_Version] ON [ApprovalLevel
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ApprovalRequests]'))
 CREATE TABLE [ApprovalRequests] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [RequestNo] VARCHAR(100) NOT NULL , -- 申请编号,
+    [RequestNo] VARCHAR(100) NULL , -- 申请编号,
     [ApprovalTypeId] UNIQUEIDENTIFIER NOT NULL , -- 审批类型ID,
+    [Title] NVARCHAR(200) , -- 审批标题,
+    [Description] NVARCHAR(500) , -- 审批描述,
+    [TargetEntityId] UNIQUEIDENTIFIER , -- 目标实体ID,
+    [TargetEntityType] NVARCHAR(64) , -- 目标实体类型,
+    [MaxLevel] INT NOT NULL DEFAULT (0) , -- 最大审批级别,
     [BusinessId] UNIQUEIDENTIFIER , -- 业务ID,
     [BusinessData] NVARCHAR(MAX) , -- 业务数据JSON,
-    [Amount] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 申请金额,
-    [Reason] NVARCHAR(500) NOT NULL , -- 申请原因,
-    [RequesterId] UNIQUEIDENTIFIER NOT NULL , -- 申请人ID,
+    [Amount] DECIMAL(18,2) NULL , -- 申请金额,
+    [Reason] NVARCHAR(500) NULL , -- 申请原因,
+    [RequesterId] UNIQUEIDENTIFIER NULL , -- 申请人ID,
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 审批状态,
     [CurrentLevel] INT NOT NULL DEFAULT (0) , -- 当前审批级别,
-    [CallbackStatus] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 回调状态,
+    [CallbackStatus] VARCHAR(20) NULL , -- 回调状态,
     [CallbackError] NVARCHAR(MAX) , -- 回调错误,
     [CallbackRetryCount] INT NOT NULL DEFAULT (0) , -- 重试次数,
     [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
@@ -867,7 +874,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主�
 GO
 -- 申请编号唯一
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ApprovalRequests]') AND name=N'IX_ApprovalRequests_RequestNo')
-CREATE UNIQUE INDEX [IX_ApprovalRequests_RequestNo] ON [ApprovalRequests]([RequestNo])
+-- CREATE UNIQUE INDEX [IX_ApprovalRequests_RequestNo] -- Removed: RequestNo is now nullable ON [ApprovalRequests]([RequestNo])
 -- 按状态查询
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ApprovalRequests]') AND name=N'IX_ApprovalRequests_Status')
 CREATE INDEX [IX_ApprovalRequests_Status] ON [ApprovalRequests]([Status])
@@ -1084,9 +1091,13 @@ CREATE TABLE [ApprovalBizData] (
     [IsProcessed] BIT NOT NULL DEFAULT (0) , -- 是否已处理,
     [ProcessedAt] DATETIME2 , -- 处理时间,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedIp] VARCHAR(45) , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
-    [UpdatedAt] DATETIME2 -- 更新时间
+    [UpdatedAt] DATETIME2 , -- 更新时间,
+    [UpdatedIp] VARCHAR(45) , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) -- 更新主机名
 )
 GO
 
@@ -1808,8 +1819,6 @@ CREATE TABLE [Contracts] (
     [RoomId] UNIQUEIDENTIFIER NOT NULL , -- 房屋ID,
     [StartDate] DATE NOT NULL , -- 合同开始日期,
     [EndDate] DATE NOT NULL , -- 合同结束日期,
-    [RentAmount] DECIMAL(18,2) NOT NULL , -- 月租金,
-    [DepositAmount] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 押金金额,
     [PaymentCycle] VARCHAR(20) NOT NULL DEFAULT ('Monthly') , -- 支付周期,
     [PaymentDueDay] INT NOT NULL DEFAULT (5) , -- 每月到期日,
     [AllowDepositAsLastRent] BIT NOT NULL DEFAULT (0) , -- 押金抵扣最后租金,
@@ -1848,8 +1857,6 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同编�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'房屋ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'RoomId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同开始日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'StartDate'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同结束日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'EndDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'月租金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'RentAmount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'押金金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'DepositAmount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付周期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'PaymentCycle'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'每月到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'PaymentDueDay'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'押金抵扣最后租金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'AllowDepositAsLastRent'
@@ -1902,8 +1909,6 @@ CREATE TABLE [Contracts_Audit] (
     [RoomId] UNIQUEIDENTIFIER , -- 房屋ID,
     [StartDate] DATE , -- 合同开始日期,
     [EndDate] DATE , -- 合同结束日期,
-    [RentAmount] DECIMAL(18,2) , -- 月租金,
-    [DepositAmount] DECIMAL(18,2) , -- 押金金额,
     [PaymentCycle] VARCHAR(20) , -- 支付周期,
     [PaymentDueDay] INT , -- 每月到期日,
     [AllowDepositAsLastRent] BIT , -- 押金抵扣最后租金,
@@ -1946,8 +1951,6 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同编�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'房屋ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'RoomId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同开始日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'StartDate'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同结束日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'EndDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'月租金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'RentAmount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'押金金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'DepositAmount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付周期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'PaymentCycle'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'每月到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'PaymentDueDay'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'押金抵扣最后租金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'AllowDepositAsLastRent'
