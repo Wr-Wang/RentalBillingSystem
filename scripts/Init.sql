@@ -1761,6 +1761,44 @@ CREATE UNIQUE INDEX [IX_Tenants_Audit_Id_Version] ON [Tenants_Audit]([Id], [Audi
 
 
 -- ===================================================================
+-- 23b. Tenant 表扩充字段
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Tenants') AND name='Wechat')
+    ALTER TABLE Tenants ADD Wechat NVARCHAR(64) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Tenants') AND name='EmergencyContact')
+    ALTER TABLE Tenants ADD EmergencyContact NVARCHAR(64) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Tenants') AND name='EmergencyPhone')
+    ALTER TABLE Tenants ADD EmergencyPhone NVARCHAR(32) NULL;
+GO
+
+-- ===================================================================
+-- 23c. TenantCreateRequests 表：新建租客审批暂存
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TenantCreateRequests]'))
+CREATE TABLE [TenantCreateRequests] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()),
+    [Name] NVARCHAR(64) NOT NULL,
+    [Phone] NVARCHAR(32) NULL,
+    [IdCard] NVARCHAR(32) NULL,
+    [Email] NVARCHAR(64) NULL,
+    [Wechat] NVARCHAR(64) NULL,
+    [EmergencyContact] NVARCHAR(64) NULL,
+    [EmergencyPhone] NVARCHAR(32) NULL,
+    [Address] NVARCHAR(256) NULL,
+    [Remark] NVARCHAR(500) NULL,
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL,
+    [ContractId] UNIQUEIDENTIFIER NOT NULL,
+    [IsPrimary] BIT NOT NULL DEFAULT 0,
+    [Status] NVARCHAR(32) NOT NULL DEFAULT 'Draft',
+    [ApprovalRequestId] UNIQUEIDENTIFIER NULL,
+    [NewTenantId] UNIQUEIDENTIFIER NULL,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
+    [UpdatedAt] DATETIME2 NULL
+)
+GO
+
+-- ===================================================================
 -- 24. Contracts 表：合同表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Contracts]'))
@@ -2106,6 +2144,362 @@ GO
 -- 按记录ID+版本号唯一索引
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractFeeConfigs_Audit]') AND name=N'IX_ContractFeeConfigs_Audit_Id_Version')
 CREATE UNIQUE INDEX [IX_ContractFeeConfigs_Audit_Id_Version] ON [ContractFeeConfigs_Audit]([Id], [AuditVersionNo])
+
+
+-- ===================================================================
+-- 26a. ContractCreateRequests 表：新建合同审批暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]'))
+CREATE TABLE [ContractCreateRequests] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [ContractNo] NVARCHAR(64) NOT NULL , -- 合同编号,
+    [RoomId] UNIQUEIDENTIFIER NOT NULL , -- 房屋ID,
+    [StartDate] DATE NOT NULL , -- 合同开始日期,
+    [EndDate] DATE NOT NULL , -- 合同结束日期,
+    [PaymentCycle] NVARCHAR(32) NOT NULL DEFAULT ('Monthly') , -- 支付周期,
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
+    [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态(Draft/PendingApproval/Executing/Completed/Rejected),
+    [Remark] NVARCHAR(500) NULL , -- 备注,
+    [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
+    [NewContractId] UNIQUEIDENTIFIER NULL , -- 新合同ID,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：新建合同审批暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'新建合同审批暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests'
+GO
+
+-- ContractCreateRequests 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同编号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'ContractNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'房屋ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'RoomId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同开始日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'StartDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同结束日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'EndDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付周期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'PaymentCycle'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'Status'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'备注', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'Remark'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审批请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'ApprovalRequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'新合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'NewContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequests', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按审批请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'IX_ContractCreateRequests_ApprovalRequestId')
+CREATE INDEX [IX_ContractCreateRequests_ApprovalRequestId] ON [ContractCreateRequests]([ApprovalRequestId])
+-- 按状态查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'IX_ContractCreateRequests_Status')
+CREATE INDEX [IX_ContractCreateRequests_Status] ON [ContractCreateRequests]([Status])
+
+
+-- ===================================================================
+-- 26b. ContractCreateRequestTenants 表：新建合同租客暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]'))
+CREATE TABLE [ContractCreateRequestTenants] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [RequestId] UNIQUEIDENTIFIER NOT NULL , -- 请求ID,
+    [TenantId] UNIQUEIDENTIFIER NOT NULL , -- 租客ID,
+    [IsPrimary] BIT NOT NULL DEFAULT (0) , -- 是否主租客,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：新建合同租客暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'新建合同租客暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants'
+GO
+
+-- ContractCreateRequestTenants 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants', @level2type = N'COLUMN', @level2name = N'RequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'租客ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants', @level2type = N'COLUMN', @level2name = N'TenantId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否主租客', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants', @level2type = N'COLUMN', @level2name = N'IsPrimary'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestTenants', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'IX_ContractCreateRequestTenants_RequestId')
+CREATE INDEX [IX_ContractCreateRequestTenants_RequestId] ON [ContractCreateRequestTenants]([RequestId])
+
+
+-- ===================================================================
+-- 26c. ContractCreateRequestFees 表：新建合同费用暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]'))
+CREATE TABLE [ContractCreateRequestFees] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [RequestId] UNIQUEIDENTIFIER NOT NULL , -- 请求ID,
+    [FeeCodeId] UNIQUEIDENTIFIER NOT NULL , -- 费用项目ID,
+    [Amount] DECIMAL(18,2) NOT NULL , -- 金额,
+    [BillingMode] NVARCHAR(32) NOT NULL DEFAULT ('FixedAmount') , -- 计费方式,
+    [ChargeType] NVARCHAR(32) NOT NULL DEFAULT ('Recurring') , -- 费用类型,
+    [Unit] NVARCHAR(32) NULL , -- 计量单位,
+    [UnitPrice] DECIMAL(18,4) NULL , -- 单价,
+    [EffectiveDate] NVARCHAR(10) NULL , -- 生效日期,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：新建合同费用暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'新建合同费用暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees'
+GO
+
+-- ContractCreateRequestFees 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'RequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'计费方式', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'BillingMode'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'ChargeType'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'计量单位', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'Unit'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'单价', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'UnitPrice'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'生效日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'EffectiveDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractCreateRequestFees', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'IX_ContractCreateRequestFees_RequestId')
+CREATE INDEX [IX_ContractCreateRequestFees_RequestId] ON [ContractCreateRequestFees]([RequestId])
+
+
+-- ===================================================================
+-- 26d. ContractModifyRequests 表：合同变更审批暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ContractModifyRequests]'))
+CREATE TABLE [ContractModifyRequests] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 合同ID,
+    [StartDate] DATE NULL , -- 合同开始日期,
+    [EndDate] DATE NULL , -- 合同结束日期,
+    [PaymentCycle] NVARCHAR(32) NULL , -- 支付周期,
+    [AutoRenew] BIT NULL , -- 是否自动续签,
+    [AllowDepositAsLastRent] BIT NULL , -- 押金抵扣最后租金,
+    [PaymentDueDay] INT NULL , -- 每月到期日,
+    [TenantPhone] NVARCHAR(32) NULL , -- 租客电话,
+    [Remark] NVARCHAR(500) NULL , -- 备注,
+    [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态,
+    [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：合同变更审批暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同变更审批暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests'
+GO
+
+-- ContractModifyRequests 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同开始日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'StartDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同结束日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'EndDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付周期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'PaymentCycle'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否自动续签', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'AutoRenew'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'押金抵扣最后租金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'AllowDepositAsLastRent'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'每月到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'PaymentDueDay'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'租客电话', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'TenantPhone'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'备注', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'Remark'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'Status'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审批请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'ApprovalRequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ContractModifyRequests', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按合同查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractModifyRequests]') AND name=N'IX_ContractModifyRequests_ContractId')
+CREATE INDEX [IX_ContractModifyRequests_ContractId] ON [ContractModifyRequests]([ContractId])
+-- 按审批请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ContractModifyRequests]') AND name=N'IX_ContractModifyRequests_ApprovalRequestId')
+CREATE INDEX [IX_ContractModifyRequests_ApprovalRequestId] ON [ContractModifyRequests]([ApprovalRequestId])
+
+
+-- ===================================================================
+-- 26e. SupplementaryFeeRequests 表：补充费用审批暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[SupplementaryFeeRequests]'))
+CREATE TABLE [SupplementaryFeeRequests] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 合同ID,
+    [FeeCodeId] UNIQUEIDENTIFIER NOT NULL , -- 费用项目ID,
+    [Amount] DECIMAL(18,2) NOT NULL , -- 金额,
+    [BillingMode] NVARCHAR(32) NOT NULL DEFAULT ('FixedAmount') , -- 计费方式,
+    [EffectiveDate] NVARCHAR(10) NOT NULL , -- 生效日期,
+    [PeriodFrom] NVARCHAR(10) NOT NULL , -- 期间开始,
+    [PeriodTo] NVARCHAR(10) NOT NULL , -- 期间结束,
+    [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态,
+    [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
+    [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置ID,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：补充费用审批暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'补充费用审批暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests'
+GO
+
+-- SupplementaryFeeRequests 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'计费方式', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'BillingMode'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'生效日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'EffectiveDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期间开始', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'PeriodFrom'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期间结束', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'PeriodTo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'Status'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审批请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'ApprovalRequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按合同查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[SupplementaryFeeRequests]') AND name=N'IX_SupplementaryFeeRequests_ContractId')
+CREATE INDEX [IX_SupplementaryFeeRequests_ContractId] ON [SupplementaryFeeRequests]([ContractId])
+-- 按审批请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[SupplementaryFeeRequests]') AND name=N'IX_SupplementaryFeeRequests_ApprovalRequestId')
+CREATE INDEX [IX_SupplementaryFeeRequests_ApprovalRequestId] ON [SupplementaryFeeRequests]([ApprovalRequestId])
+
+
+-- ===================================================================
+-- 26f. SupplementaryFeeRequestItems 表：补充费用期间明细暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[SupplementaryFeeRequestItems]'))
+CREATE TABLE [SupplementaryFeeRequestItems] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [RequestId] UNIQUEIDENTIFIER NOT NULL , -- 请求ID,
+    [Period] NVARCHAR(10) NOT NULL , -- 期间,
+    [ProratedAmount] DECIMAL(18,2) NOT NULL , -- 分摊金额,
+    [DaysInMonth] INT NOT NULL , -- 当月天数,
+    [CoveredDays] INT NOT NULL , -- 覆盖天数,
+    [ReceivablePlanId] UNIQUEIDENTIFIER NULL , -- 应收计划ID,
+    [VoucherId] UNIQUEIDENTIFIER NULL , -- 凭证ID,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：补充费用期间明细暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'补充费用期间明细暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems'
+GO
+
+-- SupplementaryFeeRequestItems 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'RequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'分摊金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'ProratedAmount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'当月天数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'DaysInMonth'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'覆盖天数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'CoveredDays'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收计划ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'ReceivablePlanId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'VoucherId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequestItems', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[SupplementaryFeeRequestItems]') AND name=N'IX_SupplementaryFeeRequestItems_RequestId')
+CREATE INDEX [IX_SupplementaryFeeRequestItems_RequestId] ON [SupplementaryFeeRequestItems]([RequestId])
+
+
+-- ===================================================================
+-- 26g. ReceivableGenerateRequests 表：应收生成审批暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivableGenerateRequests]'))
+CREATE TABLE [ReceivableGenerateRequests] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 合同ID,
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
+    [PeriodFrom] NVARCHAR(10) NOT NULL , -- 期间开始,
+    [PeriodTo] NVARCHAR(10) NOT NULL , -- 期间结束,
+    [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态,
+    [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：应收生成审批暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收生成审批暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests'
+GO
+
+-- ReceivableGenerateRequests 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期间开始', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'PeriodFrom'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期间结束', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'PeriodTo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'Status'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审批请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'ApprovalRequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequests', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按合同查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivableGenerateRequests]') AND name=N'IX_ReceivableGenerateRequests_ContractId')
+CREATE INDEX [IX_ReceivableGenerateRequests_ContractId] ON [ReceivableGenerateRequests]([ContractId])
+-- 按审批请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivableGenerateRequests]') AND name=N'IX_ReceivableGenerateRequests_ApprovalRequestId')
+CREATE INDEX [IX_ReceivableGenerateRequests_ApprovalRequestId] ON [ReceivableGenerateRequests]([ApprovalRequestId])
+
+
+-- ===================================================================
+-- 26h. ReceivableGenerateRequestItems 表：应收生成明细暂存表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivableGenerateRequestItems]'))
+CREATE TABLE [ReceivableGenerateRequestItems] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [RequestId] UNIQUEIDENTIFIER NOT NULL , -- 请求ID,
+    [FeeCodeId] UNIQUEIDENTIFIER NOT NULL , -- 费用项目ID,
+    [FeeName] NVARCHAR(64) NOT NULL , -- 费用名称,
+    [Period] NVARCHAR(10) NOT NULL , -- 期间,
+    [Amount] DECIMAL(18,2) NOT NULL , -- 金额,
+    [DueDate] DATE NOT NULL , -- 到期日,
+    [EntryType] NVARCHAR(32) NOT NULL DEFAULT ('Normal') , -- 分录类型,
+    [ReceivablePlanId] UNIQUEIDENTIFIER NULL , -- 应收计划ID,
+    [VoucherId] UNIQUEIDENTIFIER NULL , -- 凭证ID,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL -- 更新时间
+)
+GO
+
+-- 表说明：应收生成明细暂存表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收生成明细暂存表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems'
+GO
+
+-- ReceivableGenerateRequestItems 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'RequestId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用名称', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'FeeName'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'DueDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'分录类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'EntryType'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收计划ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'ReceivablePlanId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'VoucherId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivableGenerateRequestItems', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+-- 按请求查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivableGenerateRequestItems]') AND name=N'IX_ReceivableGenerateRequestItems_RequestId')
+CREATE INDEX [IX_ReceivableGenerateRequestItems_RequestId] ON [ReceivableGenerateRequestItems]([RequestId])
 
 
 -- ===================================================================

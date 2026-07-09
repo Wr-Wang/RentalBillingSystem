@@ -559,6 +559,22 @@ IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_RENEW')
     VALUES (NEWID(),N'合同续签','CONTRACT_RENEW',N'合同续签需要审批，根据月租金额自动路由审批级别',1,@Cid,@SysUserId,@Now);
 SELECT @AT_ContractRenew = [Id] FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_RENEW';
 
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_GENERATE_RECEIVABLE')
+    INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'生成应收','CONTRACT_GENERATE_RECEIVABLE',N'手动生成应收计划需要审批',1,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_SUSPEND')
+    INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'暂停合同','CONTRACT_SUSPEND',N'暂停合同需要审批',1,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_TENANT_CHANGE')
+    INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'合同租客变更','CONTRACT_TENANT_CHANGE',N'合同增删租客需要审批',1,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_SUPPLEMENTARY_FEE')
+    INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'补充收费','CONTRACT_SUPPLEMENTARY_FEE',N'补充追溯收费需要审批',1,@Cid,@SysUserId,@Now);
+
 IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CHANGE_REQUEST')
     INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),N'合同变更','CHANGE_REQUEST',N'合同信息变更请求需要审批',1,@Cid,@SysUserId,@Now);

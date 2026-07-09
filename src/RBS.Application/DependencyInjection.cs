@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<ILateFeeConfigService, LateFeeConfigService>();
         services.AddScoped<IAutoRenewConfigService, AutoRenewConfigService>();
         services.AddScoped<IHousingUnitService, HousingUnitService>();
+        services.AddScoped<ITenantAppService, TenantAppService>();
         services.AddScoped<IApprovalService, ApprovalService>();
         services.AddScoped<IImportService, ImportService>();
         services.AddScoped<IImportTypeHandler, HousingUnitImportHandler>();

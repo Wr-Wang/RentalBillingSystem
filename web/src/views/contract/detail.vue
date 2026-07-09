@@ -102,6 +102,7 @@
         <!-------- 2b. OneTime Fee Config ------>
         <el-tab-pane label="一次性收费" name="onetime">
           <div style="margin-bottom: 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <el-button type="primary" size="small" @click="openAddOneTimeFee">添加收费</el-button>
             <el-button size="small" @click="fetchFeeConfigs" :loading="feeConfigLoading">刷新</el-button>
           </div>
           <el-table :data="oneTimeConfigs" stripe style="width:100%;" @expand-change="onOneTimeExpand">
@@ -148,6 +149,39 @@
         </el-tab-pane>
 
         <!-------- 2c. Change History ------>
+        <el-tab-pane label="租户" name="tenants">
+          <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <el-button type="primary" size="small" @click="openAddTenantDialog">添加租户</el-button>
+            <el-button size="small" @click="fetchContractTenants" :loading="tenantLoading">刷新</el-button>
+            <span style="color:#909399;font-size:13px;margin-left:auto;">共 {{ contractTenants.length }} 人</span>
+          </div>
+          <el-table :data="contractTenants" stripe v-loading="tenantLoading" style="width:100%;">
+            <el-table-column type="index" label="#" width="45" />
+            <el-table-column prop="tenantName" label="姓名" min-width="90" />
+            <el-table-column prop="tenantPhone" label="电话" width="130" />
+            <el-table-column prop="idCard" label="身份证" width="180" />
+            <el-table-column prop="email" label="邮箱" min-width="150" />
+            <el-table-column label="角色" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.isPrimary" type="success" size="small">主租户</el-tag>
+                <span v-else style="color:#909399;">合租</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="210" fixed="right">
+              <template #default="{ row }">
+                <el-button v-if="!row.isPrimary" text size="small" type="primary" @click="setPrimaryTenant(row)">设为主租户</el-button>
+                <el-button text size="small" @click="$router.push('/tenants/'+row.tenantId)">详情</el-button>
+                <el-button v-if="contractTenants.length>1" text size="small" type="danger" @click="confirmRemoveTenant(row)">解绑</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="!tenantLoading && contractTenants.length===0" description="暂无租户，点击「添加租户」创建" :image-size="60" />
+        </el-tab-pane>
+
+
+      
+
+        <!-------- 2d. Tenants ------>
         <el-tab-pane label="变更历史" name="history">
           <el-timeline>
             <el-timeline-item
@@ -182,10 +216,7 @@
               
             </el-timeline-item>
           </el-timeline>
-        </el-tab-pane>
-
-
-      </el-tabs>
+        </el-tab-pane></el-tabs>
     </el-card>
 
     <!--===============================================================-->
@@ -200,7 +231,8 @@
               应收合计: <strong style="color:#e6a23c;">¥{{ receivableStats.totalAmount.toLocaleString() }}</strong>
               | 未收: <strong style="color:#f56c6c;">¥{{ receivableStats.totalDue.toLocaleString() }}</strong>
             </span>
-            <el-button type="primary" size="small" @click="generateReceivables" :loading="generatingReceivables">生成应收</el-button>
+            <el-button type="primary" size="small" @click="showReceivablePreviewDialog = true">生成应收</el-button>
+            <el-button size="small" @click="showSupplementaryFee = true">补充收费</el-button>
           </div>
         </div>
       </template>
@@ -349,15 +381,28 @@
 
     <!-- MODAL: Other Field Modify (CONTRACT_MODIFY_OTHER)              -->
     <!--===============================================================-->
-    <el-dialog v-model="showOtherModify" title="修改合同信息" width="550px">
+    <el-dialog v-model="showOtherModify" title="修改合同信息" width="600px">
       <el-alert
-        title="以下字段变更无需审批（0级），修改后立即生效。租金和费用调整请使用专用功能。"
-        type="success"
+        title="起止日期、付款周期等变更需提交审批；租客电话、备注等直接生效。"
+        type="info"
         show-icon
         :closable="false"
         style="margin-bottom: 16px;"
       />
       <el-form :model="otherForm" label-width="120px">
+        <el-form-item label="起租日期">
+          <el-date-picker v-model="otherForm.startDate" type="date" value-format="YYYY-MM-DD" style="width:200px" />
+        </el-form-item>
+        <el-form-item label="到期日期">
+          <el-date-picker v-model="otherForm.endDate" type="date" value-format="YYYY-MM-DD" style="width:200px" />
+        </el-form-item>
+        <el-form-item label="付款周期">
+          <el-select v-model="otherForm.paymentCycle" style="width:200px;">
+            <el-option label="月付" value="Monthly" />
+            <el-option label="季付" value="Quarterly" />
+            <el-option label="年付" value="Yearly" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="租客电话">
           <el-input v-model="otherForm.tenantPhone" />
         </el-form-item>
@@ -497,8 +542,8 @@
 
 
     <!-- Suspend Confirm -->
-    <el-dialog v-model="showSuspend" title="暂停合同" width="400px">
-      <p>暂停期间将不生成新的应收计划。确定暂停合同 <strong>{{ contract.contractNo }}</strong> 吗？</p>
+    <el-dialog v-model="showSuspend" title="暂停合同" width="450px">
+      <el-alert title="暂停期间将不生成新的应收计划。审批通过后执行暂停操作。" type="info" show-icon :closable="false" style="margin-bottom:16px;" />
       <el-form style="margin-top: 12px;">
         <el-form-item label="暂停原因">
           <el-input v-model="suspendReason" type="textarea" :rows="2" />
@@ -506,14 +551,125 @@
       </el-form>
       <template #footer>
         <el-button @click="showSuspend = false">取消</el-button>
-        <el-button type="warning" @click="handleSuspend">确定暂停</el-button>
+        <el-button type="primary" @click="previewSuspend" :loading="suspendPreviewLoading">预览变更</el-button>
+      </template>
+    </el-dialog>
+    <el-dialog v-model="showSuspendPreview" title="暂停合同 — 预览" width="450px">
+      <p>暂停原因: {{ suspendReason }}</p>
+      <p style="margin-top:8px;">将冻结 <strong>{{ suspendPreviewData?.frozenPeriods?.length || 0 }}</strong> 个月应收计划</p>
+      <el-checkbox v-model="suspendConfirmed" style="margin-top:12px;">我已确认以上信息</el-checkbox>
+      <template #footer>
+        <el-button @click="showSuspendPreview = false">返回修改</el-button>
+        <el-button type="warning" @click="submitSuspendApproval" :disabled="!suspendConfirmed" :loading="suspendSubmitting">提交审批</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Supplementary Fee Dialog -->
+    <el-dialog v-model="showSupplementaryFee" title="补充收费" width="550px">
+      <el-form label-width="100px">
+        <el-form-item label="收费项目">
+          <el-select v-model="suppForm.feeCodeId" placeholder="选择收费项目" style="width:100%">
+            <el-option v-for="fc in feeCodeList" :key="fc.id" :label="fc.name" :value="fc.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="月金额">
+          <el-input-number v-model="suppForm.amount" :min="0" :precision="2" style="width:200px" /> 元
+        </el-form-item>
+        <el-form-item label="生效日期">
+          <el-date-picker v-model="suppForm.effectiveDate" type="date" value-format="YYYY-MM-DD" style="width:200px"
+            :disabled-date="d => d > new Date()" />
+          <span style="margin-left:8px;color:#909399;font-size:12px;">从该日起追溯至当前月</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showSupplementaryFee = false">取消</el-button>
+        <el-button type="primary" @click="submitSupplementaryFee" :loading="suppSubmitting">提交审批</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Receivable Preview Dialog -->
+    <el-dialog v-model="showReceivablePreviewDialog" title="生成应收 — 预览" width="700px">
+      <el-descriptions :column="2" border style="margin-bottom:16px;">
+        <el-descriptions-item label="合同号">{{ contract.contractNo }}</el-descriptions-item>
+        <el-descriptions-item label="账期范围">{{ contract.startDate }} ~ {{ contract.endDate }}</el-descriptions-item>
+      </el-descriptions>
+      <div v-if="receivablePreviewLoading" style="text-align:center;padding:20px;">加载中...</div>
+      <template v-else>
+        <el-table :data="receivablePreviewItems" stripe size="small" v-if="receivablePreviewItems.length > 0">
+          <el-table-column prop="period" label="账期" width="80" />
+          <el-table-column prop="feeName" label="费用项目" width="100" />
+          <el-table-column label="金额" width="120" align="right">
+            <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+          </el-table-column>
+          <el-table-column prop="dueDate" label="到期日" width="95" />
+        </el-table>
+        <div style="text-align:right;margin-top:12px;font-size:15px;">
+          应收合计: <strong style="color:#e6a23c;">¥{{ receivablePreviewTotal.toLocaleString() }}</strong>
+        </div>
+      </template>
+      <template #footer>
+        <el-button @click="showReceivablePreviewDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitReceivableGenerate" :loading="receivableSubmitting">提交审批</el-button>
+      </template>
+    </el-dialog>
+    <!-- Add Tenant Dialog -->
+    <el-dialog v-model="showAddTenant" title="添加租户" width="600px">
+      <el-tabs v-model="addTenantTab">
+        <el-tab-pane label="选择已有租客" name="existing">
+          <el-input v-model="tenantSearchKeyword" placeholder="搜索姓名/电话/身份证" style="margin-bottom:12px;">
+            <template #append><el-button @click="searchTenants">搜索</el-button></template>
+          </el-input>
+          <el-table :data="searchResults" stripe max-height="250" v-loading="searchLoading">
+            <el-table-column prop="name" label="姓名" width="90" />
+            <el-table-column prop="phone" label="电话" width="130" />
+            <el-table-column prop="idCard" label="身份证" width="170" />
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button size="small" type="primary" @click="selectExistingTenant(row)"
+                  :disabled="contractTenants.some(t=>t.tenantId===row.id)">选择</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane label="新建租客" name="new">
+          <el-form :model="newTenantForm" label-width="90px">
+            <el-form-item label="姓名"><el-input v-model="newTenantForm.name" /></el-form-item>
+            <el-form-item label="电话"><el-input v-model="newTenantForm.phone" /></el-form-item>
+            <el-form-item label="身份证"><el-input v-model="newTenantForm.idCard" /></el-form-item>
+            <el-form-item label="邮箱"><el-input v-model="newTenantForm.email" /></el-form-item>
+          </el-form>
+        </el-tab-pane>
+      </el-tabs>
+      <div v-if="pendingAddTenants.length>0" style="margin-top:12px;">
+        <span style="font-size:13px;color:#606266;">待添加：</span>
+        <el-tag v-for="t in pendingAddTenants" :key="t.id" closable @close="removePendingTenant(t)" style="margin-right:6px;">{{ t.name }}</el-tag>
+      </div>
+      <el-alert title="添加租户将提交审批，通过后生效" type="info" show-icon :closable="false" style="margin-top:12px;" />
+      <template #footer>
+        <el-button @click="showAddTenant = false">取消</el-button>
+        <el-button type="primary" @click="submitAddTenant" :loading="addTenantLoading" :disabled="pendingAddTenants.length===0">确认提交审批</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Remove Tenant Dialog -->
+    <el-dialog v-model="showRemoveTenant" title="解绑租客" width="450px">
+      <p>确认将租客 <strong>{{ removingTenant?.tenantName }}</strong> 从本合同解绑？</p>
+      <el-form style="margin-top:12px;">
+        <el-form-item label="解绑原因">
+          <el-input v-model="removeTenantReason" type="textarea" :rows="2" placeholder="必填" />
+        </el-form-item>
+      </el-form>
+      <el-alert title="解绑操作将提交审批，通过后生效" type="info" show-icon :closable="false" style="margin-top:12px;" />
+      <template #footer>
+        <el-button @click="showRemoveTenant = false">取消</el-button>
+        <el-button type="primary" @click="submitRemoveTenant" :loading="removeTenantLoading" :disabled="!removeTenantReason">确认提交审批</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, handleApiError } from '@/api/index.js'
@@ -521,6 +677,9 @@ import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createA
 const route = useRoute()
 const router = useRouter()
 const activeTab = ref('recurring')
+watch(activeTab, (tab) => {
+  if (tab === 'tenants') fetchContractTenants()
+})
 
 /* ================================================================
  * Real Data: Contract from API
@@ -541,9 +700,37 @@ const loading = ref(true)
 const feeConfigLoading = ref(false)
 const receivableLoading = ref(false)
 const generatingReceivables = ref(false)
+
+// 租户Tab
+const tenantLoading = ref(false)
+const contractTenants = ref([])
+const showAddTenant = ref(false)
+const addTenantTab = ref("existing")
+const tenantSearchKeyword = ref("")
+const searchResults = ref([])
+const searchLoading = ref(false)
+const pendingAddTenants = ref([])
+const newTenantForm = reactive({ name: "", phone: "", idCard: "", email: "" })
+const addTenantLoading = ref(false)
+const showRemoveTenant = ref(false)
+const removingTenant = ref(null)
+const removeTenantReason = ref("")
+const removeTenantLoading = ref(false)
 const feeConfigs = ref([])
 const depositLogs = ref([])
 const receivableTimeline = ref([])
+
+// 补充收费
+const showSupplementaryFee = ref(false)
+const suppSubmitting = ref(false)
+const suppForm = reactive({ feeCodeId: null, amount: 0, effectiveDate: '' })
+
+// 生成应收预览
+const showReceivablePreviewDialog = ref(false)
+const receivablePreviewLoading = ref(false)
+const receivableSubmitting = ref(false)
+const receivablePreviewItems = ref([])
+const receivablePreviewTotal = ref(0)
 const receivableStats = computed(() => {
   const totalAmount = receivableTimeline.value.reduce((s, r) => s + (r.amount || 0), 0)
   const totalReceived = receivableTimeline.value.reduce((s, r) => s + (r.received || 0), 0)
@@ -1108,41 +1295,38 @@ async function submitFeeAdjust() {
  * ================================================================ */
 const showOtherModify = ref(false)
 const otherForm = reactive({
+  startDate: '',
+  endDate: '',
+  paymentCycle: 'Monthly',
   tenantPhone: '13800138001',
   paymentDueDay: 5,
   allowDepositAsLastRent: false,
   remark: ''
 })
 
-function submitOtherModify() {
-  // Record changes
-  const changes = []
-  if (otherForm.tenantPhone !== contract.value.tenantPhone) {
-    changes.push({ field: '租客电话', oldValue: contract.value.tenantPhone || '-', newValue: otherForm.tenantPhone })
-    contract.value.tenantPhone = otherForm.tenantPhone
+async function submitOtherModify() {
+  try {
+    const res = await fetch('/api/contracts/' + route.params.id + '/modifysubmit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        startDate: otherForm.startDate || null,
+        endDate: otherForm.endDate || null,
+        paymentCycle: otherForm.paymentCycle,
+        tenantPhone: otherForm.tenantPhone,
+        paymentDueDay: otherForm.paymentDueDay,
+        allowDepositAsLastRent: otherForm.allowDepositAsLastRent
+      })
+    }).then(r => r.json())
+    if (res.status === 'PendingApproval') {
+      ElMessage.success('修改申请已提交审批')
+    } else {
+      ElMessage.success('合同信息已更新')
+    }
+    showOtherModify.value = false
+    await fetchContract()
+  } catch (e) {
+    ElMessage.error('提交失败')
   }
-  if (otherForm.paymentDueDay !== contract.value.paymentDueDay) {
-    changes.push({ field: '付款到期日', oldValue: '每月' + contract.value.paymentDueDay + '日', newValue: '每月' + otherForm.paymentDueDay + '日' })
-    contract.value.paymentDueDay = otherForm.paymentDueDay
-  }
-  if (otherForm.allowDepositAsLastRent !== contract.value.allowDepositAsLastRent) {
-    changes.push({ field: '押金抵最后月租', oldValue: contract.value.allowDepositAsLastRent ? '是' : '否', newValue: otherForm.allowDepositAsLastRent ? '是' : '否' })
-    contract.value.allowDepositAsLastRent = otherForm.allowDepositAsLastRent
-  }
-
-  if (changes.length > 0) {
-    changeHistory.value.unshift({
-      date: nowStr(),
-      title: '合同信息修改',
-      detail: changes.map(c => `${c.field}: ${c.oldValue} → ${c.newValue}`).join('；'),
-      operator: '当前用户',
-      type: 'info',
-      hollow: true,
-      changes
-    })
-  }
-  ElMessage.success('合同信息已更新')
-  showOtherModify.value = false
 }
 
 /* ================================================================
@@ -1216,6 +1400,11 @@ async function submitRenew() {
  * ================================================================ */
 const showSuspend = ref(false)
 const suspendReason = ref('')
+const showSuspendPreview = ref(false)
+const suspendPreviewLoading = ref(false)
+const suspendSubmitting = ref(false)
+const suspendPreviewData = ref(null)
+const suspendConfirmed = ref(false)
 const showTerminate = ref(false)
 const terminateForm = reactive({
   type: 'EARLY',
@@ -1263,24 +1452,38 @@ async function submitTerminate() {
   }
 }
 
-async function handleSuspend() {
+async function previewSuspend() {
   if (!suspendReason.value) { ElMessage.warning('请填写暂停原因'); return }
+  suspendPreviewLoading.value = true
   try {
-    await suspendContract(toGuidId(contract.value.id), { reason: suspendReason.value })
-    contract.value.status = 'Suspended'
-    changeHistory.value.unshift({
-      date: nowStr(),
-      title: '合同暂停',
-      detail: `暂停原因: ${suspendReason.value}`,
-      operator: '当前用户',
-      type: 'info',
-      hollow: true
-    })
-    ElMessage.success('合同已暂停')
+    const res = await fetch('/api/contracts/' + route.params.id + '/suspendpreview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }
+    }).then(r => r.json())
+    suspendPreviewData.value = res
     showSuspend.value = false
+    showSuspendPreview.value = true
   } catch (e) {
-    handleApiError(e, '暂停失败')
+    ElMessage.error('预览失败')
   }
+  suspendPreviewLoading.value = false
+}
+
+async function submitSuspendApproval() {
+  suspendSubmitting.value = true
+  try {
+    const res = await fetch('/api/contracts/' + route.params.id + '/suspendsubmit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: suspendReason.value })
+    }).then(r => r.json())
+    if (res.status === 'PendingApproval') {
+      ElMessage.success('暂停申请已提交审批')
+    } else {
+      contract.value.status = 'Suspended'
+      ElMessage.success('合同已暂停')
+    }
+    showSuspendPreview.value = false
+  } catch (e) { ElMessage.error('提交失败') }
+  suspendSubmitting.value = false
 }
 
 async function toggleAutoRenew() {
@@ -1313,13 +1516,131 @@ function handleResume() {
   }).catch(() => {})
 }
 
-async function generateReceivables() {
+async function submitSupplementaryFee() {
+  if (!suppForm.feeCodeId) { ElMessage.warning('请选择收费项目'); return }
+  if (!suppForm.amount || suppForm.amount <= 0) { ElMessage.warning('请输入有效金额'); return }
+  if (!suppForm.effectiveDate) { ElMessage.warning('请选择生效日期'); return }
+  suppSubmitting.value = true
   try {
-    await apiGenerateReceivables({ contractId: contract.value.id })
-    ElMessage.success('应收已成功生成')
+    const res = await fetch('/api/contracts/' + route.params.id + '/supplementaryfee/request', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feeCodeId: suppForm.feeCodeId, amount: suppForm.amount, effectiveDate: suppForm.effectiveDate })
+    }).then(r => r.json())
+    if (res.status === 'PendingApproval' || res.status === 'Completed') {
+      ElMessage.success('补充收费请求已提交' + (res.status === 'PendingApproval' ? '审批' : ''))
+      showSupplementaryFee.value = false
+      await fetchReceivables()
+    } else {
+      ElMessage.error(res.message || '提交失败')
+    }
+  } catch (e) { ElMessage.error('提交失败') }
+  suppSubmitting.value = false
+}
+
+
+// === 租户Tab函数 ===
+async function fetchContractTenants() {
+  tenantLoading.value = true
+  try {
+    const { getContractTenants } = await import('@/api')
+    const res = await getContractTenants(route.params.id)
+    contractTenants.value = res.tenants || []
+  } catch { contractTenants.value = [] }
+  tenantLoading.value = false
+}
+async function openAddTenantDialog() {
+  showAddTenant.value = true
+  pendingAddTenants.value = []
+  tenantSearchKeyword.value = ''
+  searchResults.value = []
+}
+async function searchTenants() {
+  searchLoading.value = true
+  try {
+    const { getTenants } = await import('@/api')
+    const res = await getTenants({ keyword: tenantSearchKeyword.value || undefined, pageSize: 50 })
+    const list = Array.isArray(res) ? res : (res.items || res.data || [])
+    searchResults.value = list.filter(t => !contractTenants.value.some(ct => ct.tenantId === t.id))
+  } catch { searchResults.value = [] }
+  searchLoading.value = false
+}
+function selectExistingTenant(row) {
+  if (!pendingAddTenants.value.some(t => t.id === row.id))
+    pendingAddTenants.value.push({ id: row.id, name: row.name, phone: row.phone })
+}
+function removePendingTenant(t) {
+  pendingAddTenants.value = pendingAddTenants.value.filter(x => x.id !== t.id)
+}
+async function submitAddTenant() {
+  if (pendingAddTenants.value.length === 0) return
+  addTenantLoading.value = true
+  try {
+    const { addContractTenant } = await import('@/api')
+    for (const t of pendingAddTenants.value)
+      await addContractTenant(route.params.id, { tenantId: t.id, isPrimary: false })
+    ElMessage.success('添加租户申请已提交审批')
+    showAddTenant.value = false; pendingAddTenants.value = []
+    await fetchContractTenants()
+  } catch (e) { ElMessage.error('提交失败') }
+  addTenantLoading.value = false
+}
+async function setPrimaryTenant(row) {
+  try {
+    const { setContractPrimaryTenant } = await import('@/api')
+    await setContractPrimaryTenant(route.params.id, row.tenantId)
+    ElMessage.success('主租户已更新')
+    await fetchContractTenants()
+  } catch (e) { ElMessage.error('设置失败') }
+}
+function confirmRemoveTenant(row) {
+  removingTenant.value = row; removeTenantReason.value = ''; showRemoveTenant.value = true
+}
+async function submitRemoveTenant() {
+  if (!removingTenant.value || !removeTenantReason.value) return
+  removeTenantLoading.value = true
+  try {
+    const { removeContractTenant } = await import('@/api')
+    await removeContractTenant(route.params.id, removingTenant.value.tenantId, { reason: removeTenantReason.value })
+    ElMessage.success('解绊申请已提交审批')
+    showRemoveTenant.value = false; await fetchContractTenants()
+  } catch (e) { ElMessage.error('提交失败') }
+  removeTenantLoading.value = false
+}
+
+async function generateReceivables() {
+  // Show preview dialog and load preview data
+  showReceivablePreviewDialog.value = true
+  receivablePreviewLoading.value = true
+  try {
+    const res = await fetch('/api/receivables/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contractId: contract.value.id })
+    }).then(r => r.json())
+    receivablePreviewItems.value = res.items || []
+    receivablePreviewTotal.value = res.totalAmount || 0
   } catch (e) {
-    handleApiError(e, '生成应收失败')
+    receivablePreviewItems.value = []
+    receivablePreviewTotal.value = 0
   }
+  receivablePreviewLoading.value = false
+}
+
+async function submitReceivableGenerate() {
+  receivableSubmitting.value = true
+  try {
+    const res = await fetch('/api/receivables/generaterequest', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contractId: contract.value.id })
+    }).then(r => r.json())
+    if (res.status === 'PendingApproval' || res.message) {
+      ElMessage.success(res.message || '应收生成请求已提交审批')
+      showReceivablePreviewDialog.value = false
+      await fetchReceivables()
+    } else {
+      ElMessage.error(res.message || '提交失败')
+    }
+  } catch (e) { ElMessage.error('提交失败') }
+  receivableSubmitting.value = false
 }
 
 // Change Requests removed

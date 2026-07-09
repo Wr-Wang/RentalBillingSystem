@@ -69,6 +69,17 @@ public interface IUnitOfWork : IDisposable
     IApprovalBizDataRepository ApprovalBizData { get; }
     IApprovalFeeItemRepository ApprovalFeeItems { get; }
 
+    // 审批闭环暂存表
+    IRepository<ContractCreateRequest> ContractCreateRequests { get; }
+    IRepository<ContractCreateRequestTenant> ContractCreateRequestTenants { get; }
+    IRepository<ContractCreateRequestFee> ContractCreateRequestFees { get; }
+    IRepository<ContractModifyRequest> ContractModifyRequests { get; }
+    IRepository<TenantCreateRequest> TenantCreateRequests { get; }
+    IRepository<SupplementaryFeeRequest> SupplementaryFeeRequests { get; }
+    IRepository<SupplementaryFeeRequestItem> SupplementaryFeeRequestItems { get; }
+    IRepository<ReceivableGenerateRequest> ReceivableGenerateRequests { get; }
+    IRepository<ReceivableGenerateRequestItem> ReceivableGenerateRequestItems { get; }
+
     // 会计
     IRepository<Voucher> Vouchers { get; }
 

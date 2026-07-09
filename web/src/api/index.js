@@ -58,6 +58,12 @@ export function createTenant(data) { return request({ url: '/tenants', method: '
 export function updateTenant(id, data) { return request({ url: `/tenants/${id}`, method: 'put', data }) }
 export function deleteTenant(id) { return request({ url: `/tenants/${id}`, method: 'delete' }) }
 
+// 合同租客管理
+export function getContractTenants(contractId) { return request({ url: `/contracts/${contractId}/tenants`, method: 'get' }) }
+export function addContractTenant(contractId, data) { return request({ url: `/contracts/${contractId}/tenants`, method: 'post', data }) }
+export function removeContractTenant(contractId, tenantId, data) { return request({ url: `/contracts/${contractId}/tenants/${tenantId}`, method: 'delete', data }) }
+export function setContractPrimaryTenant(contractId, tenantId) { return request({ url: `/contracts/${contractId}/tenants/${tenantId}/primary`, method: 'put' }) }
+
 // Contracts
 export function getContracts(params) { return request({ url: '/contracts', method: 'get', params }) }
 export function getContract(id) { return request({ url: `/contracts/${id}`, method: 'get' }) }

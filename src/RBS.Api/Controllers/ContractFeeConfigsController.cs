@@ -2,9 +2,12 @@ using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Approval;
 using RBS.Core.Common;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
+using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
 
@@ -16,19 +19,23 @@ public class ContractFeeConfigsController : ControllerBase
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
     private readonly ICurrentUserService _currentUser;
+    private readonly IUnitOfWork _uow;
+    private readonly IApprovalService _approvalService;
 
-    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser)
+    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser,
+        IUnitOfWork uow, IApprovalService approvalService)
     {
         _db = db;
         _sql = sql;
         _currentUser = currentUser;
+        _uow = uow;
+        _approvalService = approvalService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractId, CancellationToken ct)
     {
         if (contractId == null) return Ok(new List<object>());
-
         using var conn = _db.CreateConnection(); conn.Open();
         var rows = await conn.QueryAsync(_sql.Get("Lease.Select.ContractFeeConfig.ByContractId"),
             new { ContractId = contractId.Value });
@@ -39,33 +46,74 @@ public class ContractFeeConfigsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateFeeConfigRequest request, CancellationToken ct)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
+        // 校验合同状态：Active 合同必须走审批
+        var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
+        if (contract == null) return NotFound(new { message = "合同不存在" });
 
-        // 区间不交叉校验
+        if (contract.Status == "Active")
+        {
+            var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_FEE_CHANGE", ct);
+            if (approvalType != null)
+            {
+                // 走审批流：存 ApprovalFeeItems
+                var userId = _currentUser.UserId;
+                var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+                {
+                    ApprovalTypeId = approvalType.Id,
+                    Title = $"[添加费用] {contract.ContractNo}",
+                    Description = $"添加费用 ¥{request.Amount}",
+                    TargetEntityId = request.ContractId,
+                    TargetEntityType = "ContractFeeChange"
+                }, ct);
+
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Contract.Insert.ApprovalFeeItem.ForFeeAdjust"),
+                    new
+                    {
+                        Id = Guid.NewGuid(), ApprovalRequestId = approvalResult.Id,
+                        ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                        FeeName = "", OldAmount = 0m, NewAmount = request.Amount,
+                        BillingMode = request.BillingMode ?? "FixedAmount",
+                        Unit = request.Unit, EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                        CreatedBy = userId, CreatedAt = ChinaTime.Now
+                    }, ct);
+
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Contract.Update.ApprovalRequest.SetContractId"),
+                    new { Id = approvalResult.Id, ContractId = request.ContractId }, ct);
+                await _uow.CommitAsync(ct);
+
+                return Ok(new { id = approvalResult.Id, status = "PendingApproval", message = "添加费用申请已提交审批" });
+            }
+        }
+
+        // Draft 合同或无审批配置 → 直接写入
+        using var conn = _db.CreateConnection(); conn.Open();
         var overlap = await conn.QuerySingleAsync<int>(
             _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
             new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
                 EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                 ExpiryDate = (string?)null, ExcludeId = (Guid?)null });
         if (overlap > 0)
-            return Conflict(new { code = "FEE_CONFIG_OVERLAP", message = "该费用项目在生效日期范围内已存在配置，请调整生效日期" });
+            return Conflict(new { code = "FEE_CONFIG_OVERLAP", message = "该费用项目在生效日期范围内已存在配置" });
 
         var id = Guid.NewGuid();
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
-            new
-            {
-                Id = id, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
-                BillingMode = request.BillingMode ?? "FixedAmount",
-                Amount = request.Amount, Unit = request.Unit, UnitPrice = request.UnitPrice,
+            new { Id = id, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                BillingMode = request.BillingMode ?? "FixedAmount", Amount = request.Amount,
+                Unit = request.Unit, UnitPrice = request.UnitPrice,
                 EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                CreatedBy = _currentUser.UserId, Now = ChinaTime.Now
-            });
+                CreatedBy = _currentUser.UserId, Now = ChinaTime.Now });
+        await InsertChangeHistoryAsync(conn, null, request.ContractId, "FEE_ADD",
+            "添加费用", "添加 " + (request.BillingMode ?? "FixedAmount") + " ¥" + request.Amount.ToString("F2") + ", 生效 " + (request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")),
+            null, request.Amount, request.EffectiveDate, _currentUser.UserId);
         return Ok(new { id });
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFeeConfigRequest request, CancellationToken ct)
     {
+        // Update 仅用于 Draft 合同或非关键字段，Active 合同的变更通过 Adjust 走审批
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.Default"),
             new { Id = id, request.Amount, request.BillingMode, request.Unit, request.UnitPrice, request.IsActive });
@@ -75,58 +123,48 @@ public class ContractFeeConfigsController : ControllerBase
     [HttpPost("adjust")]
     public async Task<IActionResult> Adjust([FromBody] AdjustFeeConfigRequest request, CancellationToken ct)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
+        // Active 合同禁止直接调价，必须走统一的 feeadjust 审批端点
+        var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
+        if (contract != null && contract.Status == "Active")
+        {
+            return BadRequest(new { code = "ACTIVE_CONTRACT_REQUIRES_APPROVAL",
+                message = "生效中的合同请使用「费用调价」功能提交审批，不可直接调价" });
+        }
 
-        // 查找当前生效记录
+        // Draft 合同直接执行
+        using var conn = _db.CreateConnection(); conn.Open();
         var current = await conn.QuerySingleOrDefaultAsync(
             _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
             new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId });
 
-        // 生效日校验：新生效日必须大于原生效日，否则原配置到期日 < 生效日
-        if (current != null)
-        {
-            var curEff = (DateTime)((dynamic)current).EffectiveDate;
-            var newEff = DateOnly.Parse(request.EffectiveDate);
-            if (newEff <= DateOnly.FromDateTime(curEff))
-                return BadRequest(new { code = "EFF_DATE_BEFORE_CURRENT", message = $"生效日期必须晚于当前配置的生效日期 {curEff:yyyy-MM-dd}" });
-        }
-
-        // 区间不交叉校验（排除当前生效记录自身）
         var overlap = await conn.QuerySingleAsync<int>(
             _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
             new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
                 EffectiveDate = request.EffectiveDate, ExpiryDate = (string?)null,
                 ExcludeId = current != null ? (Guid)((dynamic)current).Id : (Guid?)null });
         if (overlap > 0)
-            return Conflict(new { code = "FEE_CONFIG_OVERLAP", message = "该费用项目在新生效日期范围内已存在配置，请调整生效日期" });
+            return Conflict(new { code = "FEE_CONFIG_OVERLAP" });
 
-        // 存在则设为到期 + 停用
         if (current != null)
         {
             var expiryDate = DateTime.Parse(request.EffectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
             await conn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
                 new { Id = (Guid)((dynamic)current).Id, ExpiryDate = expiryDate });
-            await conn.ExecuteAsync(
-                _sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
+            await conn.ExecuteAsync(_sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
                 new { ExpiryDate = expiryDate, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId });
         }
 
-        // 创建新记录
         var newId = Guid.NewGuid();
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
-            new
-            {
-                Id = newId, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+            new { Id = newId, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
                 BillingMode = "FixedAmount", Amount = request.NewAmount,
                 EffectiveDate = request.EffectiveDate,
-                CreatedBy = _currentUser.UserId, Now = ChinaTime.Now
-            });
+                CreatedBy = _currentUser.UserId, Now = ChinaTime.Now });
 
-        // 写入变更历史
-	        // 写入变更历史
-            await InsertChangeHistoryAsync(conn, null, request.ContractId, "FEE_ADJUST",
-                "费用调价", "新金额 " + request.NewAmount.ToString("F2") + "，生效 " + request.EffectiveDate, null, request.NewAmount, request.EffectiveDate, _currentUser.UserId);
-            return Ok(new { id = newId, message = "调价成功" });
+        await InsertChangeHistoryAsync(conn, null, request.ContractId, "FEE_ADJUST",
+            "费用调价", "新金额 " + request.NewAmount.ToString("F2") + "，生效 " + request.EffectiveDate,
+            null, request.NewAmount, request.EffectiveDate, _currentUser.UserId);
+        return Ok(new { id = newId, message = "调价成功（草稿合同）" });
     }
 
     [HttpGet("history")]
@@ -159,34 +197,26 @@ public class ContractFeeConfigsController : ControllerBase
         return Ok(new { hasOverlap = overlap > 0 });
     }
 
-    
     private async Task InsertChangeHistoryAsync(IDbConnection conn, IDbTransaction? tx,
         Guid contractId, string changeType, string title, string detail,
         decimal? oldValue, decimal? newValue, string? effectiveDate, Guid? operatorId, string? operatorName = null)
     {
         if (string.IsNullOrEmpty(operatorName) && operatorId.HasValue)
-        {
             try { operatorName = await conn.QuerySingleOrDefaultAsync<string>(
                 "SELECT DisplayName FROM Users WHERE Id=@Id", new { Id = operatorId }, tx); } catch { }
-        }
         await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
-            new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType,
-                Title = title, Detail = detail, OldValue = oldValue, NewValue = newValue,
-                EffectiveDate = effectiveDate, OperatorId = operatorId, OperatorName = operatorName ?? "" }, tx);
+            new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType, Title = title,
+                Detail = detail, OldValue = oldValue, NewValue = newValue, EffectiveDate = effectiveDate,
+                OperatorId = operatorId, OperatorName = operatorName ?? "" }, tx);
     }
 
-private static object MapConfig(dynamic r) => new
+    private static object MapConfig(dynamic r) => new
     {
-        id = (Guid)r.Id,
-        contractId = (Guid)r.ContractId,
-        feeCodeId = (Guid)r.FeeCodeId,
-        feeCodeName = (string?)r.FeeCodeName,
-        feeCode = (string?)r.FeeCode,
+        id = (Guid)r.Id, contractId = (Guid)r.ContractId, feeCodeId = (Guid)r.FeeCodeId,
+        feeCodeName = (string?)r.FeeCodeName, feeCode = (string?)r.FeeCode,
         chargeType = (string?)r.ChargeType ?? "Recurring",
-        billingMode = (string)r.BillingMode,
-        amount = (decimal)r.Amount,
-        unit = (string?)r.Unit,
-        unitPrice = (decimal?)r.UnitPrice,
+        billingMode = (string)r.BillingMode, amount = (decimal)r.Amount,
+        unit = (string?)r.Unit, unitPrice = (decimal?)r.UnitPrice,
         isActive = (bool)r.IsActive,
         effectiveDate = r.EffectiveDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : null,
         expiryDate = r.ExpiryDate is DateTime xd ? xd.ToString("yyyy-MM-dd") : null

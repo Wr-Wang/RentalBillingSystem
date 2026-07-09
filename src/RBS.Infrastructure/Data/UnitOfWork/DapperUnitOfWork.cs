@@ -73,6 +73,17 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IApprovalBizDataRepository ApprovalBizData => _approvalBizData ??= new DapperApprovalBizDataRepository(_db, _sql, _auditWriter, this, _tenant);
     public IApprovalFeeItemRepository ApprovalFeeItems => _approvalFeeItems ??= new DapperApprovalFeeItemRepository(_db, _sql, _auditWriter, this, _tenant);
 
+    // ===== 审批闭环暂存表 =====
+    public IRepository<ContractCreateRequest> ContractCreateRequests => _contractCreateRequests ??= new DapperRepository<ContractCreateRequest>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<ContractCreateRequestTenant> ContractCreateRequestTenants => _contractCreateRequestTenants ??= new DapperRepository<ContractCreateRequestTenant>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<ContractCreateRequestFee> ContractCreateRequestFees => _contractCreateRequestFees ??= new DapperRepository<ContractCreateRequestFee>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<ContractModifyRequest> ContractModifyRequests => _contractModifyRequests ??= new DapperRepository<ContractModifyRequest>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<TenantCreateRequest> TenantCreateRequests => _tenantCreateRequests ??= new DapperRepository<TenantCreateRequest>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<SupplementaryFeeRequest> SupplementaryFeeRequests => _supplementaryFeeRequests ??= new DapperRepository<SupplementaryFeeRequest>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<SupplementaryFeeRequestItem> SupplementaryFeeRequestItems => _supplementaryFeeRequestItems ??= new DapperRepository<SupplementaryFeeRequestItem>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<ReceivableGenerateRequest> ReceivableGenerateRequests => _receivableGenerateRequests ??= new DapperRepository<ReceivableGenerateRequest>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<ReceivableGenerateRequestItem> ReceivableGenerateRequestItems => _receivableGenerateRequestItems ??= new DapperRepository<ReceivableGenerateRequestItem>(_db, _auditWriter, tracker: this, tenant: _tenant);
+
     private IUserRepository? _users;
     private IRoleRepository? _roles;
     private IMenuRepository? _menus;
@@ -113,6 +124,17 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IRenewalRequestRepository? _renewalRequests;
     private IApprovalBizDataRepository? _approvalBizData;
     private IApprovalFeeItemRepository? _approvalFeeItems;
+
+    // ===== 审批闭环暂存表 fields =====
+    private IRepository<ContractCreateRequest>? _contractCreateRequests;
+    private IRepository<ContractCreateRequestTenant>? _contractCreateRequestTenants;
+    private IRepository<ContractCreateRequestFee>? _contractCreateRequestFees;
+    private IRepository<ContractModifyRequest>? _contractModifyRequests;
+    private IRepository<TenantCreateRequest>? _tenantCreateRequests;
+    private IRepository<SupplementaryFeeRequest>? _supplementaryFeeRequests;
+    private IRepository<SupplementaryFeeRequestItem>? _supplementaryFeeRequestItems;
+    private IRepository<ReceivableGenerateRequest>? _receivableGenerateRequests;
+    private IRepository<ReceivableGenerateRequestItem>? _receivableGenerateRequestItems;
 
     // ==================================================================
     // IChangeTracker 实现

@@ -40,21 +40,27 @@
 
     <!-- Step 2: Select Tenant -->
     <el-card v-show="step === 1">
-      <template #header>选择租客</template>
+      <template #header>选择租客（可多选）</template>
       <div class="search-bar">
         <el-input v-model="tenantSearch" placeholder="搜索租客姓名/电话" clearable style="width: 220px;" @keyup.enter="loadTenants" />
         <el-button type="primary" @click="loadTenants">查询</el-button>
         <el-button @click="showNewTenant = true">新增租客</el-button>
       </div>
-      <el-table :data="filteredTenants" v-loading="tenantsLoading" stripe @row-click="selectTenant" highlight-current-row>
+      <el-table ref="tenantTableRef" :data="filteredTenants" v-loading="tenantsLoading" stripe @selection-change="onTenantSelectionChange">
         <el-table-column type="selection" width="50" />
         <el-table-column prop="name" label="姓名" />
         <el-table-column prop="idCard" label="身份证号" />
         <el-table-column prop="phone" label="电话" />
       </el-table>
+      <div v-if="selectedTenants.length > 0" style="margin:12px 0;">
+        <span style="font-size:13px;color:#606266;">已选租客：</span>
+        <el-tag v-for="t in selectedTenants" :key="t.id" closable @close="removeSelectedTenant(t)" style="margin-right:6px;margin-top:4px;">
+          {{ t.name }}（{{ t.phone || '无电话' }}）
+        </el-tag>
+      </div>
       <div style="text-align: right; margin-top: 16px;">
         <el-button @click="step = 0">上一步</el-button>
-        <el-button type="primary" :disabled="!selectedTenant" @click="step = 1">下一步</el-button>
+        <el-button type="primary" :disabled="selectedTenants.length === 0" @click="step = 2">下一步（{{ selectedTenants.length }}人）</el-button>
       </div>
     </el-card>
 
@@ -123,7 +129,7 @@
       <template #header>确认信息</template>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="房屋">{{ selectedRoom?.fullCode }}</el-descriptions-item>
-        <el-descriptions-item label="租客">{{ selectedTenant?.name }}</el-descriptions-item>
+        <el-descriptions-item label="租客">{{ selectedTenants.map(t => t.name).join('、') }}</el-descriptions-item>
         <el-descriptions-item label="起租日期">{{ contractForm.startDate }}</el-descriptions-item>
         <el-descriptions-item label="到期日期">{{ contractForm.endDate }}</el-descriptions-item>
       </el-descriptions>
@@ -181,7 +187,14 @@ const creatingTenant = ref(false)
 const roomSearch = ref('')
 const tenantSearch = ref('')
 const selectedRoom = ref(null)
-const selectedTenant = ref(null)
+const selectedTenants = ref([])
+const tenantTableRef = ref(null)
+
+function onTenantSelectionChange(rows) { selectedTenants.value = rows }
+function removeSelectedTenant(t) {
+  selectedTenants.value = selectedTenants.value.filter(x => x.id !== t.id)
+  tenantTableRef.value?.toggleRowSelection(t, false)
+}
 const showNewTenant = ref(false)
 const roomsLoading = ref(false)
 const tenantsLoading = ref(false)
@@ -296,7 +309,7 @@ async function addNewTenant() {
 }
 
 async function submitContract() {
-  if (!selectedRoom.value || !selectedTenant.value) { ElMessage.warning('请完成所有步骤'); return }
+  if (!selectedRoom.value || selectedTenants.value.length === 0) { ElMessage.warning('请完成所有步骤'); return }
   const companyId = userStore.effectiveCompanyId || userStore.homeCompanyId
   if (!companyId) { ElMessage.warning('请先选择公司'); return }
 
@@ -305,7 +318,7 @@ async function submitContract() {
     const enabledFees = feeConfigs.value.filter(f => f.enabled)
     await createContract({
       roomId: selectedRoom.value.id,
-      tenantIds: [selectedTenant.value.id],
+      tenantIds: selectedTenants.value.map(t => t.id),
       companyId,
       startDate: contractForm.startDate,
       endDate: contractForm.endDate,

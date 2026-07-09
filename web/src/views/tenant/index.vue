@@ -47,7 +47,6 @@
         </el-form-item>
         <el-form-item label="证件号码">
           <el-input v-model="tenantForm.idCard" />
-          <el-input v-model="tenantForm.identityNo" />
         </el-form-item>
         <el-form-item label="电话">
           <el-input v-model="tenantForm.phone" />

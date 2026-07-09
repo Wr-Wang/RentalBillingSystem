@@ -602,6 +602,14 @@
   <select id="Billing.Select.ReceivablePlan.ExistsByKey">
     <![CDATA[SELECT COUNT(1) FROM ReceivablePlans WHERE ContractId=@C AND FeeCodeId=@F AND Period=@P]]>
   </select>
+  <select id="Billing.Select.ReceivablePlan.ExistsByContractAndPeriod">
+    <![CDATA[SELECT COUNT(1) FROM ReceivablePlans WHERE ContractId=@ContractId AND Period=@Period]]>
+  </select>
+  <select id="Lease.Select.ContractFeeConfig.WithFeeCodeByContract">
+    <![CDATA[SELECT cfc.Id, cfc.ContractId, cfc.FeeCodeId, cfc.Amount, cfc.BillingMode, cfc.Unit, cfc.UnitPrice, cfc.EffectiveDate, cfc.ExpiryDate, cfc.IsActive, fc.Code, fc.Name, fc.ChargeType
+      FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId
+      WHERE cfc.ContractId = @ContractId]]>
+  </select>
   <select id="Billing.Select.JournalEntry.BalanceBySubject">
     <![CDATA[SELECT ISNULL(SUM(CASE WHEN Direction='Debit' THEN Amount ELSE -Amount END), 0)
       FROM JournalEntries je JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
@@ -1273,4 +1281,162 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <select id="Organization.Select.Company.NameById">
     <![CDATA[SELECT Name FROM Companies WHERE Id=@Id]]>
   </select>
+
+  <!-- ===== 租客相关 SQL（Tenant Tab + 多租客改造） ===== -->
+  <select id="Lease.Select.ContractTenant.DetailByContract">
+    <![CDATA[SELECT ct.TenantId, ct.IsPrimary, t.Name AS TenantName, t.Phone AS TenantPhone, t.IdentityNo AS IdCard, t.Email, t.Wechat
+      FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId
+      WHERE ct.ContractId = @ContractId ORDER BY ct.IsPrimary DESC, t.Name]]>
+  </select>
+  <select id="Rental.Select.Tenant.ContractCount">
+    <![CDATA[SELECT COUNT(1) FROM ContractTenants WHERE TenantId=@TenantId]]>
+  </select>
+  <select id="Rental.Select.Tenant.ActiveContractNo">
+    <![CDATA[SELECT TOP 1 c.ContractNo FROM Contracts c
+      INNER JOIN ContractTenants ct ON ct.ContractId=c.Id
+      WHERE ct.TenantId=@TenantId AND c.Status='Active']]>
+  </select>
+  <insert id="Contract.Insert.ApprovalBizData.TenantChange">
+    <![CDATA[INSERT INTO ApprovalBizData (Id, ApprovalRequestId, ContractId, ContractNo, CompanyId, ChangeType, OldAmount, Reason, IsProcessed, CreatedBy, CreatedAt)
+      VALUES (@Id, @ApprovalRequestId, @ContractId, @ContractNo, @CompanyId, @ChangeType, @OldAmount, @Reason, 0, @CreatedBy, @CreatedAt)]]>
+  </insert>
+  <update id="Lease.Update.ContractTenant.SetPrimary">
+    <![CDATA[UPDATE ContractTenants SET IsPrimary = CASE WHEN TenantId=@TenantId THEN 1 ELSE 0 END WHERE ContractId=@ContractId]]>
+  </update>
+  <insert id="TenantCreate.Insert.Request.Default">
+    <![CDATA[INSERT INTO TenantCreateRequests (Id, Name, Phone, IdCard, Email, Wechat, EmergencyContact, EmergencyPhone, Address, Remark, CompanyId, ContractId, IsPrimary, Status, CreatedBy, CreatedAt)
+      VALUES (@Id, @Name, @Phone, @IdCard, @Email, @Wechat, @EmergencyContact, @EmergencyPhone, @Address, @Remark, @CompanyId, @ContractId, @IsPrimary, @Status, @CreatedBy, @CreatedAt)]]>
+  </insert>
+  <update id="TenantCreate.Update.Request.Complete">
+    <![CDATA[UPDATE TenantCreateRequests SET Status='Completed', NewTenantId=@NewTenantId, UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Executing']]>
+  </update>
+  <update id="TenantCreate.Update.Request.Reject">
+    <![CDATA[UPDATE TenantCreateRequests SET Status='Rejected', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <update id="TenantCreate.Update.Request.LockExecuting">
+    <![CDATA[UPDATE TenantCreateRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+
+  <!-- ===== ContractCreateRequests (合同创建暂存) ===== -->
+  <insert id="ContractCreate.Insert.Request.Default">
+    <![CDATA[INSERT INTO ContractCreateRequests (Id, ContractNo, RoomId, StartDate, EndDate, PaymentCycle, CompanyId, Status, Remark, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractNo, @RoomId, @StartDate, @EndDate, @PaymentCycle, @CompanyId, @Status, @Remark, @CreatedBy, @CreatedAt)]]>
+  </insert>
+  <update id="ContractCreate.Update.Request.Submit">
+    <![CDATA[UPDATE ContractCreateRequests SET Status='PendingApproval' WHERE Id=@Id AND Status='Draft']]>
+  </update>
+  <update id="ContractCreate.Update.Request.Complete">
+    <![CDATA[UPDATE ContractCreateRequests SET Status='Completed', NewContractId=@NewContractId, UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Executing']]>
+  </update>
+  <update id="ContractCreate.Update.Request.Reject">
+    <![CDATA[UPDATE ContractCreateRequests SET Status='Rejected', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <update id="ContractCreate.Update.Request.LockExecuting">
+    <![CDATA[UPDATE ContractCreateRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <select id="ContractCreate.Select.Request.ById">
+    <![CDATA[SELECT * FROM ContractCreateRequests WHERE Id=@Id]]>
+  </select>
+  <select id="ContractCreate.Select.Request.PendingByRoom">
+    <![CDATA[SELECT COUNT(1) FROM ContractCreateRequests WHERE RoomId=@RoomId AND Status IN ('PendingApproval','Executing')]]>
+  </select>
+  <insert id="ContractCreate.Insert.Tenant.Default">
+    <![CDATA[INSERT INTO ContractCreateRequestTenants (Id, RequestId, TenantId, IsPrimary)
+      VALUES (@Id, @RequestId, @TenantId, @IsPrimary)]]>
+  </insert>
+  <select id="ContractCreate.Select.Tenants.ByRequestId">
+    <![CDATA[SELECT * FROM ContractCreateRequestTenants WHERE RequestId=@RequestId]]>
+  </select>
+  <insert id="ContractCreate.Insert.Fee.Default">
+    <![CDATA[INSERT INTO ContractCreateRequestFees (Id, RequestId, FeeCodeId, Amount, BillingMode, ChargeType, Unit, UnitPrice, EffectiveDate)
+      VALUES (@Id, @RequestId, @FeeCodeId, @Amount, @BillingMode, @ChargeType, @Unit, @UnitPrice, @EffectiveDate)]]>
+  </insert>
+  <select id="ContractCreate.Select.Fees.ByRequestId">
+    <![CDATA[SELECT * FROM ContractCreateRequestFees WHERE RequestId=@RequestId]]>
+  </select>
+
+  <!-- ===== ContractModifyRequests (合同修改暂存) ===== -->
+  <insert id="ContractModify.Insert.Request.Default">
+    <![CDATA[INSERT INTO ContractModifyRequests (Id, ContractId, StartDate, EndDate, PaymentCycle, AutoRenew, AllowDepositAsLastRent, PaymentDueDay, TenantPhone, Remark, Status, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractId, @StartDate, @EndDate, @PaymentCycle, @AutoRenew, @AllowDepositAsLastRent, @PaymentDueDay, @TenantPhone, @Remark, @Status, @CreatedBy, @CreatedAt)]]>
+  </insert>
+  <update id="ContractModify.Update.Request.Complete">
+    <![CDATA[UPDATE ContractModifyRequests SET Status='Completed', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Executing']]>
+  </update>
+  <update id="ContractModify.Update.Request.Reject">
+    <![CDATA[UPDATE ContractModifyRequests SET Status='Rejected', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <update id="ContractModify.Update.Request.LockExecuting">
+    <![CDATA[UPDATE ContractModifyRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <update id="ContractModify.Update.Contract.ApplyChanges">
+    <![CDATA[UPDATE Contracts SET
+        StartDate = ISNULL(@StartDate, StartDate),
+        EndDate = ISNULL(@EndDate, EndDate),
+        PaymentCycle = ISNULL(@PaymentCycle, PaymentCycle),
+        AutoRenew = ISNULL(@AutoRenew, AutoRenew),
+        AllowDepositAsLastRent = ISNULL(@AllowDepositAsLastRent, AllowDepositAsLastRent),
+        PaymentDueDay = ISNULL(@PaymentDueDay, PaymentDueDay),
+        UpdatedAt = GETUTCDATE()
+      WHERE Id = @ContractId]]>
+  </update>
+  <select id="ContractModify.Select.Request.ByApprovalRequestId">
+    <![CDATA[SELECT * FROM ContractModifyRequests WHERE ApprovalRequestId=@ApprovalRequestId]]>
+  </select>
+
+  <!-- ===== SupplementaryFeeRequests + Items (补充收费暂存) ===== -->
+  <insert id="SupplementaryFee.Insert.Request.Default">
+    <![CDATA[INSERT INTO SupplementaryFeeRequests (Id, ContractId, FeeCodeId, Amount, BillingMode, EffectiveDate, PeriodFrom, PeriodTo, Status, CompanyId, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractId, @FeeCodeId, @Amount, @BillingMode, @EffectiveDate, @PeriodFrom, @PeriodTo, @Status, @CompanyId, @CreatedBy, @CreatedAt)]]>
+  </insert>
+  <update id="SupplementaryFee.Update.Request.Submit">
+    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='PendingApproval' WHERE Id=@Id AND Status='Draft']]>
+  </update>
+  <update id="SupplementaryFee.Update.Request.Complete">
+    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Completed', FeeConfigId=@FeeConfigId, UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Executing']]>
+  </update>
+  <update id="SupplementaryFee.Update.Request.Reject">
+    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Rejected', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <update id="SupplementaryFee.Update.Request.LockExecuting">
+    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <insert id="SupplementaryFee.Insert.Item.Default">
+    <![CDATA[INSERT INTO SupplementaryFeeRequestItems (Id, RequestId, Period, ProratedAmount, DaysInMonth, CoveredDays)
+      VALUES (@Id, @RequestId, @Period, @ProratedAmount, @DaysInMonth, @CoveredDays)]]>
+  </insert>
+  <select id="SupplementaryFee.Select.Items.ByRequestId">
+    <![CDATA[SELECT * FROM SupplementaryFeeRequestItems WHERE RequestId=@RequestId ORDER BY Period]]>
+  </select>
+  <update id="SupplementaryFee.Update.Item.SetPlanIds">
+    <![CDATA[UPDATE SupplementaryFeeRequestItems SET ReceivablePlanId=@ReceivablePlanId, VoucherId=@VoucherId WHERE Id=@Id]]>
+  </update>
+
+  <!-- ===== ReceivableGenerateRequests + Items (生成应收暂存) ===== -->
+  <insert id="ReceivableGenerate.Insert.Request.Default">
+    <![CDATA[INSERT INTO ReceivableGenerateRequests (Id, ContractId, CompanyId, PeriodFrom, PeriodTo, Status, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractId, @CompanyId, @PeriodFrom, @PeriodTo, @Status, @CreatedBy, @CreatedAt)]]>
+  </insert>
+  <update id="ReceivableGenerate.Update.Request.Submit">
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='PendingApproval' WHERE Id=@Id AND Status='Draft']]>
+  </update>
+  <update id="ReceivableGenerate.Update.Request.Complete">
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Completed', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Executing']]>
+  </update>
+  <update id="ReceivableGenerate.Update.Request.Reject">
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Rejected', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <update id="ReceivableGenerate.Update.Request.LockExecuting">
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
+  </update>
+  <insert id="ReceivableGenerate.Insert.Item.Default">
+    <![CDATA[INSERT INTO ReceivableGenerateRequestItems (Id, RequestId, FeeCodeId, FeeName, Period, Amount, DueDate, EntryType)
+      VALUES (@Id, @RequestId, @FeeCodeId, @FeeName, @Period, @Amount, @DueDate, @EntryType)]]>
+  </insert>
+  <select id="ReceivableGenerate.Select.Items.ByRequestId">
+    <![CDATA[SELECT * FROM ReceivableGenerateRequestItems WHERE RequestId=@RequestId ORDER BY Period, FeeCodeId]]>
+  </select>
+  <update id="ReceivableGenerate.Update.Item.SetPlanIds">
+    <![CDATA[UPDATE ReceivableGenerateRequestItems SET ReceivablePlanId=@ReceivablePlanId, VoucherId=@VoucherId WHERE Id=@Id]]>
+  </update>
 </sqlMap>
