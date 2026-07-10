@@ -66,7 +66,7 @@
     <el-row :gutter="16">
       <!-- Building Tree -->
       <el-col :span="6">
-        <el-card style="min-height: 480px;">
+        <el-card style="min-height: 400px;">
           <template #header>
             <span>房屋结构</span>
           </template>
@@ -89,23 +89,23 @@
           </template>
           <el-table :data="paginatedList" stripe v-loading="roomLoading" style="width: 100%">
             <el-table-column type="index" label="#" width="50" />
-            <el-table-column prop="fullCode" label="房源编号" width="130" />
-            <el-table-column prop="buildingName" label="座楼" width="80" />
-            <el-table-column prop="floorName" label="楼层" width="70" />
-            <el-table-column prop="unitNo" label="房号" width="65" />
-            <el-table-column prop="roomTypeName" label="房型" width="90" />
-            <el-table-column prop="area" label="面积(m²)" width="85">
+            <el-table-column prop="fullCode" label="房源编号" min-width="120" />
+            <el-table-column prop="buildingName" label="座楼" min-width="70" />
+            <el-table-column prop="floorName" label="楼层" min-width="65" />
+            <el-table-column prop="unitNo" label="房号" min-width="60" />
+            <el-table-column prop="roomTypeName" label="房型" min-width="80" />
+            <el-table-column prop="area" label="面积(m²)" min-width="80">
               <template #default="{ row }">{{ row.area ? row.area + ' m²' : '-' }}</template>
             </el-table-column>
-            <el-table-column prop="orientation" label="朝向" width="65" />
-            <el-table-column prop="status" label="状态" width="80">
+            <el-table-column prop="orientation" label="朝向" min-width="60" />
+            <el-table-column prop="status" label="状态" min-width="70">
               <template #default="{ row }">
                 <el-tag :type="statusMap[row.status]?.type || 'info'" size="small">
                   {{ statusMap[row.status]?.label || row.status }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="baseRentAmount" label="标准租金" width="100">
+            <el-table-column prop="baseRentAmount" label="标准租金" min-width="90">
               <template #default="{ row }">¥{{ (row.baseRentAmount || 0).toLocaleString() }}</template>
             </el-table-column>
             <el-table-column label="操作" fixed="right" width="200">
@@ -426,9 +426,18 @@ function resetSearch() {
   pagination.page = 1; fetchUnits()
 }
 
-function handleNodeClick(data) {
+function handleNodeClick(data, node) {
   if (data.children && data.children.length > 0) {
-    search.buildingName = data.id.startsWith('B:') ? data.id.substring(2) : data.id
+    if (data.id.startsWith('B:')) {
+      // 座楼节点：按座楼筛选
+      search.buildingName = data.id.substring(2)
+      search.keyword = ''
+    } else if (data.id.startsWith('F:')) {
+      // 楼层节点：按座楼+楼层名搜索
+      const parent = node?.parent
+      search.buildingName = (parent?.data?.id?.startsWith('B:') ? parent.data.id.substring(2) : '')
+      search.keyword = data.name
+    }
     pagination.page = 1; fetchUnits()
   } else {
     viewDetail({ id: data.id })
@@ -547,6 +556,7 @@ onMounted(async () => {
 <style scoped>
 .header-right { display: flex; align-items: center; gap: 16px; }
 .stat-card { text-align: center; padding: 8px 0; }
-.stat-value { font-size: 32px; font-weight: bold; line-height: 1.2; }
-.stat-label { font-size: 14px; color: #909399; margin-top: 4px; }
+.stat-value { font-size: 26px; font-weight: bold; line-height: 1.3; }
+.stat-label { font-size: 13px; color: #909399; margin-top: 4px; }
+:deep(.el-card__body) { padding: 16px 20px; }
 </style>
