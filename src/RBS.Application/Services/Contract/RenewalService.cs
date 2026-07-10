@@ -211,7 +211,7 @@ public class RenewalService : IRenewalService
         // 找审批级别配置
         var levels = await _uow.ApprovalLevelConfigs.GetAllAsync(ct);
         var typeLevels = levels.Where(l => l.ApprovalTypeId == approvalType.Id).ToList();
-        var maxLevel = typeLevels.Count > 0 ? typeLevels.Max(l => l.Level) : 0;
+        var maxLevel = typeLevels.Count > 0 ? typeLevels.Max(l => l.LevelNo) : 0;
 
         var approvalRequest = new ApprovalRequest(
             approvalType.Id,

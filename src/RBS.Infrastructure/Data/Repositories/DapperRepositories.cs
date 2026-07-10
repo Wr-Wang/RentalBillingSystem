@@ -289,7 +289,7 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
         {
             var items = (await conn.QueryAsync<ApprovalRequest>(
                 _sql.Get("Approval.Select.Request.PendingByTypeLevel"),
-                new { TypeId = (Guid)c.ApprovalTypeId, Level = (int)c.Level })).ToList();
+                new { TypeId = (Guid)c.ApprovalTypeId, Level = (int)c.LevelNo })).ToList();
             results.AddRange(items);
         }
         return results.Distinct().OrderByDescending(a => a.CreatedAt).ToList();

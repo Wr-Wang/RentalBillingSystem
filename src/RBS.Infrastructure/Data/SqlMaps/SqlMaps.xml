@@ -186,7 +186,7 @@
     <![CDATA[SELECT * FROM ApprovalRequests WHERE Status='Pending' AND ApprovalTypeId=@TypeId AND CurrentLevel=@Level ORDER BY CreatedAt DESC]]>
   </select>
   <select id="Approval.Select.LevelConfigs.ByApprovalType">
-    <![CDATA[SELECT DISTINCT ApprovalTypeId, LevelNo AS [Level] FROM ApprovalLevelConfigs WHERE ApproverRoleId IN @Ids]]>
+    <![CDATA[SELECT DISTINCT ApprovalTypeId, LevelNo FROM ApprovalLevelConfigs WHERE ApproverRoleId IN @Ids]]>
   </select>
   <insert id="Approval.Insert.Request.Default">
     <![CDATA[INSERT INTO ApprovalRequests (Id, ApprovalTypeId, Title, Description, TargetEntityId, TargetEntityType,
@@ -385,8 +385,8 @@
        模块：Accounting（会计— Journals）
        ================================================================ -->
   <insert id="Accounting.Insert.JournalEntry.Default">
-    <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
-      VALUES (@Id, @VId, @SId, @Dir, @Amt, @Sum, @CBy, @Now)]]>
+    <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, EntryNo, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
+      VALUES (@Id, @VId, (SELECT ISNULL(MAX(EntryNo), 0) + 1 FROM JournalEntries WHERE VoucherId = @VId), @SId, @Dir, @Amt, @Sum, @CBy, @Now)]]>
   </insert>
 
     <!-- ================================================================
@@ -658,16 +658,16 @@
     <![CDATA[UPDATE ReceivablePlans SET IsBilled=1, DebitNoteId=@DebitNoteId, BilledAt=GETUTCDATE() WHERE ContractId=@ContractId AND IsBilled=0]]>
   </update>
   <insert id="Accounting.Insert.Voucher.BillJob">
-    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Description, Status, SourceEntityId, SourceEntityType, ContractId, CreatedBy, CreatedAt)
-      VALUES (@Id, @No, @Date, @Desc, 'Posted', @SrcId, @Type, @CId, @CBy, GETUTCDATE())]]>
+    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Status, SourceType, SourceId, ContractId, CompanyId, CreatedBy, CreatedAt)
+      VALUES (@Id, @No, @Date, 'Posted', @Type, @SrcId, @CId, (SELECT CompanyId FROM Contracts WHERE Id = @CId), @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Accounting.Insert.Voucher.WithPeriod">
-    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Description, Status, SourceEntityId, SourceEntityType, ContractId, Period, CreatedBy, CreatedAt)
-      VALUES (@Id, @No, @Date, @Desc, 'Posted', @SrcId, @Type, @CId, @Period, @CBy, GETUTCDATE())]]>
+    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Status, SourceType, SourceId, ContractId, CompanyId, CreatedBy, CreatedAt)
+      VALUES (@Id, @No, @Date, 'Posted', @Type, @SrcId, @CId, (SELECT CompanyId FROM Contracts WHERE Id = @CId), @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Accounting.Insert.JournalEntry.Simple">
-    <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
-      VALUES (@Id, @VId, @SId, @Dir, @Amt, @Sum, @CBy, GETUTCDATE())]]>
+    <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, EntryNo, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
+      VALUES (@Id, @VId, (SELECT ISNULL(MAX(EntryNo), 0) + 1 FROM JournalEntries WHERE VoucherId = @VId), @SId, @Dir, @Amt, @Sum, @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Billing.Insert.ReceivablePlan.Default">
     <![CDATA[INSERT INTO ReceivablePlans (Id, ContractId, FeeCodeId, Period, Amount, DueDate, Status, Received, LateFee, IsBilled, EntryType, CreatedBy, CreatedAt)

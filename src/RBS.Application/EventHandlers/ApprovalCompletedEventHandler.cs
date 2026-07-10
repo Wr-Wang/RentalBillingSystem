@@ -87,6 +87,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 break;
 
             case "ContractFeeAdjust":
+            case "ContractFeeChange":
                 await HandleContractFeeAdjustAsync(@event, bizData, ct);
                 break;
 
@@ -556,6 +557,15 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	        using var tx = conn.BeginTransaction();
 	        try
 	        {
+	            // ★ 校验新生效日不与其他 FeeConfig 区间交叉
+	            var overlap = await conn.QuerySingleAsync<int>(
+	                _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+	                new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+	                    EffectiveDate = request.EffectiveDate, ExpiryDate = (string?)null,
+	                    ExcludeId = (Guid?)null }, tx);
+	            if (overlap > 0)
+	                throw new InvalidOperationException("费用配置生效日期与已有记录存在交叉，请调整生效日期");
+
 	            var configId = Guid.NewGuid();
 	            await conn.ExecuteAsync(
 	                _sql.Get("Lease.Insert.ContractFeeConfig.Default"),

@@ -61,7 +61,7 @@ public class ApprovalService : IApprovalService
 
         var levels = await _uow.ApprovalLevelConfigs.GetAllAsync(ct);
         var typeLevels = levels.Where(l => l.ApprovalTypeId == request.ApprovalTypeId).ToList();
-        var maxLevel = typeLevels.Count > 0 ? typeLevels.Max(l => l.Level) : 0;
+        var maxLevel = typeLevels.Count > 0 ? typeLevels.Max(l => l.LevelNo) : 0;
 
         var entity = new ApprovalRequest(
             request.ApprovalTypeId,
@@ -533,10 +533,10 @@ public class ApprovalService : IApprovalService
         string? currentLevelName = null;
         var levels = await _uow.ApprovalLevelConfigs.GetAllAsync(ct);
         var currentLevelConfig = levels.FirstOrDefault(l =>
-            l.ApprovalTypeId == entity.ApprovalTypeId && l.Level == entity.CurrentLevel);
+            l.ApprovalTypeId == entity.ApprovalTypeId && l.LevelNo == entity.CurrentLevel);
         if (currentLevelConfig != null)
         {
-            var role = await _uow.Roles.GetByIdAsync(currentLevelConfig.RoleId, ct);
+            var role = await _uow.Roles.GetByIdAsync(currentLevelConfig.ApproverRoleId, ct);
             if (role != null) currentLevelName = $"{role.Name}审批";
         }
 
@@ -563,33 +563,33 @@ public class ApprovalService : IApprovalService
 
         var allLevelConfigs = levels
             .Where(l => l.ApprovalTypeId == entity.ApprovalTypeId)
-            .OrderBy(l => l.Level).ToList();
+            .OrderBy(l => l.LevelNo).ToList();
 
         foreach (var lc in allLevelConfigs)
         {
-            var role = await _uow.Roles.GetByIdAsync(lc.RoleId, ct);
+            var role = await _uow.Roles.GetByIdAsync(lc.ApproverRoleId, ct);
             var roleName = role?.Name ?? "未知角色";
-            var approvedRecord = entity.Records.FirstOrDefault(r => r.LevelNo == lc.Level && r.Action != "Submitted");
+            var approvedRecord = entity.Records.FirstOrDefault(r => r.LevelNo == lc.LevelNo && r.Action != "Submitted");
 
             string status;
             if (approvedRecord != null)
                 status = approvedRecord.Action == "Rejected" ? "rejected" : "completed";
-            else if (lc.Level == entity.CurrentLevel && entity.Status == "Pending")
+            else if (lc.LevelNo == entity.CurrentLevel && entity.Status == "Pending")
                 status = "current";
-            else if (entity.Status is "Approved" or "Rejected" || lc.Level < entity.CurrentLevel)
+            else if (entity.Status is "Approved" or "Rejected" || lc.LevelNo < entity.CurrentLevel)
                 status = "skipped";
             else
                 status = "pending";
 
             string? expectedNames = null;
-            if (approvedRecord == null && roleUserMap.TryGetValue(lc.RoleId, out var usersWithRole))
+            if (approvedRecord == null && roleUserMap.TryGetValue(lc.ApproverRoleId, out var usersWithRole))
             {
                 expectedNames = string.Join("、", usersWithRole.Select(u => $"{u.Name}({u.Account})"));
             }
 
             levelChain.Add(new ApprovalLevelStatusDto
             {
-                Level = lc.Level,
+                Level = lc.LevelNo,
                 RoleName = roleName,
                 Status = status,
                 ApproverName = approvedRecord != null

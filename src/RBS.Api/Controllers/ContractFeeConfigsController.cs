@@ -63,7 +63,7 @@ public class ContractFeeConfigsController : ControllerBase
                     Title = $"[添加费用] {contract.ContractNo}",
                     Description = $"添加费用 ¥{request.Amount}",
                     TargetEntityId = request.ContractId,
-                    TargetEntityType = "ContractFeeChange"
+                    TargetEntityType = "ContractFeeAdjust"
                 }, ct);
 
                 await _uow.ExecuteSqlRawAsync(
@@ -113,8 +113,20 @@ public class ContractFeeConfigsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFeeConfigRequest request, CancellationToken ct)
     {
-        // Update 仅用于 Draft 合同或非关键字段，Active 合同的变更通过 Adjust 走审批
+        // 查询费控配置对应的合同，检查是否有待审批
         using var conn = _db.CreateConnection(); conn.Open();
+        var config = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            "SELECT ContractId, Amount FROM ContractFeeConfigs WHERE Id=@Id", new { Id = id });
+        if (config == null) return NotFound();
+        var contractId = (Guid)config.ContractId;
+
+        var hasPending = await conn.QuerySingleAsync<int>(
+            _sql.Get("Approval.Select.Request.PendingByContractId"),
+            new { Id = contractId });
+        if (hasPending > 0)
+            return Conflict(new { code = "PENDING_APPROVAL_EXISTS",
+                message = "该合同存在待审批的申请，请处理完成后再修改费用配置" });
+
         await conn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.Default"),
             new { Id = id, request.Amount, request.BillingMode, request.Unit, request.UnitPrice, request.IsActive });
         return NoContent();

@@ -1146,6 +1146,7 @@ CREATE TABLE [ApprovalFeeItems] (
     [NewAmount] DECIMAL(18,2) NOT NULL , -- 新价,
     [BillingMode] VARCHAR(20) NOT NULL , -- 计费方式,
     [Unit] NVARCHAR(20) , -- 计量单位,
+    [EffectiveDate] VARCHAR(10) , -- 生效日期（每条费用独立，yyyy-MM-dd）,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
 )
@@ -1165,6 +1166,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'原价', @
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'新价', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalFeeItems', @level2type = N'COLUMN', @level2name = N'NewAmount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'计费方式', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalFeeItems', @level2type = N'COLUMN', @level2name = N'BillingMode'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'计量单位', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalFeeItems', @level2type = N'COLUMN', @level2name = N'Unit'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'生效日期（每条费用独立，yyyy-MM-dd）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalFeeItems', @level2type = N'COLUMN', @level2name = N'EffectiveDate'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalFeeItems', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalFeeItems', @level2type = N'COLUMN', @level2name = N'CreatedAt'
 GO
@@ -2343,6 +2345,7 @@ CREATE TABLE [SupplementaryFeeRequests] (
     [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态,
     [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
     [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置ID,
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
     [UpdatedAt] DATETIME2 NULL -- 更新时间
@@ -2365,6 +2368,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期间结�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'Status'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审批请求ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'ApprovalRequestId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'CompanyId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'CreatedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'SupplementaryFeeRequests', @level2type = N'COLUMN', @level2name = N'UpdatedAt'

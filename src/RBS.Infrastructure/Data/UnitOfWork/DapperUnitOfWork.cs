@@ -287,7 +287,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         for (int i = 0; i < args.Length; i++)
             dp.Add($"p{i}", args[i]);
 
-        if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open)
+        if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open && _sharedTransaction != null)
         {
             return await _sharedConnection.ExecuteAsync(sql, dp, _sharedTransaction);
         }
@@ -301,7 +301,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     {
         var dp = new DynamicParameters(parameters);
 
-        if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open)
+        if (_sharedConnection != null && _sharedConnection.State == ConnectionState.Open && _sharedTransaction != null)
         {
             return await _sharedConnection.ExecuteAsync(sql, dp, _sharedTransaction);
         }

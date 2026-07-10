@@ -196,10 +196,10 @@ public class NotificationService : INotificationService
 
         var levels = await _uow.ApprovalLevelConfigs.GetAllAsync(ct);
         var config = levels.FirstOrDefault(l =>
-            l.ApprovalTypeId == request.ApprovalTypeId && l.Level == level);
+            l.ApprovalTypeId == request.ApprovalTypeId && l.LevelNo == level);
         if (config == null) return;
 
-        await NotifyRoleByIdAsync(config.RoleId, title, content, "ApprovalRequest",
+        await NotifyRoleByIdAsync(config.ApproverRoleId, title, content, "ApprovalRequest",
             approvalRequestId, request.CompanyId, ct);
     }
 

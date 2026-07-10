@@ -343,14 +343,15 @@ public class ContractsController : ControllerBase
         {
             // 2. 写业务数据（带 ApprovalRequestId）
             var bizDataId = Guid.NewGuid();
-            var effectiveDate = request.EffectiveDate.HasValue
-                ? DateOnly.FromDateTime(request.EffectiveDate.Value)
-                : (DateOnly?)null;
+            // ★ Dapper DynamicParameters 无法从 null DateTime? 推断 DbType → 转为 object
+            object effectiveDateParam = request.EffectiveDate.HasValue
+                ? (object)request.EffectiveDate.Value.Date
+                : DBNull.Value;
 
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Contract.Insert.ApprovalBizData.FeeAdjust"),
                 new { Id = bizDataId, ContractId = id, ContractNo = contract.ContractNo,
-                    CompanyId = contract.CompanyId, EffectiveDate = effectiveDate,
+                    CompanyId = contract.CompanyId, EffectiveDate = effectiveDateParam,
                     Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now,
                     ApprovalRequestId = approvalResult.Id });
 
@@ -362,6 +363,7 @@ public class ContractsController : ControllerBase
                     new { Id = Guid.NewGuid(), ContractId = id, item.FeeCodeId, item.FeeName,
                         OldAmount = item.OldAmount, NewAmount = item.NewAmount,
                         BillingMode = item.BillingMode, Unit = item.Unit,
+                        EffectiveDate = item.EffectiveDate ?? "",
                         CreatedBy = userId, CreatedAt = ChinaTime.Now,
                         ApprovalRequestId = approvalResult.Id });
             }
@@ -440,16 +442,16 @@ public class ContractsController : ControllerBase
         try
         {
             var bizDataId = Guid.NewGuid();
-            var effectiveDate = request.ActualEndDate.HasValue
-                ? DateOnly.FromDateTime(request.ActualEndDate.Value)
-                : (DateOnly?)null;
+            object actualEndDateParam = request.ActualEndDate.HasValue
+                ? (object)request.ActualEndDate.Value.Date
+                : DBNull.Value;
 
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Contract.Insert.ApprovalBizData.Terminate"),
                 new { Id = bizDataId, ContractId = id, ContractNo = entity.ContractNo,
                     CompanyId = entity.CompanyId,
                     TerminateType = request.TerminateType ?? "EARLY",
-                    ActualEndDate = effectiveDate,
+                    ActualEndDate = actualEndDateParam,
                     DepositReturn = request.DepositReturn ?? "FULL",
                     Reason = request.Reason ?? "", CreatedBy = userId, CreatedAt = ChinaTime.Now });
 
@@ -780,6 +782,25 @@ public class ContractsController : ControllerBase
         using var tx = conn.BeginTransaction();
         try
         {
+            // ★ 校验新生效日不与其他 FeeConfig 区间交叉
+            var overlap = await conn.QuerySingleAsync<int>(
+                _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+                new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                    EffectiveDate = request.EffectiveDate, ExpiryDate = (string?)null,
+                    ExcludeId = (Guid?)null }, tx);
+            if (overlap > 0)
+                throw new InvalidOperationException("费用配置生效日期与已有记录存在交叉，请调整生效日期");
+
+            // ★ 创建 ContractFeeConfig（确保后续 BillJob 持续出账）
+            var configId = Guid.NewGuid();
+            await conn.ExecuteAsync(
+                _sql.Get("Lease.Insert.ContractFeeConfig.Default"),
+                new { Id = configId, ContractId = request.ContractId,
+                    FeeCodeId = request.FeeCodeId, BillingMode = request.BillingMode ?? "FixedAmount",
+                    Amount = request.Amount, Unit = (string?)null, UnitPrice = (decimal?)null,
+                    EffectiveDate = request.EffectiveDate,
+                    CreatedBy = request.CreatedBy, Now = ChinaTime.Now }, tx);
+
             var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
                 _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
             var receivableId = subjects.GetValueOrDefault("1122", Guid.Empty);
@@ -805,7 +826,7 @@ public class ContractsController : ControllerBase
                         Amt = item.ProratedAmount, Sum = "补充收费 " + item.Period, CBy = Guid.Empty }, tx);
             }
             await conn.ExecuteAsync(_sql.Get("SupplementaryFee.Update.Request.Complete"),
-                new { Id = requestId, FeeConfigId = request.FeeCodeId }, tx);
+                new { Id = requestId, FeeConfigId = configId }, tx);
             tx.Commit();
         }
         catch { tx.Rollback(); throw; }

@@ -101,12 +101,22 @@ public class JournalGenerationService : IJournalGenerationService
     public async Task GenerateSupplementaryAsync(Guid contractId, Guid feeCodeId,
         decimal newAmount, decimal oldAmount, string effectiveDate, string period, CancellationToken ct)
     {
+        // ★ 先查会计科目（只读字典，不需要事务）
+        Dictionary<string, Guid> subjectMap;
+        using (var subConn = _db.CreateConnection())
+        {
+            subConn.Open();
+            var subjects = await subConn.QueryAsync<(string Code, Guid Id)>(
+                _sql.Get("Accounting.Select.Subject.ByCodes"));
+            subjectMap = subjects.ToDictionary(x => x.Code, x => x.Id);
+        }
+
         using var conn = _db.CreateConnection();
         conn.Open();
         using var tx = conn.BeginTransaction();
         try
         {
-            await GenerateSupplementaryCoreAsync(conn, tx, contractId, feeCodeId, newAmount, oldAmount, effectiveDate, period, ct);
+            await GenerateSupplementaryCoreAsync(conn, tx, subjectMap, contractId, feeCodeId, newAmount, oldAmount, effectiveDate, period, ct);
             tx.Commit();
         }
         catch
@@ -122,17 +132,24 @@ public class JournalGenerationService : IJournalGenerationService
     public async Task GenerateSupplementaryAsync(IDbConnection conn, IDbTransaction tx,
         Guid contractId, Guid feeCodeId, decimal newAmount, decimal oldAmount, string effectiveDate, string period, CancellationToken ct)
     {
-        await GenerateSupplementaryCoreAsync(conn, tx, contractId, feeCodeId, newAmount, oldAmount, effectiveDate, period, ct);
+        // ★ 调用方已加载会计科目，此处不再重复查询
+        var subjectMap = await LoadSubjectMapAsync(conn, tx, ct);
+        await GenerateSupplementaryCoreAsync(conn, tx, subjectMap, contractId, feeCodeId, newAmount, oldAmount, effectiveDate, period, ct);
+    }
+
+    /// <summary>加载会计科目映射</summary>
+    private async Task<Dictionary<string, Guid>> LoadSubjectMapAsync(IDbConnection conn, IDbTransaction? tx, CancellationToken ct)
+    {
+        var subjects = await conn.QueryAsync<(string Code, Guid Id)>(
+            _sql.Get("Accounting.Select.Subject.ByCodes"), transaction: tx);
+        return subjects.ToDictionary(x => x.Code, x => x.Id);
     }
 
     /// <summary>核心逻辑：计算差价并插入 Voucher + JournalEntry（共享连接/事务）</summary>
     private async Task GenerateSupplementaryCoreAsync(IDbConnection conn, IDbTransaction tx,
-        Guid contractId, Guid feeCodeId, decimal newAmount, decimal oldAmount, string effectiveDate, string period, CancellationToken ct)
+        Dictionary<string, Guid> subjectMap, Guid contractId, Guid feeCodeId,
+        decimal newAmount, decimal oldAmount, string effectiveDate, string period, CancellationToken ct)
     {
-        // 查会计科目
-        var subjects = await conn.QueryAsync<(string Code, Guid Id)>(
-            _sql.Get("Accounting.Select.Subject.ByCodes"), tx);
-        var subjectMap = subjects.ToDictionary(x => x.Code, x => x.Id);
         var receivableId = subjectMap.GetValueOrDefault("1122", Guid.Empty);
         var revenueId = subjectMap.GetValueOrDefault("6001", subjectMap.GetValueOrDefault("6051", Guid.Empty));
 

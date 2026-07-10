@@ -522,6 +522,7 @@ DECLARE @AT_ReceiptReverse uniqueidentifier;
 DECLARE @AT_Discount uniqueidentifier;
 DECLARE @AT_ContractModify uniqueidentifier;
 DECLARE @AT_ContractRenew uniqueidentifier;
+DECLARE @AT_ContractFeeChange uniqueidentifier;
 DECLARE @AT_ChangeRequest uniqueidentifier;
 
 IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'BATCH_IMPORT_ROOMS')
@@ -574,6 +575,11 @@ IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_TENANT_CHA
 IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_SUPPLEMENTARY_FEE')
     INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),N'补充收费','CONTRACT_SUPPLEMENTARY_FEE',N'补充追溯收费需要审批',1,@Cid,@SysUserId,@Now);
+
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_FEE_CHANGE')
+    INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'费用调价','CONTRACT_FEE_CHANGE',N'调整合同中的费用单价需要审批',1,@Cid,@SysUserId,@Now);
+SELECT @AT_ContractFeeChange = [Id] FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_FEE_CHANGE';
 
 IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CHANGE_REQUEST')
     INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
@@ -657,6 +663,10 @@ IF @AT_ContractModify IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SEL
 IF @AT_ChangeRequest IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ChangeRequest AND [LevelNo] = 1)
     INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ChangeRequest,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
+
+IF @AT_ContractFeeChange IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractFeeChange AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractFeeChange,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractRenew IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [LevelNo] = 1)
     INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])

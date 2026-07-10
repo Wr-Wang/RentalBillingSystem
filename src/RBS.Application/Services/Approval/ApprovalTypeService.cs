@@ -57,16 +57,16 @@ public class ApprovalTypeService : IApprovalTypeService
     public async Task<List<ApprovalLevelConfigDto>> GetLevelsAsync(Guid typeId, CancellationToken ct = default)
     {
         var all = await _uow.ApprovalLevelConfigs.GetAllAsync(ct);
-        var levels = all.Where(l => l.ApprovalTypeId == typeId).OrderBy(l => l.Level).ToList();
+        var levels = all.Where(l => l.ApprovalTypeId == typeId).OrderBy(l => l.LevelNo).ToList();
         var result = new List<ApprovalLevelConfigDto>();
         foreach (var l in levels)
         {
             var dto = new ApprovalLevelConfigDto
             {
-                Id = l.Id, ApprovalTypeId = l.ApprovalTypeId, Level = l.Level,
-                RoleId = l.RoleId, MinAmount = l.MinAmount, MaxAmount = l.MaxAmount
+                Id = l.Id, ApprovalTypeId = l.ApprovalTypeId, Level = l.LevelNo,
+                RoleId = l.ApproverRoleId, MinAmount = l.MinAmount, MaxAmount = l.MaxAmount
             };
-            var role = await _uow.Roles.GetByIdAsync(l.RoleId, ct);
+            var role = await _uow.Roles.GetByIdAsync(l.ApproverRoleId, ct);
             dto.RoleName = role?.Name;
             result.Add(dto);
         }
@@ -81,8 +81,8 @@ public class ApprovalTypeService : IApprovalTypeService
         await _uow.CommitAsync(ct);
         return new ApprovalLevelConfigDto
         {
-            Id = entity.Id, ApprovalTypeId = entity.ApprovalTypeId, Level = entity.Level,
-            RoleId = entity.RoleId, MinAmount = entity.MinAmount, MaxAmount = entity.MaxAmount
+            Id = entity.Id, ApprovalTypeId = entity.ApprovalTypeId, Level = entity.LevelNo,
+            RoleId = entity.ApproverRoleId, MinAmount = entity.MinAmount, MaxAmount = entity.MaxAmount
         };
     }
 
@@ -90,8 +90,8 @@ public class ApprovalTypeService : IApprovalTypeService
     {
         var entity = await _uow.ApprovalLevelConfigs.GetByIdAsync(id, ct)
             ?? throw new KeyNotFoundException("审批级别不存在");
-        if (request.Level.HasValue) entity.SetLevel(request.Level.Value);
-        if (request.RoleId.HasValue) entity.SetRole(request.RoleId.Value);
+        if (request.Level.HasValue) entity.SetLevelNo(request.Level.Value);
+        if (request.RoleId.HasValue) entity.SetApproverRole(request.RoleId.Value);
         if (request.MinAmount.HasValue || request.MaxAmount.HasValue)
             entity.SetAmountRange(request.MinAmount, request.MaxAmount);
         await _uow.CommitAsync(ct);
