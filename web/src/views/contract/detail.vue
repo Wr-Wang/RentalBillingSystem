@@ -672,6 +672,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { toGuidId } from '@/utils'
 import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, handleApiError } from '@/api/index.js'
 
 const route = useRoute()
@@ -949,11 +950,12 @@ async function fetchFeeConfigs() {
   updateAvailableFeeCodes()
 }
 
-function updateAvailableFeeCodes() {
+async function updateAvailableFeeCodes() {
   if (feeCodeList.value.length === 0) {
-    getFeeCodes({ pageSize: 100 }).then(res => {
+    try {
+      const res = await getFeeCodes({ pageSize: 100 })
       feeCodeList.value = res.items || res.data || res || []
-    }).catch(() => {})
+    } catch { /* 静默 */ }
   }
   const usedIds = new Set(feeConfigs.value.filter(f => f.isActive).map(f => f.feeCodeId))
   availableFeeCodes.value = feeCodeList.value.filter(f => !usedIds.has(f.id) && f.chargeType === 'Recurring')
@@ -1011,6 +1013,7 @@ function openAddFeeConfig() {
   feeConfigForm.feeCodeId = null
   feeConfigForm.amount = 0
   feeConfigForm.effectiveDate = new Date().toISOString().split('T')[0]
+  updateAvailableFeeCodes()
   showFeeConfigDialog.value = true
 }
 
@@ -1122,12 +1125,7 @@ async function toggleFeeConfig(row) {
  * ================================================================ */
 
 
-// 将字符串 ID 转为 GUID 格式（模拟数据使用，已有 GUID 则直接返回）
-function toGuidId(id) {
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return id
-  const hex = Array.from(String(id)).reduce((h, c) => { const n = c.charCodeAt(0).toString(16); return h + (n.length < 2 ? '0' + n : n) }, '').padEnd(32, '0').slice(0, 32)
-  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`
-}
+// toGuidId 从 @/utils 导入，见文件顶部
 
 /* ================================================================
  * Fee Price Adjustment (CONTRACT_FEE_CHANGE — Fixed 1级)

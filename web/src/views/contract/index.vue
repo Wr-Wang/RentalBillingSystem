@@ -192,6 +192,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory, handleApiError } from '@/api/index.js'
 import { useUserStore } from '@/store/user'
+import { toGuidId } from '@/utils'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -376,14 +377,16 @@ async function showModifyFee(row) {
           _isActive: f.isActive,
           _expiryDate: f.expiryDate,
           effectiveDate: minDate ? minDate.toISOString().split('T')[0] : '',
+          _originalEffectiveDate: f.effectiveDate, // 保留原始生效日期，供校验用
           _minDate: minDate
         }
       })
     } else {
       ElMessage.warning('该合同暂无费用配置，请先在合同详情页添加费用项目')
     }
-  } catch {
-    handleApiError(new Error(), '获取费用配置失败')
+  } catch (e) {
+    console.error('[showModifyFee] 获取费用配置失败:', e)
+    handleApiError(e, '获取费用配置失败')
   }
   feeConfigLoading.value = false
 }
@@ -418,8 +421,8 @@ async function submitModifyFee() {
         return
       }
       // 生效日期必须晚于当前配置的生效日期
-      if (currentActive?.effectiveDate && newEff <= new Date(currentActive.effectiveDate)) {
-        ElMessage.error(`「${item.feeName}」的生效日期必须晚于当前配置的生效日期 ${currentActive.effectiveDate}`)
+      if (currentActive?._originalEffectiveDate && newEff <= new Date(currentActive._originalEffectiveDate)) {
+        ElMessage.error(`「${item.feeName}」的生效日期必须晚于当前配置的生效日期 ${currentActive._originalEffectiveDate}`)
         return
       }
     } catch (e) {
