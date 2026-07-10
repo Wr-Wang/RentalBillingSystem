@@ -60,7 +60,17 @@
       </div>
     </header>
     <div class="app-main">
-      <aside class="app-sidebar">
+      <aside class="app-sidebar" :class="{ collapsed: appStore.sidebarCollapsed }">
+        <div class="sidebar-header">
+          <span v-show="!appStore.sidebarCollapsed" class="sidebar-title">功能菜单</span>
+          <el-button
+            class="collapse-btn"
+            :icon="appStore.sidebarCollapsed ? Expand : Fold"
+            text
+            size="small"
+            @click="appStore.toggleSidebar()"
+          />
+        </div>
         <el-menu
           :default-active="activeMenu"
           :collapse="appStore.sidebarCollapsed"
@@ -146,7 +156,7 @@ import { useMenuStore } from '../store/menu'
 import { useNotificationStore } from '../store/notification'
 import router from '../router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Bell } from '@element-plus/icons-vue'
+import { Bell, Fold, Expand } from '@element-plus/icons-vue'
 import { changePassword as apiChangePassword } from '@/api'
 
 const userStore = useUserStore()
@@ -246,6 +256,32 @@ async function changePassword() {
 </script>
 
 <style scoped>
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 48px;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-title {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 1px;
+  padding-left: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.collapse-btn {
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.65) !important;
+  font-size: 18px;
+}
+.collapse-btn:hover {
+  color: #fff !important;
+  background: rgba(255,255,255,0.08) !important;
+}
 .header-right {
   display: flex;
   align-items: center;

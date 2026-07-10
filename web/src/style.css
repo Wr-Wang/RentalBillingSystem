@@ -55,7 +55,12 @@ body {
   width: 240px;
   background: #001529;
   overflow-y: auto;
+  overflow-x: hidden;
   flex-shrink: 0;
+  transition: width 0.25s ease;
+}
+.app-sidebar.collapsed {
+  width: 64px;
 }
 
 .app-sidebar .el-menu {
