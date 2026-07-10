@@ -34,30 +34,30 @@
     <el-card style="margin-bottom: 16px;">
       <template #header>
         <span>当前合同</span>
-        <el-button text type="primary" size="small" style="float: right;" v-if="unit?.status === 'Rented'">查看全部</el-button>
+        <el-button text type="primary" size="small" style="float: right;" v-if="unit?.status === 'Rented'" @click="$router.push('/contracts?keyword=' + encodeURIComponent(unit?.fullCode || ''))">查看全部</el-button>
       </template>
       <el-empty v-if="!loading && contracts.length === 0" description="暂无合同" />
-      <el-table :data="contracts" stripe v-else>
-        <el-table-column prop="contractNo" label="合同号" width="150" />
-        <el-table-column prop="rentAmount" label="月租金" width="120">
-          <template #default="{ row }">¥{{ (row.rentAmount || 0).toLocaleString() }}</template>
+      <el-table :data="contracts" stripe v-else style="width:100%">
+        <el-table-column prop="contractNo" label="合同号" min-width="140" />
+        <el-table-column prop="paymentCycle" label="付款周期" min-width="90">
+          <template #default="{ row }">{{ row.paymentCycle === 'Monthly' ? '月付' : row.paymentCycle === 'Quarterly' ? '季付' : row.paymentCycle === 'Yearly' ? '年付' : row.paymentCycle || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" min-width="80">
           <template #default="{ row }">
-            <el-tag :type="row.statusCode === 'Active' ? 'success' : 'info'" size="small">
-              {{ row.statusCode === 'Active' ? '生效中' : row.statusCode || row.status }}
+            <el-tag :type="row.status === 'Active' ? 'success' : row.status === 'Expired' ? 'danger' : row.status === 'Draft' ? 'info' : 'warning'" size="small">
+              {{ row.status === 'Active' ? '生效中' : row.status === 'Expired' ? '已到期' : row.status === 'Draft' ? '草稿' : row.status === 'Terminated' ? '已终止' : row.status }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="起租日期" width="120">
+        <el-table-column label="起租日期" min-width="100">
           <template #default="{ row }">{{ row.startDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="到期日期" width="120">
+        <el-table-column label="到期日期" min-width="100">
           <template #default="{ row }">{{ row.endDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="100">
+        <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button text size="small" type="primary">查看</el-button>
+            <el-button text size="small" type="primary" @click="$router.push('/contracts/' + row.id)">查看</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -78,7 +78,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getHousingUnit } from '../../api/index'
+import { getHousingUnit, getContracts } from '../../api/index'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,6 +108,13 @@ onMounted(async () => {
   try {
     const r = await getHousingUnit(route.params.id)
     unit.value = r || null
+    // 获取该房源的合同
+    if (r?.id) {
+      const cRes = await getContracts({ roomId: r.id, pageSize: 50, companyId: r.companyId }).catch(() => null)
+      if (cRes?.items) {
+        contracts.value = cRes.items
+      }
+    }
   } catch { unit.value = null }
   loading.value = false
 })

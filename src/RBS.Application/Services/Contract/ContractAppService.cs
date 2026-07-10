@@ -64,7 +64,7 @@ public class ContractAppService : IContractService
         return list;
     }
 
-    public async Task<PagedResult<ContractDto>> GetPagedListAsync(Guid companyId, int page = 1, int pageSize = 10, string? keyword = null, string? status = null, CancellationToken ct = default)
+    public async Task<PagedResult<ContractDto>> GetPagedListAsync(Guid companyId, int page = 1, int pageSize = 10, string? keyword = null, string? status = null, Guid? roomId = null, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var where = new List<string> { "c.CompanyId = @CompanyId" };
@@ -73,9 +73,11 @@ public class ContractAppService : IContractService
 
         var hasKeyword = !string.IsNullOrEmpty(keyword);
         var hasStatus = !string.IsNullOrEmpty(status);
+        var hasRoomId = roomId.HasValue && roomId.Value != Guid.Empty;
 
         if (hasKeyword) { where.Add("(c.ContractNo LIKE @Keyword OR r.FullCode LIKE @Keyword)"); parms.Add("@Keyword", $"%{keyword}%"); }
         if (hasStatus) { where.Add("c.Status = @Status"); parms.Add("@Status", status); }
+        if (hasRoomId) { where.Add("c.RoomId = @RoomId"); parms.Add("@RoomId", roomId!.Value); }
 
         var w = "WHERE " + string.Join(" AND ", where);
         var offset = (page - 1) * pageSize;

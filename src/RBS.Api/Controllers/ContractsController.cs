@@ -61,6 +61,7 @@ public class ContractsController : ControllerBase
         CancellationToken ct,
         [FromQuery] Guid? companyId = null,
         [FromQuery] Guid? tenantId = null,
+        [FromQuery] Guid? roomId = null,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 10,
         [FromQuery] string? keyword = null, [FromQuery] string? status = null)
     {
@@ -71,7 +72,7 @@ public class ContractsController : ControllerBase
         }
 
         if (companyId == null) return Ok(new { items = new List<object>(), total = 0, page = 1, pageSize = 10, totalPages = 0 });
-        var result2 = await _contractService.GetPagedListAsync(companyId.Value, page, pageSize, keyword, status, ct);
+        var result2 = await _contractService.GetPagedListAsync(companyId.Value, page, pageSize, keyword, status, roomId, ct);
         return Ok(result2);
     }
 
