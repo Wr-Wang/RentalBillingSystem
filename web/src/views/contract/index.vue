@@ -124,9 +124,24 @@
     </el-dialog>
 
     <!-- Renew Dialog -->
-    <el-dialog v-model="showRenewDialog" title="合同续签" width="550px">
+    <el-dialog v-model="showRenewDialog" title="合同续签" width="620px">
       <el-alert v-if="renewFromRejected" title="上次续签被驳回，请修改后重新提交" type="warning" show-icon :closable="false" style="margin-bottom: 16px;" />
       <el-alert v-else title="续签将创建新合同，原合同标记为已续签。审批通过后自动执行。" type="success" show-icon :closable="false" style="margin-bottom: 16px;" />
+      <!-- 检查结果提示 -->
+      <div v-if="renewChecks.paymentStatus && !renewChecks.paymentStatus.passed" style="margin-bottom: 12px;">
+        <el-alert :title="`该合同有未结清欠费 ¥${renewChecks.paymentStatus.outstandingAmount?.toLocaleString()}，请先处理`" type="error" show-icon :closable="false" />
+      </div>
+      <div v-if="renewChecks.concurrentApprovals?.hasPending" style="margin-bottom: 12px;">
+        <el-alert :title="renewChecks.concurrentApprovals.blockedMessage || '该合同存在待审批的申请，请处理完成后再提交续签'" type="warning" show-icon :closable="false" />
+      </div>
+      <div v-if="renewChecks.concurrentApprovals?.alreadyRenewed" style="margin-bottom: 12px;">
+        <el-alert title="该合同已被续签，不可再次续签" type="warning" show-icon :closable="false" />
+      </div>
+      <!-- 市场参考价 -->
+      <div v-if="renewChecks.marketPrice" style="margin-bottom: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-size: 13px; color: #606266;">
+        同户型市场参考价：¥{{ renewChecks.marketPrice.minPrice?.toLocaleString() }} ~ ¥{{ renewChecks.marketPrice.maxPrice?.toLocaleString() }}
+        （均价 ¥{{ renewChecks.marketPrice.averagePrice?.toLocaleString() }}）
+      </div>
       <el-descriptions :column="2" border style="margin-bottom: 16px;">
         <el-descriptions-item label="原合同号">{{ renewTarget?.contractNo }}</el-descriptions-item>
         <el-descriptions-item label="原到期日">{{ renewTarget?.endDate }}</el-descriptions-item>
@@ -135,9 +150,9 @@
         <el-form-item label="新合同月租">
           <el-input-number v-model="renewForm.rentAmount" :min="0" :precision="2" style="width: 200px;" />
         </el-form-item>
-        <el-form-item label="新到期日期">
-          <el-date-picker v-model="renewForm.endDate" type="date" value-format="YYYY-MM-DD" />
-          <span style="margin-left: 8px; color: #909399; font-size: 12px;">起租日自动续接</span>
+        <el-form-item label="新到期日期" :required="true">
+          <el-date-picker v-model="renewForm.endDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择到期日期" />
+          <span style="margin-left: 8px; color: #909399; font-size: 12px;">起租日自动续接，到期日须晚于起租日</span>
         </el-form-item>
         <el-form-item label="押金处理">
           <el-radio-group v-model="renewForm.depositHandling">
@@ -165,7 +180,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showRenewDialog = false; renewFromRejected = false">取消</el-button>
-        <el-button type="primary" @click="submitRenew">提交续签审批</el-button>
+        <el-button type="primary" :disabled="!canSubmitRenewal" @click="submitRenew">提交续签审批</el-button>
       </template>
     </el-dialog>
   </div>
@@ -258,6 +273,13 @@ const renewFromRejected = ref(false)
 const renewTarget = ref(null)
 const renewForm = reactive({ rentAmount: 0, endDate: '', depositHandling: 'TRANSFER', newDeposit: 0, remark: '' })
 const renewChecks = ref({})
+const canSubmitRenewal = computed(() => {
+  const checks = renewChecks.value
+  return checks.paymentStatus?.passed !== false
+    && !checks.concurrentApprovals?.hasPending
+    && !checks.concurrentApprovals?.alreadyRenewed
+})
+
 
 // === Event Handlers ===
 function handleSearch() { pagination.page = 1; fetchContracts() }
@@ -462,23 +484,10 @@ async function handleRenew(row) {
   try {
     const preview = await previewRenewal(row.id)
     renewChecks.value = preview.checks || {}
-    if (!renewChecks.value.paymentStatus?.passed) {
-      ElMessage.warning(`该合同有未结清欠费 ¥${renewChecks.value.paymentStatus.outstandingAmount?.toLocaleString()}，请先处理`)
-      return
-    }
-    if (renewChecks.value.concurrentApprovals?.hasPending) {
-      ElMessage.warning(renewChecks.value.concurrentApprovals.blockedMessage || '该合同存在待审批的申请')
-      return
-    }
-    if (renewChecks.value.concurrentApprovals?.alreadyRenewed) {
-      ElMessage.warning(`该合同已被续签（新合同号：${renewChecks.value.concurrentApprovals.renewedContractNo}），不可再次续签`)
-      return
-    }
-    // 使用后端建议的默认日期（消除 JS 时区计算偏差）
-    const suggested = preview.defaultRenewalInfo
-    if (suggested?.suggestedEndDate) {
-      renewForm.endDate = suggested.suggestedEndDate
-    }
+    // 预填租金
+    renewForm.rentAmount = preview.defaultRenewalInfo?.currentRentAmount || 0
+    // 到期日期由用户手动填写，不设默认值
+    renewForm.endDate = ''
     showRenewDialog.value = true
   } catch (e) {
     // Fallback: allow dialog open even if preview fails
@@ -491,8 +500,24 @@ async function submitRenew() {
     ElMessage.warning('请填写完整的续签信息')
     return
   }
+  // 校验到期日必须晚于起租日
+  const startDate = renewTarget.value?.endDate ? new Date(renewTarget.value.endDate).getTime() + 86400000 : 0
+  if (startDate && new Date(renewForm.endDate).getTime() <= startDate) {
+    ElMessage.warning('到期日期必须晚于起租日期（' + (renewTarget.value?.endDate ? new Date(renewTarget.value.endDate).toLocaleDateString('zh-CN') + ' 次日' : '') + '）')
+    return
+  }
+  if (!canSubmitRenewal.value) {
+    ElMessage.warning('存在待审批流或欠费，无法提交')
+    return
+  }
+  const contractId = renewTarget.value?.id
+  console.log('[submitRenew] contractId:', contractId)
+  if (!contractId) {
+    ElMessage.warning('合同 ID 无效，请重新选择')
+    return
+  }
   try {
-    const result = await submitRenewal(toGuidId(renewTarget.value?.id), {
+    const result = await submitRenewal(contractId, {
       newRentAmount: renewForm.rentAmount,
       newEndDate: renewForm.endDate,
       depositHandling: renewForm.depositHandling,
@@ -503,7 +528,8 @@ async function submitRenew() {
     showRenewDialog.value = false
     fetchContracts()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.error || e?.response?.data?.message || '续签提交失败')
+    //console.error('[submitRenew] error:', e?.response?.status, e?.response?.data, e)
+    handleApiError(e, '续签提交失败')
   }
 }
 </script>

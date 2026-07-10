@@ -465,9 +465,9 @@
           <el-form-item label="新月租金 (元)">
             <el-input-number v-model="renewForm.rentAmount" :min="0" :precision="2" style="width: 200px;" />
           </el-form-item>
-          <el-form-item label="新到期日期">
-            <el-date-picker v-model="renewForm.endDate" type="date" value-format="YYYY-MM-DD" style="width: 200px;" />
-            <span style="margin-left:8px;color:#909399;font-size:12px;">起租日自动延续：{{ contract.endDate }} 次日</span>
+          <el-form-item label="新到期日期" :required="true">
+            <el-date-picker v-model="renewForm.endDate" type="date" value-format="YYYY-MM-DD" style="width: 200px;" placeholder="请选择到期日期" />
+            <span style="margin-left:8px;color:#909399;font-size:12px;">起租日自动延续为 {{ contract.endDate }} 次日，到期日须晚于起租日</span>
           </el-form-item>
           <el-form-item label="押金处理">
             <el-radio-group v-model="renewForm.depositHandling">
@@ -1352,7 +1352,7 @@ async function openRenewDialog() {
     renewPreview.value = preview
     renewChecks.value = preview.checks || {}
     renewForm.rentAmount = preview.defaultRenewalInfo?.currentRentAmount || 0
-    renewForm.endDate = preview.defaultRenewalInfo?.suggestedEndDate || ''
+    renewForm.endDate = ''
     renewForm.depositHandling = 'TRANSFER'
     renewForm.newDeposit = 20
   } catch (e) {
@@ -1372,6 +1372,12 @@ const canSubmitRenewal = computed(() => {
 async function submitRenew() {
   if (!renewForm.rentAmount || !renewForm.endDate) {
     ElMessage.warning('请填写完整的续签信息')
+    return
+  }
+  // 校验到期日必须晚于起租日
+  const startDate = contract.value.endDate ? new Date(contract.value.endDate).getTime() + 86400000 : 0
+  if (startDate && new Date(renewForm.endDate).getTime() <= startDate) {
+    ElMessage.warning('到期日期必须晚于起租日期（' + (contract.value.endDate ? new Date(contract.value.endDate).toLocaleDateString('zh-CN') + ' 次日' : '') + '）')
     return
   }
   if (!canSubmitRenewal.value) {

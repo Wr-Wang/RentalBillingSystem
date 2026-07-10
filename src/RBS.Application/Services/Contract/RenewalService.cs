@@ -171,11 +171,17 @@ public class RenewalService : IRenewalService
         if (request.DepositHandling == "NEW" && (!request.NewDepositAmount.HasValue || request.NewDepositAmount.Value <= 0))
             throw new InvalidOperationException("重新收取押金时，新押金金额必须大于 0");
 
-        // 5. 生成新合同号：剥离已有 -R{n} 后缀，基于原始号 + 续签次数
+        // 5. 校验日期逻辑：新合同起租日 = 原合同到期次日，到期日必须晚于起租日
+        var newStartDate = oldContract.EndDate.AddDays(1);
+        var parsedNewEndDate = DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture));
+        if (parsedNewEndDate <= newStartDate)
+            throw new InvalidOperationException($"新合同到期日期必须晚于起租日期（{newStartDate:yyyy-MM-dd}），当前到期日 {parsedNewEndDate:yyyy-MM-dd} 无效");
+
+        // 6. 生成新合同号：剥离已有 -R{n} 后缀，基于原始号 + 续签次数
         var baseNo = oldContract.ContractNo.Split("-R").First();
         var newContractNo = $"{baseNo}-R{oldContract.RenewalCount + 1}";
 
-        // 5. 创建 RenewalRequest
+        // 7. 创建 RenewalRequest
         using var rentConn = _db.CreateConnection(); rentConn.Open();
         var oldRentAmount = await rentConn.QuerySingleOrDefaultAsync<decimal>(
             _sql.Get("Contract.Select.FeeConfig.AmountByCode"),
@@ -186,7 +192,7 @@ public class RenewalService : IRenewalService
 
         var renewal = new RenewalRequest(
             oldContract.Id, newContractNo, oldRentAmount,
-            request.NewRentAmount, DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture)), oldContract.CompanyId);
+            request.NewRentAmount, parsedNewEndDate, oldContract.CompanyId);
 
         renewal.SetDepositInfo(
             request.DepositHandling, oldDepositAmount, request.NewDepositAmount);
@@ -327,6 +333,10 @@ public class RenewalService : IRenewalService
                 : (renewal.NewDepositAmount ?? renewal.OldDepositAmount);
 
             var startDate = oldContract.EndDate.AddDays(1);
+
+            // 安全校验：到期日必须晚于起租日
+            if (renewal.NewEndDate <= startDate)
+                throw new InvalidOperationException($"续签执行失败：新合同到期日 {renewal.NewEndDate:yyyy-MM-dd} 必须晚于起租日 {startDate:yyyy-MM-dd}");
 
             await conn.ExecuteAsync(
                 _sql.Get("Lease.Insert.Contract.FromRenewal"),
