@@ -23,32 +23,32 @@
       <el-button @click="resetSearch">重置</el-button>
     </div>
 
-    <el-table :data="contractList" v-loading="loading" stripe style="flex:1;width:100%;" height="100%" max-height="100%">
+    <el-table :data="contractList" v-loading="loading" stripe style="flex:1;width:100%;" height="100%" max-height="100%" border>
       <el-table-column type="index" label="#" width="50" />
-      <el-table-column prop="contractNo" label="合同号" width="150" />
-      <el-table-column prop="roomName" label="房屋" width="100" />
-      <el-table-column prop="tenantName" label="租客" width="100" />
-      <el-table-column prop="startDate" label="起租" width="95" />
-      <el-table-column prop="endDate" label="到期" width="95" />
-      <el-table-column prop="status" label="状态" width="95">
+      <el-table-column prop="contractNo" label="合同号" min-width="140" />
+      <el-table-column prop="roomName" label="房屋" min-width="90" />
+      <el-table-column prop="tenantName" label="租客" min-width="90" />
+      <el-table-column prop="startDate" label="起租" min-width="90" />
+      <el-table-column prop="endDate" label="到期" min-width="90" />
+      <el-table-column prop="status" label="状态" min-width="80">
         <template #default="{ row }">
           <el-tag :type="statusTypeMap[row.status] || 'info'" size="small">{{ statusLabelMap[row.status] || row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="自动续签" width="80" align="center">
+      <el-table-column label="自动续签" min-width="70" align="center">
         <template #default="{ row }">
           <el-tag :type="row.autoRenew ? 'success' : 'info'" size="small" effect="plain">{{ row.autoRenew ? '开' : '关' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="270" fixed="right">
         <template #default="{ row }">
-          <div style="display: flex; gap: 2px; flex-wrap: wrap;">
-            <el-button text size="small" type="primary" @click="$router.push('/contracts/' + row.id)">详情</el-button>
-            <el-button v-if="row.status === 'Active' || row.status === 'Suspended'" text size="small" type="warning" @click="showModifyFee(row)">调价</el-button>
-            <el-button v-if="(row.status === 'Active' || row.status === 'Expired') && !row.hasRenewalContract" text size="small" type="primary" @click="handleRenew(row)">续签</el-button>
-            <el-button v-if="row.status === 'Active'" text size="small" type="danger" @click="handleTerminate(row)">终止</el-button>
-            <el-button v-if="row.status === 'Active'" text size="small" type="warning" @click="handleSuspend(row)">暂停</el-button>
-            <el-button v-if="row.status === 'Suspended'" text size="small" type="success" @click="handleResume(row)">恢复</el-button>
+          <div style="display: flex; gap: 0; flex-wrap: nowrap; white-space: nowrap;">
+            <el-button text size="small" type="primary" @click="$router.push('/contracts/' + row.id)" style="padding:4px 6px;">详情</el-button>
+            <el-button v-if="row.status === 'Active' || row.status === 'Suspended'" text size="small" type="warning" @click="showModifyFee(row)" style="padding:4px 6px;">调价</el-button>
+            <el-button v-if="(row.status === 'Active' || row.status === 'Expired') && !row.hasRenewalContract" text size="small" type="primary" @click="handleRenew(row)" style="padding:4px 6px;">续签</el-button>
+            <el-button v-if="row.status === 'Active'" text size="small" type="danger" @click="handleTerminate(row)" style="padding:4px 6px;">终止</el-button>
+            <el-button v-if="row.status === 'Active'" text size="small" type="warning" @click="handleSuspend(row)" style="padding:4px 6px;">暂停</el-button>
+            <el-button v-if="row.status === 'Suspended'" text size="small" type="success" @click="handleResume(row)" style="padding:4px 6px;">恢复</el-button>
           </div>
         </template>
       </el-table-column>
