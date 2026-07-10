@@ -263,6 +263,7 @@ async function changePassword() {
   height: 48px;
   padding: 0 8px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
+  transition: height 0.25s ease, padding 0.25s ease;
 }
 .sidebar-title {
   flex: 1;
