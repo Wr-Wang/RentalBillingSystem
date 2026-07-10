@@ -51,6 +51,30 @@ public class ReceivablesController : ControllerBase
         return Ok(entity);
     }
 
+    [HttpGet("byfee")]
+    public async Task<IActionResult> GetByContractAndFee([FromQuery] Guid contractId, [FromQuery] Guid feeCodeId, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var rows = await conn.QueryAsync(
+            _sql.Get("Receivable.Select.Plan.ByContractAndFee"),
+            new { ContractId = contractId, FeeCodeId = feeCodeId });
+        // ★ DapperRow 序列化为 JSON 时键名为 PascalCase（字典不受 CamelCase 策略影响）
+        //    需映射为匿名对象以确保前端接收到 camelCase 属性名
+        var plans = rows.Select(r => new
+        {
+            id = (Guid)r.Id,
+            period = (string)r.Period,
+            amount = (decimal)r.Amount,
+            dueDate = r.DueDate is DateOnly dd ? dd.ToString("yyyy-MM-dd") : ((DateTime)r.DueDate).ToString("yyyy-MM-dd"),
+            status = (string)r.Status,
+            received = (decimal)r.Received,
+            lateFee = (decimal)r.LateFee,
+            isBilled = (bool)r.IsBilled
+        }).ToList();
+        return Ok(plans);
+    }
+
     [HttpPost("preview")]
     public async Task<IActionResult> Preview([FromBody] GenerateReceivablesRequest request, CancellationToken ct)
     {

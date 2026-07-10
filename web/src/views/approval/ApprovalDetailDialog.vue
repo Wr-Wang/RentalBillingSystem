@@ -304,38 +304,10 @@
                   </div>
                 </el-card>
 
-                <!-- ===== 3. [终止专用] 终止详情卡片 ===== -->
-                <el-card v-if="bizDetail.bizType === 'TERMINATE'"
-                  shadow="never" class="section-card" style="margin-top: 14px;">
-                  <template #header>
-                    <span style="font-weight: 600;">终止详情</span>
-                  </template>
-                  <el-descriptions :column="2" border size="small">
-                    <el-descriptions-item label="终止类型">
-                      <el-tag
-                        :type="getFieldValue('终止类型') === '提前解约' ? 'danger' : 'info'"
-                        size="small">
-                        {{ getFieldValue('终止类型') }}
-                      </el-tag>
-                    </el-descriptions-item>
-                    <el-descriptions-item label="实际搬离日">
-                      <span style="font-weight: 500;">{{ getFieldValue('实际搬离日') }}</span>
-                    </el-descriptions-item>
-                    <el-descriptions-item label="押金处理">
-                      <el-tag
-                        :type="getFieldValue('押金处理') === '全额退还' ? 'success' : getFieldValue('押金处理') === '扣款后退还' ? 'warning' : 'info'"
-                        size="small">
-                        {{ getFieldValue('押金处理') }}
-                      </el-tag>
-                    </el-descriptions-item>
-                    <el-descriptions-item label="终止原因" :span="2">
-                      {{ getFieldValue('终止原因') }}
-                    </el-descriptions-item>
-                  </el-descriptions>
-                </el-card>
+                <!-- ===== 3. [终止专用] 终止详情已合并至变更摘要，无需重复展示 ===== -->
 
                 <!-- ===== 4. 无业务字段时的兜底提示 ===== -->
-                <el-empty v-if="!bizDetail.fields?.length && !bizDetail.feeItems?.length && bizDetail.bizType !== 'TERMINATE'"
+                <el-empty v-if="!bizDetail.fields?.length && !bizDetail.feeItems?.length"
                   description="暂无结构化业务数据" :image-size="60" />
               </template>
               <el-empty v-else-if="!bizLoading" description="暂无结构化业务数据" :image-size="60" />
@@ -647,14 +619,6 @@ async function loadImportBatch(batchId) {
     importBatch.value = null
   }
   loadingBatch.value = false
-}
-
-// —— Helpers ——
-// ★ v3: 按 label 查找审批业务字段值
-function getFieldValue(label) {
-  if (!bizDetail.value?.fields) return '-'
-  const field = bizDetail.value.fields.find(f => f.label === label)
-  return field?.newValue || field?.oldValue || '-'
 }
 
 function formatTime(t) {

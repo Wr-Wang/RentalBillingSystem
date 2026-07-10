@@ -14,6 +14,7 @@ public class DbConnectionFactory : IDbConnectionFactory
         static DbConnectionFactory()
         {
             SqlMapper.AddTypeHandler(new DapperDateOnlyHandler());
+            SqlMapper.AddTypeHandler(new DapperNullableDateOnlyHandler());
             SqlMapper.AddTypeHandler(new DapperRoomStatusHandler());
         }
 

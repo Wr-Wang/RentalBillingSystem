@@ -55,16 +55,30 @@ public class ContractFeeConfigsController : ControllerBase
             var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_FEE_CHANGE", ct);
             if (approvalType != null)
             {
-                // 走审批流：存 ApprovalFeeItems
                 var userId = _currentUser.UserId;
-                var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+
+                // 查 FeeCode 获取真实名称和 ChargeType
+                var feeCode = await _uow.FeeCodes.GetByIdAsync(request.FeeCodeId, ct);
+                var feeName = feeCode?.Name ?? "";
+                var chargeType = request.ChargeType ?? feeCode?.ChargeType ?? "Recurring";
+                var chargeTypeLabel = chargeType == "OneTime" ? "一次性" : "周期性";
+
+                ApprovalRequestDto approvalResult;
+                try
                 {
-                    ApprovalTypeId = approvalType.Id,
-                    Title = $"[添加费用] {contract.ContractNo}",
-                    Description = $"添加费用 ¥{request.Amount}",
-                    TargetEntityId = request.ContractId,
-                    TargetEntityType = "ContractFeeAdjust"
-                }, ct);
+                    approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+                    {
+                        ApprovalTypeId = approvalType.Id,
+                        Title = $"[添加{chargeTypeLabel}费用] {contract.ContractNo}",
+                        Description = $"添加 {feeName} ¥{request.Amount}",
+                        TargetEntityId = request.ContractId,
+                        TargetEntityType = "ContractFeeAdd"
+                    }, ct);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Conflict(new { code = "PENDING_APPROVAL_EXISTS", message = ex.Message });
+                }
 
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Contract.Insert.ApprovalFeeItem.ForFeeAdjust"),
@@ -72,10 +86,30 @@ public class ContractFeeConfigsController : ControllerBase
                     {
                         Id = Guid.NewGuid(), ApprovalRequestId = approvalResult.Id,
                         ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
-                        FeeName = "", OldAmount = 0m, NewAmount = request.Amount,
+                        FeeName = feeName, OldAmount = 0m, NewAmount = request.Amount,
                         BillingMode = request.BillingMode ?? "FixedAmount",
                         Unit = request.Unit, EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                         CreatedBy = userId, CreatedAt = ChinaTime.Now
+                    }, ct);
+
+                // 插入 ApprovalBizData（修复阻断 Bug）
+                var bizDataId = Guid.NewGuid();
+                object effectiveDateParam = request.EffectiveDate != null
+                    ? (object)DateTime.Parse(request.EffectiveDate)
+                    : DBNull.Value;
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Contract.Insert.ApprovalBizData.FeeAdjust"),
+                    new
+                    {
+                        Id = bizDataId,
+                        ApprovalRequestId = approvalResult.Id,
+                        ContractId = request.ContractId,
+                        ContractNo = contract.ContractNo,
+                        CompanyId = contract.CompanyId,
+                        EffectiveDate = effectiveDateParam,
+                        Reason = $"添加{chargeTypeLabel}费用：{feeName}",
+                        CreatedBy = userId,
+                        CreatedAt = ChinaTime.Now
                     }, ct);
 
                 await _uow.ExecuteSqlRawAsync(
@@ -244,6 +278,8 @@ public class CreateFeeConfigRequest
     public string? Unit { get; set; }
     public decimal? UnitPrice { get; set; }
     public string? EffectiveDate { get; set; }
+    /// <summary>收费类型：Recurring / OneTime，不传则由 FeeCode 决定</summary>
+    public string? ChargeType { get; set; }
 }
 
 public class UpdateFeeConfigRequest

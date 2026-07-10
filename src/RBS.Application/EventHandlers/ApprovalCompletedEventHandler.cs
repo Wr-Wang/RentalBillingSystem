@@ -91,6 +91,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 await HandleContractFeeAdjustAsync(@event, bizData, ct);
                 break;
 
+            case "ContractFeeAdd":
+                await HandleContractFeeAddAsync(@event, ct);
+                break;
+
             case "ContractTerminate":
                 await HandleContractTerminateAsync(@event, bizData, ct);
                 break;
@@ -265,6 +269,103 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     item.ContractId, item.FeeCodeId, item.NewAmount, item.OldAmount,
                     effDate, effMonth, ct);
             }
+        }
+    }
+
+    // ===== 费用添加（独立于调价，新增费用不涉及到期旧配置、补差 JE） =====
+    private async Task HandleContractFeeAddAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+    {
+        if (@event.Action != "Approved") return;
+
+        var feeItems = await _uow.ApprovalFeeItems.GetByApprovalRequestIdAsync(@event.ApprovalRequestId, ct);
+        if (feeItems.Count == 0) return;
+
+        var bizData = await _uow.ApprovalBizData.GetByApprovalRequestIdAsync(@event.ApprovalRequestId, ct);
+        if (bizData != null && bizData.IsProcessed) return;
+
+        // 事务外收集：审批后需要生成 JE 的一次性费用项（等 FeeConfig 落库后执行）
+        var oneTimeJobs = new List<(Guid ContractId, Guid ConfigId)>();
+
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            foreach (var item in feeItems)
+            {
+                // 查 FeeCode 的 ChargeType
+                var feeCode = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                    _sql.Get("FeeCode.Select.FeeCode.ChargeTypeById"),
+                    new { Id = item.FeeCodeId }, tx);
+                var chargeType = (string)(feeCode?.ChargeType ?? "Recurring");
+
+                // 插入新 ContractFeeConfig（使用 Default 保留 Unit/UnitPrice）
+                var configId = Guid.NewGuid();
+                await conn.ExecuteAsync(
+                    _sql.Get("Lease.Insert.ContractFeeConfig.Default"),
+                    new
+                    {
+                        Id = configId,
+                        ContractId = item.ContractId,
+                        FeeCodeId = item.FeeCodeId,
+                        BillingMode = item.BillingMode,
+                        Amount = item.NewAmount,
+                        Unit = item.Unit,
+                        UnitPrice = (decimal?)null,
+                        EffectiveDate = item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                        CreatedBy = Guid.Empty,
+                        Now = ChinaTime.Now
+                    }, tx);
+
+                if (chargeType == "OneTime")
+                {
+                    // 暂记，等 Commit 后再生成 JE（避免独立连接被事务锁阻塞 → 超时）
+                    oneTimeJobs.Add((item.ContractId, configId));
+
+                    // 插入 ReceivablePlan（一次性费用应收计划，用于收账追踪）
+                    var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
+                    await conn.ExecuteAsync(
+                        _sql.Get("Billing.Insert.ReceivablePlan.Default"),
+                        new
+                        {
+                            Id = Guid.NewGuid(),
+                            CId = item.ContractId,
+                            FId = item.FeeCodeId,
+                            P = period,
+                            Amt = item.NewAmount,
+                            Due = DateOnly.FromDateTime(ChinaTime.Now),
+                            CBy = Guid.Empty
+                        }, tx);
+                }
+
+                // 写入变更历史（审计追踪）
+                var effDate = item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd");
+                await InsertChangeHistoryAsync(conn, tx, item.ContractId, "FEE_ADD",
+                    "添加费用",
+                    $"添加 {item.FeeName} ¥{item.NewAmount:F2}，生效 {effDate}",
+                    null, item.NewAmount, effDate, Guid.Empty);
+            }
+
+            // 幂等标记
+            if (bizData != null)
+            {
+                await conn.ExecuteAsync(
+                    _sql.Get("Approval.Update.ApprovalBizData.MarkProcessed"),
+                    new { Id = bizData.Id }, tx);
+            }
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+
+        // ★ Commit 后再生成 OneTime JE（FeeConfig 已落库，独立连接可正常读取）
+        //    仿 HandleContractFeeAdjustAsync 对 GenerateSupplementaryAsync 的处理模式
+        foreach (var (contractId, configId) in oneTimeJobs)
+        {
+            await _journalGen.GenerateOneTimeAsync(contractId, configId, ct);
         }
     }
 

@@ -108,19 +108,34 @@
           <el-table :data="oneTimeConfigs" stripe style="width:100%;" @expand-change="onOneTimeExpand">
             <el-table-column type="expand" width="30">
               <template #default="{ row }">
-                <!-- DEPOSIT 行展开后显示押金流水 -->
-                <div v-if="row.feeCode === 'DEPOSIT'">
-                  <el-table :data="row._depositLogs || []" size="small" stripe v-loading="row._loadingLogs" style="margin:8px 0;">
-                    <el-table-column label="日期" width="100"><template #default="{ row: h }">{{ h.date || '-' }}</template></el-table-column>
+                <!-- 一次性费用展开明细 -->
+                <template v-if="row.feeCode === 'DEPOSIT'">
+                  <!-- DEPOSIT 显示押金流水 -->
+                  <el-table v-if="getExpandState(row).depositLogs.length" :data="getExpandState(row).depositLogs" size="small" stripe v-loading="getExpandState(row).loadingLogs" style="margin:8px 0;width:100%;">
+                    <el-table-column label="日期" min-width="90"><template #default="{ row: h }">{{ h.date || '-' }}</template></el-table-column>
                     <el-table-column label="操作" width="80"><template #default="{ row: h }"><el-tag :type="h.action === '收取' ? 'success' : h.action === '退还' ? 'danger' : 'warning'" size="small">{{ h.action }}</el-tag></template></el-table-column>
-                    <el-table-column label="金额" width="100"><template #default="{ row: h }"><span :style="{ color: h.amount > 0 && h.action === '收取' ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }">{{ h.amount > 0 ? '+' : '' }}¥{{ h.amount?.toLocaleString() }}</span></template></el-table-column>
-                    <el-table-column label="余额" width="100"><template #default="{ row: h }">¥{{ h.balance?.toLocaleString() }}</template></el-table-column>
-                    <el-table-column label="备注" min-width="150"><template #default="{ row: h }">{{ h.remark || '-' }}</template></el-table-column>
+                    <el-table-column label="金额" min-width="90"><template #default="{ row: h }"><span :style="{ color: h.amount > 0 && h.action === '收取' ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }">{{ h.amount > 0 ? '+' : '' }}¥{{ h.amount?.toLocaleString() }}</span></template></el-table-column>
+                    <el-table-column label="余额" min-width="90"><template #default="{ row: h }">¥{{ h.balance?.toLocaleString() }}</template></el-table-column>
+                    <el-table-column label="备注" min-width="120"><template #default="{ row: h }">{{ h.remark || '-' }}</template></el-table-column>
                   </el-table>
-                  <span v-if="!row._depositLogs?.length && !row._loadingLogs" style="color:#909399;font-size:13px;padding:8px;">暂无押金流水记录</span>
-                </div>
-                <!-- 其他 OneTime 费用展开显示空状态 -->
-                <div v-else style="padding:8px;color:#909399;font-size:13px;">暂无明细记录</div>
+                  <span v-if="!getExpandState(row).depositLogs.length && !getExpandState(row).loadingLogs" style="color:#909399;font-size:13px;padding:8px;display:block;">暂无押金流水记录</span>
+                </template>
+                <template v-else>
+                  <!-- 其他一次性费用显示应收计划 -->
+                  <el-table :data="getExpandState(row).receivablePlans" size="small" stripe v-loading="getExpandState(row).loadingPlans" style="margin:8px 0;width:100%;">
+                    <el-table-column label="账期" min-width="80"><template #default="{ row: p }">{{ p.period }}</template></el-table-column>
+                    <el-table-column label="金额" min-width="90"><template #default="{ row: p }">¥{{ p.amount.toLocaleString() }}</template></el-table-column>
+                    <el-table-column label="已收" min-width="90"><template #default="{ row: p }">¥{{ p.received.toLocaleString() }}</template></el-table-column>
+                    <el-table-column label="待收" min-width="90"><template #default="{ row: p }"><span :style="{ color: p.balance > 0 ? '#f56c6c' : '#67c23a', fontWeight: 'bold' }">¥{{ p.balance.toLocaleString() }}</span></template></el-table-column>
+                    <el-table-column label="到期日" min-width="90"><template #default="{ row: p }">{{ p.dueDate }}</template></el-table-column>
+                    <el-table-column label="状态" width="80">
+                      <template #default="{ row: p }">
+                        <el-tag :type="p.status === 'Paid' ? 'success' : p.status === 'Overdue' ? 'danger' : p.status === 'Pending' ? 'warning' : 'info'" size="small">{{ p.statusLabel }}</el-tag>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <span v-if="!getExpandState(row).receivablePlans.length && !getExpandState(row).loadingPlans" style="color:#909399;font-size:13px;padding:8px;display:block;">暂无应收记录</span>
+                </template>
               </template>
             </el-table-column>
             <el-table-column label="收费项目" min-width="120">
@@ -337,14 +352,15 @@
 
     <!--===============================================================-->
     <!-- MODAL: Add Fee Config                                          -->
-    <el-dialog v-model="showFeeConfigDialog" title="添加费用配置" width="480px">
+    <el-dialog v-model="showFeeConfigDialog" :title="addFeeDialogMode === 'OneTime' ? '添加收费' : '添加费用配置'" width="480px">
       <el-form :model="feeConfigForm" label-width="100px">
         <el-form-item label="收费项目">
           <el-select v-model="feeConfigForm.feeCodeId" placeholder="选择收费项目" style="width:100%">
             <el-option v-for="fc in availableFeeCodes" :key="fc.id" :label="fc.name" :value="fc.id" />
           </el-select>
+          <span style="margin-left:8px;color:#909399;font-size:12px;">仅显示{{ addFeeDialogMode === 'OneTime' ? '一次性' : '周期性' }}费用</span>
         </el-form-item>
-        <el-form-item label="月金额">
+        <el-form-item :label="addFeeDialogMode === 'OneTime' ? '金额' : '月金额'">
           <el-input-number v-model="feeConfigForm.amount" :min="0" :precision="2" style="width:200px" /> 元
         </el-form-item>
         <el-form-item label="生效日期">
@@ -353,7 +369,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showFeeConfigDialog = false">取消</el-button>
-        <el-button type="primary" @click="submitFeeConfig" :loading="feeConfigSaving">添加</el-button>
+        <el-button type="primary" @click="submitFeeConfig" :loading="feeConfigSaving">提交审批</el-button>
       </template>
     </el-dialog>
 
@@ -670,10 +686,20 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+
+// ★ 一次性收费展开行数据（独立响应式，避免 computed 元素属性修改不触发渲染）
+const oneTimeExpandState = reactive(new Map())
+function getExpandState(row) {
+  const key = row.id || row.feeCodeId
+  if (!oneTimeExpandState.has(key)) {
+    oneTimeExpandState.set(key, reactive({ depositLogs: [], loadingLogs: false, receivablePlans: [], loadingPlans: false }))
+  }
+  return oneTimeExpandState.get(key)
+}
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { toGuidId } from '@/utils'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, handleApiError } from '@/api/index.js'
+import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, getReceivablePlansByFee, handleApiError } from '@/api/index.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -755,12 +781,12 @@ const oneTimeConfigs = computed(() => {
   const map = new Map()
   for (const f of feeConfigs.value) {
     if (f.chargeType === 'OneTime' && f.isActive && !f.expiryDate && f.feeCodeId) {
-      map.set(f.feeCodeId, { ...f, history: [], _depositLogs: [], _loadingLogs: false })
+      map.set(f.feeCodeId, { ...f, history: [] })
     }
   }
   for (const f of feeConfigs.value) {
     if (f.chargeType === 'OneTime' && !map.has(f.feeCodeId) && f.feeCodeId) {
-      map.set(f.feeCodeId, { ...f, history: [], _depositLogs: [], _loadingLogs: false })
+      map.set(f.feeCodeId, { ...f, history: [] })
     }
   }
   return [...map.values()]
@@ -878,6 +904,7 @@ const feeCodeList = ref([])
 const availableFeeCodes = ref([])
 const showFeeConfigDialog = ref(false)
 const feeConfigSaving = ref(false)
+const addFeeDialogMode = ref('Recurring') // 'Recurring' | 'OneTime'
 const showAdjustDialog = ref(false)
 const adjustFeeConfigId = ref(null)
 const adjustFeeCodeId = ref(null)
@@ -958,17 +985,22 @@ async function updateAvailableFeeCodes() {
     } catch { /* 静默 */ }
   }
   const usedIds = new Set(feeConfigs.value.filter(f => f.isActive).map(f => f.feeCodeId))
-  availableFeeCodes.value = feeCodeList.value.filter(f => !usedIds.has(f.id) && f.chargeType === 'Recurring')
+  const chargeTypeFilter = addFeeDialogMode.value === 'OneTime' ? 'OneTime' : 'Recurring'
+  availableFeeCodes.value = feeCodeList.value.filter(f => !usedIds.has(f.id) && f.chargeType === chargeTypeFilter)
 }
 
-// 展开一次性收费行时加载押金流水
+// 展开一次性收费行时加载明细（DEPOSIT 显示押金流水，其他显示应收计划）
 async function onOneTimeExpand(row) {
-  if (row.feeCode === 'DEPOSIT' && !row._depositLogs?.length && !row._loadingLogs) {
-    row._loadingLogs = true
+  const cid = contract.value?.id || route.params.id
+  const st = getExpandState(row)
+
+  if (row.feeCode === 'DEPOSIT') {
+    if (st.depositLogs.length || st.loadingLogs) return
+    st.loadingLogs = true
     try {
-      const depRes = await getDeposits({ contractId: contract.value?.id || route.params.id })
+      const depRes = await getDeposits({ contractId: cid })
       const depItems = depRes.items || depRes.data || depRes || []
-      row._depositLogs = depItems.map(d => ({
+      st.depositLogs = depItems.map(d => ({
         date: d.createdAt?.split('T')[0] || '',
         action: d.action === 'Create' ? '收取'
           : d.action === 'Return' || d.action === 'Refund' ? '退还'
@@ -980,9 +1012,36 @@ async function onOneTimeExpand(row) {
         balance: d.balance || 0,
         remark: d.remark || ''
       }))
-    } catch { row._depositLogs = [] }
-    row._loadingLogs = false
+    } catch { /* 静默 */ }
+    st.loadingLogs = false
+    return
   }
+
+  // 非 DEPOSIT 一次性费用：加载应收计划
+  if (st.receivablePlans.length || st.loadingPlans) return
+  await loadOneTimeReceivablePlans(st, cid, row.feeCodeId)
+}
+
+async function loadOneTimeReceivablePlans(st, contractId, feeCodeId) {
+  st.loadingPlans = true
+  try {
+    const plans = await getReceivablePlansByFee(contractId, feeCodeId)
+    st.receivablePlans = (plans || []).map(p => ({
+      period: p.period || '',
+      amount: p.amount || 0,
+      dueDate: p.dueDate || '-',
+      status: p.status || 'Pending',
+      statusLabel: p.status === 'Pending' ? '待收'
+        : p.status === 'Partial' ? '部分收款'
+        : p.status === 'Paid' ? '已收款'
+        : p.status === 'Overdue' ? '逾期'
+        : p.status === 'Frozen' ? '冻结'
+        : p.status || '待收',
+      received: p.received || 0,
+      balance: (p.amount || 0) - (p.received || 0)
+    }))
+  } catch { /* 静默 */ }
+  st.loadingPlans = false
 }
 
 function onFeeCodeChange(feeCodeId) {
@@ -1010,6 +1069,16 @@ async function onFeeConfigExpand(row) {
 const feeConfigForm = reactive({ feeCodeId: null, amount: 0, effectiveDate: '' })
 
 function openAddFeeConfig() {
+  addFeeDialogMode.value = 'Recurring'
+  feeConfigForm.feeCodeId = null
+  feeConfigForm.amount = 0
+  feeConfigForm.effectiveDate = new Date().toISOString().split('T')[0]
+  updateAvailableFeeCodes()
+  showFeeConfigDialog.value = true
+}
+
+function openAddOneTimeFee() {
+  addFeeDialogMode.value = 'OneTime'
   feeConfigForm.feeCodeId = null
   feeConfigForm.amount = 0
   feeConfigForm.effectiveDate = new Date().toISOString().split('T')[0]
@@ -1028,9 +1097,10 @@ async function submitFeeConfig() {
       feeCodeId: feeConfigForm.feeCodeId,
       amount: feeConfigForm.amount,
       billingMode: 'FixedAmount',
-      effectiveDate: feeConfigForm.effectiveDate
+      effectiveDate: feeConfigForm.effectiveDate,
+      chargeType: addFeeDialogMode.value
     })
-    ElMessage.success('费用配置已添加')
+    ElMessage.success(addFeeDialogMode.value === 'OneTime' ? '一次性收费已添加' : '费用配置已添加')
     showFeeConfigDialog.value = false
     await fetchFeeConfigs()
   } catch (e) {

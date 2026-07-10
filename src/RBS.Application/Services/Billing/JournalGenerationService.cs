@@ -83,6 +83,16 @@ public class JournalGenerationService : IJournalGenerationService
                 _sql.Get("Accounting.Insert.JournalEntry.Simple"),
                 new { Id = Guid.NewGuid(), VId = voucherId, SId = depositLiabilityId, Dir = "Credit", Amt = (decimal)config.Amount, Sum = $"{config.FeeName}", CBy = Guid.Empty });
         }
+        else if (config.ChargeType == "OneTime" && receivableId != Guid.Empty && revenueId != Guid.Empty)
+        {
+            // 其他一次性费用：DEBIT 1122（应收）/ CREDIT 6001(6051)（收入）
+            await conn.ExecuteAsync(
+                _sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                new { Id = Guid.NewGuid(), VId = voucherId, SId = receivableId, Dir = "Debit", Amt = (decimal)config.Amount, Sum = $"{config.FeeName}（一次性）", CBy = Guid.Empty });
+            await conn.ExecuteAsync(
+                _sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                new { Id = Guid.NewGuid(), VId = voucherId, SId = revenueId, Dir = "Credit", Amt = (decimal)config.Amount, Sum = $"{config.FeeName}（一次性）", CBy = Guid.Empty });
+        }
     }
 
     /// <summary>

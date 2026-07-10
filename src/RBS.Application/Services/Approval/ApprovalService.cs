@@ -360,7 +360,15 @@ public class ApprovalService : IApprovalService
         var bizData = await _uow.ApprovalBizData.GetByApprovalRequestIdAsync(id, ct);
         if (bizData != null)
         {
-            return await BuildBizDetailFromStructuredData(bizData, approval, ct);
+            try
+            {
+                return await BuildBizDetailFromStructuredData(bizData, approval, ct);
+            }
+            catch (Exception ex)
+            {
+                // ★ 定位无业务数据的根因
+                System.Diagnostics.Debug.WriteLine($"[BizDetail] BuildBizDetailFromStructuredData failed for approval {id}: {ex}");
+            }
         }
 
         // Fallback: 旧审批无结构化数据时，保留原有逻辑
@@ -421,6 +429,15 @@ public class ApprovalService : IApprovalService
                             _sql.Get("Lease.Select.ContractFeeConfig.FullCurrentByContractAndFee"),
                             new { ContractId = item.ContractId, FeeCodeId = item.FeeCodeId });
 
+                        // 旧配置无 ChargeType 时直接从 FeeCodes 表查询
+                        var chargeType = oldConfig?.ChargeType as string;
+                        if (string.IsNullOrEmpty(chargeType))
+                        {
+                            var feeCodeInfo = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                                _sql.Get("FeeCode.Select.FeeCode.ChargeTypeById"), new { Id = item.FeeCodeId });
+                            chargeType = feeCodeInfo?.ChargeType as string;
+                        }
+
                         dto.FeeItems.Add(new BizFeeItemDto
                         {
                             FeeName = item.FeeName,
@@ -435,7 +452,7 @@ public class ApprovalService : IApprovalService
                                 ? oldXd.ToString("yyyy-MM-dd") : oldConfig?.ExpiryDate as string,
                             OldBillingMode = oldConfig?.BillingMode as string,
                             OldUnit = oldConfig?.Unit as string,
-                            ChargeType = oldConfig?.ChargeType as string,
+                            ChargeType = chargeType,
                         });
                     }
                 }

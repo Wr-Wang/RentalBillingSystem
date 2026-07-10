@@ -245,6 +245,9 @@
   <select id="FeeCode.Select.FeeCode.ByCategory">
     <![CDATA[SELECT * FROM FeeCodes WHERE Category=@Category]]>
   </select>
+  <select id="FeeCode.Select.FeeCode.ChargeTypeById">
+    <![CDATA[SELECT Code, ChargeType FROM FeeCodes WHERE Id=@Id]]>
+  </select>
 
   <!-- ================================================================
        模块：PaymentChannel（付款通道）
@@ -1067,6 +1070,12 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   </select>
   <select id="Receivable.Select.Plan.ByContractPeriodFee">
     <![CDATA[SELECT * FROM ReceivablePlans WHERE ContractId=@Id AND Period=@P AND FeeCodeId=@F]]>
+  </select>
+  <select id="Receivable.Select.Plan.ByContractAndFee">
+    <![CDATA[SELECT Id, Period, Amount, DueDate, Status, Received, LateFee, IsBilled
+             FROM ReceivablePlans
+             WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
+             ORDER BY Period]]>
   </select>
   <select id="Receivable.Select.Plan.Overdue">
     <![CDATA[SELECT * FROM ReceivablePlans WHERE Status='Pending' AND DueDate < CAST(GETDATE() AS DATE)]]>

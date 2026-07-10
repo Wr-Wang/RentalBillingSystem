@@ -1,10 +1,38 @@
 <template>
-  <div class="fee-card" :class="{ 'fee-card-changed': isChanged }">
-    <!-- ====== Header ====== -->
+  <!-- ====== 新增费用（一次性，无历史配置） ====== -->
+  <div v-if="isNewFee" class="fee-card fee-card-new">
     <div class="fee-card-header">
       <div class="fee-card-title">
-        <el-tag v-if="item.chargeType === 'OneTime'" size="small" type="warning" effect="plain" class="charge-badge">一次性</el-tag>
-        <el-tag v-else size="small" type="primary" effect="plain" class="charge-badge">周期性</el-tag>
+        <el-tag size="small" type="warning" effect="plain" class="charge-badge">一次性</el-tag>
+        <span class="fee-name">{{ item.feeName }}</span>
+      </div>
+    </div>
+
+    <div class="new-fee-body">
+      <div class="new-fee-row">
+        <span class="new-fee-label">金额</span>
+        <span class="new-fee-value">¥{{ formattedAmount(item.newAmount) }}</span>
+      </div>
+      <div class="new-fee-row">
+        <span class="new-fee-label">生效日期</span>
+        <span class="new-fee-value">{{ formatDate(item.effectiveDate) || '-' }}</span>
+      </div>
+      <div class="new-fee-row">
+        <span class="new-fee-label">计费方式</span>
+        <span class="new-fee-value">{{ billingLabel(item.billingMode) }}</span>
+      </div>
+      <div class="new-fee-row">
+        <span class="new-fee-label">收费类型</span>
+        <span class="new-fee-value">一次性收费</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 调价费用（有历史配置，新旧对比） ====== -->
+  <div v-else class="fee-card" :class="{ 'fee-card-changed': isChanged }">
+    <div class="fee-card-header">
+      <div class="fee-card-title">
+        <el-tag size="small" type="primary" effect="plain" class="charge-badge">周期性</el-tag>
         <span class="fee-name">{{ item.feeName }}</span>
       </div>
       <div v-if="isChanged" class="fee-card-change-badge">
@@ -19,9 +47,7 @@
       <el-tag v-else size="small" type="info" effect="plain">不变</el-tag>
     </div>
 
-    <!-- ====== Body: Old vs New ====== -->
     <div class="fee-card-body">
-      <!-- Left: 当前配置 -->
       <div class="fee-config-col">
         <div class="config-col-title">当前配置</div>
         <div class="config-field">
@@ -48,12 +74,10 @@
         </div>
       </div>
 
-      <!-- Center: Arrow -->
       <div class="config-arrow">
         <el-icon :size="22" color="#c0c4cc"><Right /></el-icon>
       </div>
 
-      <!-- Right: 新配置 -->
       <div class="fee-config-col new-config-col">
         <div class="config-col-title">新配置</div>
         <div class="config-field">
@@ -81,7 +105,6 @@
       </div>
     </div>
 
-    <!-- ====== Footer: Diff Bar ====== -->
     <div v-if="isChanged" class="fee-card-footer" :class="isIncrease ? 'diff-increase' : 'diff-decrease'">
       <span class="diff-label">差额</span>
       <span class="diff-amount">
@@ -109,6 +132,7 @@ const diffAmount = computed(() => props.item.newAmount - props.item.oldAmount)
 const isIncrease = computed(() => diffAmount.value > 0)
 const isDecrease = computed(() => diffAmount.value < 0)
 const isChanged = computed(() => diffAmount.value !== 0)
+const isNewFee = computed(() => props.item.chargeType === 'OneTime')
 
 const changePercent = computed(() => {
   if (props.item.oldAmount <= 0) return isIncrease.value ? '+∞' : '-∞'
@@ -263,5 +287,32 @@ function formatDate(d) {
 }
 .diff-pct {
   font-weight: bold;
+}
+
+/* ====== 新增费用（一次性，无历史配置） ====== */
+.fee-card-new {
+  border-left: 3px solid #409eff;
+}
+.new-fee-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.new-fee-row {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+}
+.new-fee-label {
+  width: 80px;
+  font-size: 13px;
+  color: #909399;
+  flex-shrink: 0;
+}
+.new-fee-value {
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
 }
 </style>

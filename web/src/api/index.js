@@ -110,6 +110,7 @@ export function importMeterReadings(data) { return request({ url: '/meterreading
 // Receivables
 export function getReceivables(params) { return request({ url: '/receivables', method: 'get', params }) }
 export function getReceivable(id) { return request({ url: `/receivables/${id}`, method: 'get' }) }
+export function getReceivablePlansByFee(contractId, feeCodeId) { return request({ url: `/receivables/byfee?contractId=${contractId}&feeCodeId=${feeCodeId}`, method: 'get' }) }
 export function generateReceivables(data) { return request({ url: '/receivables/generate', method: 'post', data }) }
 
 // Receipts
