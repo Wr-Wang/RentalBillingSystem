@@ -755,8 +755,8 @@
     <![CDATA[SELECT * FROM ApprovalFeeItems WHERE ApprovalRequestId = @Id]]>
   </select>
   <insert id="Approval.Insert.ApprovalFeeItem.Default">
-    <![CDATA[INSERT INTO ApprovalFeeItems (Id, ApprovalRequestId, ContractId, FeeCodeId, FeeName, OldAmount, NewAmount, BillingMode, Unit, CreatedBy, CreatedAt)
-      VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO ApprovalFeeItems (Id, ApprovalRequestId, ContractId, FeeCodeId, FeeName, OldAmount, NewAmount, BillingMode, Unit, EffectiveDate, CreatedBy, CreatedAt)
+      VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
   </insert>
 
   <!-- ★ 合同操作闭环 v3 — 控制器/事件处理器用 SQL -->
@@ -983,6 +983,18 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT Id, EffectiveDate FROM ContractFeeConfigs
             WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
               AND ExpiryDate IS NULL AND IsActive=1]]>
+  </select>
+  <select id="Lease.Select.ContractFeeConfig.FullCurrentByContractAndFee">
+    <![CDATA[SELECT TOP 1 cfc.Id, cfc.ContractId, cfc.FeeCodeId, cfc.Amount, cfc.BillingMode,
+                    cfc.Unit, cfc.UnitPrice, cfc.EffectiveDate, cfc.ExpiryDate, cfc.IsActive,
+                    fc.Name AS FeeCodeName, fc.Code AS FeeCode, fc.ChargeType
+             FROM ContractFeeConfigs cfc
+             LEFT JOIN FeeCodes fc ON fc.Id = cfc.FeeCodeId
+             WHERE cfc.ContractId = @ContractId
+               AND cfc.FeeCodeId = @FeeCodeId
+               AND cfc.ExpiryDate IS NULL
+               AND cfc.IsActive = 1
+             ORDER BY cfc.EffectiveDate DESC]]>
   </select>
   <select id="Lease.Select.ContractFeeConfig.CheckOverlap">
     <![CDATA[SELECT COUNT(1) FROM ContractFeeConfigs

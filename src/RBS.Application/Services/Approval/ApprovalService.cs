@@ -409,14 +409,36 @@ public class ApprovalService : IApprovalService
                     new() { Label = "调价项目数", NewValue = $"{feeItems.Count} 项", IsChanged = true },
                     new() { Label = "生效日期",   NewValue = bizData.EffectiveDate?.ToString("yyyy-MM-dd"), IsChanged = true },
                 };
-                dto.FeeItems = feeItems.Select(i => new BizFeeItemDto
+
+                // 逐项查询当前活跃配置，补充原数据信息
+                dto.FeeItems = new List<BizFeeItemDto>();
+                using (var conn = _connectionFactory.CreateConnection())
                 {
-                    FeeName = i.FeeName,
-                    OldAmount = i.OldAmount,
-                    NewAmount = i.NewAmount,
-                    BillingMode = i.BillingMode,
-                    Unit = i.Unit,
-                }).ToList();
+                    conn.Open();
+                    foreach (var item in feeItems)
+                    {
+                        var oldConfig = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                            _sql.Get("Lease.Select.ContractFeeConfig.FullCurrentByContractAndFee"),
+                            new { ContractId = item.ContractId, FeeCodeId = item.FeeCodeId });
+
+                        dto.FeeItems.Add(new BizFeeItemDto
+                        {
+                            FeeName = item.FeeName,
+                            OldAmount = item.OldAmount,
+                            NewAmount = item.NewAmount,
+                            BillingMode = item.BillingMode,
+                            Unit = item.Unit,
+                            EffectiveDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd"),
+                            OldEffectiveDate = oldConfig?.EffectiveDate is DateTime oldEd
+                                ? oldEd.ToString("yyyy-MM-dd") : oldConfig?.EffectiveDate as string,
+                            OldExpiryDate = oldConfig?.ExpiryDate is DateTime oldXd
+                                ? oldXd.ToString("yyyy-MM-dd") : oldConfig?.ExpiryDate as string,
+                            OldBillingMode = oldConfig?.BillingMode as string,
+                            OldUnit = oldConfig?.Unit as string,
+                            ChargeType = oldConfig?.ChargeType as string,
+                        });
+                    }
+                }
                 break;
 
             case "TERMINATE":

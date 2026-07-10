@@ -94,4 +94,16 @@ public class BizFeeItemDto
     public decimal NewAmount { get; set; }
     public string? BillingMode { get; set; }
     public string? Unit { get; set; }
+    /// <summary>生效日期（单项独立，null 时取全局生效日）</summary>
+    public string? EffectiveDate { get; set; }
+    /// <summary>旧配置生效日期（查当前活跃 ContractFeeConfig）</summary>
+    public string? OldEffectiveDate { get; set; }
+    /// <summary>旧配置到期日期（null = 至今有效）</summary>
+    public string? OldExpiryDate { get; set; }
+    /// <summary>旧计费方式</summary>
+    public string? OldBillingMode { get; set; }
+    /// <summary>旧计量单位</summary>
+    public string? OldUnit { get; set; }
+    /// <summary>收费类型：Recurring / OneTime</summary>
+    public string? ChargeType { get; set; }
 }

@@ -253,7 +253,7 @@
             </template>
             <div v-loading="bizLoading">
               <template v-if="bizDetail">
-                <!-- ===== 1. 通用字段对比表（所有 BizType） ===== -->
+                <!-- ===== 1. 通用字段对比（所有 BizType） ===== -->
                 <el-card v-if="bizDetail.fields?.length || bizDetail.effectiveDate" shadow="never" class="section-card">
                   <template #header>
                     <span style="font-weight: 600;">变更摘要</span>
@@ -261,30 +261,32 @@
                       生效日: {{ formatBizDate(bizDetail.effectiveDate) }}
                     </el-tag>
                   </template>
-                  <el-table v-if="bizDetail.fields?.length" :data="bizDetail.fields" stripe size="small">
-                    <el-table-column prop="label" label="字段" width="130" />
-                    <el-table-column label="原值" width="180">
-                      <template #default="{ row }">
-                        <span v-if="row.oldValue" style="color: #909399;">{{ row.oldValue }}</span>
-                        <span v-else style="color: #c0c4cc;">-</span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="新值" width="180">
-                      <template #default="{ row }">
-                        <span v-if="row.newValue" :style="{ color: row.isChanged ? '#e6a23c' : '#303133', fontWeight: row.isChanged ? 'bold' : 'normal' }">{{ row.newValue }}</span>
-                        <span v-else style="color: #c0c4cc;">-</span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="变化" width="70" align="center">
-                      <template #default="{ row }">
-                        <el-tag v-if="row.isChanged" size="small" type="warning" effect="plain">变更</el-tag>
-                        <el-tag v-else size="small" type="info" effect="plain">不变</el-tag>
-                      </template>
-                    </el-table-column>
-                  </el-table>
+                  <div v-if="bizDetail.fields?.length" class="change-summary">
+                    <div
+                      v-for="field in bizDetail.fields"
+                      :key="field.label"
+                      class="summary-row"
+                      :class="{ 'row-changed': field.isChanged }"
+                    >
+                      <span class="summary-label">{{ field.label }}</span>
+                      <span v-if="field.oldValue && field.newValue" class="summary-values">
+                        <span class="summary-oldval">{{ field.oldValue }}</span>
+                        <el-icon class="summary-arrow"><ArrowRight /></el-icon>
+                        <span class="summary-newval">{{ field.newValue }}</span>
+                      </span>
+                      <span v-else-if="field.oldValue && !field.newValue" class="summary-values">
+                        <span class="summary-oldval">{{ field.oldValue }}</span>
+                      </span>
+                      <span v-else-if="field.newValue" class="summary-values">
+                        <span class="summary-newval summary-newval-only">{{ field.newValue }}</span>
+                      </span>
+                      <span v-else class="summary-values summary-empty">—</span>
+                      <el-tag v-if="field.isChanged" size="small" type="warning" effect="plain" class="summary-tag">变更</el-tag>
+                    </div>
+                  </div>
                 </el-card>
 
-                <!-- ===== 2. [调价专用] 费用项目明细表 ===== -->
+                <!-- ===== 2. [调价专用] 费用项目卡片列表 ===== -->
                 <el-card v-if="bizDetail.bizType === 'FEE_ADJUST' && bizDetail.feeItems?.length"
                   shadow="never" class="section-card" style="margin-top: 14px;">
                   <template #header>
@@ -293,36 +295,13 @@
                       共 {{ bizDetail.feeItems.length }} 项
                     </el-tag>
                   </template>
-                  <el-table :data="bizDetail.feeItems" stripe size="small">
-                    <el-table-column prop="feeName" label="收费项目" min-width="110" />
-                    <el-table-column label="原价" width="120" align="right">
-                      <template #default="{ row }">
-                        ¥{{ row.oldAmount?.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="新价" width="120" align="right">
-                      <template #default="{ row }">
-                        <span style="color: #e6a23c; font-weight: bold;">
-                          ¥{{ row.newAmount?.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
-                        </span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="涨幅" width="100" align="center">
-                      <template #default="{ row }">
-                        <el-tag
-                          :type="row.newAmount > row.oldAmount ? 'danger' : row.newAmount < row.oldAmount ? 'success' : 'info'"
-                          size="small" effect="plain">
-                          {{ row.oldAmount > 0 ? ((row.newAmount - row.oldAmount) / row.oldAmount * 100).toFixed(1) + '%' : '-' }}
-                        </el-tag>
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="billingMode" label="计费方式" width="100">
-                      <template #default="{ row }">
-                        {{ row.billingMode === 'MeterBased' ? '按表计量' : '固定金额' }}
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="unit" label="单位" width="60" />
-                  </el-table>
+                  <div class="fee-cards-container">
+                    <FeeItemCard
+                      v-for="(item, idx) in bizDetail.feeItems"
+                      :key="idx"
+                      :item="item"
+                    />
+                  </div>
                 </el-card>
 
                 <!-- ===== 3. [终止专用] 终止详情卡片 ===== -->
@@ -484,7 +463,8 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Close, CircleCheck, List, Upload, InfoFilled, MoreFilled, ChatDotSquare, RefreshLeft, DataBoard } from '@element-plus/icons-vue'
+import { Check, Close, CircleCheck, List, Upload, InfoFilled, MoreFilled, ChatDotSquare, RefreshLeft, DataBoard, ArrowRight } from '@element-plus/icons-vue'
+import FeeItemCard from './FeeItemCard.vue'
 import { getApprovalDetail, getImportBatch, approveApproval, rejectApproval, cancelApproval, getApprovalBizDetail } from '../../api/index'
 
 const props = defineProps({
@@ -721,6 +701,7 @@ function formatBizDate(d) {
   return ''
 }
 
+/** 费用明细行样式：有变价的行加高亮标记 */
 function avatarStyle(action) {
   const colors = {
     Approved: '#67c23a',
@@ -1178,6 +1159,76 @@ function close() {
 }
 .cell-empty {
   color: #c0c4cc;
+}
+
+/* ====== Tab 3: 变更摘要卡片布局 ====== */
+.change-summary {
+  display: flex;
+  flex-direction: column;
+}
+.summary-row {
+  display: flex;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid #f5f5f5;
+  gap: 10px;
+}
+.summary-row:last-child {
+  border-bottom: none;
+}
+.row-changed {
+  background: #fffcf0;
+  margin: 0 -12px;
+  padding: 7px 12px;
+  border-radius: 4px;
+  border-bottom-color: transparent;
+}
+.summary-label {
+  min-width: 100px;
+  font-size: 13px;
+  color: #606266;
+  flex-shrink: 0;
+}
+.summary-values {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.summary-oldval {
+  font-size: 13px;
+  color: #909399;
+  text-decoration: line-through;
+}
+.summary-arrow {
+  font-size: 14px;
+  color: #c0c4cc;
+  flex-shrink: 0;
+}
+.summary-newval {
+  font-size: 13px;
+  color: #e6a23c;
+  font-weight: bold;
+}
+.summary-newval-only {
+  color: #303133;
+  font-weight: 500;
+}
+.summary-empty {
+  font-size: 13px;
+  color: #c0c4cc;
+}
+.summary-tag {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ====== Tab 3: 费用项卡片列表容器 ====== */
+.fee-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* ====== Drawer Footer ====== */
