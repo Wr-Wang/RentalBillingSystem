@@ -125,7 +125,11 @@ public class ReceivableGenerationService : IReceivableGenerationService
                     await journalGen.GenerateOneTimeAsync(contractId, fc.Id, ct);
                     result.OneTimeFeeGenerated = true;
                 }
-                catch { /* 单个 JE 失败不影响主流程 */ }
+                catch
+                {
+                    // 单个 JE 生成失败不影响激活主流程，可后续手动重试
+                    // GenerateOneTimeAsync 已具备幂等性，重试调用不会产生重复 JE
+                }
             }
         }
 

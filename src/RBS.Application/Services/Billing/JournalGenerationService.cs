@@ -1,4 +1,5 @@
 using System.Data;
+using System.Linq;
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
@@ -29,11 +30,18 @@ public class JournalGenerationService : IJournalGenerationService
 
     /// <summary>
     /// 生成 OneTime 费用的 JE（合同签署时调用，如押金）
+    /// ★ 幂等：已存在同一 FeeConfig 的 Voucher 则跳过
     /// </summary>
     public async Task GenerateOneTimeAsync(Guid contractId, Guid feeConfigId, CancellationToken ct)
     {
         using var conn = _db.CreateConnection();
         conn.Open();
+
+        // ★ 幂等检查：该 FeeConfig 是否已生成过 Voucher
+        var exists = await conn.QuerySingleAsync<int>(
+            _sql.Get("Accounting.Select.Voucher.ExistsByFeeConfigId"),
+            new { FeeConfigId = feeConfigId });
+        if (exists > 0) return;
 
         // 获取 FeeConfig + FeeCode
         var config = await conn.QuerySingleOrDefaultAsync<dynamic>(
@@ -57,19 +65,18 @@ public class JournalGenerationService : IJournalGenerationService
         var voucherId = Guid.NewGuid();
         var voucherNo = $"OT-{now:yyyyMMdd}-{voucherId:N}".Truncate(32);
 
-        // 插入 Voucher（含 Period）
+        // 插入 Voucher（含 Period），关联 FeeConfigId 用于幂等去重
         await conn.ExecuteAsync(
-            _sql.Get("Accounting.Insert.Voucher.WithPeriod"),
+            _sql.Get("Accounting.Insert.Voucher.WithPeriodAndFeeConfig"),
             new
             {
                 Id = voucherId,
                 No = voucherNo,
                 Date = DateOnly.FromDateTime(now),
-                Desc = $"{config.FeeName}（一次性）",
                 SrcId = contractId,
                 Type = "ContractFee.Immediate",
                 CId = contractId,
-                Period = period,
+                FConfigId = feeConfigId,
                 CBy = Guid.Empty
             });
 

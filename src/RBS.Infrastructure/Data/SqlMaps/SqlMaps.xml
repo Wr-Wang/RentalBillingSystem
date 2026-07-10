@@ -668,13 +668,27 @@
     <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Status, SourceType, SourceId, ContractId, CompanyId, CreatedBy, CreatedAt)
       VALUES (@Id, @No, @Date, 'Posted', @Type, @SrcId, @CId, (SELECT CompanyId FROM Contracts WHERE Id = @CId), @CBy, GETUTCDATE())]]>
   </insert>
+  <insert id="Accounting.Insert.Voucher.WithPeriodAndFeeConfig">
+    <![CDATA[INSERT INTO Vouchers (Id, VoucherNo, VoucherDate, Status, SourceType, SourceId, ContractId, CompanyId, FeeConfigId, CreatedBy, CreatedAt)
+      VALUES (@Id, @No, @Date, 'Posted', @Type, @SrcId, @CId, (SELECT CompanyId FROM Contracts WHERE Id = @CId), @FConfigId, @CBy, GETUTCDATE())]]>
+  </insert>
   <insert id="Accounting.Insert.JournalEntry.Simple">
     <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, EntryNo, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @VId, (SELECT ISNULL(MAX(EntryNo), 0) + 1 FROM JournalEntries WHERE VoucherId = @VId), @SId, @Dir, @Amt, @Sum, @CBy, GETUTCDATE())]]>
   </insert>
+  <select id="Accounting.Select.Voucher.ExistsBySource">
+    <![CDATA[SELECT COUNT(1) FROM Vouchers WHERE SourceId=@SourceId AND SourceType=@SourceType]]>
+  </select>
+  <select id="Accounting.Select.Voucher.ExistsByFeeConfigId">
+    <![CDATA[SELECT COUNT(1) FROM Vouchers WHERE FeeConfigId=@FeeConfigId]]>
+  </select>
   <insert id="Billing.Insert.ReceivablePlan.Default">
     <![CDATA[INSERT INTO ReceivablePlans (Id, ContractId, FeeCodeId, Period, Amount, DueDate, Status, Received, LateFee, IsBilled, EntryType, CreatedBy, CreatedAt)
       VALUES (@Id, @CId, @FId, @P, @Amt, @Due, 'Pending', 0, 0, 0, 'Normal', @CBy, GETUTCDATE())]]>
+  </insert>
+  <insert id="Billing.Insert.ReceivablePlan.ForOneTimeFee">
+    <![CDATA[INSERT INTO ReceivablePlans (Id, ContractId, FeeCodeId, FeeConfigId, Period, Amount, DueDate, Status, Received, LateFee, IsBilled, EntryType, CreatedBy, CreatedAt)
+      VALUES (@Id, @CId, @FId, @FConfigId, @P, @Amt, @Due, 'Pending', 0, 0, 0, 'Normal', @CBy, GETUTCDATE())]]>
   </insert>
   <insert id="Lease.Insert.DebitNote.FromBillJob">
     <![CDATA[INSERT INTO DebitNotes (Id, NoteNo, ContractId, ContractNo, Period, CompanyId,
@@ -731,6 +745,11 @@
   </select>
   <select id="Approval.Select.Request.PendingByContractId">
     <![CDATA[SELECT COUNT(1) FROM ApprovalRequests WHERE ContractId = @Id AND Status = 'Pending']]>
+  </select>
+  <select id="Approval.Select.ApprovalFeeItem.PendingByContractAndFee">
+    <![CDATA[SELECT COUNT(1) FROM ApprovalFeeItems afi
+            INNER JOIN ApprovalRequests ar ON ar.Id = afi.ApprovalRequestId
+            WHERE afi.ContractId = @ContractId AND afi.FeeCodeId = @FeeCodeId AND ar.Status = 'Pending']]>
   </select>
 
   <!-- ★ ApprovalBizData / ApprovalFeeItems 查询（合同操作闭环 v3） -->
@@ -998,6 +1017,10 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
                AND cfc.ExpiryDate IS NULL
                AND cfc.IsActive = 1
              ORDER BY cfc.EffectiveDate DESC]]>
+  </select>
+  <select id="Lease.Select.ContractFeeConfig.ActiveCountByContractAndFee">
+    <![CDATA[SELECT COUNT(1) FROM ContractFeeConfigs
+            WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId AND IsActive=1]]>
   </select>
   <select id="Lease.Select.ContractFeeConfig.CheckOverlap">
     <![CDATA[SELECT COUNT(1) FROM ContractFeeConfigs

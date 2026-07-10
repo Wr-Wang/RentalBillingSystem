@@ -21,15 +21,17 @@ public class ContractFeeConfigsController : ControllerBase
     private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _uow;
     private readonly IApprovalService _approvalService;
+    private readonly IJournalGenerationService _journalGen;
 
     public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser,
-        IUnitOfWork uow, IApprovalService approvalService)
+        IUnitOfWork uow, IApprovalService approvalService, IJournalGenerationService journalGen)
     {
         _db = db;
         _sql = sql;
         _currentUser = currentUser;
         _uow = uow;
         _approvalService = approvalService;
+        _journalGen = journalGen;
     }
 
     [HttpGet]
@@ -123,6 +125,9 @@ public class ContractFeeConfigsController : ControllerBase
 
         // Draft 合同或无审批配置 → 直接写入
         using var conn = _db.CreateConnection(); conn.Open();
+
+        var isOneTime = request.ChargeType == "OneTime";
+
         var overlap = await conn.QuerySingleAsync<int>(
             _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
             new { ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
@@ -141,6 +146,13 @@ public class ContractFeeConfigsController : ControllerBase
         await InsertChangeHistoryAsync(conn, null, request.ContractId, "FEE_ADD",
             "添加费用", "添加 " + (request.BillingMode ?? "FixedAmount") + " ¥" + request.Amount.ToString("F2") + ", 生效 " + (request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")),
             null, request.Amount, request.EffectiveDate, _currentUser.UserId);
+
+        // ★ 一次性收费落地后立即生成 JE（草稿合同激活时也会补生成，此处先发可提前记账）
+        if (isOneTime)
+        {
+            try { await _journalGen.GenerateOneTimeAsync(request.ContractId, id, ct); } catch { /* JE 生成失败不影响 FeeConfig 落库 */ }
+        }
+
         return Ok(new { id });
     }
 

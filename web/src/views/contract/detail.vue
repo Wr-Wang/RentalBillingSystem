@@ -984,7 +984,10 @@ async function updateAvailableFeeCodes() {
       feeCodeList.value = res.items || res.data || res || []
     } catch { /* 静默 */ }
   }
-  const usedIds = new Set(feeConfigs.value.filter(f => f.isActive).map(f => f.feeCodeId))
+  // 周期性收费过滤掉当前活跃的配置；一次性收费不过滤，允许重复添加
+  const usedIds = addFeeDialogMode.value === 'OneTime'
+    ? new Set()
+    : new Set(feeConfigs.value.filter(f => f.isActive).map(f => f.feeCodeId))
   const chargeTypeFilter = addFeeDialogMode.value === 'OneTime' ? 'OneTime' : 'Recurring'
   availableFeeCodes.value = feeCodeList.value.filter(f => !usedIds.has(f.id) && f.chargeType === chargeTypeFilter)
 }

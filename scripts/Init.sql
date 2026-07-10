@@ -3030,6 +3030,7 @@ CREATE TABLE [ReceivablePlans] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
     [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 合同ID,
     [FeeCodeId] UNIQUEIDENTIFIER NOT NULL , -- 费用项目ID,
+    [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置实例ID（一次性费用关联到具体添加实例，NULL 为周期性费用）,
     [Period] VARCHAR(7) NOT NULL , -- 账期(格式: yyyy-MM),
     [Amount] DECIMAL(18,2) NOT NULL , -- 应收金额,
     [Received] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 已收金额,
@@ -3060,6 +3061,7 @@ GO
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Id'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'ContractId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置实例ID（一次性费用关联到具体添加实例，NULL为周期性费用）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'账期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Period'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Amount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'已收金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Received'
@@ -3080,9 +3082,12 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
--- 合同+账期+费用唯一
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_Contract_Fee_Period')
-CREATE UNIQUE INDEX [IX_ReceivablePlans_Contract_Fee_Period] ON [ReceivablePlans]([ContractId],[FeeCodeId],[Period])
+-- 一次性费用唯一：同合同+同 FeeConfig 实例+同账期
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_FeeConfig_Period')
+CREATE UNIQUE INDEX [IX_ReceivablePlans_FeeConfig_Period] ON [ReceivablePlans]([ContractId],[FeeConfigId],[Period]) WHERE [FeeConfigId] IS NOT NULL
+-- 周期性费用唯一：同合同+同费用类型+同账期（FeeConfigId=NULL 时沿用原逻辑）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_FeeCode_Period')
+CREATE UNIQUE INDEX [IX_ReceivablePlans_FeeCode_Period] ON [ReceivablePlans]([ContractId],[FeeCodeId],[Period]) WHERE [FeeConfigId] IS NULL
 -- 账期降序索引
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_Period')
 CREATE INDEX [IX_ReceivablePlans_Period] ON [ReceivablePlans]([Period] DESC)
@@ -4086,6 +4091,7 @@ CREATE TABLE [Vouchers] (
     [ApprovedAt] DATETIME2 , -- 审核时间,
     [RowVersion] TIMESTAMP NOT NULL , -- 乐观锁,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
+    [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置实例ID（一次性费用 JE 幂等去重用，NULL 为周期性/补差凭证）,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
@@ -4115,6 +4121,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审核人'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审核时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'ApprovedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'乐观锁', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'RowVersion'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置实例ID（一次性费用 JE 幂等去重用，NULL 为周期性/补差凭证）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CreatedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CreatedIp'
@@ -4133,6 +4140,9 @@ CREATE INDEX [IX_Vouchers_Status] ON [Vouchers]([Status])
 -- 按合同查询
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Vouchers]') AND name=N'IX_Vouchers_ContractId')
 CREATE INDEX [IX_Vouchers_ContractId] ON [Vouchers]([ContractId])
+-- 一次性费用 JE 幂等去重
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Vouchers]') AND name=N'IX_Vouchers_FeeConfigId')
+CREATE UNIQUE INDEX [IX_Vouchers_FeeConfigId] ON [Vouchers]([FeeConfigId]) WHERE [FeeConfigId] IS NOT NULL
 
 -- ===================================================================
 -- Vouchers_Audit 表：会计凭证表审计

@@ -322,15 +322,16 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     // 暂记，等 Commit 后再生成 JE（避免独立连接被事务锁阻塞 → 超时）
                     oneTimeJobs.Add((item.ContractId, configId));
 
-                    // 插入 ReceivablePlan（一次性费用应收计划，用于收账追踪）
+                    // 插入 ReceivablePlan（一次性费用应收计划，关联到 FeeConfig 实例以支持同费用多次添加）
                     var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
                     await conn.ExecuteAsync(
-                        _sql.Get("Billing.Insert.ReceivablePlan.Default"),
+                        _sql.Get("Billing.Insert.ReceivablePlan.ForOneTimeFee"),
                         new
                         {
                             Id = Guid.NewGuid(),
                             CId = item.ContractId,
                             FId = item.FeeCodeId,
+                            FConfigId = configId,
                             P = period,
                             Amt = item.NewAmount,
                             Due = DateOnly.FromDateTime(ChinaTime.Now),
