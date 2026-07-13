@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<IRepository<FloorLevelBand>, DapperRepository<FloorLevelBand>>();
         services.AddScoped<IRepository<TaxRateConfig>, DapperRepository<TaxRateConfig>>();
         services.AddScoped<IRepository<AccountingSubject>, DapperRepository<AccountingSubject>>();
+        services.AddScoped<IRepository<AccountingPeriod>, DapperRepository<AccountingPeriod>>();
 
         // IUnitOfWork（Dapper 实现）
         services.AddScoped<IUnitOfWork, DapperUnitOfWork>();

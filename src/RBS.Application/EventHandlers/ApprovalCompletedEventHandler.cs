@@ -28,6 +28,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly ISqlLoader _sql;
     private readonly IDbConnectionFactory _db;
     private readonly IJournalGenerationService _journalGen;
+    private readonly ITerminateJob _terminateJob;
     private readonly IServiceProvider _serviceProvider;
 
     public ApprovalCompletedEventHandler(
@@ -40,6 +41,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         ISqlLoader sql,
         IDbConnectionFactory db,
         IJournalGenerationService journalGen,
+        ITerminateJob terminateJob,
         IServiceProvider serviceProvider)
     {
         _importService = importService;
@@ -51,6 +53,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _sql = sql;
         _db = db;
         _journalGen = journalGen;
+        _terminateJob = terminateJob;
         _serviceProvider = serviceProvider;
     }
 
@@ -388,6 +391,17 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     OldValue = (decimal?)null, NewValue = (decimal?)null,
                     EffectiveDate = bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
                     OperatorId = Guid.Empty, OperatorName = "" }); } catch { }
+
+        // 生成押金结算凭证（独立事务，失败不阻断终止主流程）
+        try
+        {
+            await _terminateJob.ExecuteAsync(
+                bizData.ContractId,
+                bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
+                bizData.DepositReturn ?? "FULL",
+                bizData.Reason ?? "合同终止", ct);
+        }
+        catch { /* 押金 JE 生成失败可后续手动重试 */ }
     }
 
     // ===== 续签 =====

@@ -1,81 +1,141 @@
+using System.Data;
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Accounting;
-using RBS.Core.Entities.Billing;
 using RBS.Core.Interfaces.Persistence;
-using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Accounting;
 
+/// <summary>
+/// 自动凭证服务 — 收款确认时自动创建会计凭证
+/// 全部操作在同一 Dapper 事务中完成，保障 Voucher + JE + PrepaidBalance 一致性
+/// </summary>
 public class AutoVoucherService : IAutoVoucherService
 {
-    private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
 
-    public AutoVoucherService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
+    public AutoVoucherService(IDbConnectionFactory db, ISqlLoader sql)
     {
-        _uow = uow;
         _db = db;
         _sql = sql;
     }
 
+    /// <summary>
+    /// 收款确认后自动生成凭证（独立连接/事务）
+    /// </summary>
     public async Task<Voucher?> GenerateFromReceiptAsync(Guid receiptId, CancellationToken ct)
     {
-        var receipt = await _uow.Receipts.GetByIdAsync(receiptId, ct);
-        if (receipt == null || receipt.Status != "Confirmed")
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            var result = await GenerateFromReceiptCoreAsync(conn, tx, receiptId, ct);
+            tx.Commit();
+            return result;
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 收款确认后自动生成凭证（共享连接/事务，与调用方同一事务）
+    /// 调用方负责 Commit/Rollback
+    /// </summary>
+    public async Task<Voucher?> GenerateFromReceiptAsync(IDbConnection conn, IDbTransaction tx, Guid receiptId, CancellationToken ct)
+    {
+        return await GenerateFromReceiptCoreAsync(conn, tx, receiptId, ct);
+    }
+
+    /// <summary>
+    /// 核心逻辑：查收款单 → 查科目 → 查应收余额 → 拆分 → 写入 Voucher + JE + PrepaidBalance
+    /// </summary>
+    private async Task<Voucher?> GenerateFromReceiptCoreAsync(IDbConnection conn, IDbTransaction tx, Guid receiptId, CancellationToken ct)
+    {
+        // 1. 查收款单
+        var receipt = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            "SELECT Id, ReceiptNo, Amount, ContractId, CompanyId FROM Receipts WHERE Id=@Id AND Status='Confirmed'",
+            new { Id = receiptId }, tx);
+        if (receipt == null) return null;
+
+        var amount = (decimal)receipt.Amount;
+        Guid? contractId = (Guid?)receipt.ContractId;
+
+        // 2. 查会计科目
+        var subjects = await conn.QueryAsync<(string Code, Guid Id)>(
+            "SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1122','2203')", transaction: tx);
+        var subjectDict = subjects.ToDictionary(r => r.Code, r => r.Id);
+
+        if (!subjectDict.TryGetValue("1001", out var subject1001) ||
+            !subjectDict.TryGetValue("1122", out var subject1122))
             return null;
 
-        var allSubjects = await _uow.AccountingSubjects.GetAllAsync(ct);
-        var subject1001 = allSubjects.FirstOrDefault(s => s.Code == "1001")?.Id;
-        var subject1122 = allSubjects.FirstOrDefault(s => s.Code == "1122")?.Id;
-        var subject2203 = allSubjects.FirstOrDefault(s => s.Code == "2203")?.Id;
+        subjectDict.TryGetValue("2203", out var subject2203);
 
-        if (subject1001 == null || subject1122 == null)
-            return null;
-
-        // 查询该合同的应收余额（通过 Dapper 直查）
+        // 3. 查询该合同的应收账款余额（按合同维度）
         decimal arBalance = 0;
-        if (receipt.ContractId.HasValue)
+        if (contractId.HasValue)
         {
-            using var conn = _db.CreateConnection(); conn.Open();
             arBalance = await conn.QuerySingleAsync<decimal>(
-                _sql.Get("Billing.Select.JournalEntry.BalanceBySubject"),
-                new { Code = "1122", SrcId = receipt.ContractId.Value });
+                _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
+                new { Code = "1122", ContractId = contractId.Value }, tx);
         }
 
-        // 拆分：offset 冲应收，overflow 进预收
-        var offset = Math.Min(receipt.Amount, Math.Max(0, arBalance));
-        var overflow = receipt.Amount - offset;
+        // 4. 拆分：offset 冲应收，overflow 进预收
+        var offset = Math.Min(amount, Math.Max(0, arBalance));
+        var overflow = amount - offset;
 
+        // 5. 创建凭证
+        var voucherId = Guid.NewGuid();
         var voucherNo = $"PZ-{DateTime.UtcNow:yyyyMMdd}-{receiptId:N}".Substring(0, 32);
-        var voucher = new Voucher(voucherNo, DateOnly.FromDateTime(DateTime.UtcNow),
-            $"收款确认：{receipt.ReceiptNo}");
-        voucher.SetSource(receiptId, "Receipt");
+        var now = DateTime.UtcNow;
+        var period = DateOnly.FromDateTime(now).ToString("yyyy-MM");
+        var companyId = (Guid)receipt.CompanyId;
 
-        voucher.AddEntry(subject1001.Value, "Debit", receipt.Amount, $"收款 {receipt.ReceiptNo}");
+        await conn.ExecuteAsync(
+            _sql.Get("Accounting.Insert.Voucher.WithCompanyId"),
+            new
+            {
+                Id = voucherId, No = voucherNo,
+                Date = DateOnly.FromDateTime(now),
+                Type = "Receipt", SrcId = receiptId,
+                CId = contractId ?? (object)DBNull.Value,
+                CoId = companyId, Period = period,
+                CBy = Guid.Empty
+            }, tx);
+
+        // 6. 插入分录：借 1001 银行存款（全额）
+        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+            new { Id = Guid.NewGuid(), VId = voucherId, SId = subject1001,
+                Dir = "Debit", Amt = amount, Sum = $"收款 {(string)receipt.ReceiptNo}", CBy = Guid.Empty }, tx);
+
+        // 贷 1122 应收账款（≤ 余额冲应收）
         if (offset > 0)
-            voucher.AddEntry(subject1122.Value, "Credit", offset, "冲应收");
-        if (overflow > 0 && subject2203 != null)
-            voucher.AddEntry(subject2203.Value, "Credit", overflow, "溢出进预收");
+            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                new { Id = Guid.NewGuid(), VId = voucherId, SId = subject1122,
+                    Dir = "Credit", Amt = offset, Sum = "冲应收", CBy = Guid.Empty }, tx);
 
-        voucher.Post();
-        await _uow.Vouchers.AddAsync(voucher, ct);
-
-        using var conn2 = _db.CreateConnection(); conn2.Open();
-        foreach (var entry in voucher.Entries)
+        // 贷 2203 预收账款（溢出部分）
+        if (overflow > 0 && subject2203 != Guid.Empty)
         {
-            await conn2.ExecuteAsync(
-                _sql.Get("Accounting.Insert.JournalEntry.Default"),
-                new
-                {
-                    Id = Guid.NewGuid(), VId = voucher.Id, SId = entry.AccountingSubjectId,
-                    Dir = entry.Direction, Amt = entry.Amount, Sum = entry.Summary ?? "",
-                    CBy = Guid.Empty, Now = DateTime.UtcNow
-                });
+            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                new { Id = Guid.NewGuid(), VId = voucherId, SId = subject2203,
+                    Dir = "Credit", Amt = overflow, Sum = "溢出进预收", CBy = Guid.Empty }, tx);
+
+            // 7. 更新合同预存金额（供 SettleJob 预收抵应收使用）
+            if (contractId.HasValue)
+            {
+                await conn.ExecuteAsync(
+                    _sql.Get("Accounting.Update.Contract.PrepaidBalanceIncrement"),
+                    new { Amt = overflow, Id = contractId.Value }, tx);
+            }
         }
 
-        await _uow.CommitAsync(ct);
-        return voucher;
+        return new Voucher(voucherNo, DateOnly.FromDateTime(now), $"收款确认：{(string)receipt.ReceiptNo}");
     }
 }

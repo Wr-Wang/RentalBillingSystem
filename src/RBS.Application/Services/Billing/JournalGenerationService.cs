@@ -77,6 +77,7 @@ public class JournalGenerationService : IJournalGenerationService
                 Type = "ContractFee.Immediate",
                 CId = contractId,
                 FConfigId = feeConfigId,
+                Period = period,
                 CBy = Guid.Empty
             });
 
@@ -100,16 +101,6 @@ public class JournalGenerationService : IJournalGenerationService
                 _sql.Get("Accounting.Insert.JournalEntry.Simple"),
                 new { Id = Guid.NewGuid(), VId = voucherId, SId = revenueId, Dir = "Credit", Amt = (decimal)config.Amount, Sum = $"{config.FeeName}（一次性）", CBy = Guid.Empty });
         }
-    }
-
-    /// <summary>
-    /// BillJob：生成下一个月的 JE（由 BillJob 调用）
-    /// </summary>
-    public async Task GenerateNextMonthAsync(Guid companyId, string targetMonth, CancellationToken ct)
-    {
-        // 由 BillJob 自身实现，此处留空
-        // BillJob 保留原有的分摊计算逻辑 + 插入 Voucher/JE
-        await Task.CompletedTask;
     }
 
     /// <summary>

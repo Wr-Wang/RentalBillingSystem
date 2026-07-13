@@ -82,6 +82,7 @@ public interface IUnitOfWork : IDisposable
 
     // 会计
     IRepository<Voucher> Vouchers { get; }
+    IRepository<AccountingPeriod> AccountingPeriods { get; }
 
     // 系统配置
     IHolidayCalendarRepository HolidayCalendars { get; }

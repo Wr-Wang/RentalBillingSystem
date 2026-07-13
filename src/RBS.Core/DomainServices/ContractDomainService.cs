@@ -86,7 +86,7 @@ public class ContractDomainService : IContractDomainService
             _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
             new { ExpiryDate = effectiveEnd, ContractId = contractId }, ct);
 
-        // 4. 押金处理（TODO: 后续改为从 FeeConfig 查询并生成押金退款 JE）
+        // 4. 押金处理（由 ApprovalCompletedEventHandler 调用 TerminateJob 生成 JE）
 
         await _uow.CommitAsync(ct);
     }

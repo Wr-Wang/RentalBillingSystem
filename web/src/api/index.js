@@ -162,12 +162,23 @@ export function getAccountingSubjects(params) { return request({ url: '/accounti
 export function createAccountingSubject(data) { return request({ url: '/accountingsubjects', method: 'post', data }) }
 export function updateAccountingSubject(id, data) { return request({ url: `/accountingsubjects/${id}`, method: 'put', data }) }
 export function deleteAccountingSubject(id) { return request({ url: `/accountingsubjects/${id}`, method: 'delete' }) }
+export function getLedger(params) { return request({ url: '/ledger', method: 'get', params }) }
+export function getBalanceSheet(params) { return request({ url: '/financialstatements/balancesheet', method: 'get', params }) }
+export function getIncomeStatement(params) { return request({ url: '/financialstatements/incomestatement', method: 'get', params }) }
 export function getJournalEntries(params) { return request({ url: '/journalentries', method: 'get', params }) }
 export function getVouchers(params) { return request({ url: '/vouchers', method: 'get', params }) }
 export function getVoucher(id) { return request({ url: `/vouchers/${id}`, method: 'get' }) }
+export function createVoucher(data) { return request({ url: '/vouchers', method: 'post', data }) }
+export function updateVoucher(id, data) { return request({ url: `/vouchers/${id}`, method: 'put', data }) }
 export function postVoucher(id) { return request({ url: `/vouchers/${id}/post`, method: 'put' }) }
 export function reverseVoucher(id, data) { return request({ url: `/vouchers/${id}/reverse`, method: 'post', data }) }
+export function auditVoucher(id) { return request({ url: `/vouchers/${id}/audit`, method: 'put' }) }
 export function getTrialBalance(params) { return request({ url: '/trialbalance', method: 'get', params }) }
+export function getAccountingPeriods() { return request({ url: '/accountingperiods', method: 'get' }) }
+export function openAccountingPeriod(data) { return request({ url: '/accountingperiods', method: 'post', data }) }
+export function closeAccountingPeriod(id) { return request({ url: `/accountingperiods/${id}/close`, method: 'put' }) }
+export function reopenAccountingPeriod(id) { return request({ url: `/accountingperiods/${id}/reopen`, method: 'put' }) }
+export function lockAccountingPeriod(id) { return request({ url: `/accountingperiods/${id}/lock`, method: 'put' }) }
 
 // Banking
 export function getBankStatements(params) { return request({ url: '/banking/statements', method: 'get', params }) }

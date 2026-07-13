@@ -9,9 +9,16 @@ using RBS.Core.Interfaces.UnitOfWork;
 namespace RBS.Application.Services.Scheduling;
 
 /// <summary>
-/// 收款入账处理 — 确认收款时生成银行存款分录
-/// 事件驱动（由 ReceiptsController.Confirm 触发）
+/// 📣 已废弃 — 请使用 AutoVoucherService 替代
+///
+/// 本类的逻辑（AR 余额查询 + 溢出拆到 2203 + PrepaidBalance 更新）
+/// 已合并到 AutoVoucherService.GenerateFromReceiptAsync()。
+/// AutoVoucherService 由 ReceiptsController.Confirm 触发，且使用统一的 Dapper 事务。
+///
+/// 保留此文件仅作参考，不再注入任何 Controller。
+/// 移除时间：确认 AutoVoucherService 线上运行稳定后即可删除。
 /// </summary>
+[Obsolete("已由 AutoVoucherService 替代", false)]
 public class ReceiptJob
 {
     private readonly ITaskLogRepository _taskLogRepo;
@@ -68,7 +75,7 @@ public class ReceiptJob
             await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
                 new { Id = vid, No = $"RC-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
                     Date = DateOnly.FromDateTime(DateTime.UtcNow), Desc = $"收款确认 {receipt.ReceiptNo}",
-                    SrcId = receiptId, Type = "Receipt", CBy = Guid.Empty }, tx);
+                    SrcId = receiptId, Type = "Receipt", Period = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM"), CBy = Guid.Empty }, tx);
 
             var offset = Math.Min(amount, receivableBalance > 0 ? receivableBalance : amount);
             var overflow = amount - offset;

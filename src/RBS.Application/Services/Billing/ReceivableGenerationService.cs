@@ -176,7 +176,7 @@ public class ReceivableGenerationService : IReceivableGenerationService
                     _sql.Get("Accounting.Insert.Voucher.BillJob"),
                     new { Id = voucherId, No = $"ACT-{current}-{Guid.NewGuid():N}"[..32],
                         Date = DateOnly.FromDateTime(today), Desc = $"合同激活初始化应收 {current}",
-                        SrcId = contractId, Type = "ContractActivation", CId = contractId, CBy = Guid.Empty });
+                        SrcId = contractId, Type = "ContractActivation", CId = contractId, Period = current, CBy = Guid.Empty });
                 await conn.ExecuteAsync(
                     _sql.Get("Accounting.Insert.JournalEntry.Simple"),
                     new { Id = Guid.NewGuid(), VId = voucherId, SId = receivableId,

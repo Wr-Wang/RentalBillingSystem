@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
   ============================================================
-  SQL æ˜ å°„æ–‡ä»¶ â€” ç³»ç»Ÿå”¯ä¸€çš„SQLå­˜æ”¾ä½ç½®
-  å‘½åè§„èŒƒï¼š{æ¨¡å—}.{CRUD}.{å®žä½“}.{æè¿°}
-  CRUD åŠ¨è¯ï¼šSelect / Insert / Update / Delete
-  ç»´æŠ¤äººï¼šDBA å¯ç‹¬ç«‹ç¼–è¾‘æ­¤æ–‡ä»¶
+  SQL Ó³ÉäÎÄ¼þ ¡ª ÏµÍ³Î¨Ò»µÄSQL´æ·ÅÎ»ÖÃ
+  ÃüÃû¹æ·¶£º{Ä£¿é}.{CRUD}.{ÊµÌå}.{ÃèÊö}
+  CRUD ¶¯´Ê£ºSelect / Insert / Update / Delete
+  Î¬»¤ÈË£ºDBA ¿É¶ÀÁ¢±à¼­´ËÎÄ¼þ
   ============================================================
 -->
 <sqlMap>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šUserï¼ˆç”¨æˆ·ï¼‰
+       Ä£¿é£ºUser£¨ÓÃ»§£©
        ================================================================ -->
   <select id="Identity.Select.User.ById">
     <![CDATA[SELECT * FROM Users WHERE Id=@Id]]>
@@ -61,7 +61,7 @@
     <![CDATA[SELECT COUNT(1) FROM Users WHERE Id=@Id]]>
   </select>
 
-  <!-- ç”¨æˆ·è§’è‰² -->
+  <!-- ÓÃ»§½ÇÉ« -->
   <select id="Identity.Select.RoleIds.ByUserId">
     <![CDATA[SELECT RoleId FROM UserRoles WHERE UserId=@UserId]]>
   </select>
@@ -73,7 +73,7 @@
   </insert>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šRoleï¼ˆè§’è‰²ï¼‰
+       Ä£¿é£ºRole£¨½ÇÉ«£©
        ================================================================ -->
   <select id="Authorization.Select.Role.ById">
     <![CDATA[SELECT * FROM Roles WHERE Id=@Id]]>
@@ -105,7 +105,7 @@
   </delete>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šMenuï¼ˆèœå•ï¼‰
+       Ä£¿é£ºMenu£¨²Ëµ¥£©
        ================================================================ -->
   <select id="Authorization.Select.Menu.ById">
     <![CDATA[SELECT * FROM Menus WHERE Id=@Id]]>
@@ -131,7 +131,7 @@
   </delete>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šCompanyï¼ˆå…¬å¸ï¼‰
+       Ä£¿é£ºCompany£¨¹«Ë¾£©
        ================================================================ -->
   <select id="Organization.Select.Company.ById">
     <![CDATA[SELECT * FROM Companies WHERE Id=@Id]]>
@@ -163,7 +163,7 @@
   </update>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šApprovalï¼ˆå®¡æ‰¹ï¼‰
+       Ä£¿é£ºApproval£¨ÉóÅú£©
        ================================================================ -->
   <select id="Approval.Select.Request.ById">
     <![CDATA[SELECT * FROM ApprovalRequests WHERE Id=@Id]]>
@@ -201,7 +201,7 @@
     <![CDATA[DELETE FROM ApprovalRequests WHERE Id=@Id]]>
   </delete>
 
-  <!-- å®¡æ‰¹å¤šè¡¨æŸ¥è¯¢ -->
+  <!-- ÉóÅú¶à±í²éÑ¯ -->
   <select id="Approval.Select.Request.ByIdWithRecords">
     <![CDATA[SELECT * FROM ApprovalRequests WHERE Id=@Id; SELECT * FROM ApprovalRecords WHERE RequestId=@Id ORDER BY CreatedAt]]>
   </select>
@@ -209,7 +209,7 @@
     <![CDATA[SELECT * FROM ApprovalRequests WHERE TargetEntityId=@Id AND TargetEntityType=@Type ORDER BY CreatedAt DESC]]>
   </select>
 
-  <!-- å®¡æ‰¹è®°å½• -->
+  <!-- ÉóÅú¼ÇÂ¼ -->
   <insert id="Approval.Insert.Record.Default">
     <![CDATA[INSERT INTO ApprovalRecords (Id, RequestId, LevelNo, ApproverId, Action, Comment, CreatedBy, CreatedAt)
       VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)]]>
@@ -222,7 +222,7 @@
     <![CDATA[SELECT * FROM ApprovalRecords WHERE RequestId=@Id ORDER BY CreatedAt]]>
   </select>
 
-  <!-- å®¡æ‰¹åŽ†å² -->
+  <!-- ÉóÅúÀúÊ· -->
   <select id="Approval.Select.History.ByUserId">
     <![CDATA[SELECT * FROM ApprovalRequests a
       WHERE EXISTS (SELECT 1 FROM ApprovalRecords r WHERE r.RequestId=a.Id AND r.ApproverId=@UserId
@@ -237,7 +237,7 @@
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šFeeCodeï¼ˆè´¹ç”¨ç§‘ç›®ï¼‰
+       Ä£¿é£ºFeeCode£¨·ÑÓÃ¿ÆÄ¿£©
        ================================================================ -->
   <select id="FeeCode.Select.FeeCode.ByCode">
     <![CDATA[SELECT * FROM FeeCodes WHERE Code=@Code]]>
@@ -250,14 +250,14 @@
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šPaymentChannelï¼ˆä»˜æ¬¾é€šé“ï¼‰
+       Ä£¿é£ºPaymentChannel£¨¸¶¿îÍ¨µÀ£©
        ================================================================ -->
   <select id="PaymentChannel.Select.PaymentChannel.Active">
     <![CDATA[SELECT * FROM PaymentChannels WHERE IsActive=1]]>
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šHolidayCalendarï¼ˆèŠ‚å‡æ—¥ï¼‰
+       Ä£¿é£ºHolidayCalendar£¨½Ú¼ÙÈÕ£©
        ================================================================ -->
   <select id="Calendar.Select.Holiday.ByYear">
     <![CDATA[SELECT * FROM HolidayCalendars WHERE YEAR(HolidayDate)=@Year ORDER BY HolidayDate]]>
@@ -267,7 +267,7 @@
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šTenantï¼ˆç§Ÿå®¢ï¼‰
+       Ä£¿é£ºTenant£¨×â¿Í£©
        ================================================================ -->
   <select id="Rental.Select.Tenant.ByPhone">
     <![CDATA[SELECT * FROM Tenants WHERE Phone=@Phone]]>
@@ -277,7 +277,7 @@
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šReceiptï¼ˆæ”¶æ¬¾ï¼‰
+       Ä£¿é£ºReceipt£¨ÊÕ¿î£©
        ================================================================ -->
   <select id="Collection.Select.Receipt.PendingConfirm">
     <![CDATA[SELECT * FROM Receipts WHERE CompanyId=@Id AND Status='Pending' ORDER BY CreatedAt DESC]]>
@@ -290,7 +290,7 @@
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šDebitNoteï¼ˆè´¦å•ï¼‰
+       Ä£¿é£ºDebitNote£¨ÕËµ¥£©
        ================================================================ -->
   <select id="Billing.Select.DebitNote.ByCompany">
     <![CDATA[SELECT dn.*, c.ContractNo
@@ -322,7 +322,7 @@
     <![CDATA[SELECT * FROM DebitNoteItems WHERE DebitNoteId=@Id ORDER BY CreatedAt]]>
   </select>
 
-  <!-- æ”¶æ¬¾æŠ¥è¡¨æŸ¥è¯¢ -->
+  <!-- ÊÕ¿î±¨±í²éÑ¯ -->
   <select id="Billing.Select.Receipt.DailyReceipt">
     <![CDATA[SELECT Status, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE ReceivedDate=@D GROUP BY Status]]>
   </select>
@@ -333,7 +333,7 @@
     <![CDATA[SELECT ReceivablePlanId, Amount FROM ReceiptAllocations WHERE ReceiptId=@Id]]>
   </select>
 
-  <!-- åº”æ”¶æŠ¥è¡¨æŸ¥è¯¢ -->
+  <!-- Ó¦ÊÕ±¨±í²éÑ¯ -->
   <select id="Billing.Select.ReceivablePlan.MonthlySummary">
     <![CDATA[SELECT COUNT(1) AS TotalPlans, SUM(Amount) AS TotalAmount, SUM(Received) AS TotalReceived FROM ReceivablePlans WHERE Period=@P]]>
   </select>
@@ -359,7 +359,7 @@
     <![CDATA[UPDATE ReceivablePlans SET LateFee = @Fee WHERE Id = @Id]]>
   </update>
 
-  <!-- æˆ¿å±‹å‡ºç§ŸçŽ‡ -->
+  <!-- ·¿ÎÝ³ö×âÂÊ -->
   <select id="Billing.Select.HousingUnit.OccupancyRate">
     <![CDATA[SELECT hu.BuildingName, hu.Id AS BuildingId, COUNT(hu.Id) AS TotalRooms,
       SUM(CASE WHEN hu.Status='Rented' THEN 1 ELSE 0 END) AS RentedRooms,
@@ -368,7 +368,7 @@
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šMeterReadingï¼ˆæŠ„è¡¨ï¼‰
+       Ä£¿é£ºMeterReading£¨³­±í£©
        ================================================================ -->
   <update id="Utility.Update.MeterReading.Confirm">
     <![CDATA[UPDATE MeterReadings SET Status='Confirmed' WHERE Id=@Id AND Status='Draft']]>
@@ -378,14 +378,14 @@
   </update>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šImportï¼ˆå¯¼å…¥ï¼‰
+       Ä£¿é£ºImport£¨µ¼Èë£©
        ================================================================ -->
   <select id="Import.Select.BatchItem.ByBatchId">
     <![CDATA[SELECT * FROM ImportBatchItems WHERE ImportBatchId = @Id ORDER BY RowIndex]]>
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šAccountingï¼ˆä¼šè®¡â€” Journalsï¼‰
+       Ä£¿é£ºAccounting£¨»á¼Æ¡ª Journals£©
        ================================================================ -->
   <insert id="Accounting.Insert.JournalEntry.Default">
     <![CDATA[INSERT INTO JournalEntries (Id, VoucherId, EntryNo, AccountingSubjectId, Direction, Amount, Summary, CreatedBy, CreatedAt)
@@ -393,7 +393,7 @@
   </insert>
 
     <!-- ================================================================
-       æ¨¡å—ï¼šSchedulingï¼ˆè°ƒåº¦ä»»åŠ¡æ—¥å¿— â€” æ›¿æ¢æ—§ ScheduledTaskLogsï¼‰
+       Ä£¿é£ºScheduling£¨µ÷¶ÈÈÎÎñÈÕÖ¾ ¡ª Ìæ»»¾É ScheduledTaskLogs£©
        ================================================================ -->
   <select id="Scheduling.Select.TaskLog.Running">
     <![CDATA[SELECT COUNT(1) FROM TaskLogs WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
@@ -441,7 +441,7 @@
       WHERE TaskName=@Name AND CompanyId=@Cid AND TargetMonth=@Month AND Status='Running']]>
   </update>
 
-  <!-- JobScheduleExecutions æ‰§è¡ŒæŽ’æœŸ -->
+  <!-- JobScheduleExecutions Ö´ÐÐÅÅÆÚ -->
   <select id="Scheduling.Select.Execution.PendingDue">
     <![CDATA[SELECT * FROM [JobScheduleExecutions]
       WHERE [Status]='Pending' AND [TargetDate] <= @Now
@@ -548,7 +548,7 @@
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šNotificationï¼ˆé€šçŸ¥ï¼‰
+       Ä£¿é£ºNotification£¨Í¨Öª£©
        ================================================================ -->
   <select id="Notification.Select.Notification.Paged">
     <![CDATA[SELECT [Id], [UserId], [Category], [Title], [Content],
@@ -582,7 +582,7 @@
     <![CDATA[UPDATE [Notifications] SET [IsRead] = 1 WHERE [UserId] = @UserId AND [IsRead] = 0]]>
   </update>
 
-  <!-- BillJob / SettleJob æŸ¥è¯¢ -->
+  <!-- BillJob / SettleJob ²éÑ¯ -->
   <select id="Lease.Select.FeeConfig.WithFeeNameByContract">
     <![CDATA[SELECT cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName, fc.ChargeType
       FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
@@ -759,7 +759,7 @@
             WHERE afi.ContractId = @ContractId AND afi.FeeCodeId = @FeeCodeId AND ar.Status = 'Pending']]>
   </select>
 
-  <!-- â˜… ApprovalBizData / ApprovalFeeItems æŸ¥è¯¢ï¼ˆåˆåŒæ“ä½œé—­çŽ¯ v3ï¼‰ -->
+  <!-- ¡ï ApprovalBizData / ApprovalFeeItems ²éÑ¯£¨ºÏÍ¬²Ù×÷±Õ»· v3£© -->
   <select id="Approval.Select.ApprovalBizData.ByApprovalRequestId">
     <![CDATA[SELECT * FROM ApprovalBizData WHERE ApprovalRequestId = @Id]]>
   </select>
@@ -788,7 +788,7 @@
       VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @EffectiveDate, @CreatedBy, @CreatedAt)]]>
   </insert>
 
-  <!-- â˜… åˆåŒæ“ä½œé—­çŽ¯ v3 â€” æŽ§åˆ¶å™¨/äº‹ä»¶å¤„ç†å™¨ç”¨ SQL -->
+  <!-- ¡ï ºÏÍ¬²Ù×÷±Õ»· v3 ¡ª ¿ØÖÆÆ÷/ÊÂ¼þ´¦ÀíÆ÷ÓÃ SQL -->
   <insert id="Contract.Insert.ApprovalBizData.RentAdjust">
     <![CDATA[INSERT INTO ApprovalBizData (Id, ApprovalRequestId, ContractId, ContractNo, CompanyId, ChangeType, EffectiveDate, OldAmount, NewAmount, Reason, IsProcessed, CreatedBy, CreatedAt)
       VALUES (@Id, NULL, @ContractId, @ContractNo, @CompanyId, 'RENT_ADJUST', @EffectiveDate, @OldAmount, @NewAmount, @Reason, 0, @CreatedBy, @CreatedAt)]]>
@@ -875,7 +875,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   </insert>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šRenewalï¼ˆç»­ç­¾â€”åº”ç”¨æœåŠ¡ç”¨ SQLï¼‰
+       Ä£¿é£ºRenewal£¨ÐøÇ©¡ªÓ¦ÓÃ·þÎñÓÃ SQL£©
        ================================================================ -->
   <select id="Lease.Select.Contract.RenewalPreview">
     <![CDATA[SELECT c.Id, c.ContractNo, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.RenewalCount,
@@ -919,7 +919,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT COUNT(1) FROM ApprovalRequests WHERE ContractId = @Id AND Status = 'Pending']]>
   </select>
 
-  <!-- ç»­ç­¾å†™æ“ä½œ -->
+  <!-- ÐøÇ©Ð´²Ù×÷ -->
   <insert id="Lease.Insert.RenewalRequest.ApprovalRecord">
     <![CDATA[INSERT INTO ApprovalRecords (Id, RequestId, LevelNo, ApproverId, Action, Comment, CreatedBy, CreatedAt)
       VALUES (@Id, @ApprovalRequestId, @Level, @ApproverId, @Action, @Comment, @CreatedBy, @CreatedAt)]]>
@@ -965,7 +965,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   </update>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šContractï¼ˆåˆåŒâ€”SQL æ›´æ–°è¯­å¥ï¼Œç”¨äºŽ ContractAppServiceï¼‰
+       Ä£¿é£ºContract£¨ºÏÍ¬¡ªSQL ¸üÐÂÓï¾ä£¬ÓÃÓÚ ContractAppService£©
        ================================================================ -->
   <insert id="Lease.Insert.Contract.Default">
     <![CDATA[INSERT INTO Contracts (Id,ContractNo,RoomId,StartDate,EndDate,PaymentCycle,Status,CompanyId,CreatedBy,CreatedAt)
@@ -982,14 +982,14 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[DELETE FROM ReceiptAllocations WHERE ReceiptId=@Id]]>
   </delete>
 
-  <!-- DepositLogï¼ˆæŠ¼é‡‘æ—¥å¿—ï¼‰ -->
+  <!-- DepositLog£¨Ñº½ðÈÕÖ¾£© -->
   <insert id="Contract.Insert.DepositLog.Refund">
     <![CDATA[INSERT INTO DepositLogs (Id, ContractId, ActionType, Amount, BalanceAfter, Remarks, OperatedBy, OperatedAt, CompanyId, CreatedBy, CreatedAt)
       VALUES (@Id, @ContractId, 'Refund', @Amount, @BalanceAfter, @Remarks, @OperatedBy, GETUTCDATE(), @CompanyId, @CreatedBy, @CreatedAt)]]>
   </insert>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šContractFeeConfig â€” åˆåŒè´¹ç”¨é…ç½®ï¼ˆContract å­å®žä½“ï¼‰
+       Ä£¿é£ºContractFeeConfig ¡ª ºÏÍ¬·ÑÓÃÅäÖÃ£¨Contract ×ÓÊµÌå£©
        ================================================================ -->
   <select id="Lease.Select.ContractFeeConfig.ByContractId">
     <![CDATA[SELECT cf.Id, cf.ContractId, cf.FeeCodeId, fc.Name AS FeeCodeName, fc.Code AS FeeCode, fc.ChargeType,
@@ -1059,9 +1059,9 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šCommonï¼ˆé€šç”¨æŸ¥è¯¢ â€” å„ Repository å…¬å…±æŸ¥è¯¢ï¼‰
+       Ä£¿é£ºCommon£¨Í¨ÓÃ²éÑ¯ ¡ª ¸÷ Repository ¹«¹²²éÑ¯£©
        ================================================================ -->
-  <!-- åˆåŒæ—¶é—´çº¿ -->
+  <!-- ºÏÍ¬Ê±¼äÏß -->
   <select id="Lease.Select.Contract.RenewalRequests">
     <![CDATA[SELECT CreatedAt, Status, NewRent FROM RenewalRequests WHERE OldContractId=@Id ORDER BY CreatedAt]]>
   </select>
@@ -1082,7 +1082,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT * FROM ImportBatches WHERE Id=@Id; SELECT * FROM ImportBatchItems WHERE ImportBatchId=@Id ORDER BY RowIndex]]>
   </select>
 
-  <!-- ç³»ç»Ÿæ—¥å¿—æ¸…ç† -->
+  <!-- ÏµÍ³ÈÕÖ¾ÇåÀí -->
   <delete id="Common.Delete.SystemLog.ById">
     <![CDATA[DELETE FROM SystemLogs WHERE Id = @Id]]>
   </delete>
@@ -1090,7 +1090,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[DELETE FROM SystemLogs]]>
   </delete>
 
-  <!-- API æ—¥å¿—æ¸…ç† -->
+  <!-- API ÈÕÖ¾ÇåÀí -->
   <delete id="Common.Delete.ApiLog.ById">
     <![CDATA[DELETE FROM ApiLogs WHERE Id = @Id]]>
   </delete>
@@ -1121,26 +1121,11 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       ORDER BY p.DueDate]]>
   </select>
   <select id="Accounting.Select.Voucher.List">
-    <![CDATA[SELECT [Id],[VoucherNo],[VoucherDate],[Status],
-            [SourceType] AS [SourceEntityType],[SourceId] AS [SourceEntityId],
-            [TotalDebit],[TotalCredit],[ContractId],[CompanyId],[Period],
-            [CreatedBy],[CreatedAt]
-      FROM [Vouchers] WHERE (@StartDate IS NULL OR [VoucherDate] >= @StartDate)
+    <![CDATA[SELECT * FROM [Vouchers] WHERE (@StartDate IS NULL OR [VoucherDate] >= @StartDate)
       AND (@EndDate IS NULL OR [VoucherDate] <= @EndDate) ORDER BY [VoucherDate] DESC]]>
   </select>
-  <select id="Accounting.Select.Voucher.ById">
-    <![CDATA[SELECT [Id],[VoucherNo],[VoucherDate],[Status],
-            [SourceType] AS [SourceEntityType],[SourceId] AS [SourceEntityId],
-            [TotalDebit],[TotalCredit],[ContractId],[CompanyId],[Period],
-            [CreatedBy],[CreatedAt],[FeeConfigId]
-      FROM [Vouchers] WHERE [Id] = @Id]]>
-  </select>
   <select id="Accounting.Select.Voucher.ByIdWithEntries">
-    <![CDATA[SELECT [Id],[VoucherNo],[VoucherDate],[Status],
-            [SourceType] AS [SourceEntityType],[SourceId] AS [SourceEntityId],
-            [TotalDebit],[TotalCredit],[ContractId],[CompanyId],[Period],
-            [CreatedBy],[CreatedAt],[FeeConfigId]
-      FROM [Vouchers] WHERE [Id] = @Id;
+    <![CDATA[SELECT * FROM [Vouchers] WHERE [Id] = @Id;
     SELECT je.*, s.Code AS SubjectCode, s.Name AS SubjectName
       FROM [JournalEntries] je
       LEFT JOIN [AccountingSubjects] s ON s.Id = je.AccountingSubjectId
@@ -1174,11 +1159,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
         AND (@EndDate IS NULL OR v.VoucherDate <= @EndDate)]]>
   </select>
   <select id="Accounting.Select.Voucher.Paged">
-    <![CDATA[SELECT [Id],[VoucherNo],[VoucherDate],[Status],
-            [SourceType] AS [SourceEntityType],[SourceId] AS [SourceEntityId],
-            [TotalDebit],[TotalCredit],[ContractId],[CompanyId],[Period],
-            [CreatedBy],[CreatedAt],[FeeConfigId]
-      FROM [Vouchers]
+    <![CDATA[SELECT * FROM [Vouchers]
       WHERE (@CompanyId IS NULL OR CompanyId = @CompanyId)
         AND (@StartDate IS NULL OR VoucherDate >= @StartDate)
         AND (@EndDate IS NULL OR VoucherDate <= @EndDate)
@@ -1217,8 +1198,8 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   </select>
 
   <!-- ================================================================
-       æ¨¡å—ï¼šMonitorï¼ˆè°ƒåº¦æ‰§è¡Œç›‘æŽ§ï¼‰
-       å‘½åè§„èŒƒï¼š{æ¨¡å—}.{CRUD}.{å®žä½“}.{æè¿°}
+       Ä£¿é£ºMonitor£¨µ÷¶ÈÖ´ÐÐ¼à¿Ø£©
+       ÃüÃû¹æ·¶£º{Ä£¿é}.{CRUD}.{ÊµÌå}.{ÃèÊö}
        ================================================================ -->
   <select id="Monitor.Select.TaskLog.DashboardStats">
     <![CDATA[
@@ -1319,18 +1300,18 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
 
   <select id="Monitor.Select.TaskLog.PreviewReverse">
     <![CDATA[
-      -- æ£€æŸ¥è¯¥æœŸæ˜¯å¦æœ‰æ”¶æ¬¾
+      -- ¼ì²é¸ÃÆÚÊÇ·ñÓÐÊÕ¿î
       SELECT COUNT(1) FROM JournalEntries je
       JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
       WHERE s.Code = '1001' AND je.VoucherId IN
       (SELECT Id FROM Vouchers WHERE SourceEntityId IN
       (SELECT ContractId FROM ReceivablePlans WHERE Period = @P));
-      -- è´¦å•æ•°
+      -- ÕËµ¥Êý
       SELECT COUNT(1) FROM DebitNotes WHERE BillJobTaskLogId = @Id AND Status = 'Published';
-      -- åº”æ”¶è®¡åˆ’æ•°
+      -- Ó¦ÊÕ¼Æ»®Êý
       SELECT COUNT(1) FROM ReceivablePlans
       WHERE Period = @P AND CreatedAt >= @Start AND CreatedAt <= @End;
-      -- å‡­è¯æ•°
+      -- Æ¾Ö¤Êý
       SELECT COUNT(1) FROM Vouchers
       WHERE SourceEntityType = 'ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End;
     ]]>
@@ -1412,7 +1393,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT Name FROM Companies WHERE Id=@Id]]>
   </select>
 
-  <!-- ===== ç§Ÿå®¢ç›¸å…³ SQLï¼ˆTenant Tab + å¤šç§Ÿå®¢æ”¹é€ ï¼‰ ===== -->
+  <!-- ===== ×â¿ÍÏà¹Ø SQL£¨Tenant Tab + ¶à×â¿Í¸ÄÔì£© ===== -->
   <select id="Lease.Select.ContractTenant.DetailByContract">
     <![CDATA[SELECT ct.TenantId, ct.IsPrimary, t.Name AS TenantName, t.Phone AS TenantPhone, t.IdentityNo AS IdCard, t.Email, t.Wechat
       FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId
@@ -1447,7 +1428,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[UPDATE TenantCreateRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
 
-  <!-- ===== ContractCreateRequests (åˆåŒåˆ›å»ºæš‚å­˜) ===== -->
+  <!-- ===== ContractCreateRequests (ºÏÍ¬´´½¨ÔÝ´æ) ===== -->
   <insert id="ContractCreate.Insert.Request.Default">
     <![CDATA[INSERT INTO ContractCreateRequests (Id, ContractNo, RoomId, StartDate, EndDate, PaymentCycle, CompanyId, Status, Remark, CreatedBy, CreatedAt)
       VALUES (@Id, @ContractNo, @RoomId, @StartDate, @EndDate, @PaymentCycle, @CompanyId, @Status, @Remark, @CreatedBy, @CreatedAt)]]>
@@ -1486,7 +1467,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.RequestId = @RequestId]]>
   </select>
 
-  <!-- ===== ContractModifyRequests (åˆåŒä¿®æ”¹æš‚å­˜) ===== -->
+  <!-- ===== ContractModifyRequests (ºÏÍ¬ÐÞ¸ÄÔÝ´æ) ===== -->
   <insert id="ContractModify.Insert.Request.Default">
     <![CDATA[INSERT INTO ContractModifyRequests (Id, ContractId, StartDate, EndDate, PaymentCycle, AutoRenew, AllowDepositAsLastRent, PaymentDueDay, TenantPhone, Remark, Status, CreatedBy, CreatedAt)
       VALUES (@Id, @ContractId, @StartDate, @EndDate, @PaymentCycle, @AutoRenew, @AllowDepositAsLastRent, @PaymentDueDay, @TenantPhone, @Remark, @Status, @CreatedBy, @CreatedAt)]]>
@@ -1515,7 +1496,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT * FROM ContractModifyRequests WHERE ApprovalRequestId=@ApprovalRequestId]]>
   </select>
 
-  <!-- ===== SupplementaryFeeRequests + Items (è¡¥å……æ”¶è´¹æš‚å­˜) ===== -->
+  <!-- ===== SupplementaryFeeRequests + Items (²¹³äÊÕ·ÑÔÝ´æ) ===== -->
   <insert id="SupplementaryFee.Insert.Request.Default">
     <![CDATA[INSERT INTO SupplementaryFeeRequests (Id, ContractId, FeeCodeId, Amount, BillingMode, EffectiveDate, PeriodFrom, PeriodTo, Status, CompanyId, CreatedBy, CreatedAt)
       VALUES (@Id, @ContractId, @FeeCodeId, @Amount, @BillingMode, @EffectiveDate, @PeriodFrom, @PeriodTo, @Status, @CompanyId, @CreatedBy, @CreatedAt)]]>
@@ -1543,7 +1524,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[UPDATE SupplementaryFeeRequestItems SET ReceivablePlanId=@ReceivablePlanId, VoucherId=@VoucherId WHERE Id=@Id]]>
   </update>
 
-  <!-- ===== ReceivableGenerateRequests + Items (ç”Ÿæˆåº”æ”¶æš‚å­˜) ===== -->
+  <!-- ===== ReceivableGenerateRequests + Items (Éú³ÉÓ¦ÊÕÔÝ´æ) ===== -->
   <insert id="ReceivableGenerate.Insert.Request.Default">
     <![CDATA[INSERT INTO ReceivableGenerateRequests (Id, ContractId, CompanyId, PeriodFrom, PeriodTo, Status, CreatedBy, CreatedAt)
       VALUES (@Id, @ContractId, @CompanyId, @PeriodFrom, @PeriodTo, @Status, @CreatedBy, @CreatedAt)]]>

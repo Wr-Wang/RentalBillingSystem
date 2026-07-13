@@ -1,4 +1,5 @@
 using Dapper;
+using RBS.Core.Entities.Accounting;
 using RBS.Core.Entities.Base;
 
 namespace RBS.Infrastructure.Data.TypeHandlers;
@@ -17,6 +18,19 @@ public static class ValueObjectHandlers
         SqlMapper.AddTypeHandler(new ContractStatusHandler());
         SqlMapper.AddTypeHandler(new ReceiptStatusHandler());
         SqlMapper.AddTypeHandler(new ReceivableStatusHandler());
+        SqlMapper.AddTypeHandler(new VoucherStatusHandler());
+    }
+}
+
+public class VoucherStatusHandler : SqlMapper.TypeHandler<VoucherStatus>
+{
+    public override VoucherStatus Parse(object value) =>
+        VoucherStatus.FromCode(value?.ToString() ?? "Draft");
+
+    public override void SetValue(System.Data.IDbDataParameter parameter, VoucherStatus value)
+    {
+        parameter.Value = value.Code;
+        parameter.DbType = System.Data.DbType.String;
     }
 }
 

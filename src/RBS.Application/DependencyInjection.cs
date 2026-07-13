@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IFeeCodeService, FeeCodeService>();
         services.AddScoped<ITaxRateConfigService, TaxRateConfigService>();
         services.AddScoped<IAccountingSubjectService, AccountingSubjectService>();
+        services.AddScoped<IAccountingPeriodService, AccountingPeriodService>();
         services.AddScoped<ISchedulerService, SchedulerService>();
         services.AddScoped<IJobTemplateService, JobTemplateService>();
         services.AddScoped<IJobScheduleExecutionService, JobScheduleExecutionService>();
@@ -58,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IAutoVoucherService, AutoVoucherService>();
         services.AddScoped<IReportingService, ReportingService>();
 		services.AddScoped<IJournalGenerationService, JournalGenerationService>();
+		services.AddScoped<ITerminateJob, TerminateJob>();
 
         // 调度执行监控
         services.AddScoped<ITaskMonitorService, TaskMonitorService>();

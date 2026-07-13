@@ -84,7 +84,7 @@ public class SettleJob : ScheduledJobBase
                         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
                             new { Id = vid, No = $"STL-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
                                 Date = today, Desc = $"SettleJob {targetMonth} 预收抵应收",
-                                SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, CBy = Guid.Empty }, tx);
+                                SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, Period = targetMonth, CBy = Guid.Empty }, tx);
                         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
                             new { Id = Guid.NewGuid(), VId = vid, SId = subjects["2203"],
                                 Dir = "Debit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
@@ -93,7 +93,7 @@ public class SettleJob : ScheduledJobBase
                                 Dir = "Credit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
                         // 扣减合同预存金额（闭合：预存金额 = 原值 - 本次抵扣）
                         await conn.ExecuteAsync(
-                            "UPDATE Contracts SET PrepaidBalance = PrepaidBalance - @Amt WHERE Id = @Id",
+                            _sql.Get("Accounting.Update.Contract.PrepaidBalanceDecrement"),
                             new { Amt = amt, Id = contract.Id }, tx);
                         counters[0]++;
                     }
@@ -123,7 +123,7 @@ public class SettleJob : ScheduledJobBase
                     await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
                         new { Id = pvId, No = $"PEN-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
                             Date = today, Desc = $"SettleJob {targetMonth} 滞纳金",
-                            SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, CBy = Guid.Empty }, tx);
+                            SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, Period = targetMonth, CBy = Guid.Empty }, tx);
                     await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
                         new { Id = Guid.NewGuid(), VId = pvId, SId = subjects["1122"],
                             Dir = "Debit", Amt = penalty, Sum = "滞纳金", CBy = Guid.Empty }, tx);
@@ -163,8 +163,9 @@ public class SettleJob : ScheduledJobBase
     private async Task<Dictionary<string, Guid>> LoadSubjectsAsync(CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
+        var codes = new[] { "1122", "2203", "6051" };
         var rows = await conn.QueryAsync<(string Code, Guid Id)>(
-            "SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1122','2203','6051')");
+            _sql.Get("Accounting.Select.Subject.ByCodeList"), new { Codes = codes });
         return rows.ToDictionary(r => r.Code, r => r.Id);
     }
 }

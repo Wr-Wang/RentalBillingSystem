@@ -4092,6 +4092,7 @@ CREATE TABLE [Vouchers] (
     [RowVersion] TIMESTAMP NOT NULL , -- 乐观锁,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置实例ID（一次性费用 JE 幂等去重用，NULL 为周期性/补差凭证）,
+    [Period] VARCHAR(7) NULL , -- 会计期间(yyyy-MM),
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
@@ -4257,6 +4258,29 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'CreatedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'CreatedIp'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+-- 49. AccountingPeriods 表：会计期间表
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[AccountingPeriods]'))
+CREATE TABLE [AccountingPeriods] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()),
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL,
+    [Period] VARCHAR(7) NOT NULL,
+    [Status] VARCHAR(20) NOT NULL DEFAULT ('Open'),
+    [OpenedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
+    [OpenedBy] UNIQUEIDENTIFIER NOT NULL,
+    [ClosedAt] DATETIME2 NULL,
+    [ClosedBy] UNIQUEIDENTIFIER NULL,
+    [CreatedBy] UNIQUEIDENTIFIER NOT NULL,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
+    [UpdatedBy] UNIQUEIDENTIFIER NULL,
+    [UpdatedAt] DATETIME2 NULL,
+    [UpdatedIp] VARCHAR(45),
+    [UpdatedHostname] VARCHAR(100)
+)
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'AccountingPeriods'
+GO
+
+
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
@@ -5404,4 +5428,12 @@ GO
 -- 按批次查询
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ImportBatchItems]') AND name=N'IX_ImportBatchItems_BatchId')
 CREATE INDEX [IX_ImportBatchItems_BatchId] ON [ImportBatchItems]([BatchId])
+
+-- =================================================================
+-- v2026.07: Vouchers 表增加 Period 列（日记账方案新增）
+-- =================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Vouchers]') AND name=N'Period')
+ALTER TABLE [Vouchers] ADD [Period] VARCHAR(7) NULL
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间(yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'Period'
 

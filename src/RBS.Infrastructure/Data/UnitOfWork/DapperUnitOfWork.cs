@@ -51,6 +51,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IRepository<AutoRenewConfig> AutoRenewConfigs => _autoRenewConfigs ??= new DapperRepository<AutoRenewConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<Voucher> Vouchers => _vouchers ??= new DapperRepository<Voucher>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<AccountingPeriod> AccountingPeriods => _accountingPeriods ??= new DapperRepository<AccountingPeriod>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new DapperRepository<JobSchedule>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new DapperRepository<JobTemplate>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<JobScheduleExecution> JobScheduleExecutions => _jobScheduleExecutions ??= new DapperRepository<JobScheduleExecution>(_db, _auditWriter, tracker: this, tenant: _tenant);
@@ -103,6 +104,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IRepository<AutoRenewConfig>? _autoRenewConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
     private IRepository<Voucher>? _vouchers;
+    private IRepository<AccountingPeriod>? _accountingPeriods;
     private IRepository<JobSchedule>? _jobSchedules;
     private IRepository<JobTemplate>? _jobTemplates;
     private IRepository<JobScheduleExecution>? _jobScheduleExecutions;

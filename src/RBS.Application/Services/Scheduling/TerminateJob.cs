@@ -11,8 +11,9 @@ namespace RBS.Application.Services.Scheduling;
 /// <summary>
 /// 合同终止结算 — 审批通过后执行全套结算
 /// 事件驱动（由 ApprovalCompletedEventHandler 触发）
+/// 生成一张 Voucher 包含所有终止分录（扣款/抵扣欠费/退还）
 /// </summary>
-public class TerminateJob
+public class TerminateJob : ITerminateJob
 {
     private readonly ITaskLogRepository _taskLogRepo;
     private readonly ITaskStepLogger _stepLogger;
@@ -38,74 +39,83 @@ public class TerminateJob
 
         try
         {
-            // Step01: 查询合同和当前账期
+            // Step01: 查询合同信息
             var step01 = await _stepLogger.StartStepAsync(taskLogId, "TermStep01", "查询合同信息", null, null, ct);
             var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                "SELECT Id, ContractNo, StartDate, EndDate, CompanyId FROM Contracts WHERE Id=@Id",
-                new { Id = contractId }, tx);
+                _sql.Get("Terminate.Select.Contract.Detail"), new { Id = contractId }, tx);
             if (contract == null) throw new InvalidOperationException("合同不存在");
 
-            // 从 FeeConfig 查询押金金额（Contracts.DepositAmount 列已移除）
+            var companyId = (Guid)contract.CompanyId;
+            var now = DateTime.UtcNow;
+            var period = $"{now.Year:D4}-{now.Month:D2}";
+            await _stepLogger.CompleteStepAsync(step01, 1, null, ct);
+
+            // Step02: 查询押金 + 应收余额
+            var step02 = await _stepLogger.StartStepAsync(taskLogId, "TermStep02", "查询押金与应收余额", null, null, ct);
             var depositAmount = await conn.QuerySingleOrDefaultAsync<decimal>(
                 _sql.Get("Contract.Select.DepositConfig.AmountByContract"),
                 new { Cid = contractId }, tx);
 
-            var curPeriod = $"{DateTime.UtcNow.Year}-{DateTime.UtcNow.Month:D2}";
-            await _stepLogger.CompleteStepAsync(step01, 1, null, ct);
+            var receivableBal = await conn.QuerySingleAsync<decimal>(
+                _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
+                new { Code = "1122", ContractId = contractId }, tx);
+            await _stepLogger.CompleteStepAsync(step02, 1, null, ct);
 
-            // Step02: 补生未出账月份应收
-            var step02 = await _stepLogger.StartStepAsync(taskLogId, "TermStep02", "补生未出账应收", null, null, ct);
-            // TODO: 按合同起止日期补生 missing 月份
-            await _stepLogger.CompleteStepAsync(step02, 0, null, ct);
-
-            // Step03: 扣款处理
-            var step03 = await _stepLogger.StartStepAsync(taskLogId, "TermStep03", "押金扣款处理", null, null, ct);
-            if (depositAmount > 0)
+            if (depositAmount <= 0)
             {
-                var deduction = 0m;
-                // 扣款分录：借押金/贷其他业务收入
-                // TODO: 从 TerminationBizData 获取扣款明细
-                if (deduction > 0)
-                {
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = Guid.NewGuid(), SId = subjects["2241"],
-                            Dir = "Debit", Amt = deduction, Sum = "终止扣款", CBy = Guid.Empty }, tx);
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = Guid.NewGuid(), SId = subjects["6051"],
-                            Dir = "Credit", Amt = deduction, Sum = "扣款收入", CBy = Guid.Empty }, tx);
-                }
+                await _stepLogger.SkipStepAsync(
+                    await _stepLogger.StartStepAsync(taskLogId, "TermStep03", "押金结算", null, null, ct),
+                    "无押金，跳过结算", null, ct);
+                tx.Commit();
+                await _taskLogRepo.CompleteAsync(taskLogId, 1, 1, 0, 0, "无押金，终止结算完成", ct);
+                return;
             }
-            await _stepLogger.CompleteStepAsync(step03, 0, null, ct);
 
-            // Step04: 押金抵扣欠费 + 退还
-            var step04 = await _stepLogger.StartStepAsync(taskLogId, "TermStep04", "押金结算", null, null, ct);
-            if (depositAmount > 0)
-            {
-                var receivableBal = await conn.QuerySingleAsync<decimal>(
-                    _sql.Get("Billing.Select.JournalEntry.BalanceBySubject"),
-                    new { Code = "1122", SrcId = contractId }, tx);
-                var offsetAmount = Math.Min(receivableBal, depositAmount);
-                if (offsetAmount > 0)
+            // Step03: 创建终止结算 Voucher
+            var step03 = await _stepLogger.StartStepAsync(taskLogId, "TermStep03", "生成终止结算凭证", null, null, ct);
+
+            var voucherId = Guid.NewGuid();
+            var voucherNo = $"TERM-{now:yyyyMMdd}-{contractId:N}".Substring(0, 32);
+            var deduction = 0m; // TODO: 从 TerminationBizData 获取扣款明细
+            var offsetAmount = Math.Min(receivableBal, depositAmount);
+            var refundAmount = depositAmount - offsetAmount - deduction;
+
+            // 插入 Voucher
+            await conn.ExecuteAsync(
+                _sql.Get("Accounting.Insert.Voucher.WithCompanyId"),
+                new
                 {
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = Guid.NewGuid(), SId = subjects["2241"],
-                            Dir = "Debit", Amt = offsetAmount, Sum = "押金抵扣欠费", CBy = Guid.Empty }, tx);
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = Guid.NewGuid(), SId = subjects["1122"],
-                            Dir = "Credit", Amt = offsetAmount, Sum = "欠费已抵扣", CBy = Guid.Empty }, tx);
-                }
-                var refundAmount = depositAmount - offsetAmount;
-                if (refundAmount > 0)
-                {
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = Guid.NewGuid(), SId = subjects["2241"],
-                            Dir = "Debit", Amt = refundAmount, Sum = "押金退还", CBy = Guid.Empty }, tx);
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = Guid.NewGuid(), SId = subjects["1001"],
-                            Dir = "Credit", Amt = refundAmount, Sum = "退还押金", CBy = Guid.Empty }, tx);
-                }
-            }
-            await _stepLogger.CompleteStepAsync(step04, 1, null, ct);
+                    Id = voucherId, No = voucherNo,
+                    Date = DateOnly.FromDateTime(now),
+                    Type = "ContractTermination", SrcId = contractId,
+                    CId = contractId, CoId = companyId, Period = period,
+                    CBy = Guid.Empty
+                }, tx);
+
+            // 借方：2241 押金（全额冲减）
+            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                new { Id = Guid.NewGuid(), VId = voucherId, SId = subjects["2241"],
+                    Dir = "Debit", Amt = depositAmount, Sum = "合同终止押金结算", CBy = Guid.Empty }, tx);
+
+            // 贷方：6051 扣款（如有）
+            if (deduction > 0)
+                await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                    new { Id = Guid.NewGuid(), VId = voucherId, SId = subjects["6051"],
+                        Dir = "Credit", Amt = deduction, Sum = "终止扣款", CBy = Guid.Empty }, tx);
+
+            // 贷方：1122 抵扣欠费
+            if (offsetAmount > 0)
+                await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                    new { Id = Guid.NewGuid(), VId = voucherId, SId = subjects["1122"],
+                        Dir = "Credit", Amt = offsetAmount, Sum = "押金抵扣欠费", CBy = Guid.Empty }, tx);
+
+            // 贷方：1001 退还押金
+            if (refundAmount > 0)
+                await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
+                    new { Id = Guid.NewGuid(), VId = voucherId, SId = subjects["1001"],
+                        Dir = "Credit", Amt = refundAmount, Sum = "退还押金", CBy = Guid.Empty }, tx);
+
+            await _stepLogger.CompleteStepAsync(step03, 1, null, ct);
 
             tx.Commit();
             await _taskLogRepo.CompleteAsync(taskLogId, 1, 1, 0, 0, "终止结算完成", ct);
@@ -141,8 +151,9 @@ public class TerminateJob
     private async Task<Dictionary<string, Guid>> LoadSubjectsAsync(CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
+        var codes = new[] { "1001", "1122", "2241", "6051" };
         var rows = await conn.QueryAsync<(string Code, Guid Id)>(
-            "SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1122','2241','6051')");
+            _sql.Get("Accounting.Select.Subject.ByCodeList"), new { Codes = codes });
         return rows.ToDictionary(r => r.Code, r => r.Id);
     }
 }

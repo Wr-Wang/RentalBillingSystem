@@ -13,6 +13,12 @@ public class JournalEntry : AuditableEntity
     public decimal Amount { get; private set; }
     public string? Summary { get; private set; }
 
+    /// <summary>科目编码（SQL 查询映射用，非持久化）</summary>
+    public string? SubjectCode { get; set; }
+
+    /// <summary>科目名称（SQL 查询映射用，非持久化）</summary>
+    public string? SubjectName { get; set; }
+
     private JournalEntry() : base()
     {
         Direction = string.Empty;

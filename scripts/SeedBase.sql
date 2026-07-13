@@ -996,6 +996,21 @@ DECLARE @M_Accounting_TrialBalance uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_Accounting_TrialBalance,N'试算平衡表','accounting:trialbalance','/accounting/trialbalance',@M_Accounting,4,1,@SysUserId,@Now);
 
+DECLARE @M_Accounting_Periods uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_Accounting_Periods,N'会计期间','accounting:periods','/accounting/periods',@M_Accounting,5,1,@SysUserId,@Now);
+
+DECLARE @M_Accounting_Ledger uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_Accounting_Ledger,N'明细账','accounting:ledger','/accounting/ledger',@M_Accounting,6,1,@SysUserId,@Now);
+nDECLARE @M_Accounting_BalanceSheet uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_Accounting_BalanceSheet,N'资产负债表','accounting:balancesheet','/accounting/balancesheet',@M_Accounting,7,1,@SysUserId,@Now);
+
+DECLARE @M_Accounting_IncomeStatement uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_Accounting_IncomeStatement,N'利润表','accounting:incomestatement','/accounting/incomestatement',@M_Accounting,8,1,@SysUserId,@Now);
+
 DECLARE @M_Accounting_SubjectCreate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_Accounting_SubjectCreate,N'新增科目','accounting:subjectcreate',NULL,@M_Accounting,10,1,@SysUserId,@Now);
@@ -1443,7 +1458,7 @@ WHERE M.PermissionCode IN (
   'notification:view', 'notification:markallread',
   'receipt:view', 'receipt:list',
   'bill:view', 'bill:list',
-  'accounting:view', 'accounting:subjects', 'accounting:journal', 'accounting:vouchers', 'accounting:trialbalance',
+  'accounting:view', 'accounting:subjects', 'accounting:journal', 'accounting:vouchers', 'accounting:trialbalance', 'accounting:periods', 'accounting:ledger', 'accounting:balancesheet', 'accounting:incomestatement',
   'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
   'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )

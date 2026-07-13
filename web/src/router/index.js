@@ -197,6 +197,30 @@ const routes = [
             name: 'TrialBalance',
             component: () => import('../views/accounting/trialBalance.vue'),
             meta: { title: '试算平衡表', icon: 'ScaleToOriginal' }
+          },
+          {
+            path: 'periods',
+            name: 'AccountingPeriods',
+            component: () => import('../views/accounting/periods.vue'),
+            meta: { title: '会计期间', icon: 'Calendar' }
+          },
+          {
+            path: 'ledger',
+            name: 'AccountingLedger',
+            component: () => import('../views/accounting/ledger.vue'),
+            meta: { title: '明细账', icon: 'List' }
+          },
+          {
+            path: 'balancesheet',
+            name: 'BalanceSheet',
+            component: () => import('../views/accounting/balanceSheet.vue'),
+            meta: { title: '资产负债表', icon: 'DataBoard' }
+          },
+          {
+            path: 'incomestatement',
+            name: 'IncomeStatement',
+            component: () => import('../views/accounting/incomeStatement.vue'),
+            meta: { title: '利润表', icon: 'DataLine' }
           }
         ]
       },
@@ -339,6 +363,9 @@ const routes = [
       { path: 'subjects', redirect: '/accounting/subjects', meta: { hidden: true } },
       { path: 'journal', redirect: '/accounting/journal', meta: { hidden: true } },
       { path: 'vouchers', redirect: '/accounting/vouchers', meta: { hidden: true } },
+      { path: 'ledger', redirect: '/accounting/ledger', meta: { hidden: true } },
+      { path: 'balancesheet', redirect: '/accounting/balancesheet', meta: { hidden: true } },
+      { path: 'incomestatement', redirect: '/accounting/incomestatement', meta: { hidden: true } },
       { path: 'match', redirect: '/bank/match', meta: { hidden: true } },
       { path: 'reconciliation', redirect: '/bank/reconciliation', meta: { hidden: true } },
       { path: 'users', redirect: '/system/organization/users', meta: { hidden: true } },

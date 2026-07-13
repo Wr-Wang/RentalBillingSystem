@@ -175,7 +175,7 @@ public class BillJob : ScheduledJobBase
             {
                 Id = voucherId, No = $"BILL-{period}-{Guid.NewGuid():N}".Substring(0, 32),
                 Date = DateOnly.FromDateTime(DateTime.UtcNow), Desc = $"BillJob {period}",
-                SrcId = contractId, Type = "ReceivablePlan", CId = contractId, CBy = Guid.Empty
+                SrcId = contractId, Type = "ReceivablePlan", CId = contractId, Period = period, CBy = Guid.Empty
             }, tx);
 
         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),

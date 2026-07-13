@@ -56,6 +56,12 @@ public class Voucher : AggregateRoot
     /// </summary>
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
+    /// <summary>借方总额（来自 DB 列，仅用于列表查询展示）</summary>
+    public decimal TotalDebit { get; set; }
+
+    /// <summary>贷方总额（来自 DB 列，仅用于列表查询展示）</summary>
+    public decimal TotalCredit { get; set; }
+
     /// <summary>
     /// 凭证分录集合（只读）
     /// </summary>
@@ -194,6 +200,15 @@ public class Voucher : AggregateRoot
     public void SetContract(Guid? contractId)
     {
         ContractId = contractId;
+    }
+
+    /// <summary>
+    /// 设置会计期间
+    /// </summary>
+    /// <param name="period">期间字符串（yyyy-MM）</param>
+    public void SetPeriod(string period)
+    {
+        Period = period;
     }
 
     /// <summary>

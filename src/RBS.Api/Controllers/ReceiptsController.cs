@@ -1,7 +1,10 @@
+using System.Data;
+using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Billing;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
@@ -14,12 +17,19 @@ public class ReceiptsController : ControllerBase
     private readonly IUnitOfWork _uow;
     private readonly IAutoVoucherService _autoVoucher;
     private readonly IReceiptService _receiptService;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
-    public ReceiptsController(IUnitOfWork uow, IAutoVoucherService autoVoucher, IReceiptService receiptService)
+    public ReceiptsController(
+        IUnitOfWork uow, IAutoVoucherService autoVoucher,
+        IReceiptService receiptService,
+        IDbConnectionFactory db, ISqlLoader sql)
     {
         _uow = uow;
         _autoVoucher = autoVoucher;
         _receiptService = receiptService;
+        _db = db;
+        _sql = sql;
     }
 
     [HttpGet]
@@ -52,12 +62,41 @@ public class ReceiptsController : ControllerBase
     [HttpPut("{id}/confirm")]
     public async Task<IActionResult> Confirm(Guid id, CancellationToken ct)
     {
-        var entity = await _uow.Receipts.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        entity.Confirm(Guid.Empty);
-        await _uow.CommitAsync(ct);
-        await _autoVoucher.GenerateFromReceiptAsync(id, ct);
-        return Ok(entity);
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            // 1. 乐观锁更新收款单状态（仅 Pending 可确认）
+            var updated = await conn.ExecuteAsync(
+                "UPDATE Receipts SET Status='Confirmed', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Pending'",
+                new { Id = id }, tx);
+
+            if (updated == 0)
+            {
+                var receipt = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                    "SELECT Status FROM Receipts WHERE Id=@Id", new { Id = id }, tx);
+                if (receipt == null) return NotFound();
+                return BadRequest(new { message = $"收款单状态为「{(string)receipt.Status}」，仅待确认状态可确认" });
+            }
+
+            // 2. 同一事务内生成凭证（含 Voucher + JE + PrepaidBalance）
+            await _autoVoucher.GenerateFromReceiptAsync(conn, tx, id, ct);
+
+            tx.Commit();
+            return Ok(new { message = "已确认" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            tx.Rollback();
+            return BadRequest(new { message = ex.Message });
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
     }
 
     [HttpPut("{id}/reject")]
