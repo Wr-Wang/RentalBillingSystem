@@ -11,7 +11,8 @@ public class Contract : AggregateRoot, IHasCompany
     public string ContractNo { get; private set; }
     public Guid RoomId { get; private set; }
     public DateOnly StartDate { get; private set; }
-    public DateOnly EndDate { get; private set; }
+    /// <summary>null 表示不限制（无固定到期日）</summary>
+    public DateOnly? EndDate { get; private set; }
     public string PaymentCycle { get; private set; }
     public ContractStatus Status { get; private set; } = ContractStatus.Draft;
     public Guid CompanyId { get; private set; }
@@ -62,9 +63,9 @@ public class Contract : AggregateRoot, IHasCompany
 
     // ===== 设置器（草稿状态可修改）=====
 
-    public void SetPeriod(DateOnly start, DateOnly end)
+    public void SetPeriod(DateOnly start, DateOnly? end)
     {
-        if (start >= end) throw new ArgumentException("结束日期必须大于开始日期");
+        if (end.HasValue && start >= end.Value) throw new ArgumentException("结束日期必须大于开始日期");
         AssertIsDraft();
         StartDate = start;
         EndDate = end;
@@ -209,16 +210,17 @@ public class Contract : AggregateRoot, IHasCompany
 
     // ===== 查询方法 =====
 
-    /// <summary>判断合同在指定日期是否有效</summary>
+    /// <summary>判断合同在指定日期是否有效（EndDate 为 null 表示不限制）</summary>
     public bool IsEffectiveOn(DateOnly date)
-        => Status == "Active" && date >= StartDate && date <= EndDate;
+        => Status == "Active" && date >= StartDate && (EndDate == null || date <= EndDate.Value);
 
-    /// <summary>判断指定账期是否需要生成应收</summary>
+    /// <summary>判断指定账期是否需要生成应收（EndDate 为 null 表示不限制）</summary>
     public bool ShouldGenerateReceivableFor(string periodStr)
     {
         if (Status != "Active") return false;
         var period = Period.Parse(periodStr);
-        return period.StartDate <= EndDate && period.EndDate >= StartDate;
+        if (EndDate == null) return period.EndDate >= StartDate;
+        return period.StartDate <= EndDate.Value && period.EndDate >= StartDate;
     }
 
     /// <summary>获取活跃的 FeeConfigs 集合</summary>
@@ -233,11 +235,12 @@ public class Contract : AggregateRoot, IHasCompany
         return today.DayNumber - StartDate.DayNumber;
     }
 
-    /// <summary>获取剩余天数</summary>
+    /// <summary>获取剩余天数（EndDate 为 null 返回 int.MaxValue）</summary>
     public int RemainingDays()
     {
+        if (EndDate == null) return int.MaxValue;
         var today = DateOnly.FromDateTime(ChinaTime.Now);
-        return EndDate.DayNumber - today.DayNumber;
+        return EndDate.Value.DayNumber - today.DayNumber;
     }
 
     // ===== 私有校验 =====
@@ -253,7 +256,6 @@ public class Contract : AggregateRoot, IHasCompany
         if (!_feeConfigs.Any(f => f.IsActive)) throw new InvalidOperationException("合同必须至少有一个费用配置");
         if (_contractTenants.Count == 0) throw new InvalidOperationException("合同必须至少有一个租客");
         if (StartDate == default) throw new InvalidOperationException("合同起租日期未设置");
-        if (EndDate == default) throw new InvalidOperationException("合同结束日期未设置");
     }
 
     private void AssertValidTransition(string targetStatus)

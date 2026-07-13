@@ -70,7 +70,7 @@ public class BillJob : ScheduledJobBase
                     $"加载费用-{contract.ContractNo}", null, null, token);
                 var today = ChinaTime.Now;
                 var lastDay = DateTime.DaysInMonth(today.Year, today.Month);
-                var dueDay = Math.Min(contract.EndDate.Day, lastDay);
+                var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
                 var dueDate = new DateOnly(today.Year, today.Month, dueDay);
 
                 var feeConfigs = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(

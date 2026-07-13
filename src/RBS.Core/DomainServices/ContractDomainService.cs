@@ -48,12 +48,13 @@ public class ContractDomainService : IContractDomainService
     {
         if (oldContract.Status != "Active" && oldContract.Status != "Expired")
             throw new InvalidOperationException("只有生效中或已到期的合同可以续签");
+        if (oldContract.EndDate == null) throw new InvalidOperationException("无固定到期日的合同不可续签");
         oldContract.MarkAsRenewed();
         var newContract = new Contract(
             $"{oldContract.ContractNo}-R{new Random().Next(1, 99)}",
             oldContract.RoomId,
             oldContract.CompanyId);
-        newContract.SetPeriod(oldContract.EndDate.AddDays(1), newEndDate);
+        newContract.SetPeriod(oldContract.EndDate.Value.AddDays(1), newEndDate);
         newContract.SetPaymentCycle(oldContract.PaymentCycle);
         return newContract;
     }
@@ -81,7 +82,7 @@ public class ContractDomainService : IContractDomainService
         }
 
         // 3. 费用配置到期
-        var effectiveEnd = actualEndDate?.ToString("yyyy-MM-dd") ?? contract.EndDate.ToString("yyyy-MM-dd");
+        var effectiveEnd = actualEndDate?.ToString("yyyy-MM-dd") ?? contract.EndDate?.ToString("yyyy-MM-dd") ?? DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM-dd");
         await _uow.ExecuteSqlRawAsync(
             _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
             new { ExpiryDate = effectiveEnd, ContractId = contractId }, ct);

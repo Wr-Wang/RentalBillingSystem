@@ -440,82 +440,95 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-	    // ===== 合同创建审批通过 =====
-	    private async Task HandleContractActivationAsync(ApprovalCompletedEvent @event, CancellationToken ct)
-	    {
-	        if (@event.Action != "Approved") return;
+	    		    // ===== 合同创建审批通过 =====
+		    private async Task HandleContractActivationAsync(ApprovalCompletedEvent @event, CancellationToken ct)
+		    {
+		        if (@event.Action != "Approved") return;
 
-	        var request = await _uow.ContractCreateRequests.GetByIdAsync(@event.TargetEntityId, ct);
-	        if (request == null || request.Status != "PendingApproval") return;
+		        var request = await _uow.ContractCreateRequests.GetByIdAsync(@event.TargetEntityId, ct);
+		        if (request == null || request.Status != "PendingApproval") return;
 
-	        // 乐观锁
-	        var locked = await _uow.ExecuteSqlRawAsync(
-	            _sql.Get("ContractCreate.Update.Request.LockExecuting"),
-	            new { Id = request.Id, Now = ChinaTime.Now }, ct);
-	        if (locked == 0) return;
+		        // 加载暂存数据（只读，独立连接）
+		        List<dynamic> tenants, fees;
+		        using (var readConn = _db.CreateConnection()) { readConn.Open();
+		            tenants = (await readConn.QueryAsync<dynamic>(
+		                _sql.Get("ContractCreate.Select.Tenants.ByRequestId"), new { RequestId = request.Id })).ToList();
+		            fees = (await readConn.QueryAsync<dynamic>(
+		                _sql.Get("ContractCreate.Select.Fees.ByRequestId"), new { RequestId = request.Id })).ToList();
+		        }
 
-	        // 房间竞争检查
-	        var hasActive = await _uow.Contracts.HasActiveForHousingUnitAsync(request.RoomId, ct);
-	        if (hasActive) throw new InvalidOperationException("该房源已有生效合同");
+		        var now = ChinaTime.Now;
+		        var contractId = Guid.NewGuid();
 
-	        // 加载暂存数据
-	        List<dynamic> tenants, fees;
-	        using (var conn = _db.CreateConnection()) { conn.Open();
-	            tenants = (await conn.QueryAsync<dynamic>(
-	                _sql.Get("ContractCreate.Select.Tenants.ByRequestId"), new { RequestId = request.Id })).ToList();
-	            fees = (await conn.QueryAsync<dynamic>(
-	                _sql.Get("ContractCreate.Select.Fees.ByRequestId"), new { RequestId = request.Id })).ToList();
-	        }
+		        // 统一事务：乐观锁 + 竞争检查 + 所有写入
+		        using var conn = _db.CreateConnection(); conn.Open();
+		        using var tx = conn.BeginTransaction();
+		        try
+		        {
+		            // 1. 乐观锁
+		            var locked = await conn.ExecuteAsync(
+		                _sql.Get("ContractCreate.Update.Request.LockExecuting"),
+		                new { Id = request.Id, Now = now }, tx);
+		            if (locked == 0) return;
 
+		            // 2. 房间竞争检查（同一事务内，防止并发）
+		            var hasActive = await conn.QuerySingleAsync<int>(
+		                "SELECT COUNT(1) FROM Contracts WHERE RoomId=@RoomId AND Status='Active'",
+		                new { RoomId = request.RoomId }, tx);
+		            if (hasActive > 0) throw new InvalidOperationException("该房源已有生效合同");
 
-	        var now = ChinaTime.Now;
-	        var contractId = Guid.NewGuid();
+		            // 3. 写入合同主表
+		            await conn.ExecuteAsync(
+		                _sql.Get("Lease.Insert.Contract.Default"),
+		                new { Id = contractId, ContractNo = request.ContractNo,
+		                    RoomId = request.RoomId, StartDate = request.StartDate,
+		                    EndDate = request.EndDate, PaymentCycle = request.PaymentCycle,
+		                    Status = "Active", CompanyId = request.CompanyId,
+		                    CreatedBy = request.CreatedBy, CreatedAt = now }, tx);
 
-	        // 写主表
-	        await _uow.ExecuteSqlRawAsync(
-	            _sql.Get("Lease.Insert.Contract.FromRenewal"),
-	            new { Id = contractId, ContractNo = request.ContractNo,
-	                RoomId = request.RoomId, StartDate = request.StartDate,
-	                EndDate = request.EndDate, PaymentCycle = request.PaymentCycle,
-	                CompanyId = request.CompanyId,
-	                CreatedBy = request.CreatedBy, CreatedAt = now });
+		            // 4. 写入租客关联
+		            foreach (var t in tenants)
+		            {
+		                await conn.ExecuteAsync(
+		                    _sql.Get("Lease.Insert.ContractTenant.Default"),
+		                    new { ContractId = contractId,
+		                        TenantId = t.TenantId, IsPrimary = t.IsPrimary,
+		                        CreatedBy = request.CreatedBy, CreatedAt = now }, tx);
+		            }
 
-	        foreach (var t in tenants)
-	        {
-	            await _uow.ExecuteSqlRawAsync(
-	                _sql.Get("Lease.Insert.ContractTenant.Default"),
-	                new { ContractId = contractId,
-	                    TenantId = t.TenantId, IsPrimary = t.IsPrimary,
-	                    CreatedBy = request.CreatedBy, CreatedAt = now }, ct);
-	        }
+		            // 5. 写入费用配置
+		            foreach (var f in fees)
+		            {
+		                await conn.ExecuteAsync(
+		                    _sql.Get("Lease.Insert.ContractFeeConfig.Default"),
+		                    new { Id = Guid.NewGuid(), ContractId = contractId,
+		                        FeeCodeId = f.FeeCodeId, BillingMode = f.BillingMode,
+		                        Amount = f.Amount, Unit = f.Unit, UnitPrice = f.UnitPrice,
+		                        EffectiveDate = f.EffectiveDate ?? request.StartDate.ToString("yyyy-MM-dd"),
+		                        CreatedBy = request.CreatedBy, Now = now }, tx);
+		            }
 
-	        foreach (var f in fees)
-	        {
-	            await _uow.ExecuteSqlRawAsync(
-	                _sql.Get("Lease.Insert.ContractFeeConfig.Default"),
-	                new { Id = Guid.NewGuid(), ContractId = contractId,
-	                    FeeCodeId = f.FeeCodeId, BillingMode = f.BillingMode,
-	                    Amount = f.Amount, Unit = f.Unit, UnitPrice = f.UnitPrice,
-	                    EffectiveDate = f.EffectiveDate ?? request.StartDate.ToString("yyyy-MM-dd"),
-	                    CreatedBy = request.CreatedBy, CreatedAt = now }, ct);
-	        }
+		            // 6. 标记暂存表完成
+		            await conn.ExecuteAsync(
+		                _sql.Get("ContractCreate.Update.Request.Complete"),
+		                new { Id = request.Id, NewContractId = contractId }, tx);
 
-	        await _uow.ExecuteSqlRawAsync(
-	            _sql.Get("ContractCreate.Update.Request.Complete"),
-	            new { Id = request.Id, NewContractId = contractId }, ct);
+		            tx.Commit();
+		        }
+		        catch
+		        {
+		            tx.Rollback();
+		            throw;
+		        }
 
-	        await _uow.CommitAsync(ct);
-
-	        // 初始化应收（Commit 后独立执行）
-	        try
-	        {
-	            var receivableGen = _serviceProvider.GetRequiredService<IReceivableGenerationService>();
-	            await receivableGen.GenerateForActivationAsync(contractId, ct);
-	        }
-	        catch { /* 不阻断审批完成 */ }
-	    }
-
-	    // ===== 生成应收审批通过 =====
+		        // 初始化应收（事务外独立执行，失败不阻断审批完成）
+		        try
+		        {
+		            var receivableGen = _serviceProvider.GetRequiredService<IReceivableGenerationService>();
+		            await receivableGen.GenerateForActivationAsync(contractId, ct);
+		        }
+		        catch { /* 不阻断审批完成 */ }
+		    }// ===== 生成应收审批通过 =====
 	    private async Task HandleReceivableGenerationAsync(ApprovalCompletedEvent @event, CancellationToken ct)
 	    {
 	        if (@event.Action != "Approved") return;

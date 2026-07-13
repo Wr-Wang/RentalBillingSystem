@@ -821,6 +821,9 @@
            OperatorName AS operatorName, CreatedAt AS createdAt
       FROM ChangeHistory WHERE ContractId = @ContractId ORDER BY CreatedAt DESC]]>
   </select>
+  <update id="Approval.Update.Request.SetContractId">
+    <![CDATA[UPDATE ApprovalRequests SET ContractId = @ContractId WHERE Id = @Id]]>
+  </update>
   <update id="Contract.Update.ApprovalRequest.SetContractId">
     <![CDATA[UPDATE ApprovalRequests SET ContractId = @ContractId WHERE Id = @Id]]>
   </update>
@@ -1399,8 +1402,13 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       FROM Contracts c WHERE c.CompanyId = @Id ORDER BY c.CreatedAt DESC]]>
   </select>
   <select id="Lease.Select.Contract.ByTenantId">
-    <![CDATA[SELECT c.Id, c.ContractNo, c.RoomId, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.CompanyId, c.AutoRenew, c.RenewalCount, c.MarketPriceAtRenewal, c.PreviousContractId, c.OriginalContractId
-      FROM Contracts c INNER JOIN ContractTenants ct ON ct.ContractId=c.Id WHERE ct.TenantId=@TenantId ORDER BY c.CreatedAt DESC]]>
+    <![CDATA[SELECT c.Id, c.ContractNo, c.RoomId, c.StartDate, c.EndDate, c.PaymentCycle, c.Status, c.CompanyId, c.AutoRenew, c.RenewalCount, c.MarketPriceAtRenewal, c.PreviousContractId, c.OriginalContractId,
+            h.FullCode AS RoomFullCode,
+            (SELECT TOP 1 cfc.Amount FROM ContractFeeConfigs cfc INNER JOIN FeeCodes fc ON fc.Id=cfc.FeeCodeId WHERE cfc.ContractId=c.Id AND fc.Code='RENT' AND cfc.IsActive=1 ORDER BY cfc.EffectiveDate DESC) AS RentAmount
+      FROM Contracts c
+      INNER JOIN ContractTenants ct ON ct.ContractId=c.Id
+      LEFT JOIN HousingUnits h ON h.Id=c.RoomId
+      WHERE ct.TenantId=@TenantId ORDER BY c.CreatedAt DESC]]>
   </select>
   <select id="Lease.Select.Contract.CreatedAt">
     <![CDATA[SELECT CreatedAt FROM Contracts WHERE Id=@Id]]>
@@ -1452,6 +1460,16 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[INSERT INTO ContractCreateRequests (Id, ContractNo, RoomId, StartDate, EndDate, PaymentCycle, CompanyId, Status, Remark, CreatedBy, CreatedAt)
       VALUES (@Id, @ContractNo, @RoomId, @StartDate, @EndDate, @PaymentCycle, @CompanyId, @Status, @Remark, @CreatedBy, @CreatedAt)]]>
   </insert>
+  <select id="ContractCreate.Select.Room.FullCode">
+    <![CDATA[SELECT FullCode FROM HousingUnits WHERE Id=@Id]]>
+  </select>
+  <select id="ContractCreate.Select.Tenants.NamesByRequest">
+    <![CDATA[SELECT t.Name FROM ContractCreateRequestTenants ct INNER JOIN Tenants t ON t.Id=ct.TenantId WHERE ct.RequestId=@Id]]>
+  </select>
+  <select id="ContractCreate.Select.Fees.NamesByRequest">
+    <![CDATA[SELECT fc.Name, cf.Amount, cf.ChargeType, cf.BillingMode, cf.EffectiveDate
+      FROM ContractCreateRequestFees cf INNER JOIN FeeCodes fc ON fc.Id=cf.FeeCodeId WHERE cf.RequestId=@Id]]>
+  </select>
   <update id="ContractCreate.Update.Request.Submit">
     <![CDATA[UPDATE ContractCreateRequests SET Status='PendingApproval' WHERE Id=@Id AND Status='Draft']]>
   </update>

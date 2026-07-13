@@ -7,7 +7,7 @@ public class ContractDto
     public Guid RoomId { get; set; }
     public string? RoomFullCode { get; set; }
     public DateOnly StartDate { get; set; }
-    public DateOnly EndDate { get; set; }
+    public DateOnly? EndDate { get; set; }
     public string PaymentCycle { get; set; } = "Monthly";
     public string Status { get; set; } = "Draft";
     public Guid CompanyId { get; set; }
@@ -19,6 +19,7 @@ public class ContractDto
     public bool HasPendingRenewal { get; set; }   // 是否有待审批的续签
     public bool HasRejectedRenewal { get; set; }  // 是否有被驳回的续签
     public bool AutoRenew { get; set; } = true;
+    public decimal? RentAmount { get; set; }
     public List<ContractTenantDto> Tenants { get; set; } = new();
     public List<ContractFeeConfigDto> FeeConfigs { get; set; } = new();
 }
@@ -54,7 +55,7 @@ public class CreateContractRequest
     public string? ContractNo { get; set; }
     public Guid RoomId { get; set; }
     public DateOnly StartDate { get; set; }
-    public DateOnly EndDate { get; set; }
+    public DateOnly? EndDate { get; set; }
     public string PaymentCycle { get; set; } = "Monthly";
     public Guid CompanyId { get; set; }
     public List<Guid> TenantIds { get; set; } = new();

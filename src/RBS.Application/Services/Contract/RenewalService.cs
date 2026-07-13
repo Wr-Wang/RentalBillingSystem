@@ -172,7 +172,8 @@ public class RenewalService : IRenewalService
             throw new InvalidOperationException("重新收取押金时，新押金金额必须大于 0");
 
         // 5. 校验日期逻辑：新合同起租日 = 原合同到期次日，到期日必须晚于起租日
-        var newStartDate = oldContract.EndDate.AddDays(1);
+        if (oldContract.EndDate == null) throw new InvalidOperationException("无固定到期日的合同不可续签");
+        var newStartDate = oldContract.EndDate.Value.AddDays(1);
         var parsedNewEndDate = DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture));
         if (parsedNewEndDate <= newStartDate)
             throw new InvalidOperationException($"新合同到期日期必须晚于起租日期（{newStartDate:yyyy-MM-dd}），当前到期日 {parsedNewEndDate:yyyy-MM-dd} 无效");
@@ -332,7 +333,8 @@ public class RenewalService : IRenewalService
                 ? renewal.OldDepositAmount
                 : (renewal.NewDepositAmount ?? renewal.OldDepositAmount);
 
-            var startDate = oldContract.EndDate.AddDays(1);
+            if (oldContract.EndDate == null) throw new InvalidOperationException("无固定到期日的合同不可续签");
+            var startDate = oldContract.EndDate.Value.AddDays(1);
 
             // 安全校验：到期日必须晚于起租日
             if (renewal.NewEndDate <= startDate)
@@ -382,7 +384,7 @@ public class RenewalService : IRenewalService
 		    }
 
             // 4.5 原合同费用配置到期（在复制之后执行，避免 SELECT 查不到数据）
-            var oldEndDate = oldContract.EndDate.ToString("yyyy-MM-dd");
+            var oldEndDate = oldContract.EndDate!.Value.ToString("yyyy-MM-dd");
             await conn.ExecuteAsync(
                 _sql.Get("Lease.Update.ContractFeeConfig.ExpireByOldContract"),
                 new { p0 = oldEndDate, p1 = renewal.OldContractId }, tx);

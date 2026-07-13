@@ -1820,7 +1820,7 @@ CREATE TABLE [Contracts] (
     [ContractNo] VARCHAR(100) NOT NULL , -- 合同编号,
     [RoomId] UNIQUEIDENTIFIER NOT NULL , -- 房屋ID,
     [StartDate] DATE NOT NULL , -- 合同开始日期,
-    [EndDate] DATE NOT NULL , -- 合同结束日期,
+    [EndDate] DATE NULL , -- 合同结束日期（null 表示无固定到期日）,
     [PaymentCycle] VARCHAR(20) NOT NULL DEFAULT ('Monthly') , -- 支付周期,
     [PaymentDueDay] INT NOT NULL DEFAULT (5) , -- 每月到期日,
     [AllowDepositAsLastRent] BIT NOT NULL DEFAULT (0) , -- 押金抵扣最后租金,
@@ -2160,7 +2160,7 @@ CREATE TABLE [ContractCreateRequests] (
     [ContractNo] NVARCHAR(64) NOT NULL , -- 合同编号,
     [RoomId] UNIQUEIDENTIFIER NOT NULL , -- 房屋ID,
     [StartDate] DATE NOT NULL , -- 合同开始日期,
-    [EndDate] DATE NOT NULL , -- 合同结束日期,
+    [EndDate] DATE NULL , -- 合同结束日期,
     [PaymentCycle] NVARCHAR(32) NOT NULL DEFAULT ('Monthly') , -- 支付周期,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态(Draft/PendingApproval/Executing/Completed/Rejected),
@@ -2169,7 +2169,12 @@ CREATE TABLE [ContractCreateRequests] (
     [NewContractId] UNIQUEIDENTIFIER NULL , -- 新合同ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedIp] NVARCHAR(64) NULL , -- 创建IP,
+    [CreatedHostname] NVARCHAR(128) NULL , -- 创建主机名,
+    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
+    [UpdatedIp] NVARCHAR(64) NULL , -- 更新IP,
+    [UpdatedHostname] NVARCHAR(128) NULL -- 更新主机名
 )
 GO
 
@@ -2212,7 +2217,12 @@ CREATE TABLE [ContractCreateRequestTenants] (
     [IsPrimary] BIT NOT NULL DEFAULT (0) , -- 是否主租客,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedIp] NVARCHAR(64) NULL , -- 创建IP,
+    [CreatedHostname] NVARCHAR(128) NULL , -- 创建主机名,
+    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
+    [UpdatedIp] NVARCHAR(64) NULL , -- 更新IP,
+    [UpdatedHostname] NVARCHAR(128) NULL -- 更新主机名
 )
 GO
 
@@ -2250,7 +2260,12 @@ CREATE TABLE [ContractCreateRequestFees] (
     [EffectiveDate] NVARCHAR(10) NULL , -- 生效日期,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedIp] NVARCHAR(64) NULL , -- 创建IP,
+    [CreatedHostname] NVARCHAR(128) NULL , -- 创建主机名,
+    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
+    [UpdatedIp] NVARCHAR(64) NULL , -- 更新IP,
+    [UpdatedHostname] NVARCHAR(128) NULL -- 更新主机名
 )
 GO
 
@@ -5436,4 +5451,75 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Vouchers]'
 ALTER TABLE [Vouchers] ADD [Period] VARCHAR(7) NULL
 GO
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间(yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'Period'
+
+-- =================================================================
+-- v2026.07.13: ContractCreateRequests.EndDate 改为可选
+-- =================================================================
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'EndDate' AND is_nullable=0)
+ALTER TABLE [ContractCreateRequests] ALTER COLUMN [EndDate] DATE NULL
+GO
+
+-- =================================================================
+-- v2026.07.13: Contracts.EndDate 改为可选（null 表示无固定到期日）
+-- =================================================================
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Contracts]') AND name=N'EndDate' AND is_nullable=0)
+ALTER TABLE [Contracts] ALTER COLUMN [EndDate] DATE NULL
+GO
+
+-- =================================================================
+-- v2026.07.13: ContractCreateRequests 补充审计字段
+-- =================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'CreatedIp')
+ALTER TABLE [ContractCreateRequests] ADD [CreatedIp] NVARCHAR(64) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'CreatedHostname')
+ALTER TABLE [ContractCreateRequests] ADD [CreatedHostname] NVARCHAR(128) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'UpdatedBy')
+ALTER TABLE [ContractCreateRequests] ADD [UpdatedBy] UNIQUEIDENTIFIER NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'UpdatedIp')
+ALTER TABLE [ContractCreateRequests] ADD [UpdatedIp] NVARCHAR(64) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'UpdatedHostname')
+ALTER TABLE [ContractCreateRequests] ADD [UpdatedHostname] NVARCHAR(128) NULL
+GO
+
+-- =================================================================
+-- v2026.07.13: ContractCreateRequestTenants 补充审计字段
+-- =================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'CreatedIp')
+ALTER TABLE [ContractCreateRequestTenants] ADD [CreatedIp] NVARCHAR(64) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'CreatedHostname')
+ALTER TABLE [ContractCreateRequestTenants] ADD [CreatedHostname] NVARCHAR(128) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'UpdatedBy')
+ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedBy] UNIQUEIDENTIFIER NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'UpdatedIp')
+ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedIp] NVARCHAR(64) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'UpdatedHostname')
+ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedHostname] NVARCHAR(128) NULL
+GO
+
+-- =================================================================
+-- v2026.07.13: ContractCreateRequestFees 补充审计字段
+-- =================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'CreatedIp')
+ALTER TABLE [ContractCreateRequestFees] ADD [CreatedIp] NVARCHAR(64) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'CreatedHostname')
+ALTER TABLE [ContractCreateRequestFees] ADD [CreatedHostname] NVARCHAR(128) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'UpdatedBy')
+ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedBy] UNIQUEIDENTIFIER NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'UpdatedIp')
+ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedIp] NVARCHAR(64) NULL
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'UpdatedHostname')
+ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedHostname] NVARCHAR(128) NULL
+GO
 

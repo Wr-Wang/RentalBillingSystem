@@ -10,7 +10,7 @@ public class ContractCreateRequest : AuditableEntity, IHasCompany
     public string ContractNo { get; private set; } = string.Empty;
     public Guid RoomId { get; private set; }
     public DateOnly StartDate { get; private set; }
-    public DateOnly EndDate { get; private set; }
+    public DateOnly? EndDate { get; private set; }
     public string PaymentCycle { get; private set; } = "Monthly";
     public Guid CompanyId { get; private set; }
     public string Status { get; private set; } = "Draft"; // Draft/PendingApproval/Executing/Completed/Rejected
@@ -20,7 +20,7 @@ public class ContractCreateRequest : AuditableEntity, IHasCompany
 
     private ContractCreateRequest() { }
 
-    public ContractCreateRequest(string contractNo, Guid roomId, DateOnly startDate, DateOnly endDate, string paymentCycle, Guid companyId)
+    public ContractCreateRequest(string contractNo, Guid roomId, DateOnly startDate, DateOnly? endDate, string paymentCycle, Guid companyId)
     {
         ContractNo = contractNo;
         RoomId = roomId;

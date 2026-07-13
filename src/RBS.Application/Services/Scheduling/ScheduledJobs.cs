@@ -77,7 +77,7 @@ public class AutoRenewJob : IScheduledJob
                     {
                         ContractId = contract.Id,
                         NewRentAmount = rentAmount,
-                        NewEndDate = contract.EndDate.AddMonths(12).ToString("yyyy-MM-dd"),
+                        NewEndDate = contract.EndDate!.Value.AddMonths(12).ToString("yyyy-MM-dd"),
                         DepositHandling = "TRANSFER"
                     }, Guid.Empty, ct);
                 if (result != null) submitted++;

@@ -492,13 +492,56 @@ public class ApprovalService : IApprovalService
                 var oldContract = _uow.Contracts.GetByIdAsync(renewal.OldContractId, CancellationToken.None).GetAwaiter().GetResult();
                 dto.Fields.Add(new BizFieldDto { Label = "原合同号", OldValue = oldContract?.ContractNo, NewValue = renewal.ContractNo, IsChanged = true });
                 dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = $"¥{renewal.PreviousRent:N2}", NewValue = $"¥{renewal.NewRent:N2}", IsChanged = true });
-                dto.Fields.Add(new BizFieldDto { Label = "到期日", OldValue = oldContract?.EndDate.ToString("yyyy-MM-dd"), NewValue = renewal.NewEndDate.ToString("yyyy-MM-dd"), IsChanged = true });
+                dto.Fields.Add(new BizFieldDto { Label = "到期日", OldValue = oldContract?.EndDate?.ToString("yyyy-MM-dd") ?? "不限", NewValue = renewal.NewEndDate.ToString("yyyy-MM-dd"), IsChanged = true });
                 var oldDeposit = renewal.OldDepositAmount;
                 var newDeposit = renewal.DepositHandling == "NEW" ? (renewal.NewDepositAmount ?? oldDeposit) : oldDeposit;
                 dto.Fields.Add(new BizFieldDto { Label = "押金", OldValue = $"¥{oldDeposit:N2}", NewValue = $"¥{newDeposit:N2}", IsChanged = newDeposit != oldDeposit });
                 dto.Fields.Add(new BizFieldDto { Label = "押金处理方式", OldValue = null, NewValue = renewal.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取", IsChanged = false });
                 if (!string.IsNullOrEmpty(renewal.Remark))
                     dto.Fields.Add(new BizFieldDto { Label = "备注", OldValue = null, NewValue = renewal.Remark, IsChanged = true });
+            }
+            return dto.Fields.Count > 0 ? dto : null;
+        }
+
+        // ContractActivation 类型：新建合同审批
+        if (approval.TargetEntityType == "ContractActivation" && approval.TargetEntityId != Guid.Empty)
+        {
+            var req = _uow.ContractCreateRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
+            if (req != null)
+            {
+                using var conn = _connectionFactory.CreateConnection(); conn.Open();
+                var room = conn.QuerySingleOrDefault(_sql.Get("ContractCreate.Select.Room.FullCode"), new { Id = req.RoomId });
+                var tenants = conn.Query(_sql.Get("ContractCreate.Select.Tenants.NamesByRequest"), new { Id = req.Id }).ToList();
+                var fees = conn.Query(_sql.Get("ContractCreate.Select.Fees.NamesByRequest"), new { Id = req.Id }).ToList();
+
+                dto.BizType = "ContractActivation";
+                dto.Fields.Add(new BizFieldDto { Label = "合同编号", NewValue = req.ContractNo });
+                dto.Fields.Add(new BizFieldDto { Label = "房屋", NewValue = room?.FullCode ?? "" });
+                dto.Fields.Add(new BizFieldDto { Label = "起租日期", NewValue = req.StartDate.ToString("yyyy-MM-dd") });
+                dto.Fields.Add(new BizFieldDto { Label = "到期日期", NewValue = req.EndDate?.ToString("yyyy-MM-dd") ?? "不限" });
+                dto.Fields.Add(new BizFieldDto { Label = "付款周期", NewValue = req.PaymentCycle switch { "Monthly" => "月付", "Quarterly" => "季付", "HalfYearly" => "半年付", "Yearly" => "年付", _ => req.PaymentCycle } });
+                dto.Fields.Add(new BizFieldDto { Label = "租客", NewValue = string.Join("、", tenants.Select(t => (string)t.Name)) });
+                var feeItems = fees.Select(f => new BizFeeItemDto
+                {
+                    FeeName = f.Name, NewAmount = f.Amount,
+                    ChargeType = f.ChargeType, BillingMode = f.BillingMode,
+                    EffectiveDate = f.EffectiveDate
+                }).ToList();
+                dto.FeeItems = feeItems;
+                var onceFees = fees.Where(f => f.ChargeType == "OneTime").ToList();
+                var recFees = fees.Where(f => f.ChargeType == "Recurring").ToList();
+                if (onceFees.Count > 0)
+                {
+                    var t = onceFees.Sum(f => (decimal)f.Amount);
+                    dto.Fields.Add(new BizFieldDto { Label = $"一次性费用（{onceFees.Count} 项）", NewValue = $"¥{t:N2}" });
+                }
+                if (recFees.Count > 0)
+                {
+                    var t = recFees.Sum(f => (decimal)f.Amount);
+                    dto.Fields.Add(new BizFieldDto { Label = $"周期性费用（{recFees.Count} 项）", NewValue = $"¥{t:N2}/月" });
+                }
+                var grandTotal = fees.Sum(f => (decimal)f.Amount);
+                dto.Fields.Add(new BizFieldDto { Label = $"费用合计（{fees.Count} 项）", NewValue = $"¥{grandTotal:N2}" });
             }
             return dto.Fields.Count > 0 ? dto : null;
         }

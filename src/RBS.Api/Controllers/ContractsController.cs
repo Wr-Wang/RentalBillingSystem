@@ -125,7 +125,7 @@ public class ContractsController : ControllerBase
     {
         public Guid RoomId { get; set; }
         public DateOnly StartDate { get; set; }
-        public DateOnly EndDate { get; set; }
+        public DateOnly? EndDate { get; set; }
         public string PaymentCycle { get; set; } = "Monthly";
         public Guid CompanyId { get; set; }
         public List<Guid> TenantIds { get; set; } = new();
@@ -148,7 +148,9 @@ public class ContractsController : ControllerBase
         if (request.RoomId == Guid.Empty) return BadRequest(new { message = "房源不能为空" });
         if (request.TenantIds.Count == 0) return BadRequest(new { message = "必须至少有一个租客" });
         if (request.Fees.Count == 0) return BadRequest(new { message = "必须至少有一个费用配置" });
-        if (request.StartDate >= request.EndDate) return BadRequest(new { message = "结束日期必须大于开始日期" });
+        // EndDate 选填
+        if (request.EndDate.HasValue && request.StartDate >= request.EndDate.Value)
+            return BadRequest(new { message = "结束日期必须大于开始日期" });
 
         var hasActive = await _uow.Contracts.HasActiveForHousingUnitAsync(request.RoomId, ct);
         if (hasActive) return Conflict(new { message = "该房源已有生效合同" });
@@ -180,11 +182,13 @@ public class ContractsController : ControllerBase
             return Ok(new { status = "Active", contractId = createReq.NewContractId, message = "合同已直接激活" });
         }
 
-        createReq.Submit(); await _uow.CommitAsync(ct);
+        // 直接 SQL 更新状态（CommitAsync 已清空追踪缓存，Submit() 的内存变更不会自动持久化）
+        await _uow.ExecuteSqlRawAsync(_sql.Get("ContractCreate.Update.Request.Submit"),
+            new { Id = createReq.Id }, ct);
         var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
         {
             ApprovalTypeId = approvalType.Id, Title = $"[合同新建] {contractNo}",
-            Description = $"起租 {request.StartDate}，到期 {request.EndDate}",
+            Description = $"起租 {request.StartDate}" + (request.EndDate.HasValue ? $"，到期 {request.EndDate}" : ""),
             TargetEntityId = createReq.Id, TargetEntityType = "ContractActivation"
         }, ct);
         await _uow.ExecuteSqlRawAsync(_sql.Get("Approval.Update.Request.SetContractId"),
@@ -207,7 +211,7 @@ public class ContractsController : ControllerBase
         await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.Contract.Default"),
             new { Id = contractId, ContractNo = request.ContractNo, RoomId = request.RoomId,
                 StartDate = request.StartDate, EndDate = request.EndDate,
-                PaymentCycle = request.PaymentCycle, CompanyId = request.CompanyId,
+                PaymentCycle = request.PaymentCycle, Status = "Active", CompanyId = request.CompanyId,
                 CreatedBy = userId, CreatedAt = now }, ct);
         foreach (var t in tenants)
             await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.ContractTenant.Default"),

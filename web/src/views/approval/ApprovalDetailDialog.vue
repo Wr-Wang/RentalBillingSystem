@@ -261,7 +261,21 @@
                       生效日: {{ formatBizDate(bizDetail.effectiveDate) }}
                     </el-tag>
                   </template>
-                  <div v-if="bizDetail.fields?.length" class="change-summary">
+
+                  <!-- [新建合同] 双栏描述列表 -->
+                  <el-descriptions v-if="bizDetail.bizType === 'ContractActivation'" :column="2" border size="small">
+                    <el-descriptions-item
+                      v-for="field in bizDetail.fields"
+                      :key="field.label"
+                      :label="field.label"
+                      :span="field.label.startsWith('费用合计') ? 2 : 1"
+                    >
+                      <span :style="{ fontWeight: field.label.startsWith('费用合计') ? 'bold' : 500, color: field.label.startsWith('费用合计') ? '#e6a23c' : '#303133' }">{{ field.newValue || '-' }}</span>
+                    </el-descriptions-item>
+                  </el-descriptions>
+
+                  <!-- [其他审批类型] 原始变更行布局 -->
+                  <div v-else-if="bizDetail.fields?.length" class="change-summary">
                     <div
                       v-for="field in bizDetail.fields"
                       :key="field.label"
@@ -304,7 +318,35 @@
                   </div>
                 </el-card>
 
-                <!-- ===== 3. [终止专用] 终止详情已合并至变更摘要，无需重复展示 ===== -->
+                <!-- ===== 3. [新建合同专用] 费用明细表格 ===== -->
+                <el-card v-if="bizDetail.bizType === 'ContractActivation' && bizDetail.feeItems?.length"
+                  shadow="never" class="section-card" style="margin-top: 14px;">
+                  <template #header>
+                    <span style="font-weight: 600;">费用明细</span>
+                    <el-tag size="small" type="warning" effect="plain" style="float: right;">
+                      共 {{ bizDetail.feeItems.length }} 项
+                    </el-tag>
+                  </template>
+                  <el-table :data="bizDetail.feeItems" stripe size="small">
+                    <el-table-column prop="feeName" label="收费项目" min-width="120" />
+                    <el-table-column label="金额" width="140" align="right">
+                      <template #default="{ row }">
+                        <span style="font-weight: bold;">¥{{ Number(row.newAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="类型" width="80" align="center">
+                      <template #default="{ row }">{{ row.chargeType === 'OneTime' ? '一次性' : '周期性' }}</template>
+                    </el-table-column>
+                    <el-table-column label="计费方式" width="100" align="center">
+                      <template #default="{ row }">{{ row.billingMode === 'MeterBased' ? '按表计量' : '固定金额' }}</template>
+                    </el-table-column>
+                    <el-table-column prop="effectiveDate" label="生效日期" width="110" align="center">
+                      <template #default="{ row }">{{ row.effectiveDate || '-' }}</template>
+                    </el-table-column>
+                  </el-table>
+                </el-card>
+
+                <!-- ===== 4. [终止专用] 终止详情已合并至变更摘要，无需重复展示 ===== -->
 
                 <!-- ===== 4. 无业务字段时的兜底提示 ===== -->
                 <el-empty v-if="!bizDetail.fields?.length && !bizDetail.feeItems?.length"
@@ -792,7 +834,7 @@ function close() {
   font-size: 13px;
 }
 .section-card :deep(.el-card__body) {
-  padding: 16px;
+  padding: 12px 16px;
 }
 .section-card + .section-card {
   margin-top: 0;
@@ -1133,22 +1175,17 @@ function close() {
 .summary-row {
   display: flex;
   align-items: center;
-  padding: 7px 0;
-  border-bottom: 1px solid #f5f5f5;
-  gap: 10px;
-}
-.summary-row:last-child {
-  border-bottom: none;
+  padding: 3px 0;
+  gap: 8px;
 }
 .row-changed {
   background: #fffcf0;
   margin: 0 -12px;
-  padding: 7px 12px;
+  padding: 3px 12px;
   border-radius: 4px;
-  border-bottom-color: transparent;
 }
 .summary-label {
-  min-width: 100px;
+  min-width: 72px;
   font-size: 13px;
   color: #606266;
   flex-shrink: 0;
@@ -1178,6 +1215,8 @@ function close() {
 .summary-newval-only {
   color: #303133;
   font-weight: 500;
+  white-space: pre-line;
+  line-height: 1.7;
 }
 .summary-empty {
   font-size: 13px;

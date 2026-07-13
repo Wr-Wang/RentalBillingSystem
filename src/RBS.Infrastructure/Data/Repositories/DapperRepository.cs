@@ -61,8 +61,10 @@ public class DapperRepository<T> : IRepository<T> where T : AuditableEntity
     public async Task<T> AddAsync(T entity, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var bp = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-        var props = bp.Where(p => p.CanRead && !IsNavProp(p)).Select(p => p.Name).ToList();
+        var exclude = new HashSet<string> { "CreatedIp", "CreatedHostname", "UpdatedBy", "UpdatedAt", "UpdatedIp", "UpdatedHostname" };
+        var props = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Where(p => p.CanRead && !exclude.Contains(p.Name) && !IsNavProp(p))
+            .Select(p => p.Name).ToList();
         var cols = string.Join(",", props);
         var vals = string.Join(",", props.Select(p => "@" + p));
         await conn.ExecuteAsync($"INSERT INTO [{_tableName}] ({cols}) VALUES ({vals})", entity);

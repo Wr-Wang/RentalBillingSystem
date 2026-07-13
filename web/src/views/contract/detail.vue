@@ -28,7 +28,7 @@
         <el-descriptions-item label="租客">{{ contract.tenantName }}</el-descriptions-item>
         <el-descriptions-item label="付款到期日">每月{{ contract.paymentDueDay || 5 }}日</el-descriptions-item>
         <el-descriptions-item label="起租日期">{{ contract.startDate }}</el-descriptions-item>
-        <el-descriptions-item label="到期日期">{{ contract.endDate }}</el-descriptions-item>
+        <el-descriptions-item label="到期日期">{{ contract.endDate || '不限' }}</el-descriptions-item>
         <el-descriptions-item label="押金抵最后月租">{{ contract.allowDepositAsLastRent ? '是' : '否' }}</el-descriptions-item>
         <el-descriptions-item label="自动续签">
           <el-tag :type="contract.autoRenew ? 'success' : 'info'" size="small" style="cursor:pointer;" @click="toggleAutoRenew">
@@ -474,7 +474,7 @@
         </div>
         <el-descriptions :column="2" border style="margin-bottom: 16px;">
           <el-descriptions-item label="原合同号">{{ contract.contractNo }}</el-descriptions-item>
-          <el-descriptions-item label="原到期日">{{ contract.endDate }}</el-descriptions-item>
+          <el-descriptions-item label="原到期日">{{ contract.endDate || '不限' }}</el-descriptions-item>
 
         </el-descriptions>
         <el-form :model="renewForm" label-width="120px">
@@ -607,7 +607,7 @@
     <el-dialog v-model="showReceivablePreviewDialog" title="生成应收 — 预览" width="700px">
       <el-descriptions :column="2" border style="margin-bottom:16px;">
         <el-descriptions-item label="合同号">{{ contract.contractNo }}</el-descriptions-item>
-        <el-descriptions-item label="账期范围">{{ contract.startDate }} ~ {{ contract.endDate }}</el-descriptions-item>
+        <el-descriptions-item label="账期范围">{{ contract.startDate }} ~ {{ contract.endDate || '不限' }}</el-descriptions-item>
       </el-descriptions>
       <div v-if="receivablePreviewLoading" style="text-align:center;padding:20px;">加载中...</div>
       <template v-else>

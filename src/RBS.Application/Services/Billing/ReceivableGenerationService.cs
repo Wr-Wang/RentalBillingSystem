@@ -146,7 +146,7 @@ public class ReceivableGenerationService : IReceivableGenerationService
 
             var lastDay = DateTime.DaysInMonth(
                 int.Parse(current[..4]), int.Parse(current[5..7]));
-            var dueDay = Math.Min(contract.EndDate.Day, lastDay);
+            var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
             var dueDate = new DateOnly(
                 int.Parse(current[..4]), int.Parse(current[5..7]), dueDay);
             var periodStart = $"{current}-01";
@@ -209,11 +209,11 @@ public class ReceivableGenerationService : IReceivableGenerationService
     public List<string> SplitPeriods(ContractEntity contract)
     {
         var start = contract.StartDate;
-        var end = contract.EndDate;
         var periods = new List<string>();
 
         var current = new Period(start.Year, start.Month);
-        var endPeriod = new Period(end.Year, end.Month);
+        if (contract.EndDate == null) { periods.Add(current.ToString()); return periods; }
+        var endPeriod = new Period(contract.EndDate.Value.Year, contract.EndDate.Value.Month);
 
         while (current.Year < endPeriod.Year || (current.Year == endPeriod.Year && current.Month <= endPeriod.Month))
         {
@@ -228,7 +228,7 @@ public class ReceivableGenerationService : IReceivableGenerationService
     {
         var period = Period.Parse(periodStr);
         var lastDay = DateTime.DaysInMonth(period.Year, period.Month);
-        var dueDay = Math.Min(contract.EndDate.Day, lastDay);
+        var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
         return new DateOnly(period.Year, period.Month, dueDay);
     }
 }
