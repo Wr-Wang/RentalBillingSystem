@@ -188,6 +188,7 @@ import router from '../router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bell, Fold, Expand } from '@element-plus/icons-vue'
 import { changePassword as apiChangePassword } from '@/api'
+import { broadcast, onMessage } from '../utils/broadcast'
 
 // ---------------------------------------------------------------------------
 // Stores
@@ -197,6 +198,9 @@ const appStore = useAppStore()
 const menuStore = useMenuStore()
 const notifStore = useNotificationStore()
 const route = useRoute()
+
+/** 跨标签页广播监听取消函数 */
+let unlistenBroadcast = null
 
 // ---------------------------------------------------------------------------
 // Dialog 状态
@@ -287,13 +291,34 @@ onMounted(async () => {
   // 恢复上次的视角状态（超管切换公司）
   userStore.restoreView()
 
-  // 启动通知轮询
-  notifStore.fetchUnreadCounts()
-  notifStore.startPolling()
+  // 启动通知轮询（5 分钟兜底，BroadcastChannel 负责实时更新）
+  // startPolling 内部会立即执行一次 fetchUnreadCounts，无需单独调用
+  notifStore.startPolling(300000)
+
+  // -----------------------------------------------------------------------
+  // 4. 启动跨标签页广播监听
+  //    其他标签页提交审批后即时刷新本页面的通知计数
+  //    其他标签页登出后即时跳转登录页
+  // -----------------------------------------------------------------------
+  unlistenBroadcast = notifStore.startBroadcastListener()
+
+  // 监听其他标签页的登出信号
+  const unlistenLogout = onMessage('LOGOUT', () => {
+    notifStore.stopPolling()
+    userStore.logout()
+    router.push('/login')
+  })
+  // 合并清理函数
+  const origUnlisten = unlistenBroadcast
+  unlistenBroadcast = () => {
+    origUnlisten()
+    unlistenLogout()
+  }
 })
 
 onUnmounted(() => {
   notifStore.stopPolling()
+  if (unlistenBroadcast) unlistenBroadcast()
 })
 
 function handleLogout() {
@@ -302,6 +327,7 @@ function handleLogout() {
     cancelButtonText: '取消',
     type: 'warning'
   }).then(() => {
+    broadcast('LOGOUT')   // 先通知其他标签页，再清本页状态
     userStore.logout()
     router.push('/login')
   }).catch(() => {})

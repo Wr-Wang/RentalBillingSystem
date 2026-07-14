@@ -13,6 +13,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
 import { getEffectiveCompanyId, clearEffectiveCompanyId } from '../utils/requestContext'
+import { broadcast } from '../utils/broadcast'
 
 // ---------------------------------------------------------------------------
 // Axios 实例：所有 API 请求的基础配置
@@ -108,8 +109,16 @@ request.interceptors.response.use(
   // 成功响应：自动剥壳 response.data
   // 组件调用的返回值 = response.data（即后端返回的 JSON 本体）
   // 例如：后端返回 { id, name }，组件直接拿到 { id, name }
+  //
+  // 额外逻辑：非 GET 请求成功 → 广播 NOTIFICATION_REFRESH
+  // 通知其他标签页即时刷新未读计数，无需等待轮询
   // -----------------------------------------------------------------------
   response => {
+    if (response.config.method !== 'get') {
+      // 非 GET 请求（POST/PUT/PATCH/DELETE）成功后，
+      // 其他标签页的通知铃铛可能需要更新
+      broadcast('NOTIFICATION_REFRESH')
+    }
     return response.data
   },
 
@@ -132,6 +141,7 @@ request.interceptors.response.use(
           localStorage.removeItem('userId')
           localStorage.removeItem('currentCompanyId')
           clearEffectiveCompanyId()
+          broadcast('LOGOUT')        // 通知其他标签页同步登出
           router.push('/login')
           ElMessage.closeAll()
           ElMessage.error('登录已过期，请重新登录')

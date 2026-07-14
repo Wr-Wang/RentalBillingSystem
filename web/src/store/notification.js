@@ -12,15 +12,17 @@
  *    System      — 系统通知
  *    Total       — 总和
  *
- *  轮询机制：
- *    startPolling(60000) 在 MainLayout 的 onMounted 中启动
- *    每 60 秒刷新一次未读计数
- *    组件销毁时 stopPolling() 清除定时器
+ *  通知刷新策略：
+ *    1. BroadcastChannel 实时广播 — 其他标签页有操作时即时推送（主要路径）
+ *    2. 兜底轮询 5 分钟一次 — 防止广播丢失（备用路径）
+ *    3. startPolling() 在 MainLayout onMounted 中启动，stopPolling() 销毁时清除
+ *    4. 广播触发后会重置轮询计时器，避免刚刷完又来一次轮询
  * =========================================================================
  */
 import { defineStore } from 'pinia'
 import { ref, reactive } from 'vue'
 import { getNotifications, getUnreadCounts, markNotificationRead, markAllNotificationsRead } from '../api'
+import { onMessage } from '../utils/broadcast'
 
 export const useNotificationStore = defineStore('notification', () => {
   // ---------------------------------------------------------------------------
@@ -43,6 +45,10 @@ export const useNotificationStore = defineStore('notification', () => {
 
   /** 轮询定时器句柄 */
   let pollTimer = null
+  /** 轮询是否活跃（用于 finally 中判断是否调度下一轮）*/
+  let isPolling = false
+  /** 当前轮询间隔（默认 5 分钟，作为广播的兜底）*/
+  let pollInterval = 300000
 
   // =========================================================================
   // fetchNotifications — 获取通知列表
@@ -76,6 +82,11 @@ export const useNotificationStore = defineStore('notification', () => {
       unreadCounts.Total = res.total || 0
     } catch (e) {
       // 静默失败，保持上次的值
+    } finally {
+      // 请求完成后再调度下一次，确保间隔从本次完成算起
+      if (isPolling) {
+        scheduleNextPoll()
+      }
     }
   }
 
@@ -101,24 +112,66 @@ export const useNotificationStore = defineStore('notification', () => {
 
   // =========================================================================
   // 轮询控制
+  //
+  // 有了 BroadcastChannel 之后，轮询降级为兜底机制：
+  //   - 实时通知 → 由其他标签页的广播触发
+  //   - 兜底轮询 → 每 5 分钟一次，防止广播丢失
+  //   - 广播触发后 → 重置轮询计时器（避免刚刷完又轮询）
   // =========================================================================
-  /** 启动轮询（默认 60 秒）*/
-  function startPolling(interval = 60000) {
+  /** 调度下一次轮询（完成一次请求后调用）*/
+  function scheduleNextPoll(delay) {
+    if (pollTimer) {
+      clearTimeout(pollTimer)
+      pollTimer = null
+    }
+    pollTimer = setTimeout(fetchUnreadCounts, delay || pollInterval)
+  }
+
+  /** 启动轮询：立即执行一次，完成后重新计时 */
+  function startPolling(interval) {
+    pollInterval = interval || pollInterval
     stopPolling()
-    pollTimer = setInterval(fetchUnreadCounts, interval)
+    isPolling = true
+    fetchUnreadCounts()
   }
 
   /** 停止轮询 */
   function stopPolling() {
+    isPolling = false
     if (pollTimer) {
-      clearInterval(pollTimer)
+      clearTimeout(pollTimer)
       pollTimer = null
     }
+  }
+
+  // =========================================================================
+  // startBroadcastListener — 监听跨标签页通知刷新信号（带防抖）
+  //
+  // 当其他标签页提交审批/催缴等操作后，会通过 BroadcastChannel 发送
+  // NOTIFICATION_REFRESH 消息。本标签页收到后立即刷新未读计数，
+  // 无需等待下一次轮询。
+  //
+  // 防抖：短时间内多次触发（如批量操作），只调用一次 API。
+  // 重置轮询：广播触发后重新计时 5 分钟，避免刚刷完又来一次轮询。
+  //
+  // @returns {Function} 取消监听的函数，在组件销毁时调用
+  // =========================================================================
+  function startBroadcastListener() {
+    let debounceTimer = null
+
+    return onMessage('NOTIFICATION_REFRESH', () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        fetchUnreadCounts()         // 内部 finally 会自动调度下一轮
+        debounceTimer = null
+      }, 800)
+    })
   }
 
   return {
     notifications, total, loading, unreadCounts,
     fetchNotifications, fetchUnreadCounts, markRead, markAllRead,
-    startPolling, stopPolling
+    startPolling, stopPolling,
+    startBroadcastListener
   }
 })
