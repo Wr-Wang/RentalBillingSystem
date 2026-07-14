@@ -1,13 +1,14 @@
 using System.Threading.Channels;
-using RBS.Core.Entities.SystemConfig;
 using Dapper;
 using RBS.Api.Middleware;
+using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Interfaces.Persistence;
 
 namespace RBS.Api.Services;
 
 /// <summary>
 /// API 日志批量写入服务 — 从 Channel 读取日志，每 50 条或 2 秒批量写入数据库
+/// 使用多行 INSERT 减少数据库往返
 /// </summary>
 public class ApiLogWriterService : BackgroundService
 {
@@ -70,19 +71,31 @@ public class ApiLogWriterService : BackgroundService
             using var conn = db.CreateConnection();
             conn.Open();
 
-            foreach (var log in buffer)
+            // 多行 INSERT — 一次往返写入全部
+            var cols = "(Id, UserId, UserDisplayName, HttpMethod, ApiPath, QueryString, RequestBody, StatusCode, ResponseBody, DurationMs, ClientIp, UserAgent, RequestAt)";
+            var values = string.Join(",",
+                buffer.Select((_, i) => $"(@Id{i}, @UserId{i}, @UserDisplayName{i}, @HttpMethod{i}, @ApiPath{i}, @QueryString{i}, @RequestBody{i}, @StatusCode{i}, @ResponseBody{i}, @DurationMs{i}, @ClientIp{i}, @UserAgent{i}, @RequestAt{i})"));
+
+            var parms = new DynamicParameters();
+            for (int i = 0; i < buffer.Count; i++)
             {
-                await conn.ExecuteAsync(@"
-                    INSERT INTO ApiLogs (Id, UserId, UserDisplayName, HttpMethod, ApiPath, QueryString, RequestBody, StatusCode, ResponseBody, DurationMs, ClientIp, UserAgent, RequestAt)
-                    VALUES (@Id, @UserId, @UserDisplayName, @HttpMethod, @ApiPath, @QueryString, @RequestBody, @StatusCode, @ResponseBody, @DurationMs, @ClientIp, @UserAgent, @RequestAt)",
-                    new
-                    {
-                        log.Id, log.UserId, log.UserDisplayName, log.HttpMethod,
-                        ApiPath = log.Path, log.QueryString, log.RequestBody, log.StatusCode, log.ResponseBody,
-                        log.DurationMs, ClientIp = log.IpAddress, log.UserAgent,
-                        RequestAt = log.RequestAt
-                    });
+                var log = buffer[i];
+                parms.Add($"@Id{i}", log.Id);
+                parms.Add($"@UserId{i}", log.UserId);
+                parms.Add($"@UserDisplayName{i}", log.UserDisplayName);
+                parms.Add($"@HttpMethod{i}", log.HttpMethod);
+                parms.Add($"@ApiPath{i}", log.Path);
+                parms.Add($"@QueryString{i}", log.QueryString);
+                parms.Add($"@RequestBody{i}", log.RequestBody);
+                parms.Add($"@StatusCode{i}", log.StatusCode);
+                parms.Add($"@ResponseBody{i}", log.ResponseBody);
+                parms.Add($"@DurationMs{i}", log.DurationMs);
+                parms.Add($"@ClientIp{i}", log.IpAddress);
+                parms.Add($"@UserAgent{i}", log.UserAgent);
+                parms.Add($"@RequestAt{i}", log.RequestAt);
             }
+
+            await conn.ExecuteAsync($"INSERT INTO ApiLogs {cols} VALUES {values}", parms);
         }
         catch { }
     }

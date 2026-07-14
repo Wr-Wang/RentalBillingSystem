@@ -6,19 +6,27 @@ using RBS.Core.Interfaces.UnitOfWork;
 namespace RBS.Application.EventHandlers;
 
 /// <summary>
-/// 审批推进事件处理器 — 通知下一级审批人
+/// 审批推进事件处理器 — 通知下一级审批人进行审批
 /// </summary>
 public class ApprovalLevelAdvancedEventHandler : IEventHandler<ApprovalLevelAdvancedEvent>
 {
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _uow;
 
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="notificationService">通知服务</param>
+    /// <param name="uow">工作单元，用于加载审批请求信息</param>
     public ApprovalLevelAdvancedEventHandler(INotificationService notificationService, IUnitOfWork uow)
     {
         _notificationService = notificationService;
         _uow = uow;
     }
 
+    /// <summary>
+    /// 处理审批级别推进事件 — 通知下一级审批人
+    /// </summary>
     public async Task HandleAsync(ApprovalLevelAdvancedEvent @event, CancellationToken ct)
     {
         var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);

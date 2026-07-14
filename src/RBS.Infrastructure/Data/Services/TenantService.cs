@@ -4,12 +4,27 @@ using RBS.Core.Interfaces.Services;
 namespace RBS.Infrastructure.Data.Services;
 
 /// <summary>
-/// 多租户（多公司）服务实现
+/// 多租户（多公司）服务实现 — 从 HttpContext 中的 JWT 声明和查询参数解析当前公司信息
 /// </summary>
+/// <remarks>
+/// 核心逻辑：
+/// <list type="bullet">
+///   <item><description>CompanyId 从 JWT Claim "CompanyId" 中读取</description></item>
+///   <item><description>IsSuperAdmin 从 JWT Claim "IsSuperAdmin" 中读取</description></item>
+///   <item><description>EffectiveCompanyId：超管可通过查询参数 ?companyId=xxx 切换公司；普通用户直接使用 CompanyId</description></item>
+///   <item><description>DefaultCompanyId：写入操作使用的公司 ID，优先级：EffectiveCompanyId → DefaultCompanyId(Claim) → CompanyId</description></item>
+///   <item><description>IsViewingAll：超管且未指定公司 ID 时为"查看全部数据"模式</description></item>
+/// </list>
+/// 设计模式：基于 HttpContext 的请求范围多租户解析。
+/// </remarks>
 public class TenantService : ITenantService
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
 
+    /// <summary>
+    /// 初始化多租户服务
+    /// </summary>
+    /// <param name="httpContextAccessor">HttpContext 访问器，用于读取 JWT Claims</param>
     public TenantService(IHttpContextAccessor httpContextAccessor)
     {
         _httpContextAccessor = httpContextAccessor;

@@ -9,6 +9,7 @@ using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Core.DomainServices;
 
 namespace RBS.Application.Services.Approval;
 
@@ -25,14 +26,26 @@ public class ApprovalService : IApprovalService
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IServiceProvider _serviceProvider;
     private readonly ISqlLoader _sql;
+    private readonly IApprovalDomainService _approvalDomain;
 
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="uow">工作单元</param>
+    /// <param name="tenantService">租户服务，获取默认公司 ID</param>
+    /// <param name="currentUserService">当前用户服务，获取操作用户 ID</param>
+    /// <param name="connectionFactory">数据库连接工厂</param>
+    /// <param name="serviceProvider">服务提供者（延迟获取事件处理器）</param>
+    /// <param name="sql">SQL 加载器</param>
+    /// <param name="approvalDomain">审批领域服务</param>
     public ApprovalService(
         IUnitOfWork uow,
         ITenantService tenantService,
         ICurrentUserService currentUserService,
         IDbConnectionFactory connectionFactory,
         IServiceProvider serviceProvider,
-        ISqlLoader sql)
+        ISqlLoader sql,
+        IApprovalDomainService approvalDomain)
     {
         _uow = uow;
         _tenantService = tenantService;
@@ -40,12 +53,17 @@ public class ApprovalService : IApprovalService
         _currentUserService = currentUserService;
         _serviceProvider = serviceProvider;
         _sql = sql;
+        _approvalDomain = approvalDomain;
     }
 
     // =====================================================================
     // 写操作：SubmitAsync
+    // 包含并发守卫（同一业务实体不能有两个待审批） + 事件分发
     // =====================================================================
 
+    /// <summary>
+    /// 提交审批请求 — 含并发守卫，自动提交后通知第一级审批人
+    /// </summary>
     public async Task<ApprovalRequestDto> SubmitAsync(SubmitApprovalRequest request, CancellationToken ct = default)
     {
         // ===== 并发守卫：同一业务实体+同类型不能有两个待审批 =====
@@ -75,8 +93,8 @@ public class ApprovalService : IApprovalService
         entity.AddRecord(_currentUserService.UserId, "Submitted", request.Description);
         await _uow.ApprovalRequests.AddAsync(entity, ct);
 
-        // 提交（Draft → Pending，若0级则自动 Approved）
-        entity.Submit();
+        // [领域] 通过领域服务执行提交状态变迁（Draft → Pending，若0级则自动 Approved）
+        _approvalDomain.SubmitRequest(entity);
 
         var record = entity.Records.First();
         using (var updateConn = _connectionFactory.CreateConnection())
@@ -111,6 +129,9 @@ public class ApprovalService : IApprovalService
     // 写操作：ApproveAsync / RejectAsync / CancelAsync 使用原始 SQL
     // =====================================================================
 
+    /// <summary>
+    /// 审批通过 — 终审时触发业务回调事件，非终审则推进到下一级
+    /// </summary>
     public async Task<ApprovalRequestDto> ApproveAsync(Guid id, string? comment, CancellationToken ct = default)
     {
         // [读] 加载实体，验证状态
@@ -120,9 +141,11 @@ public class ApprovalService : IApprovalService
         if (entity.Status != "Pending")
             throw new InvalidOperationException("该审批已处理，请刷新后重试");
 
-        var now = ChinaTime.Now;
         var userId = _currentUserService.UserId;
-        var isFinalLevel = entity.CurrentLevel >= entity.MaxLevel;
+        var now = ChinaTime.Now;
+
+        // [领域] 通过领域服务执行审批流转
+        var result = await _approvalDomain.ApproveAsync(entity, userId, comment, ct);
 
         // [写] 原始 SQL + 显式事务
         using var tx = await _uow.BeginTransactionAsync(ct);
@@ -130,7 +153,7 @@ public class ApprovalService : IApprovalService
         {
             // 状态变迁：终审设 Status，非终审进 CurrentLevel+1
             string updateSql;
-            if (isFinalLevel)
+            if (result.IsCompleted)
             {
                 updateSql = _sql.Get("Approval.Update.Request.ToApproved");
             }
@@ -144,11 +167,11 @@ public class ApprovalService : IApprovalService
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
-            // 插入审批记录
-            var recordId = Guid.NewGuid();
+            // 插入审批记录（读取领域服务在聚合根上添加的记录）
+            var newRecord = entity.LatestRecord!;
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Approval.Insert.Record.Raw"),
-                new object[] { recordId, id, entity.CurrentLevel, userId, "Approved",
+                new object[] { newRecord.Id, id, newRecord.LevelNo, userId, result.Action,
                     comment ?? "", userId, now }, ct);
 
             await tx.CommitAsync(ct);
@@ -161,13 +184,13 @@ public class ApprovalService : IApprovalService
         }
 
         // [事件] 终审时手动分发领域事件
-        if (isFinalLevel)
+        if (result.IsCompleted)
         {
             using var scope = _serviceProvider.CreateScope();
             var handler = scope.ServiceProvider
                 .GetRequiredService<IEventHandler<ApprovalCompletedEvent>>();
             await handler.HandleAsync(
-                new ApprovalCompletedEvent(id, entity.TargetEntityId, entity.TargetEntityType, "Approved"),
+                new ApprovalCompletedEvent(id, entity.TargetEntityId, entity.TargetEntityType, result.Action),
                 ct);
         }
         else
@@ -177,7 +200,7 @@ public class ApprovalService : IApprovalService
             var handler = scope.ServiceProvider
                 .GetRequiredService<IEventHandler<ApprovalLevelAdvancedEvent>>();
             await handler.HandleAsync(
-                new ApprovalLevelAdvancedEvent(id, entity.CurrentLevel + 1),
+                new ApprovalLevelAdvancedEvent(id, result.NextLevel!.Value),
                 ct);
         }
 
@@ -186,6 +209,9 @@ public class ApprovalService : IApprovalService
         return await MapToDtoAsync(entity, ct);
     }
 
+    /// <summary>
+    /// 审批驳回 — 驳回即为终审，触发审批完成事件
+    /// </summary>
     public async Task<ApprovalRequestDto> RejectAsync(Guid id, string comment, CancellationToken ct = default)
     {
         var entity = await _uow.ApprovalRequests.GetByIdAsync(id, ct)
@@ -194,8 +220,11 @@ public class ApprovalService : IApprovalService
         if (entity.Status != "Pending")
             throw new InvalidOperationException("该审批已处理，请刷新后重试");
 
-        var now = ChinaTime.Now;
         var userId = _currentUserService.UserId;
+        var now = ChinaTime.Now;
+
+        // [领域] 通过领域服务执行审批驳回
+        var result = await _approvalDomain.RejectAsync(entity, userId, comment, ct);
 
         // [写] 原始 SQL + 显式事务
         using var tx = await _uow.BeginTransactionAsync(ct);
@@ -207,10 +236,11 @@ public class ApprovalService : IApprovalService
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
-            var recordId = Guid.NewGuid();
+            // 插入审批记录（读取领域服务在聚合根上添加的记录）
+            var newRecord = entity.LatestRecord!;
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Approval.Insert.Record.Raw"),
-                new object[] { recordId, id, entity.CurrentLevel, userId, "Rejected",
+                new object[] { newRecord.Id, id, newRecord.LevelNo, userId, result.Action,
                     comment, userId, now }, ct);
 
             await tx.CommitAsync(ct);
@@ -227,7 +257,7 @@ public class ApprovalService : IApprovalService
         var handler = scope.ServiceProvider
             .GetRequiredService<IEventHandler<ApprovalCompletedEvent>>();
         await handler.HandleAsync(
-            new ApprovalCompletedEvent(id, entity.TargetEntityId, entity.TargetEntityType, "Rejected"),
+            new ApprovalCompletedEvent(id, entity.TargetEntityId, entity.TargetEntityType, result.Action),
             ct);
 
         // [读] 重新加载实体
@@ -235,6 +265,9 @@ public class ApprovalService : IApprovalService
         return await MapToDtoAsync(entity, ct);
     }
 
+    /// <summary>
+    /// 撤回审批请求 — 仅提交人可操作，关联导入批次时同步更新批次状态
+    /// </summary>
     public async Task<ApprovalRequestDto> CancelAsync(Guid id, string? reason = null, CancellationToken ct = default)
     {
         // [读] 加载实体（含 Records，需校验提交人）
@@ -295,6 +328,9 @@ public class ApprovalService : IApprovalService
     // 读操作
     // =====================================================================
 
+    /// <summary>
+    /// 获取当前用户可审批的待审批列表
+    /// </summary>
     public async Task<List<ApprovalRequestDto>> GetPendingAsync(CancellationToken ct = default)
     {
         var userId = _currentUserService.UserId;
@@ -305,6 +341,9 @@ public class ApprovalService : IApprovalService
         return dtos;
     }
 
+    /// <summary>
+    /// 获取当前用户提交的审批请求
+    /// </summary>
     public async Task<List<ApprovalRequestDto>> GetMyRequestsAsync(CancellationToken ct = default)
     {
         var list = await _uow.ApprovalRequests.GetByApproverAsync(_currentUserService.UserId, ct);
@@ -314,6 +353,9 @@ public class ApprovalService : IApprovalService
         return dtos;
     }
 
+    /// <summary>
+    /// 根据 ID 获取审批请求详情（含审批记录）
+    /// </summary>
     public async Task<ApprovalRequestDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         var entity = await _uow.ApprovalRequests.GetByIdWithRecordsAsync(id, ct);
@@ -321,6 +363,9 @@ public class ApprovalService : IApprovalService
         return await MapToDtoAsync(entity, ct);
     }
 
+    /// <summary>
+    /// 分页获取当前用户的审批历史记录
+    /// </summary>
     public async Task<PagedResult<ApprovalRequestDto>> GetHistoryAsync(
         ApprovalHistoryQuery query, CancellationToken ct = default)
     {
@@ -342,6 +387,9 @@ public class ApprovalService : IApprovalService
         };
     }
 
+    /// <summary>
+    /// 获取指定业务实体的最近一次被驳回的审批数据（用于重新提交预填）
+    /// </summary>
     public async Task<LastRejectedApprovalDto?> GetLastRejectedAsync(Guid targetEntityId, string targetEntityType, CancellationToken ct = default)
     {
         using var conn = _connectionFactory.CreateConnection();
@@ -351,7 +399,12 @@ public class ApprovalService : IApprovalService
             new { Id = targetEntityId, Type = targetEntityType });
     }
 
-        public async Task<ApprovalBizDetailDto?> GetBizDetailAsync(Guid id, CancellationToken ct = default)
+    /// <summary>
+    /// 获取审批业务详情（新旧对比数据）
+    /// 优先从 ApprovalBizData 结构化数据构建，无结构化数据时回退 Description 正则解析
+    /// 按业务类型分发：RENT_ADJUST / FEE_ADJUST / TERMINATE / ContractRenewal / ContractActivation
+    /// </summary>
+    public async Task<ApprovalBizDetailDto?> GetBizDetailAsync(Guid id, CancellationToken ct = default)
     {
         var approval = await _uow.ApprovalRequests.GetByIdAsync(id, ct);
         if (approval == null) return null;

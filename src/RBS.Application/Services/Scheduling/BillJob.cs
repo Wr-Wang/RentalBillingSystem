@@ -18,15 +18,18 @@ public class BillJob : ScheduledJobBase
 
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
+    private readonly IBillingDomainService _billingDomain;
 
     public BillJob(
         ITaskLogRepository taskLogRepo, ITaskStepLogger stepLogger, IUnitOfWork uow,
         IDbConnectionFactory db, ISqlLoader sql,
+        IBillingDomainService billingDomain,
         JobExecutionContext jobContext)
         : base(taskLogRepo, stepLogger, uow, jobContext)
     {
         _db = db;
         _sql = sql;
+        _billingDomain = billingDomain;
     }
 
     protected override async Task<JobResult> ExecuteCoreAsync(
@@ -83,8 +86,7 @@ public class BillJob : ScheduledJobBase
                 int created = 0;
                 decimal totalAmount = 0;
 
-                var domain = new BillingDomainService();
-                var plans = domain.GenerateProratedReceivablePlans(
+                var plans = _billingDomain.GenerateProratedReceivablePlans(
                     feeConfigs.Select(f => (f.FeeCodeId, f.Amount, f.EffDate, f.ExpDate, f.FeeName)).ToList(),
                     contract.Id, targetMonth, dueDate);
 

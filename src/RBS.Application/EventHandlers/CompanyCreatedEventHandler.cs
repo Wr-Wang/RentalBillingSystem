@@ -7,17 +7,25 @@ using RBS.Core.Interfaces.Persistence;
 namespace RBS.Application.EventHandlers;
 
 /// <summary>
-/// 公司创建事件处理器 — 自动从全局模板复制 JobSchedule
+/// 公司创建事件处理器 — 新公司注册时自动从全局模板（CompanyId IS NULL）
+/// 复制所有启用的 JobSchedule 配置到新公司，实现开箱即用的调度任务初始化
 /// </summary>
 public class CompanyCreatedEventHandler : IEventHandler<CompanyCreatedEvent>
 {
     private readonly IDbConnectionFactory _db;
 
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="db">数据库连接工厂</param>
     public CompanyCreatedEventHandler(IDbConnectionFactory db)
     {
         _db = db;
     }
 
+    /// <summary>
+    /// 处理公司创建事件 — 从全局模板复制任务调度配置到新公司
+    /// </summary>
     public async Task HandleAsync(CompanyCreatedEvent @event, CancellationToken ct)
     {
         using var conn = _db.CreateConnection();

@@ -4,6 +4,13 @@ using System.Data;
 
 namespace RBS.Infrastructure.Data;
 
+/// <summary>
+/// Dapper 房间状态类型处理器 — 实现 RoomStatus 值对象与数据库字符串的转换
+/// </summary>
+/// <remarks>
+/// RoomStatus 使用 FromCode(string) 工厂方法创建，Code 作为持久化字段。
+/// 默认值 "Vacant"（空闲）在 DB 值为 null 时使用。
+/// </remarks>
 public class DapperRoomStatusHandler : SqlMapper.TypeHandler<RoomStatus>
 {
     public override RoomStatus Parse(object value)

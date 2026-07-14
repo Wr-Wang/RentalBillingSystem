@@ -12,7 +12,9 @@ using ContractEntity = RBS.Core.Entities.Contract.Contract;
 namespace RBS.Application.Services.Billing;
 
 /// <summary>
-/// 应收生成编排服务 — 批量按合同生成应收计划，去重后写入
+/// 应收生成编排服务实现 — 批量按合同生成应收计划，去重后写入
+/// 合同激活时同步生成应收计划及对应的会计凭证（Voucher + JournalEntry）
+/// 依赖 IBillingDomainService 领域服务计算按月分摊的应收计划
 /// </summary>
 public class ReceivableGenerationService : IReceivableGenerationService
 {
@@ -22,6 +24,14 @@ public class ReceivableGenerationService : IReceivableGenerationService
     private readonly ISqlLoader _sql;
     private readonly IServiceProvider _serviceProvider;
 
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="uow">工作单元</param>
+    /// <param name="billingDomain">计费领域服务，用于计算应收计划</param>
+    /// <param name="db">数据库连接工厂</param>
+    /// <param name="sql">SQL 加载器</param>
+    /// <param name="serviceProvider">服务提供者（延迟获取 IJournalGenerationService）</param>
     public ReceivableGenerationService(
         IUnitOfWork uow,
         IBillingDomainService billingDomain,
@@ -36,6 +46,15 @@ public class ReceivableGenerationService : IReceivableGenerationService
         _serviceProvider = serviceProvider;
     }
 
+    /// <summary>
+    /// 为指定合同在指定账期范围内生成应收计划（去重：同一合同+账期+费用类型只生成一次）
+    /// </summary>
+    /// <param name="contractId">合同 ID</param>
+    /// <param name="periodFrom">起始账期 (yyyy-MM)，null 表示合同起租月</param>
+    /// <param name="periodTo">截止账期 (yyyy-MM)，null 表示合同结束月</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>本次新生成的应收计划数量</returns>
+    /// <exception cref="InvalidOperationException">合同不存在或非生效中时抛出</exception>
     public async Task<int> GenerateAsync(Guid contractId, string? periodFrom, string? periodTo, CancellationToken ct)
     {
         // 1. 加载合同（含费用配置）
@@ -85,6 +104,13 @@ public class ReceivableGenerationService : IReceivableGenerationService
         return totalCreated;
     }
 
+    /// <summary>
+    /// 合同激活时初始化生成所有应收（含财务日记账）
+    /// 从合同起租月补全到当前月的应收计划 + 凭证，一次性费用另行生成 JE
+    /// </summary>
+    /// <param name="contractId">合同 ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>初始化结果，包含生成的应收数量和处理的账期列表</returns>
     public async Task<ActivationInitResult> GenerateForActivationAsync(Guid contractId, CancellationToken ct)
     {
         var contract = await _uow.Contracts.GetByIdAsync(contractId, ct)
@@ -134,7 +160,6 @@ public class ReceivableGenerationService : IReceivableGenerationService
         }
 
         // 从起租月到当前月逐月生成
-        var domain = new BillingDomainService();
         var current = startPeriod;
         while (string.Compare(current, currentPeriod, StringComparison.Ordinal) <= 0)
         {
@@ -158,7 +183,7 @@ public class ReceivableGenerationService : IReceivableGenerationService
 
             if (activeFees.Count == 0) { current = NextPeriod(current); continue; }
 
-            var plans = domain.GenerateProratedReceivablePlans(
+            var plans = _billingDomain.GenerateProratedReceivablePlans(
                 activeFees.Select(f => (f.FeeCodeId, f.Amount, f.EffDate, f.ExpDate, f.FeeName)).ToList(),
                 contractId, current, dueDate);
 
@@ -197,6 +222,9 @@ public class ReceivableGenerationService : IReceivableGenerationService
         return result;
     }
 
+    /// <summary>
+    /// 切换到下一个月份
+    /// </summary>
     private static string NextPeriod(string period)
     {
         var parts = period.Split('-');
@@ -206,6 +234,9 @@ public class ReceivableGenerationService : IReceivableGenerationService
         return $"{year}-{month + 1:D2}";
     }
 
+    /// <summary>
+    /// 按付款周期拆分合同有效期内的所有应收月份
+    /// </summary>
     public List<string> SplitPeriods(ContractEntity contract)
     {
         var start = contract.StartDate;
@@ -224,6 +255,9 @@ public class ReceivableGenerationService : IReceivableGenerationService
         return periods;
     }
 
+    /// <summary>
+    /// 计算指定账期的到期日 — 取合同到期日与当月最后一天的较小值
+    /// </summary>
     public DateOnly CalculateDueDate(string periodStr, ContractEntity contract)
     {
         var period = Period.Parse(periodStr);

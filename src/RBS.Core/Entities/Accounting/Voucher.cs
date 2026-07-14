@@ -57,10 +57,10 @@ public class Voucher : AggregateRoot
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     /// <summary>借方总额（来自 DB 列，仅用于列表查询展示）</summary>
-    public decimal TotalDebit { get; set; }
+    public decimal TotalDebit { get; private set; }
 
     /// <summary>贷方总额（来自 DB 列，仅用于列表查询展示）</summary>
-    public decimal TotalCredit { get; set; }
+    public decimal TotalCredit { get; private set; }
 
     /// <summary>
     /// 凭证分录集合（只读）

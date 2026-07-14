@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Api.Models;
 using RBS.Core.Interfaces.Persistence;
 
 namespace RBS.Api.Controllers;
@@ -17,6 +18,9 @@ public class ApiLogsController : ControllerBase
     private bool IsSuperAdmin => User.FindFirst("IsSuperAdmin")?.Value == "True";
     private IActionResult? RequireSuperAdmin() => IsSuperAdmin ? null : Forbid();
 
+    /// <summary>
+    /// API 日志列表查询（默认近 7 天，排除 RequestBody/ResponseBody 大字段）
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetList(
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
@@ -37,34 +41,42 @@ public class ApiLogsController : ControllerBase
         if (!string.IsNullOrEmpty(path)) { where.Add("ApiPath LIKE @Path"); parms.Add("@Path", $"%{path}%"); }
         if (statusCode.HasValue) { where.Add("StatusCode = @StatusCode"); parms.Add("@StatusCode", statusCode.Value); }
         if (userId.HasValue) { where.Add("UserId = @UserId"); parms.Add("@UserId", userId.Value); }
-        if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
-        if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
 
-        var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
+        // 默认近 7 天日期范围，避免全表扫描
+        startDate ??= DateTime.UtcNow.AddDays(-7);
+        endDate ??= DateTime.UtcNow.AddDays(1);
+        where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value);
+        where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value);
+
+        var w = "WHERE " + string.Join(" AND ", where);
         var offset = (page - 1) * pageSize;
         parms.Add("@Offset", offset);
         parms.Add("@PageSize", pageSize);
 
-        var total = Convert.ToInt32(await conn.ExecuteScalarAsync($"SELECT COUNT(*) FROM ApiLogs {w}", parms));
-        var items = await conn.QueryAsync($"SELECT * FROM ApiLogs {w} ORDER BY RequestAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
+        // 总数 + 数据 一次查询（COUNT(*) OVER() 窗口函数）
+        var sql = $@"
+            SELECT COUNT(*) OVER() AS Total,
+                   Id, HttpMethod, ApiPath, StatusCode, DurationMs, ClientIp, UserId, RequestAt
+            FROM ApiLogs {w}
+            ORDER BY RequestAt DESC
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+        var rows = (await conn.QueryAsync<ApiLogListItem>(sql, parms)).ToList();
+        var total = rows.Count > 0 ? rows[0].Total : 0;
 
         return Ok(new
         {
-            items = items.Select(l =>
+            items = rows.Select(r => new
             {
-                dynamic r = l;
-                return new
-                {
-                    id = (Guid)r.Id,
-                    httpMethod = (string)r.HttpMethod,
-                    path = (string)r.ApiPath,
-                    statusCode = (int)r.StatusCode,
-                    durationMs = (int)r.DurationMs,
-                    ipAddress = (string?)r.ClientIp,
-                    userId = (Guid?)r.UserId,
-                    createdAt = (DateTime)r.RequestAt,
-                    userDisplayName = (string?)null   // 暂为 null，待数据库加列后补全
-                };
+                id = r.Id,
+                httpMethod = r.HttpMethod,
+                path = r.ApiPath,
+                statusCode = r.StatusCode,
+                durationMs = r.DurationMs,
+                ipAddress = r.ClientIp,
+                userId = r.UserId,
+                userDisplayName = (string?)null,
+                createdAt = r.RequestAt
             }),
             total, page, pageSize
         });
@@ -77,25 +89,27 @@ public class ApiLogsController : ControllerBase
         if (auth != null) return auth;
 
         using var conn = _db.CreateConnection(); conn.Open();
-        var log = await conn.QuerySingleOrDefaultAsync("SELECT * FROM ApiLogs WHERE Id = @Id", new { Id = id });
+        var log = await conn.QuerySingleOrDefaultAsync<ApiLogDetail>(
+            @"SELECT Id, HttpMethod, ApiPath, QueryString, RequestBody, StatusCode, ResponseBody,
+                     DurationMs, ClientIp, UserAgent, UserId, UserDisplayName, RequestAt
+              FROM ApiLogs WHERE Id = @Id", new { Id = id });
         if (log == null) return NotFound();
 
-        dynamic d = log;
         return Ok(new
         {
-            id = (Guid)d.Id,
-            userId = (Guid?)d.UserId,
-            httpMethod = (string)d.HttpMethod,
-            path = (string)d.ApiPath,
-            queryString = (string?)null,     // 暂为 null，待数据库加列后补全
-            requestBody = (string?)d.RequestBody,
-            statusCode = (int)d.StatusCode,
-            responseBody = (string?)d.ResponseBody,
-            durationMs = (long)(int)d.DurationMs,
-            ipAddress = (string?)d.ClientIp,
-            userAgent = (string?)null,       // 暂为 null，待数据库加列后补全
-            userDisplayName = (string?)null, // 暂为 null，待数据库加列后补全
-            createdAt = (DateTime)d.RequestAt
+            id = log.Id,
+            userId = log.UserId,
+            httpMethod = log.HttpMethod,
+            path = log.ApiPath,
+            queryString = log.QueryString,
+            requestBody = log.RequestBody,
+            statusCode = log.StatusCode,
+            responseBody = log.ResponseBody,
+            durationMs = log.DurationMs,
+            ipAddress = log.ClientIp,
+            userAgent = log.UserAgent,
+            userDisplayName = log.UserDisplayName,
+            createdAt = log.RequestAt
         });
     }
 
@@ -125,7 +139,11 @@ public class ApiLogsController : ControllerBase
         if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
         var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
 
-        await conn.ExecuteAsync($"DELETE FROM ApiLogs {w}", parms);
+        // 批次删除，每次最多 1000 条，避免锁表
+        await conn.ExecuteAsync($@"
+            DELETE TOP(1000) FROM ApiLogs {w};
+            WHILE @@ROWCOUNT > 0
+                DELETE TOP(1000) FROM ApiLogs {w};", parms);
         return NoContent();
     }
 }

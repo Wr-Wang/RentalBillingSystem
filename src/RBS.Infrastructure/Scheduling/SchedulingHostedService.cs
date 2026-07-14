@@ -22,11 +22,20 @@ namespace RBS.Infrastructure.Scheduling;
 /// </summary>
 public class SchedulingHostedService : BackgroundService
 {
+    /// <summary>服务作用域工厂，用于在轮询时创建独立 DI 作用域</summary>
     private readonly IServiceScopeFactory _scopeFactory;
+    /// <summary>日志记录器</summary>
     private readonly ILogger<SchedulingHostedService> _logger;
+    /// <summary>轮询间隔（60 秒）</summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(60);
+    /// <summary>缓存 SqlLoader 实例（因运行在 Singleton 中，懒加载避免启动时依赖未就绪）</summary>
     private ISqlLoader? _cachedSql;
 
+    /// <summary>
+    /// 初始化调度宿主服务
+    /// </summary>
+    /// <param name="scopeFactory">服务作用域工厂</param>
+    /// <param name="logger">日志记录器</param>
     public SchedulingHostedService(IServiceScopeFactory scopeFactory, ILogger<SchedulingHostedService> logger)
     {
         _scopeFactory = scopeFactory;
@@ -70,6 +79,16 @@ public class SchedulingHostedService : BackgroundService
     /// 处理所有到期排期：查出 Pending 且 TargetDate≤Now 的排期，
     /// 按公司分组并行执行，同一公司内串行执行。
     /// </summary>
+    /// <remarks>
+    /// 执行策略：
+    /// <list type="bullet">
+    ///   <item><description>先查出所有到期执行记录及其关联的活跃 JobSchedule</description></item>
+    ///   <item><description>按 CompanyId 分组，公司间使用 Parallel.ForEachAsync 并行</description></item>
+    ///   <item><description>同一公司内按 TargetDate 升序串行，确保先到期先执行</description></item>
+    ///   <item><description>上游执行失败会阻断下游（返回 false 时 break）</description></item>
+    /// </list>
+    /// </remarks>
+    /// <param name="ct">取消令牌</param>
     private async Task ProcessPendingExecutionsAsync(CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -124,7 +143,24 @@ public class SchedulingHostedService : BackgroundService
         });
     }
 
-    /// <summary>执行单个排期（含原子抢占、互斥检查、步骤日志）</summary>
+    /// <summary>
+    /// 执行单个排期（含原子抢占、互斥检查、步骤日志）
+    /// </summary>
+    /// <remarks>
+    /// 执行流程：
+    /// <list type="bullet">
+    ///   <item><description>依赖检查：查询同一公司是否有 TargetDate 靠前的失败排期（阻断依赖链）</description></item>
+    ///   <item><description>原子抢占：UPDATE ... WHERE Status='Pending' 防止重复执行（乐观锁机制）</description></item>
+    ///   <item><description>互斥检查：同一任务+公司+月份是否有正在运行的任务日志</description></item>
+    ///   <item><description>创建任务日志和步骤日志，通过 JobExecutionContext 传递给具体 Job</description></item>
+    ///   <item><description>启动排期级心跳线程（每 30 秒更新），用于进程崩溃恢复</description></item>
+    ///   <item><description>执行完成后更新排期状态和任务日志</description></item>
+    ///   <item><description>异常时记录错误并标记失败，finally 中停止心跳</description></item>
+    /// </list>
+    /// </remarks>
+    /// <param name="execution">排期执行记录</param>
+    /// <param name="schedule">排期定义</param>
+    /// <param name="ct">取消令牌</param>
     /// <returns>true=执行成功, false=执行失败（上游失败时应阻断下游）</returns>
     private async Task<bool> ExecuteJobAsync(
         JobScheduleExecution execution, JobSchedule schedule, CancellationToken ct)
@@ -265,7 +301,16 @@ public class SchedulingHostedService : BackgroundService
         }
     }
 
-    /// <summary>创建任务日志，返回 taskLogId</summary>
+    /// <summary>
+    /// 创建任务日志
+    /// </summary>
+    /// <param name="db">数据库连接工厂</param>
+    /// <param name="taskName">任务名称</param>
+    /// <param name="companyId">公司 ID</param>
+    /// <param name="month">目标月份</param>
+    /// <param name="status">初始状态</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>新建任务日志的 ID</returns>
     private async Task<Guid> CreateTaskLogAsync(IDbConnectionFactory db, string taskName,
         Guid companyId, string month, string status, CancellationToken ct)
     {
@@ -289,6 +334,16 @@ public class SchedulingHostedService : BackgroundService
         return id;
     }
 
+    /// <summary>
+    /// 更新任务日志状态（完成或失败）
+    /// </summary>
+    /// <param name="db">数据库连接工厂</param>
+    /// <param name="taskName">任务名称</param>
+    /// <param name="companyId">公司 ID</param>
+    /// <param name="month">目标月份</param>
+    /// <param name="status">目标状态（"Completed" 或 "Failed"）</param>
+    /// <param name="error">失败时的错误信息</param>
+    /// <param name="ct">取消令牌</param>
     private async Task UpdateTaskLogAsync(IDbConnectionFactory db, string taskName, Guid companyId, string month, string status, string? error, CancellationToken ct)
     {
         using var conn = db.CreateConnection(); conn.Open();
@@ -300,6 +355,18 @@ public class SchedulingHostedService : BackgroundService
             new { Status = status, Now = ChinaTime.Now, Error = error, Name = taskName, Cid = companyId, Month = month });
     }
 
+    /// <summary>
+    /// 启动时检测并恢复僵死任务和排期
+    /// </summary>
+    /// <remarks>
+    /// 两个步骤：
+    /// <list type="bullet">
+    ///   <item><description>使用 GetStaleTasksAsync 查询心跳超时的任务日志并标记为 Stale</description></item>
+    ///   <item><description>基于 ExecutionHeartbeats 表，恢复因进程崩溃而卡在 Processing/Running 的排期为 Pending</description></item>
+    /// </list>
+    /// 心跳超时阈值：任务日志 5 分钟，排期心跳 10 分钟。
+    /// </remarks>
+    /// <param name="ct">取消令牌</param>
     private async Task DetectStaleTasksAsync(CancellationToken ct)
     {
         try

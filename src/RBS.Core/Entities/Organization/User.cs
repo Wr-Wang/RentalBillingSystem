@@ -209,6 +209,11 @@ public class User : AggregateRoot
         CompanyId = companyId;
     }
 
+    /// <summary>
+    /// 设置默认公司（用于写入操作时的归属公司标识）
+    /// 当超管在多个公司间切换时，持久化到数据库作为默认值
+    /// </summary>
+    /// <param name="companyId">默认公司标识，设为 null 表示清空</param>
     public void SetDefaultCompany(Guid? companyId)
     {
         DefaultCompanyId = companyId;

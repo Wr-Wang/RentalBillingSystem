@@ -8,10 +8,10 @@
 
     <!-- ────── 减号按钮 ────── -->
     <button
-      class="app-input-number__decrease"                            /* BEM 元素 */
-      :class="{ 'is-disabled': modelValue <= min }"                 /* 到达最小值时显示禁用样式 */
-      :disabled="disabled || modelValue <= min"                     /* 禁用时不可点击 */
-      @click="decrease"                                             /* 点击触发减少 */
+      class="app-input-number__decrease"
+      :class="{ 'is-disabled': modelValue <= min }"
+      :disabled="disabled || modelValue <= min"
+      @click="decrease"
       type="button"
     >
       <el-icon><Minus /></el-icon>
@@ -24,15 +24,15 @@
       如果 v-model 直接把非法值写入了父组件数据，clamp 就来不及了。
     -->
     <input
-      :value="String(modelValue)"       /* 将数值转字符串显示（input 的 value 只能是 string）*/
+      :value="String(modelValue)"
       :disabled="disabled"
-      type="number"                      /* 移动端弹出数字键盘 */
-      :min="min"                         /* 浏览器原生校验（虽然不是主要约束，聊胜于无）*/
+      type="number"
+      :min="min"
       :max="max"
       :step="step"
       :placeholder="placeholder"
-      @input="handleInput"              /* 每次按键都触发，实时更新 */
-      @blur="handleBlur"                /* 失焦时修正无效值 */
+      @input="handleInput"
+      @blur="handleBlur"
       class="app-input-number__input"
     />
 

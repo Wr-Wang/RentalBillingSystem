@@ -13,24 +13,57 @@ using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
+using Microsoft.Extensions.DependencyInjection;
+using RBS.Core.Common;
+using RBS.Core.Entities.Base;
 using RBS.Infrastructure.Data.Repositories;
 
 namespace RBS.Infrastructure.Data.UnitOfWork;
 
+/// <summary>
+/// Dapper 工作单元实现 — 同时实现 IUnitOfWork（公开仓储访问）和 IChangeTracker（内部变更追踪）
+/// </summary>
+/// <remarks>
+/// 架构说明：
+/// <list type="bullet">
+///   <item><description>聚合所有 Dapper 仓储实例，通过延迟初始化按需创建</description></item>
+///   <item><description>实现 IChangeTracker 接口，支持快照追踪→差异计算→批量 UPDATE 的变更持久化模式</description></item>
+///   <item><description>CommitAsync 遍历所有被追踪的实体，只写入有变化的字段（差异更新）</description></item>
+///   <item><description>审计日志在事务提交后、事务外写入，避免审计表影响业务事务</description></item>
+///   <item><description>BeginTransactionAsync 创建共享连接+事务，供 ExecuteSqlRawAsync 复用</description></item>
+/// </list>
+/// 设计模式：Unit of Work + Change Tracker（类似 EF Core 的 ChangeTracker 机制但更轻量）。
+/// </remarks>
 public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
 {
+    /// <summary>数据库连接工厂</summary>
     private readonly IDbConnectionFactory _db;
+    /// <summary>SQL 映射加载器</summary>
     private readonly ISqlLoader _sql;
+    /// <summary>审计日志写入器</summary>
     private readonly IAuditLogWriter _auditWriter;
+    /// <summary>多租户服务（可选）</summary>
     private readonly ITenantService? _tenant;
+    /// <summary>服务提供者（可选，用于延迟解析领域事件调度器以避免循环依赖）</summary>
+    private readonly IServiceProvider? _serviceProvider;
+    /// <summary>共享连接（用于事务）</summary>
     private IDbConnection? _sharedConnection;
+    /// <summary>共享事务（由 BeginTransactionAsync 创建）</summary>
     private IDbTransaction? _sharedTransaction;
 
     // ===== 变更追踪 =====
+    /// <summary>变更追踪字典：表名 → (实体 ID → 快照条目)</summary>
     private readonly Dictionary<string, Dictionary<Guid, TrackedEntry>> _tracked = new();
 
-    public DapperUnitOfWork(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, ITenantService? tenant = null) { _db = db; _sql = sql; _auditWriter = auditWriter;
-        _tenant = tenant; }
+    /// <summary>
+    /// 初始化工作单元
+    /// </summary>
+    /// <param name="db">数据库连接工厂</param>
+    /// <param name="sql">SQL 映射加载器</param>
+    /// <param name="auditWriter">审计日志写入器</param>
+    /// <param name="tenant">多租户服务（可选）</param>
+    public DapperUnitOfWork(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, ITenantService? tenant = null, IServiceProvider? serviceProvider = null) { _db = db; _sql = sql; _auditWriter = auditWriter;
+        _tenant = tenant; _serviceProvider = serviceProvider; }
 
     public IUserRepository Users => _users ??= new DapperUserRepository(_db, _sql, _auditWriter, this);
     public IRoleRepository Roles => _roles ??= new DapperRoleRepository(_db, _sql, _auditWriter, this);
@@ -142,6 +175,12 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     // IChangeTracker 实现
     // ==================================================================
 
+    /// <summary>
+    /// 追踪实体的当前快照，用于后续差异比较
+    /// </summary>
+    /// <typeparam name="T">实体类型</typeparam>
+    /// <param name="entity">实体对象</param>
+    /// <param name="tableName">数据库表名</param>
     void IChangeTracker.Track<T>(T entity, string tableName)
     {
         var id = typeof(T).GetProperty("Id")?.GetValue(entity) is Guid g ? g : Guid.Empty;
@@ -151,15 +190,32 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         _tracked[tableName][id] = new TrackedEntry(entity, EntityToDict(entity));
     }
 
+    /// <summary>获取所有被追踪的脏数据条目（只读）</summary>
     IReadOnlyDictionary<string, Dictionary<Guid, TrackedEntry>> IChangeTracker.DirtyEntries
         => _tracked;
 
+    /// <summary>清空变更追踪缓存</summary>
     void IChangeTracker.Clear() => _tracked.Clear();
 
     // ==================================================================
     // CommitAsync — 真正的变更持久化入口
     // ==================================================================
 
+    /// <summary>
+    /// 提交所有变更 — 遍历被追踪的脏数据，生成差异 UPDATE 并持久化
+    /// </summary>
+    /// <remarks>
+    /// 提交策略：
+    /// <list type="bullet">
+    ///   <item><description>仅对有变化的字段生成 UPDATE SET 子句（差异更新）</description></item>
+    ///   <item><description>所有变更在同一个事务中提交</description></item>
+    ///   <item><description>审计日志在事务外写入，避免审计失败导致业务回滚</description></item>
+    ///   <item><description>CommitAsync 是唯一支持 UPDATE 审计的入口；直接调用仓储的 UpdateAsync 也有独立的审计逻辑</description></item>
+    /// </list>
+    /// </remarks>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>受影响的行数</returns>
+    /// <exception cref="Exception">事务提交失败时回滚并重新抛出异常</exception>
     public async Task<int> CommitAsync(CancellationToken ct = default)
     {
         if (_tracked.Count == 0) return 0;
@@ -208,7 +264,25 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
                 await _auditWriter.LogChangesAsync(tn, eid, action, chg, uid, ct);
             }
 
+            // 在清除追踪前提取聚合根，用于后续领域事件分发
+            var aggregates = _tracked.Values
+                .SelectMany(dict => dict.Values)
+                .Select(entry => entry.Entity)
+                .OfType<AggregateRoot>()
+                .ToList();
+
             _tracked.Clear();
+
+            // 领域事件分发（仅在提交成功后）
+            if (aggregates.Count > 0)
+            {
+                var dispatcher = _serviceProvider?.GetService<IDomainEventDispatcher>();
+                if (dispatcher != null)
+                {
+                    await dispatcher.DispatchAsync(aggregates, ct);
+                }
+            }
+
             return affected;
         }
         catch
@@ -219,17 +293,31 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         }
     }
 
+    /// <summary>重新加载实体（当前实现为空操作）</summary>
     public Task ReloadAsync<T>(T entity, CancellationToken ct = default) where T : class => Task.CompletedTask;
 
     // ==================================================================
-    // 其他方法（原样保留）
+    // 其他方法
     // ==================================================================
 
+    /// <summary>
+    /// 根据编码查找审批类型
+    /// </summary>
+    /// <param name="code">审批类型编码</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>审批类型，未找到时返回 null</returns>
     public async Task<ApprovalType?> FindApprovalTypeByCodeAsync(string code, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         return await conn.QuerySingleOrDefaultAsync<ApprovalType>(_sql.Get("Common.Select.ApprovalType.ByCode"), new { Code = code });
     }
+    /// <summary>
+    /// 查询导入批次及其明细项
+    /// </summary>
+    /// <remarks>使用 QueryMultipleAsync 实现主子表一次性加载</remarks>
+    /// <param name="id">导入批次 ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>含明细项的导入批次，未找到时返回 null</returns>
     public async Task<ImportBatch?> GetImportBatchWithItemsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -244,6 +332,13 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         return batch;
     }
 
+    /// <summary>
+    /// 查询指定公司的欠款通知单（可选按账期筛选）
+    /// </summary>
+    /// <param name="companyId">公司 ID</param>
+    /// <param name="period">账期（可选，格式 yyyy-MM）</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>欠款通知单列表</returns>
     public async Task<List<DebitNote>> GetDebitNotesByCompanyAsync(Guid companyId, string? period = null, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -268,6 +363,15 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
             new { Id = debitNoteId })).ToList();
     }
 
+    /// <summary>
+    /// 开启共享事务 — 创建供同一 UoW 内多个操作复用的连接+事务
+    /// </summary>
+    /// <remarks>
+    /// 被 ExecuteSqlRawAsync 复用，可确保同一个 UoW 中的原始 SQL 操作在同一个事务中执行。
+    /// 释放时通过 DapperTransaction 的回调自动清理共享连接引用。
+    /// </remarks>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>事务包装器</returns>
     public async Task<ITransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
         _sharedConnection = _db.CreateConnection();
@@ -280,8 +384,45 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         });
     }
 
-    public Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default) => Task.FromResult(0);
+    /// <summary>
+    /// 带重试的提交 — 在遇到死锁或临时异常时自动重试，提高分布式环境下的写入成功率
+    /// </summary>
+    /// <remarks>
+    /// 重试策略：首次重试无延迟，后续每次递增等待时间（100ms × 重试次数）。
+    /// 达到最大重试次数后仍失败则直接抛出异常，不再捕获。
+    /// </remarks>
+    /// <param name="maxRetries">最大重试次数，默认 3 次</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>受影响的行数</returns>
+    public async Task<int> CommitWithRetryAsync(int maxRetries = 3, CancellationToken ct = default)
+    {
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                return await CommitAsync(ct);
+            }
+            catch (Exception ex) when (attempt < maxRetries)
+            {
+                // 短暂等待后重试，首次重试无延迟
+                if (attempt > 1)
+                    await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), ct);
+            }
+        }
+        return await CommitAsync(ct);
+    }
 
+    /// <summary>
+    /// 执行原始 SQL（参数为 IEnumerable）
+    /// </summary>
+    /// <remarks>
+    /// 优先使用共享连接+事务（如果存在），否则创建新连接。
+    /// 参数自动命名为 @p0, @p1, @p2...
+    /// </remarks>
+    /// <param name="sql">原始 SQL 语句</param>
+    /// <param name="parameters">参数列表</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>受影响的行数</returns>
     public async Task<int> ExecuteSqlRawAsync(string sql, IEnumerable<object> parameters, CancellationToken ct = default)
     {
         var args = parameters.ToArray();
@@ -299,6 +440,14 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         return await conn.ExecuteAsync(sql, dp);
     }
 
+    /// <summary>
+    /// 执行原始 SQL（参数为匿名对象或 DynamicParameters）
+    /// </summary>
+    /// <remarks>优先使用共享连接+事务（如果存在）</remarks>
+    /// <param name="sql">原始 SQL 语句</param>
+    /// <param name="parameters">参数对象</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>受影响的行数</returns>
     public async Task<int> ExecuteSqlRawAsync(string sql, object parameters, CancellationToken ct = default)
     {
         var dp = new DynamicParameters(parameters);
@@ -313,6 +462,9 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         return await conn.ExecuteAsync(sql, dp);
     }
 
+    /// <summary>
+    /// 释放共享事务和共享连接
+    /// </summary>
     public void Dispose()
     {
         _sharedTransaction?.Dispose();
@@ -325,6 +477,12 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     // 快照/比对工具（与 DapperRepository 共享逻辑）
     // ==================================================================
 
+    /// <summary>
+    /// 将实体对象转换为字典（用于快照比较）
+    /// </summary>
+    /// <remarks>排除 DomainEvents、RowVersion、导航属性和只读计算属性</remarks>
+    /// <param name="entity">实体对象</param>
+    /// <returns>属性名→属性值的字典</returns>
     internal static Dictionary<string, object?> EntityToDict(object entity)
     {
         var dict = new Dictionary<string, object?>();
@@ -339,6 +497,12 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         return dict;
     }
 
+    /// <summary>
+    /// 计算两个字典的差异（用于变更追踪的字段级别差异检测）
+    /// </summary>
+    /// <param name="old">旧快照字典</param>
+    /// <param name="now">当前值字典</param>
+    /// <returns>发生变化的字段集合</returns>
     internal static Dictionary<string, object?> DiffDict(Dictionary<string, object?> old, Dictionary<string, object?> now)
     {
         var diff = new Dictionary<string, object?>();
@@ -355,6 +519,12 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         return diff;
     }
 
+    /// <summary>
+    /// 判断属性是否为导航属性
+    /// </summary>
+    /// <remarks>Nullable&lt;T&gt; 视为标量值类型而非导航属性</remarks>
+    /// <param name="p">属性信息</param>
+    /// <returns>是导航属性返回 true</returns>
     private static bool IsNavProp(System.Reflection.PropertyInfo p)
     {
         var t = p.PropertyType;

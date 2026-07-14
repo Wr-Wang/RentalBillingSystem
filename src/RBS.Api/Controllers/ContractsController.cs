@@ -104,7 +104,7 @@ public class ContractsController : ControllerBase
         if (request.StartDate.HasValue && request.EndDate.HasValue)
             entity.SetPeriod(request.StartDate.Value, request.EndDate.Value);
         if (!string.IsNullOrEmpty(request.PaymentCycle)) entity.SetPaymentCycle(request.PaymentCycle);
-        if (request.AutoRenew.HasValue) entity.SetAutoRenew(request.AutoRenew.Value);
+        if (request.AutoRenew.HasValue) entity.ConfigureAutoRenew(request.AutoRenew.Value);
 
         await _uow.CommitAsync(ct);
         return Ok(entity);

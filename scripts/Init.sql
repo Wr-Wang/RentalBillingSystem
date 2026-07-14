@@ -4911,6 +4911,24 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'响应时�
 GO
 
 -- ===================================================================
+-- ApiLogs 索引：提升列表查询性能
+-- ===================================================================
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[ApiLogs]'))
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ApiLogs_RequestAt' AND object_id = OBJECT_ID('ApiLogs'))
+        CREATE INDEX [IX_ApiLogs_RequestAt] ON [ApiLogs] ([RequestAt] DESC);
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ApiLogs_Method_StatusCode' AND object_id = OBJECT_ID('ApiLogs'))
+        CREATE INDEX [IX_ApiLogs_Method_StatusCode] ON [ApiLogs] ([HttpMethod], [StatusCode])
+        INCLUDE ([ApiPath], [DurationMs], [ClientIp], [UserId], [RequestAt]);
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ApiLogs_UserId' AND object_id = OBJECT_ID('ApiLogs'))
+        CREATE INDEX [IX_ApiLogs_UserId] ON [ApiLogs] ([UserId])
+        INCLUDE ([RequestAt]);
+END
+GO
+
+-- ===================================================================
 -- 56. TaskLogs 表：任务执行日志表
 -- ===================================================================
 -- 56. TaskLogs 表：任务执行日志表

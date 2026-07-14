@@ -9,14 +9,38 @@ namespace RBS.Infrastructure.PdfGeneration;
 /// <summary>
 /// 账单 PDF 生成器 — 使用 QuestPDF 渲染欠款通知单
 /// </summary>
+/// <remarks>
+/// 功能说明：
+/// <list type="bullet">
+///   <item><description>静态构造函数设置 QuestPDF 为 Community 许可证（免费使用）</description></item>
+///   <item><description>Generate 方法生成 A4 版式的 PDF 字节流</description></item>
+///   <item><description>PDF 内容包含：公司名称、单号、合同/租客/账期信息、费用明细表格、合计金额（数字+大写）、备注说明</description></item>
+///   <item><description>草稿状态的账单标题显示"欠款通知单（草稿）"</description></item>
+///   <item><description>使用 SimSun（宋体）作为默认字体，适合中文显示</description></item>
+///   <item><description>页脚显示"第 X 页 / 共 Y 页"</description></item>
+/// </list>
+/// 设计模式：Strategy Pattern — PDF 生成策略的具体实现。
+/// 依赖 QuestPDF 开源库。
+/// </remarks>
 public class BillPdfGenerator : IBillPdfGenerator
 {
+    /// <summary>
+    /// 静态构造函数 — 设置 QuestPDF Community 许可证
+    /// </summary>
     static BillPdfGenerator()
     {
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    /// <summary>生成账单 PDF 字节流</summary>
+    /// <summary>
+    /// 生成欠款通知单 PDF 字节流
+    /// </summary>
+    /// <param name="note">欠款通知单实体</param>
+    /// <param name="items">费用明细列表（费用名称 + 金额）</param>
+    /// <param name="contractNo">合同编号</param>
+    /// <param name="tenantName">租客姓名</param>
+    /// <param name="companyName">公司名称</param>
+    /// <returns>PDF 文件的字节数组</returns>
     public byte[] Generate(DebitNote note, IReadOnlyList<(string FeeName, decimal Amount)> items,
         string contractNo, string tenantName, string? companyName)
     {

@@ -9,8 +9,24 @@ namespace RBS.Infrastructure.Data.TypeHandlers;
 /// Dapper 类型处理器 — 实现值对象与原始类型的自动转换
 /// 避免实体中同时维护两套属性（DB原始类型 + 领域类型）
 /// </summary>
+/// <remarks>
+/// 注册的值对象处理器：
+/// <list type="bullet">
+///   <item><description>MoneyHandler — Money ↔ decimal</description></item>
+///   <item><description>PeriodHandler — Period ↔ string (yyyy-MM)</description></item>
+///   <item><description>ContractStatusHandler — ContractStatus ↔ string</description></item>
+///   <item><description>ReceiptStatusHandler — ReceiptStatus ↔ string</description></item>
+///   <item><description>ReceivableStatusHandler — ReceivableStatus ↔ string</description></item>
+///   <item><description>VoucherStatusHandler — VoucherStatus ↔ string</description></item>
+/// </list>
+/// 每个处理器继承 SqlMapper.TypeHandler&lt;T&gt;，Dapper 自动在查询/写入时调用。
+/// 该机制使得领域实体可以直接使用值对象属性，无需在仓储中手动转换。
+/// </remarks>
 public static class ValueObjectHandlers
 {
+    /// <summary>
+    /// 注册所有值对象类型处理器 — 在应用程序启动时调用
+    /// </summary>
     public static void Register()
     {
         SqlMapper.AddTypeHandler(new MoneyHandler());
@@ -22,6 +38,7 @@ public static class ValueObjectHandlers
     }
 }
 
+/// <summary>凭证状态处理器 — VoucherStatus ↔ string 转换</summary>
 public class VoucherStatusHandler : SqlMapper.TypeHandler<VoucherStatus>
 {
     public override VoucherStatus Parse(object value) =>
@@ -34,6 +51,7 @@ public class VoucherStatusHandler : SqlMapper.TypeHandler<VoucherStatus>
     }
 }
 
+/// <summary>金额值对象处理器 — Money ↔ decimal 转换</summary>
 public class MoneyHandler : SqlMapper.TypeHandler<Money>
 {
     public override Money Parse(object value) =>
@@ -46,6 +64,7 @@ public class MoneyHandler : SqlMapper.TypeHandler<Money>
     }
 }
 
+/// <summary>账期值对象处理器 — Period ↔ string (yyyy-MM) 转换</summary>
 public class PeriodHandler : SqlMapper.TypeHandler<Period>
 {
     public override Period Parse(object value) =>
@@ -58,6 +77,7 @@ public class PeriodHandler : SqlMapper.TypeHandler<Period>
     }
 }
 
+/// <summary>合同状态值对象处理器 — ContractStatus ↔ string 转换</summary>
 public class ContractStatusHandler : SqlMapper.TypeHandler<ContractStatus>
 {
     public override ContractStatus Parse(object value) =>
@@ -70,6 +90,7 @@ public class ContractStatusHandler : SqlMapper.TypeHandler<ContractStatus>
     }
 }
 
+/// <summary>收款单状态值对象处理器 — ReceiptStatus ↔ string 转换</summary>
 public class ReceiptStatusHandler : SqlMapper.TypeHandler<ReceiptStatus>
 {
     public override ReceiptStatus Parse(object value) =>
@@ -82,6 +103,7 @@ public class ReceiptStatusHandler : SqlMapper.TypeHandler<ReceiptStatus>
     }
 }
 
+/// <summary>应收状态值对象处理器 — ReceivableStatus ↔ string 转换</summary>
 public class ReceivableStatusHandler : SqlMapper.TypeHandler<ReceivableStatus>
 {
     public override ReceivableStatus Parse(object value) =>

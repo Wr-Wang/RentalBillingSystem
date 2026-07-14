@@ -1,9 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.EventHandlers;
 using RBS.Application.Services.Billing;
 using RBS.Application.Services.Contract;
 using RBS.Application.Services.Import;
 using RBS.Application.Services.Organization;
+using RBS.Core.Common;
+using RBS.Core.Entities.Base;
 using RBS.Core.Interfaces.Services;
 using RBS.Application.Services.Property;
 using RBS.Application.Services.Approval;
@@ -76,6 +79,14 @@ public static class DependencyInjection
         services.AddTransient<IScheduledJob, AutoRenewJob>();
         services.AddTransient<IScheduledJob, CollectionJob>();
         services.AddTransient<IScheduledJob, RenewalReminderJob>();
+
+        // ===== 领域事件处理器（Scoped） =====
+        // 处理审批完成/提交/级别推进、合同暂停/恢复等事件
+        services.AddScoped<IEventHandler<ApprovalCompletedEvent>, ApprovalCompletedEventHandler>();
+        services.AddScoped<IEventHandler<ApprovalSubmittedEvent>, ApprovalSubmittedEventHandler>();
+        services.AddScoped<IEventHandler<ApprovalLevelAdvancedEvent>, ApprovalLevelAdvancedEventHandler>();
+        services.AddScoped<IEventHandler<ContractSuspendedEvent>, ContractSuspendedEventHandler>();
+        services.AddScoped<IEventHandler<ContractResumedEvent>, ContractResumedEventHandler>();
 
         return services;
     }

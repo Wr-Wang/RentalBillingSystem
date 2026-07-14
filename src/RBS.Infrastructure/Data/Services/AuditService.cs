@@ -9,12 +9,39 @@ namespace RBS.Infrastructure.Data.Services;
 /// <summary>
 /// 审计日志查询服务 — 使用 Dapper 查询 {TableName}_Audit 表
 /// </summary>
+/// <remarks>
+/// 提供三种查询能力：
+/// <list type="bullet">
+///   <item><description>GetHistoryAsync — 分页查询审计历史（支持按记录 ID/日期范围筛选）</description></item>
+///   <item><description>CompareAsync — 对比两个版本的字段差异</description></item>
+///   <item><description>GetStatsAsync — 统计今日/本周/本月审计记录量和表数量</description></item>
+/// </list>
+/// 表名使用 SanitizeTableName 消毒，防止 SQL 注入。
+/// </remarks>
 public class AuditService : IAuditService
 {
     private readonly IDbConnectionFactory _db;
 
+    /// <summary>
+    /// 初始化审计服务
+    /// </summary>
+    /// <param name="db">数据库连接工厂</param>
     public AuditService(IDbConnectionFactory db) => _db = db;
 
+    /// <summary>
+    /// 分页查询审计日志历史
+    /// </summary>
+    /// <remarks>
+    /// SQL 策略：
+    /// <list type="bullet">
+    ///   <item><description>动态拼接 WHERE 条件（记录 ID、开始日期、结束日期均为可选）</description></item>
+    ///   <item><description>先 COUNT 查总数，再 OFFSET-FETCH 分页</description></item>
+    ///   <item><description>审计元字段（AuditAction/AuditVersionNo/AuditChangedAt/AuditChangedBy）从 Changes 字典中排除</description></item>
+    /// </list>
+    /// </remarks>
+    /// <param name="query">审计查询参数</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>分页审计条目</returns>
     public async Task<PagedResult<AuditEntryDto>> GetHistoryAsync(AuditQuery query, CancellationToken ct = default)
     {
         var tableName = $"{SanitizeTableName(query.TableName)}_Audit";
@@ -83,6 +110,15 @@ public class AuditService : IAuditService
         };
     }
 
+    /// <summary>
+    /// 对比指定记录的两个审计版本之间的字段差异
+    /// </summary>
+    /// <param name="tableName">业务表名</param>
+    /// <param name="recordId">记录 ID</param>
+    /// <param name="v1">旧版本号</param>
+    /// <param name="v2">新版本号</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>字段级别差异列表（每个字段含新旧值和是否变更标记）</returns>
     public async Task<List<AuditCompareDto>> CompareAsync(string tableName, string recordId, int v1, int v2, CancellationToken ct = default)
     {
         var table = $"{SanitizeTableName(tableName)}_Audit";

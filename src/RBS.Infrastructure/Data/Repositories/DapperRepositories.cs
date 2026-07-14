@@ -13,9 +13,20 @@ using RBS.Core.Interfaces.Services;
 namespace RBS.Infrastructure.Data.Repositories;
 
 // =====================================================================
+/// <summary>
+/// Dapper 用户仓储实现 — 使用 ISqlLoader 加载 SQL 映射文件中的语句
+/// 用户仓储包含角色关联、权限查询、用户名唯一性检查等用户专属操作
+/// </summary>
+/// <remarks>
+/// SQL 策略：所有 SQL 存储在 SqlMaps.xml 中，通过命名规范 {模块}.{CRUD}.{实体}.{描述} 加载。
+/// 用户-角色关联使用反射写入私有字段 _roles，避免破坏领域封装。
+/// </remarks>
 // Dapper 仓储 — IUserRepository
 // =====================================================================
 
+/// <summary>
+/// Dapper 用户仓储实现 — 用户 CRUD、用户名唯一性检查、角色替换、权限查询
+/// </summary>
 public class DapperUserRepository : IUserRepository
 {
     protected readonly IDbConnectionFactory _db;
@@ -81,6 +92,17 @@ public class DapperUserRepository : IUserRepository
         using var conn = _db.CreateConnection(); conn.Open();
         return await conn.QuerySingleOrDefaultAsync<User>(_sql.Get("Identity.Select.User.ById"), new { Id = id });
     }
+    /// <summary>
+    /// 查询所有用户及其角色关联
+    /// </summary>
+    /// <remarks>
+    /// 使用 QueryMultipleAsync 执行多结果集查询：
+    /// 第一个结果集返回用户列表，第二个结果集返回角色关联数据。
+    /// 通过反射将 UserRole 列表写入用户的私有 _roles 字段，
+    /// 避免在 User 实体中暴露公开的 Roles 集合 setter。
+    /// </remarks>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>含角色关联的用户列表</returns>
     public async Task<List<User>> GetAllWithRolesAsync(CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -112,6 +134,17 @@ public class DapperUserRepository : IUserRepository
             return await conn.QuerySingleAsync<int>(_sql.Get("Identity.Select.User.UsernameUniqueExclude"), new { Username = username, Id = excludeId }) == 0;
         return await conn.QuerySingleAsync<int>(_sql.Get("Identity.Select.User.UsernameUnique"), new { Username = username }) == 0;
     }
+    /// <summary>
+    /// 替换用户角色 — 在事务中先删后插
+    /// </summary>
+    /// <remarks>
+    /// 事务策略：开启显式事务，先删除所有旧角色关联，再逐条插入新关联。
+    /// 审计日志记录新角色 ID 列表（逗号分隔）。
+    /// </remarks>
+    /// <param name="userId">用户 ID</param>
+    /// <param name="newRoleIds">新角色 ID 列表</param>
+    /// <param name="changedBy">操作人 ID</param>
+    /// <param name="ct">取消令牌</param>
     public async Task ReplaceRolesAsync(Guid userId, List<Guid> newRoleIds, Guid changedBy, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -128,6 +161,13 @@ public class DapperUserRepository : IUserRepository
 }
 
 // =====================================================================
+/// <summary>
+/// Dapper 角色仓储实现 — 角色 CRUD、按用户/编码查询、角色菜单关联
+/// </summary>
+/// <remarks>
+/// GetByIdWithRolesAsync 使用 QueryMultipleAsync 实现主子表一次性加载，
+/// 通过反射写入私有字段 _roleMenus。
+/// </remarks>
 // Dapper 仓储 — IRoleRepository
 // =====================================================================
 
@@ -147,6 +187,16 @@ public class DapperRoleRepository : IRoleRepository
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Authorization.Select.Role.Exists"), new { Id = id }) > 0; }
     public async Task<Role?> GetByCodeAsync(string code, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Role>(_sql.Get("Authorization.Select.Role.ByCode"), new { Code = code }); }
     public async Task<List<Role>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Role>(_sql.Get("Authorization.Select.Role.ByUserId"), new { UserId = userId })).ToList(); }
+    /// <summary>
+    /// 查询角色及其关联的菜单 ID 列表
+    /// </summary>
+    /// <remarks>
+    /// 使用 QueryMultipleAsync 一次性加载角色信息和关联菜单 ID，
+    /// 通过反射将 RoleMenu 列表写入角色的私有 _roleMenus 字段。
+    /// </remarks>
+    /// <param name="id">角色 ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>含菜单关联的角色，未找到时返回 null</returns>
     public async Task<Role?> GetByIdWithRoleMenusAsync(Guid id, CancellationToken ct = default) {
         using var conn = _db.CreateConnection(); conn.Open();
         using var multi = await conn.QueryMultipleAsync(
@@ -170,6 +220,13 @@ public class DapperRoleRepository : IRoleRepository
 }
 
 // =====================================================================
+/// <summary>
+/// Dapper 菜单仓储实现 — 菜单 CRUD、按角色 ID 查询、全量树形加载
+/// </summary>
+/// <remarks>
+/// GetTreeAsync 返回全量菜单数据，由应用层组装为树形结构。
+/// GetByRoleIdsAsync 使用 SQL IN 查询多角色关联。
+/// </remarks>
 // Dapper 仓储 — IMenuRepository
 // =====================================================================
 
@@ -194,6 +251,9 @@ public class DapperMenuRepository : IMenuRepository
 }
 
 // =====================================================================
+/// <summary>
+/// Dapper 公司仓储实现 — 公司 CRUD、按名称查询、获取活跃公司列表
+/// </summary>
 // Dapper 仓储 — ICompanyRepository
 // =====================================================================
 
@@ -217,6 +277,17 @@ public class DapperCompanyRepository : ICompanyRepository
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
 }
 
+/// <summary>
+/// Dapper 审批请求仓储实现 — 审批请求 CRUD、按审批人/目标实体查询、审批历史分页
+/// </summary>
+/// <remarks>
+/// 审批业务特有的查询：
+/// <list type="bullet">
+///   <item><description>GetPendingByApproverAsync：根据用户角色查找待审批请求，跨审批类型+级别</description></item>
+///   <item><description>GetHistoryAsync：支持关键词/状态筛选的分页查询，使用 string.Format 动态拼接 WHERE 条件</description></item>
+///   <item><description>GetByIdWithRecordsAsync：使用 QueryMultipleAsync 一次性加载审批请求及审批记录</description></item>
+/// </list>
+/// </remarks>
 public class DapperApprovalRequestRepository : IApprovalRequestRepository
 {
     private readonly IDbConnectionFactory _db;
@@ -275,6 +346,19 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
         return await conn.QuerySingleAsync<int>(_sql.Get("Approval.Select.Request.Exists"), new { Id = id }) > 0;
     }
 
+    /// <summary>
+    /// 查询指定审批人待审批的请求列表
+    /// </summary>
+    /// <remarks>
+    /// 查询策略：
+    /// 1. 先查出用户的所有角色 ID
+    /// 2. 根据角色查找对应的审批层级配置（ApprovalLevelConfigs）
+    /// 3. 按审批类型+级别逐类查询待审批请求
+    /// 4. 去重后按创建时间降序排列
+    /// </remarks>
+    /// <param name="userId">审批人用户 ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>待审批请求列表</returns>
     public async Task<List<ApprovalRequest>> GetPendingByApproverAsync(Guid userId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -295,6 +379,13 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
         return results.Distinct().OrderByDescending(a => a.CreatedAt).ToList();
     }
 
+    /// <summary>
+    /// 根据目标实体 ID 和类型查询关联的审批请求
+    /// </summary>
+    /// <param name="targetEntityId">目标实体 ID（如合同 ID）</param>
+    /// <param name="targetEntityType">目标实体类型（如 "Contract"）</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>关联的审批请求列表</returns>
     public async Task<List<ApprovalRequest>> GetByTargetAsync(Guid targetEntityId, string targetEntityType, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -310,6 +401,16 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
             _sql.Get("Approval.Select.Request.ByApprover"), new { UserId = userId })).ToList();
     }
 
+    /// <summary>
+    /// 根据 ID 查询审批请求及其关联的审批记录
+    /// </summary>
+    /// <remarks>
+    /// 使用 QueryMultipleAsync 一次性加载主表和子表数据，
+    /// 通过反射将 ApprovalRecord 列表写入审批请求的私有 _records 字段。
+    /// </remarks>
+    /// <param name="id">审批请求 ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>含审批记录的审批请求，未找到时返回 null</returns>
     public async Task<ApprovalRequest?> GetByIdWithRecordsAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -326,6 +427,21 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
         return entity;
     }
 
+    /// <summary>
+    /// 分页查询审批历史记录（含关键词和状态筛选）
+    /// </summary>
+    /// <remarks>
+    /// SQL 策略：使用 string.Format 动态拼接 WHERE 子句，
+    /// 先 COUNT 查总数再 OFFSET-FETCH 分页查询。
+    /// 关键词和状态均为可选参数。
+    /// </remarks>
+    /// <param name="userId">用户 ID</param>
+    /// <param name="keyword">关键词（模糊匹配标题）</param>
+    /// <param name="status">审批状态筛选</param>
+    /// <param name="page">页码（从 1 开始）</param>
+    /// <param name="pageSize">每页条数</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>分页结果</returns>
     public async Task<PagedResult<ApprovalRequest>> GetHistoryAsync(Guid userId, string? keyword, string? status,
         int page, int pageSize, CancellationToken ct = default)
     {
@@ -349,6 +465,10 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
 }
 
 // ===== Dapper 仓储 — IFeeCodeRepository =====
+/// <summary>
+/// Dapper 费用科目仓储实现 — 继承泛型仓储，增加按编码/类别查询
+/// </summary>
+/// <remarks>显式指定表名为 "FeeCodes"</remarks>
 public class DapperFeeCodeRepository : DapperRepository<FeeCode>, IFeeCodeRepository
 {
     private readonly ISqlLoader _sql;
@@ -363,6 +483,10 @@ public class DapperFeeCodeRepository : DapperRepository<FeeCode>, IFeeCodeReposi
 }
 
 // ===== Dapper 仓储 — IPaymentChannelRepository =====
+/// <summary>
+/// Dapper 支付渠道仓储实现 — 继承泛型仓储，增加按公司查询活跃渠道
+/// </summary>
+/// <remarks>显式指定表名为 "PaymentChannels"</remarks>
 public class DapperPaymentChannelRepository : DapperRepository<PaymentChannel>, IPaymentChannelRepository
 {
     private readonly ISqlLoader _sql;
@@ -375,6 +499,10 @@ public class DapperPaymentChannelRepository : DapperRepository<PaymentChannel>, 
 }
 
 // ===== Dapper 仓储 — IHolidayCalendarRepository =====
+/// <summary>
+/// Dapper 节假日日历仓储实现 — 继承泛型仓储，增加按年/日期查询
+/// </summary>
+/// <remarks>显式指定表名为 "HolidayCalendars"</remarks>
 public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>, IHolidayCalendarRepository
 {
     private readonly ISqlLoader _sql;
@@ -388,6 +516,10 @@ public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<HolidayCalendar>(_sql.Get("Calendar.Select.Holiday.ByDate"), new { Date = date }); }
 }
 
+/// <summary>
+/// Dapper 租客仓储实现 — 继承泛型仓储，增加按手机号查询和关键字搜索
+/// </summary>
+/// <remarks>使用通用表名推断（Tenant→Tenants）</remarks>
 public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepository
 {
     private readonly ISqlLoader _sql;
@@ -401,6 +533,9 @@ public class DapperTenantRepository : DapperRepository<Tenant>, ITenantRepositor
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Tenant>(_sql.Get("Rental.Select.Tenant.Search"), new { K = $"%{keyword}%" })).ToList(); }
 }
 
+/// <summary>
+/// Dapper 收款单仓储实现 — 继承泛型仓储，增加待确认/按公司/按合同总额查询
+/// </summary>
 public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptRepository
 {
     private readonly ISqlLoader _sql;
@@ -416,6 +551,9 @@ public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptReposi
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<decimal>(_sql.Get("Collection.Select.Receipt.TotalConfirmed"), new { Id = contractId }); }
 }
 
+/// <summary>
+/// Dapper 应收计划仓储实现 — 继承泛型仓储，增加按合同/合同+期间+费用/逾期查询
+/// </summary>
 public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, IReceivablePlanRepository
 {
     private readonly ISqlLoader _sql;
@@ -431,6 +569,9 @@ public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, 
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>(_sql.Get("Receivable.Select.Plan.Overdue"))).ToList(); }
 }
 
+/// <summary>
+/// Dapper 抄表读数仓储实现 — 继承泛型仓储，增加最新读数/历史记录/存在性查询
+/// </summary>
 public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMeterReadingRepository
 {
     private readonly ISqlLoader _sql;
@@ -446,6 +587,9 @@ public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMet
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Utility.Select.MeterReading.Exists"), new { Id = contractFeeConfigId, Y = year, M = month }) > 0; }
 }
 
+/// <summary>
+/// Dapper 合同仓储实现 — 继承泛型仓储，增加按合同号/活跃合同/到期合同/房屋单元占用判断查询
+/// </summary>
 public class DapperContractRepository : DapperRepository<Contract>, IContractRepository
 {
     private readonly ISqlLoader _sql;
@@ -463,6 +607,9 @@ public class DapperContractRepository : DapperRepository<Contract>, IContractRep
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Lease.Select.Contract.HasActiveForHousingUnit"), new { Id = housingUnitId }) > 0; }
 }
 
+/// <summary>
+/// Dapper 续租申请仓储实现 — 继承泛型仓储，增加按原合同/待审批/存在性查询
+/// </summary>
 public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, IRenewalRequestRepository
 {
     private readonly ISqlLoader _sql;
@@ -482,6 +629,10 @@ public class DapperRenewalRequestRepository : DapperRepository<RenewalRequest>, 
 }
 
 // ===== Dapper 仓储 — IApprovalBizDataRepository =====
+/// <summary>
+/// Dapper 审批业务数据仓储实现 — 继承泛型仓储，增加按审批请求/合同查询
+/// </summary>
+/// <remarks>显式指定表名为 "ApprovalBizData"</remarks>
 public class DapperApprovalBizDataRepository : DapperRepository<ApprovalBizData>, IApprovalBizDataRepository
 {
     private readonly ISqlLoader _sql;
@@ -498,6 +649,10 @@ public class DapperApprovalBizDataRepository : DapperRepository<ApprovalBizData>
 }
 
 // ===== Dapper 仓储 — IApprovalFeeItemRepository =====
+/// <summary>
+/// Dapper 审批费用明细仓储实现 — 继承泛型仓储，增加按审批请求查询费用项
+/// </summary>
+/// <remarks>显式指定表名为 "ApprovalFeeItems"</remarks>
 public class DapperApprovalFeeItemRepository : DapperRepository<ApprovalFeeItem>, IApprovalFeeItemRepository
 {
     private readonly ISqlLoader _sql;

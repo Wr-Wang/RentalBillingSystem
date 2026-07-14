@@ -147,14 +147,22 @@ public class ContractFeeConfig : AuditableEntity
         IsActive = false;
     }
 
-    /// <summary>设置生效期</summary>
+    /// <summary>
+    /// 设置生效期范围
+    /// </summary>
+    /// <param name="effectiveDate">生效日期（yyyy-MM-dd），null 表示立即生效</param>
+    /// <param name="expiryDate">到期日期（yyyy-MM-dd），null 表示长期有效</param>
     public void SetEffectivePeriod(string? effectiveDate, string? expiryDate)
     {
         EffectiveDate = effectiveDate;
         ExpiryDate = expiryDate;
     }
 
-    /// <summary>到期停用（调价时调用）</summary>
+    /// <summary>
+    /// 到期停用（调价时调用），将当前配置标记为到期并停用
+    /// </summary>
+    /// <param name="expiryDate">到期日期（yyyy-MM-dd），通常是新配置生效日期的前一天</param>
+    /// <exception cref="InvalidOperationException">当该配置已设置到期日（重复到期）时抛出</exception>
     public void ExpireOn(string expiryDate)
     {
         if (ExpiryDate != null)

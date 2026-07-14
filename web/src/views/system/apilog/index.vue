@@ -144,6 +144,14 @@ const page = ref(1)
 const pageSize = ref(20)
 const filter = reactive({ method: '', path: '', statusCode: '', startDate: '', endDate: '' })
 
+// 默认近 7 天
+function initDefaultDateRange() {
+  const now = new Date()
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  filter.startDate = sevenDaysAgo.toISOString().slice(0, 16)
+  filter.endDate = now.toISOString().slice(0, 16)
+}
+
 const showDetailDialog = ref(false)
 const detail = ref(null)
 
@@ -216,7 +224,8 @@ async function confirmClearRange() {
 
 async function handleExport() {
   try {
-    const params = { page: 1, pageSize: 10000 }
+    // 导出使用当前过滤条件 + 合理上限（最大 2000 条）
+    const params = { page: 1, pageSize: 2000 }
     if (filter.method) params.method = filter.method
     if (filter.path) params.path = filter.path
     if (filter.statusCode) params.statusCode = parseInt(filter.statusCode)
@@ -263,7 +272,7 @@ function formatTime(d) {
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
 }
 
-onMounted(() => fetchList())
+onMounted(() => { initDefaultDateRange(); fetchList() })
 </script>
 
 <style scoped>

@@ -1,6 +1,7 @@
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Contract;
+using RBS.Core.DomainServices;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -9,13 +10,29 @@ using ContractEntity = RBS.Core.Entities.Contract.Contract;
 
 namespace RBS.Application.Services.Contract;
 
+/// <summary>
+/// 合同管理应用服务实现 — 基于 Dapper 直接 SQL 访问数据，手动关联租客与续签状态
+/// 查询使用 IDbConnectionFactory 创建独立连接，写操作用 IUnitOfWork 工作单元
+/// </summary>
 public class ContractAppService : IContractService
 {
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
     private readonly IUnitOfWork _uow;
-    public ContractAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql) { _uow = uow; _db = db; _sql = sql; }
+    private readonly IContractDomainService _contractDomain;
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="uow">工作单元</param>
+    /// <param name="db">数据库连接工厂</param>
+    /// <param name="sql">SQL 加载器</param>
+    /// <param name="contractDomain">合同领域服务</param>
+    public ContractAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql, IContractDomainService contractDomain) { _uow = uow; _db = db; _sql = sql; _contractDomain = contractDomain; }
 
+    /// <summary>
+    /// 获取指定公司的合同列表（含主租客信息）
+    /// 优化：使用 Dapper 多结果集查询，减少数据库往返
+    /// </summary>
     public async Task<List<ContractDto>> GetListAsync(Guid companyId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -43,6 +60,9 @@ public class ContractAppService : IContractService
     }
 
     
+    /// <summary>
+    /// 根据租客 ID 获取其关联的所有合同（含主租客信息）
+    /// </summary>
     public async Task<List<ContractDto>> GetByTenantIdAsync(Guid tenantId, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -64,6 +84,11 @@ public class ContractAppService : IContractService
         return list;
     }
 
+    /// <summary>
+    /// 分页查询合同列表
+    /// 优化：无关键词时 COUNT 无需 JOIN HousingUnits；
+    /// 租客 + 续签状态使用 Task.WhenAll 并行查询减少等待时间
+    /// </summary>
     public async Task<PagedResult<ContractDto>> GetPagedListAsync(Guid companyId, int page = 1, int pageSize = 10, string? keyword = null, string? status = null, Guid? roomId = null, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -145,6 +170,10 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         return new PagedResult<ContractDto> { Items = list, Total = (int)total, Page = page, PageSize = pageSize, TotalPages = total > 0 ? (int)Math.Ceiling(total / (double)pageSize) : 0 };
     }
 
+    /// <summary>
+    /// 根据 ID 获取合同详情（含租客列表、费用配置）
+    /// 使用 QueryMultipleAsync 一次查询多结果集
+    /// </summary>
     public async Task<ContractDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
@@ -158,6 +187,9 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         return dto;
     }
 
+    /// <summary>
+    /// 创建新合同（仅写入主表，不含租客关联和费用配置）
+    /// </summary>
     public async Task<ContractDto> CreateAsync(CreateContractRequest request, CancellationToken ct = default)
     {
         var contractNo = request.ContractNo ?? "";
@@ -167,16 +199,48 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         return (await GetByIdAsync(contract.Id, ct))!;
     }
 
+    /// <summary>
+    /// 激活合同 — 通过领域服务校验房间状态并触发状态机变更
+    /// </summary>
     public async Task ActivateAsync(Guid id, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Lease.Update.Contract.Status"), new { Id = id, Status = "Active" }); }
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("合同不存在");
+        await _contractDomain.ActivateContractAsync(contract, ct);
+        await _uow.Contracts.UpdateAsync(contract, ct);
+        await _uow.CommitAsync(ct);
+    }
 
+    /// <summary>
+    /// 终止合同 — 通过领域服务校验状态机并记录终止原因
+    /// </summary>
     public async Task TerminateAsync(Guid id, string reason, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Lease.Update.Contract.Terminate"), new { Id = id, Reason = reason }); }
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("合同不存在");
+        await _contractDomain.TerminateContractAsync(contract, reason, ct);
+        await _uow.Contracts.UpdateAsync(contract, ct);
+        await _uow.CommitAsync(ct);
+    }
 
+    /// <summary>
+    /// 暂停合同 — 通过领域服务校验状态机并记录暂停时间
+    /// </summary>
     public async Task SuspendAsync(Guid id, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Lease.Update.Contract.Status"), new { Id = id, Status = "Suspended" }); }
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("合同不存在");
+        await _contractDomain.SuspendContractAsync(contract, ct);
+        await _uow.Contracts.UpdateAsync(contract, ct);
+        await _uow.CommitAsync(ct);
+    }
 
+    /// <summary>
+    /// 恢复合同 — 通过领域服务校验状态机并记录恢复时间
+    /// </summary>
     public async Task ResumeAsync(Guid id, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Lease.Update.Contract.Status"), new { Id = id, Status = "Active" }); }
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("合同不存在");
+        await _contractDomain.ResumeContractAsync(contract, ct);
+        await _uow.Contracts.UpdateAsync(contract, ct);
+        await _uow.CommitAsync(ct);
+    }
 
 }

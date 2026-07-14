@@ -15,7 +15,12 @@ namespace RBS.Application.EventHandlers;
 
 /// <summary>
 /// 审批完成事件处理器 — 审批通过/驳回后执行业务回调 + 通知相关人员
-/// ★ v3 重构：幂等守卫 + 按 TargetEntityType 分发
+/// ★ v3 重构：幂等守卫（ApprovalBizData.IsProcessed） + 按 TargetEntityType 分发
+/// 支持的业务类型包括：Import（导入）、ContractFeeAdjust（费用调价）、
+/// ContractFeeAdd（费用添加）、ContractTerminate（终止）、ContractRenewal（续签）、
+/// ContractActivation（合同创建）、ReceivableGeneration（应收生成）、
+/// ContractSuspend（暂停）、ContractModify（修改）、ContractTenantChange（换租）、
+/// SupplementaryFee（补充收费）等
 /// </summary>
 public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEvent>
 {
@@ -31,6 +36,20 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly ITerminateJob _terminateJob;
     private readonly IServiceProvider _serviceProvider;
 
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="importService">导入服务（处理 Import 类型审批回调）</param>
+    /// <param name="contractService">合同服务</param>
+    /// <param name="renewalService">续签服务</param>
+    /// <param name="contractDomainService">合同领域服务（终止逻辑）</param>
+    /// <param name="uow">工作单元</param>
+    /// <param name="notificationService">通知服务</param>
+    /// <param name="sql">SQL 加载器</param>
+    /// <param name="db">数据库连接工厂</param>
+    /// <param name="journalGen">日记账生成服务</param>
+    /// <param name="terminateJob">终止结算服务</param>
+    /// <param name="serviceProvider">服务提供者</param>
     public ApprovalCompletedEventHandler(
         IImportService importService,
         IContractService contractService,
@@ -57,6 +76,9 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _serviceProvider = serviceProvider;
     }
 
+    /// <summary>
+    /// 处理审批完成事件 — 幂等守卫 + 业务回调 + 通知相关人员
+    /// </summary>
     public async Task HandleAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         // ★ 幂等守卫：通过 ApprovalBizData.IsProcessed（直接查 DB 避免缓存的脏数据）
@@ -133,7 +155,9 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-    // ★ 向后兼容：旧审批 TargetEntityType="Contract"
+    /// <summary>
+    /// 处理旧版合同审批回调（向后兼容） — 根据标题前缀区分终止/调租
+    /// </summary>
     private async Task HandleLegacyContractAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
     {
         var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
@@ -172,7 +196,9 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-    // ===== Import =====
+    /// <summary>
+    /// 处理导入审批回调 — 通过则执行导入，驳回则标记批次为已驳回
+    /// </summary>
     private async Task HandleImportAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         if (@event.Action == "Approved")
@@ -190,7 +216,11 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-    // ===== 费用调价 =====
+    /// <summary>
+    /// 处理费用调价审批回调 — 到期旧配置 → 插入新配置 → 生成补差 JE
+    /// 按 FeeConfig 逐项处理，抄表计量调 UnitPrice，固定金额调 Amount
+    /// 补差 JE 在 FeeConfig 落库后独立生成，失败不影响 FeeConfig 变更
+    /// </summary>
     private async Task HandleContractFeeAdjustAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
     {
         if (@event.Action != "Approved" || bizData == null) return;
@@ -275,7 +305,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-    // ===== 费用添加（独立于调价，新增费用不涉及到期旧配置、补差 JE） =====
+    /// <summary>
+    /// 处理费用添加审批回调 — 插入新 FeeConfig + 一次性费用应收计划 + JE
+    /// 一次性费用在事务 Commit 后独立生成 OneTime JE（避免事务锁阻塞）
+    /// </summary>
     private async Task HandleContractFeeAddAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         if (@event.Action != "Approved") return;
@@ -373,7 +406,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
     }
 
-    // ===== 合同终止 =====
+    /// <summary>
+    /// 处理合同终止审批回调 — 执行终止 + 写入变更历史 + 生成押金结算凭证
+    /// 押金 JE 生成失败不阻断终止主流程，可后续手动重试
+    /// </summary>
     private async Task HandleContractTerminateAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
     {
         if (@event.Action != "Approved" || bizData == null) return;
@@ -404,7 +440,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         catch { /* 押金 JE 生成失败可后续手动重试 */ }
     }
 
-    // ===== 续签 =====
+    /// <summary>
+    /// 处理续签审批回调 — 通过则执行续签，驳回则标记续签请求为已驳回
+    /// 续签执行失败时回滚审批状态为 Pending，允许用户修复后重新审批
+    /// </summary>
     private async Task HandleContractRenewalAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         if (@event.Action == "Approved")
@@ -441,6 +480,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     }
 
 	    		    // ===== 合同创建审批通过 =====
+    /// <summary>
+    /// 处理合同创建审批回调 — 乐观锁 + 房间竞争检查 + 写入合同/租客/费用 + 初始化应收
+    /// 流程：乐观锁锁定 → 检查房间是否有生效合同 → 写入合同主表 → 写入租客关联 → 写入费用配置 → 事务提交 → 初始化应收（独立于事务执行，失败不阻断审批完成）
+    /// </summary>
 		    private async Task HandleContractActivationAsync(ApprovalCompletedEvent @event, CancellationToken ct)
 		    {
 		        if (@event.Action != "Approved") return;

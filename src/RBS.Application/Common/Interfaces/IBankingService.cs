@@ -2,6 +2,9 @@ using RBS.Core.Entities.Banking;
 
 namespace RBS.Application.Common.Interfaces;
 
+/// <summary>
+/// 银行对账服务接口 — 提供银行流水导入、自动/手动匹配、对账确认等能力
+/// </summary>
 public interface IBankingService
 {
     /// <summary>导入银行流水</summary>

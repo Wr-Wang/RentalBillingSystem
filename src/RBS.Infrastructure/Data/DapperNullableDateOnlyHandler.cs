@@ -4,8 +4,12 @@ using System.Data;
 namespace RBS.Infrastructure.Data;
 
 /// <summary>
-/// Dapper DateOnly? 类型处理器 — 处理 SQL DATE → DateOnly? 的映射
+/// Dapper Nullable DateOnly 类型处理器 — 处理 SQL DATE → DateOnly? 的映射
 /// </summary>
+/// <remarks>
+/// 与 DapperDateOnlyHandler 功能相同，额外处理 DBNull 和 null 值。
+/// 用于实体中可空的 DateOnly 属性（如合同的终止日期）。
+/// </remarks>
 public class DapperNullableDateOnlyHandler : SqlMapper.TypeHandler<DateOnly?>
 {
     public override DateOnly? Parse(object value)
