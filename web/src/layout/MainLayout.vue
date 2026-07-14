@@ -1,12 +1,42 @@
+<!--
+  =========================================================================
+  MainLayout — 主框架布局
+
+  结构（从上到下，从左到右）：
+    ┌──────────────────────────────────────────────────┐
+    │  头部: logo / 公司切换 / 通知铃铛 / 用户菜单     │
+    ├──────────┬───────────────────────────────────────┤
+    │ 侧边栏   │  主内容区                             │
+    │ 功能菜单 │  <router-view /> (页面组件)            │
+    │ 折叠按钮 │                                       │
+    └──────────┴───────────────────────────────────────┘
+
+  公司视角切换：
+    - 超管显示下拉选择器：全部数据 / 具体公司
+    - 普通用户显示固定公司标签（不可切换）
+
+  通知轮询：
+    onMounted → notificationStore.startPolling(60000)
+    onUnmounted → notificationStore.stopPolling()
+    每 60 秒刷新一次未读计数
+
+  侧边栏菜单：
+    由 menuStore.initFromRoutes(router.options.routes) 在 onMounted 中初始化
+    根据用户角色动态过滤
+  =========================================================================
+-->
 <template>
   <div class="app-layout">
     <header class="app-header">
+      <!-- 左上角：Logo + 系统名称 -->
       <div class="logo">
         <el-icon :size="28"><HomeFilled /></el-icon>
         <span>房屋租赁收租结算系统</span>
       </div>
+
+      <!-- 右上角功能区 -->
       <div class="header-right">
-        <!-- 超级管理员：公司视角切换器 -->
+        <!-- ★ 多公司视角切换（仅超管可见） -->
         <el-dropdown v-if="userStore.isSuperAdmin" @command="handleCompanySwitch">
           <span class="company-switcher">
             <el-icon><OfficeBuilding /></el-icon>
@@ -25,12 +55,12 @@
           </template>
         </el-dropdown>
 
-        <!-- 普通用户：显示当前所属公司 -->
+        <!-- 普通用户：只显示公司名称，不可切换 -->
         <span v-else-if="userStore.homeCompanyId" class="company-tag">
           <el-tag size="small" type="info">{{ userStore.currentCompanyName }}</el-tag>
         </span>
 
-        <!-- 通知铃铛 -->
+        <!-- 通知铃铛（显示未读总数） -->
         <el-badge :value="notifStore.unreadCounts.Total" :max="99" :hidden="notifStore.unreadCounts.Total === 0">
           <el-button circle size="small" @click="goToNotifications" style="border: none; color: #fff; background: transparent;">
             <el-icon :size="20"><Bell /></el-icon>
@@ -159,15 +189,24 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bell, Fold, Expand } from '@element-plus/icons-vue'
 import { changePassword as apiChangePassword } from '@/api'
 
+// ---------------------------------------------------------------------------
+// Stores
+// ---------------------------------------------------------------------------
 const userStore = useUserStore()
 const appStore = useAppStore()
 const menuStore = useMenuStore()
 const notifStore = useNotificationStore()
 const route = useRoute()
 
+// ---------------------------------------------------------------------------
+// Dialog 状态
+// ---------------------------------------------------------------------------
+/** 我的资料弹窗 */
 const showProfile = ref(false)
+/** 修改密码弹窗 */
 const showChangePassword = ref(false)
 
+/** 个人资料表单 */
 const profileForm = ref({
   username: userStore.user.username || '',
   displayName: userStore.user.displayName || '',
@@ -175,28 +214,37 @@ const profileForm = ref({
   email: userStore.user.email || ''
 })
 
+/** 修改密码表单 */
 const passwordForm = ref({
   oldPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
 
-const activeMenu = computed(() => {
-  return route.path
-})
+// ---------------------------------------------------------------------------
+// 计算属性
+// ---------------------------------------------------------------------------
+/** 当前激活的菜单项（由当前路由路径决定）*/
+const activeMenu = computed(() => route.path)
 
-// 公司切换器数据
-const companyOptions = computed(() => {
-  return userStore.companyList || []
-})
+/** 公司切换下拉框选项列表 */
+const companyOptions = computed(() => userStore.companyList || [])
 
+// ---------------------------------------------------------------------------
+// 公司视角切换
+// ---------------------------------------------------------------------------
+/**
+ * 处理公司切换
+ * "all" → 查看全部数据
+ * 其他 → 切换到指定公司
+ * 切换后通过重定向触发页面刷新
+ */
 async function handleCompanySwitch(command) {
   if (command === 'all') {
     await userStore.switchToAll()
   } else {
     await userStore.switchToCompany(command)
   }
-  // 强制刷新当前页面数据（通过重新加载路由）
   const currentPath = route.path
   router.push('/redirect' + currentPath).then(() => {
     router.replace(currentPath)

@@ -1,3 +1,34 @@
+<!--
+  =========================================================================
+  ApprovalDetailDialog — 审批详情抽屉
+
+  布局：
+    ┌─ Drawer (720px, 右侧滑出) ──────────────────────────────┐
+    │  头部: 标题 + 状态标签 + ID                              │
+    ├────────────────────────────────────────────────────────┤
+    │  Tab 1: 审批流程                                        │
+    │    - 审批概要（标题/申请人/时间/进度）                     │
+    │    - 流转步骤（审批级别进度条）                           │
+    │    - 最新审批意见                                        │
+    ├────────────────────────────────────────────────────────┤
+    │  Tab 2: 审批记录（时间线）                                │
+    ├────────────────────────────────────────────────────────┤
+    │  Tab 3: 业务数据                                        │
+    │    - 变更摘要（字段对比列表）                             │
+    │    - [调价专用] 费用项目卡片                              │
+    │    - [新建合同专用] 费用明细表格                          │
+    ├────────────────────────────────────────────────────────┤
+    │  Tab 4: 导入数据（Import 专用）                           │
+    ├────────────────────────────────────────────────────────┤
+    │  底部: 审批意见输入 + 通过/驳回/撤回按钮                  │
+    └────────────────────────────────────────────────────────┘
+
+  状态流转：
+    父组件控制 modelValue → visible
+    loadDetail() → 加载审批主数据 + 业务数据 + 导入批次
+    用户操作 → approve / reject / cancel → emit 事件通知父组件
+  =========================================================================
+-->
 <template>
   <el-drawer
     v-model="visible"
@@ -475,35 +506,61 @@
 </template>
 
 <script setup>
+/**
+ * =========================================================================
+ * 审批详情抽屉组件
+ *
+ * 三种状态模式：
+ *   modelValue = true → 打开抽屉
+ *   approvalId → 加载指定审批
+ *   showActions = true → 底部显示通过/驳回/撤回按钮
+ *
+ * 数据加载顺序：
+ *   loadDetail()
+ *     → getApprovalDetail(id)          审批主数据
+ *     → getApprovalBizDetail(id)       业务数据（变更摘要/费用明细）
+ *     → (if Import) getImportBatch(id)  导入批次详情
+ *
+ * 事件通知：
+ *   'approved'  → 父组件刷新列表
+ *   'rejected'  → 父组件刷新列表
+ *   'cancelled' → 父组件刷新列表
+ * =========================================================================
+ */
 import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, CircleCheck, List, Upload, InfoFilled, MoreFilled, ChatDotSquare, RefreshLeft, DataBoard, ArrowRight } from '@element-plus/icons-vue'
 import FeeItemCard from './FeeItemCard.vue'
 import { getApprovalDetail, getImportBatch, approveApproval, rejectApproval, cancelApproval, getApprovalBizDetail } from '../../api/index'
 
+// ---------------------------------------------------------------------------
+// Props / Emits
+// ---------------------------------------------------------------------------
 const props = defineProps({
-  modelValue: Boolean,
-  approvalId: String,
-  showActions: { type: Boolean, default: false }
+  modelValue: Boolean,       // 控制 drawer 开/关
+  approvalId: String,        // 审批请求 ID
+  showActions: { type: Boolean, default: false }  // 是否显示操作按钮
 })
 const emit = defineEmits(['update:modelValue', 'approved', 'rejected', 'cancelled'])
 
-// —— State ——
-const visible = ref(false)
-const data = ref(null)
-const loading = ref(false)
-const activeTab = ref('flow')
-const comment = ref('')
-const approving = ref(false)
-const rejecting = ref(false)
-const cancelling = ref(false)
-const importBatch = ref(null)
-const loadingBatch = ref(false)
-const bizDetail = ref(null)
-const bizLoading = ref(false)
-const filterStatus = ref('all')
-const itemsTableRef = ref(null)
-const tableKey = ref(0)
+// ---------------------------------------------------------------------------
+// 状态
+// ---------------------------------------------------------------------------
+const visible = ref(false)       // drawer 可见性
+const data = ref(null)           // 审批主数据
+const loading = ref(false)       // 主数据加载中
+const activeTab = ref('flow')    // 当前 Tab
+const comment = ref('')          // 审批意见输入
+const approving = ref(false)     // 通过中
+const rejecting = ref(false)     // 驳回中
+const cancelling = ref(false)    // 撤回中
+const importBatch = ref(null)    // 导入批次数据
+const loadingBatch = ref(false)  // 导入数据加载中
+const bizDetail = ref(null)      // 业务数据
+const bizLoading = ref(false)    // 业务数据加载中
+const filterStatus = ref('all')  // 导入行筛选
+const itemsTableRef = ref(null)  // 导入表格 ref
+const tableKey = ref(0)          // 强制表格重挂载
 
 // —— Computed ——
 

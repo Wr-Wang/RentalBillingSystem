@@ -1,5 +1,34 @@
+<!--
+  =========================================================================
+  合同详情（detail.vue）
+
+  页面结构：
+    ┌─ 操作按钮栏 ─────────────────────────────────────────────────┐
+    │  费用调价 ｜ 续签 ｜ 终止 ｜ 暂停 ｜ 修改信息 ｜ 返回           │
+    └────────────────────────────────────────────────────────────────┘
+    ┌─ 基本信息卡片 ───────────────────────────────────────────────┐
+    │  合同号 / 房屋 / 租客 / 起租 / 到期 / 付款周期 / 自动续签     │
+    └────────────────────────────────────────────────────────────────┘
+    ┌─ Tab 页 ─────────────────────────────────────────────────────┐
+    │  周期费用 | 一次性费用 | 押金 | 变更历史                     │
+    │  ┌────────────────────────────────────────────────────────┐  │
+    │  │ (各 Tab 内容)                                          │  │
+    │  └────────────────────────────────────────────────────────┘  │
+    └────────────────────────────────────────────────────────────────┘
+
+  功能点：
+    - 费用调价（审批驱动）
+    - 续签（审批驱动）
+    - 终止（审批驱动）
+    - 暂停/恢复
+    - 修改合同信息（审批驱动）
+    - 应收/账单/凭证查看
+    - 时间线查看
+  =========================================================================
+-->
 <template>
   <div>
+    <!-- ★ 页面头部 + 操作按钮（按状态动态显示）-->
     <div class="page-header">
       <h2>合同详情</h2>
       <div class="table-actions">
@@ -13,9 +42,9 @@
       </div>
     </div>
 
-    <!--===============================================================-->
-    <!-- 1. Basic Info Card                                               -->
-    <!--===============================================================-->
+    <!-- ═══════════════════════════════════════════════════════════════════
+    1. 基本信息卡片
+    ═══════════════════════════════════════════════════════════════════ -->
     <el-card style="margin-bottom: 16px;">
       <template #header>
         <span>基本信息</span>
@@ -685,50 +714,91 @@
 </template>
 
 <script setup>
+/**
+ * =========================================================================
+ * 合同详情 — 多 Tab 聚合页
+ *
+ * 职责：
+ *   - 展示合同全维度信息（基本信息、费用配置、押金、变更历史）
+ *   - 提供所有合同操作入口（调价、续签、终止、暂停、修改）
+ *   - 所有修改类操作均走审批流，提交后跳转审批
+ *
+ * 操作模式：
+ *   - 直接执行（0 级审批）：无审批配置时立即执行
+ *   - 审批驱动：有审批配置时提交 → 审批通过 → 回调执行
+ *
+ * 依赖：
+ *   - useUserStore：获取 currentUserId、effectiveCompanyId
+ *   - 大量 API 函数（约 30 个接口）
+ * =========================================================================
+ */
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { toGuidId } from '@/utils'
+import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel,
+  getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract,
+  feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits,
+  getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig,
+  getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal,
+  getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges,
+  getReceivablePlansByFee, handleApiError } from '@/api/index.js'
 
-// ★ 一次性收费展开行数据（独立响应式，避免 computed 元素属性修改不触发渲染）
+// ---------------------------------------------------------------------------
+// ★ 一次性收费展开行状态管理
+// 使用 reactive Map 独立管理，避免 computed 元素属性修改不触发重新渲染
+// ---------------------------------------------------------------------------
 const oneTimeExpandState = reactive(new Map())
 function getExpandState(row) {
   const key = row.id || row.feeCodeId
   if (!oneTimeExpandState.has(key)) {
-    oneTimeExpandState.set(key, reactive({ depositLogs: [], loadingLogs: false, receivablePlans: [], loadingPlans: false }))
+    oneTimeExpandState.set(key, reactive({
+      depositLogs: [], loadingLogs: false,
+      receivablePlans: [], loadingPlans: false
+    }))
   }
   return oneTimeExpandState.get(key)
 }
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { toGuidId } from '@/utils'
-import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract, feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits, getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig, getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal, getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges, getReceivablePlansByFee, handleApiError } from '@/api/index.js'
 
+// ---------------------------------------------------------------------------
+// 路由 & 路由
+// ---------------------------------------------------------------------------
 const route = useRoute()
 const router = useRouter()
+
+/** 当前激活的 Tab */
 const activeTab = ref('recurring')
 watch(activeTab, (tab) => {
   if (tab === 'tenants') fetchContractTenants()
 })
 
-/* ================================================================
- * Real Data: Contract from API
- * ================================================================ */
+// =========================================================================
+// 主数据 — 从 API 加载
+// =========================================================================
+/** 合同基本信息 */
 const contract = ref({
   id: route.params.id,
   contractNo: '',
   roomName: '',
   tenantName: '',
   tenantPhone: '',
-
   startDate: '',
   endDate: '',
   status: '',
   remark: ''
 })
+/** 主数据加载中 */
 const loading = ref(true)
+/** 费用配置加载中 */
 const feeConfigLoading = ref(false)
+/** 应收加载中 */
 const receivableLoading = ref(false)
+/** 应收生成中 */
 const generatingReceivables = ref(false)
 
-// 租户Tab
+// =========================================================================
+// 租客管理 Tab
+// =========================================================================
 const tenantLoading = ref(false)
 const contractTenants = ref([])
 const showAddTenant = ref(false)
@@ -743,11 +813,20 @@ const showRemoveTenant = ref(false)
 const removingTenant = ref(null)
 const removeTenantReason = ref("")
 const removeTenantLoading = ref(false)
+
+// =========================================================================
+// 费用 & 应收
+// =========================================================================
+/** 费用配置列表 */
 const feeConfigs = ref([])
+/** 押金日志 */
 const depositLogs = ref([])
+/** 应收时间线 */
 const receivableTimeline = ref([])
 
-// 补充收费
+// =========================================================================
+// 补充收费弹窗
+// =========================================================================
 const showSupplementaryFee = ref(false)
 const suppSubmitting = ref(false)
 const suppForm = reactive({ feeCodeId: null, amount: 0, effectiveDate: '' })

@@ -1,26 +1,73 @@
+/**
+ * =========================================================================
+ *  Vue Router — 集中式路由配置
+ *
+ *  路由结构：
+ *    /login          → 登录页（无 token 可访问）
+ *    /redirect/:path → 刷新兜底
+ *    /               → MainLayout（主框架，含侧边栏 + 头部）
+ *      /dashboard
+ *      /contracts
+ *      /accounting    → RouteView（嵌套子路由）
+ *        /accounting/subjects
+ *        /accounting/vouchers
+ *      /system        → RouteView（嵌套子路由，仅超管可见）
+ *      ...
+ *    /:pathMatch(.*)  → 404
+ *
+ *  路由守卫 beforeEach：
+ *    1. 无 token 且非 /login → 跳 /login
+ *    2. 有 token 且去 /login → 跳 /dashboard
+ *    3. meta.scope === 'System' 且非超管 → 跳 /dashboard
+ *    4. 正常放行
+ *
+ *  命名规范：
+ *    - path 使用小驼峰（trialBalance），禁止连字符
+ *    - name 使用 PascalCase（TrialBalance）
+ *    - meta.title 中文描述，用于侧边栏菜单
+ *    - meta.icon Element Plus 图标名
+ *    - meta.roles 角色白名单，空数组 = 全员可见
+ *    - meta.hidden 不在侧边栏显示（详情页/创建页）
+ *    - meta.scope='System' 系统级路由，仅超管可见
+ * =========================================================================
+ */
 import { createRouter, createWebHistory } from 'vue-router'
 import RouteView from '../layout/RouteView.vue'
 
 import NotFound from '../views/error/NotFound.vue'
 
 const routes = [
-  // Redirect helper（用于视角切换时强制刷新页面）
+  // -------------------------------------------------------------------------
+  // 重定向辅助路由 — 用于视角切换时强制刷新当前页面
+  // 路由守卫无法在相同路径下触发组件重新初始化
+  // 切换时 router.push('/redirect' + currentPath) 强制重载
+  // -------------------------------------------------------------------------
   {
     path: '/redirect/:path(.*)',
     component: () => import('../views/redirect/index.vue'),
     hidden: true
   },
+  // -------------------------------------------------------------------------
+  // 登录页 — 无 token 唯一可访问的路由
+  // -------------------------------------------------------------------------
   {
     path: '/login',
     name: 'Login',
     component: () => import('../views/login/index.vue'),
     hidden: true
   },
+  // -------------------------------------------------------------------------
+  // 主框架 — 所有业务页面都是 MainLayout 的子路由
+  // 重定向到 /dashboard
+  // -------------------------------------------------------------------------
   {
     path: '/',
     component: () => import('../layout/MainLayout.vue'),
     redirect: '/dashboard',
     children: [
+      // =====================================================================
+      // 仪表盘
+      // =====================================================================
       {
         path: 'dashboard',
         name: 'Dashboard',
@@ -46,6 +93,7 @@ const routes = [
         component: () => import('../views/building/import.vue'),
         meta: { title: '批量导入房屋', icon: 'Upload', hidden: true }
       },
+      // =====================================================================
       // 合同管理
       {
         path: 'contracts',
@@ -65,6 +113,7 @@ const routes = [
         component: () => import('../views/contract/detail.vue'),
         meta: { title: '合同详情', icon: 'Document', hidden: true }
       },
+      // =====================================================================
       // 收款管理
       {
         path: 'receipts',
@@ -84,6 +133,7 @@ const routes = [
         component: () => import('../views/receipt/confirm.vue'),
         meta: { title: '收款确认', icon: 'Select', hidden: true }
       },
+      // =====================================================================
       // 账单管理
       {
         path: 'bills',
@@ -103,6 +153,7 @@ const routes = [
         component: () => import('../views/bill/preview.vue'),
         meta: { title: '账单预览', hidden: true }
       },
+      // =====================================================================
       // 租客管理
       {
         path: 'tenants',
@@ -116,6 +167,7 @@ const routes = [
         component: () => import('../views/tenant/detail.vue'),
         meta: { title: '租客详情', icon: 'UserFilled', hidden: true }
       },
+      // =====================================================================
       // 催缴管理
       {
         path: 'collection',
@@ -135,6 +187,7 @@ const routes = [
         component: () => import('../views/collection/records.vue'),
         meta: { title: '催缴记录', icon: 'Tickets', hidden: true }
       },
+      // =====================================================================
       // 抄表管理
       {
         path: 'meter',
@@ -142,6 +195,7 @@ const routes = [
         component: () => import('../views/meter/index.vue'),
         meta: { title: '抄表管理', icon: 'Reading', roles: ['Admin', 'OpsSupervisor', 'Operator'] }
       },
+      // =====================================================================
       // 审批中心
       {
         path: 'approvals',
@@ -167,6 +221,7 @@ const routes = [
         component: () => import('../views/approval/ImportBatchDetail.vue'),
         meta: { title: '导入批次详情', hidden: true }
       },
+      // =====================================================================
       // 会计管理
       {
         path: 'accounting',
@@ -224,6 +279,7 @@ const routes = [
           }
         ]
       },
+      // =====================================================================
       // 银行对账
       {
         path: 'bank',
@@ -251,6 +307,7 @@ const routes = [
           }
         ]
       },
+      // =====================================================================
       // 报表中心
       {
         path: 'reports',
@@ -296,6 +353,7 @@ const routes = [
           }
         ]
       },
+      // =====================================================================
       // 续签看板
       {
         path: 'renewaldashboard',
@@ -303,6 +361,7 @@ const routes = [
         component: () => import('../views/renewal/dashboard.vue'),
         meta: { title: '待续签看板', icon: 'RefreshRight', roles: ['Admin', 'OpsSupervisor', 'DeptManager'] }
       },
+      // =====================================================================
       // 通知中心
       {
         path: 'notifications',
@@ -311,7 +370,8 @@ const routes = [
         meta: { title: '通知中心', icon: 'Bell', roles: ['Admin', 'OpsSupervisor', 'Operator', 'FinanceSupervisor', 'FinanceDirector', 'Accountant', 'DeptManager', 'GeneralManager', 'Legal'] }
       },
 
-      // ========== 多公司相关页面 ==========
+      // =====================================================================
+      // 多公司
       // 多公司总览（仅超级管理员可见）
       {
         path: 'reports/companyoverview',
@@ -321,6 +381,7 @@ const routes = [
       },
       // Report shortcuts for companyoverview
       { path: 'companyoverview', redirect: '/reports/companyoverview', meta: { hidden: true } },
+      // =====================================================================
       // 变更审计
       {
         path: 'audit',
@@ -328,7 +389,8 @@ const routes = [
         component: () => import('../views/audit/index.vue'),
         meta: { title: '变更审计', icon: 'Search', roles: ['Admin', 'OpsSupervisor', 'FinanceSupervisor', 'FinanceDirector'] }
       },
-      // ========== Convenience Redirect Aliases (no hyphens) ==========
+      // =====================================================================
+      // 快捷重定向别名 (no hyphens) ==========
       { path: 'organization/users', redirect: '/system/organization/users', meta: { hidden: true } },
       { path: 'organization/roles', redirect: '/system/organization/roles', meta: { hidden: true } },
       { path: 'menus', redirect: '/system/menus', meta: { hidden: true } },
@@ -370,6 +432,7 @@ const routes = [
       { path: 'reconciliation', redirect: '/bank/reconciliation', meta: { hidden: true } },
       { path: 'users', redirect: '/system/organization/users', meta: { hidden: true } },
       { path: 'roles', redirect: '/system/organization/roles', meta: { hidden: true } },
+      // =====================================================================
       // 系统设置
       {
         path: 'system',
@@ -510,7 +573,19 @@ const router = createRouter({
   routes
 })
 
-// Route guard
+/**
+ * =========================================================================
+ * 路由守卫 beforeEach
+ *
+ * 守卫逻辑：
+ *  1. 未登录（无 token）且目标非 /login → 跳 /login
+ *  2. 已登录（有 token）且目标是 /login → 跳 /dashboard
+ *  3. meta.scope === 'System' → 非超管跳 /dashboard
+ *  4. 其他 → next()
+ *
+ * 注意：基于 localStorage 的 token 判断，非响应式（刷新页面时执行一次）
+ * =========================================================================
+ */
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   if (to.path !== '/login' && !token) {

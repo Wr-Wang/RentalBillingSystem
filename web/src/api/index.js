@@ -1,61 +1,164 @@
+/**
+ * =========================================================================
+ *  API 接口声明
+ *  集中管理所有后端接口的调用函数，按业务模块分组
+ *
+ *  调用规范：
+ *    每个函数都返回 request(config) 的 Promise
+ *    响应拦截器已剥壳 response.data，组件直接拿到业务 JSON
+ *    错误由响应拦截器 + 组件 catch 中的 handleApiError 两级处理
+ *
+ *  模块索引：
+ *    1. Auth                 行  4 — 登录/刷新/改密
+ *    2. Companies            行 10 — 多公司管理
+ *    3. Users                行 16 — 用户管理
+ *    4. Roles                行 24 — 角色管理
+ *    5. Menus                行 33 — 菜单管理
+ *    6. HousingUnits         行 39 — 房源管理
+ *    7. Imports              行 50 — 通用导入
+ *    8. Tenants              行 54 — 租客管理
+ *    9. ContractTenants      行 62 — 合同租客管理
+ *   10. Contracts            行 68 — 合同管理（核心模块）
+ *   11. FeeCodes             行 90 — 收费项目
+ *   12. ContractFeeConfigs   行 96 — 合同费用配置
+ *   13. MeterReadings        行 105 — 抄表
+ *   14. Receivables          行 112 — 应收
+ *   15. Receipts             行 118 — 收款
+ *   16. Deposits             行 127 — 押金
+ *   17. Collection           行 131 — 催缴
+ *   18. Approvals            行 141 — 审批（核心模块）
+ *   19. Accounting           行 162 — 会计（9 个子模块）
+ *   20. Banking              行 185 — 银行对账
+ *   21. Reports              行 195 — 报表
+ *   22. DebitNotes           行 203 — 账单/催缴通知
+ *   23. Holidays             行 210 — 节假日
+ *   24. PaymentChannels      行 217 — 支付通道
+ *   25. TaxRateConfigs       行 223 — 税率
+ *   26. Scheduler            行 229 — 调度任务
+ *   27. Audit                行 264 — 变更审计
+ *   28. SystemLogs           行 270 — 系统日志
+ *   29. Notifications        行 276 — 通知
+ *   30. ApiLogs              行 282 — API 日志
+ *   31. SystemConfig         行 288 — 系统配置
+ * =========================================================================
+ */
 import request, { handleApiError } from './request'
 
-// Auth
+// =========================================================================
+// 1. Auth — 认证
+// =========================================================================
+/** 登录：提交凭证获取 token + user 信息 */
 export function login(data) { return request({ url: '/auth/login', method: 'post', data }) }
+/** 刷新 token：用 refreshToken 换取新 accessToken */
 export function refreshToken(data) { return request({ url: '/auth/refresh', method: 'post', data }) }
+/** 修改密码（需旧密码 + 新密码）*/
 export function changePassword(data) { return request({ url: '/auth/changepassword', method: 'post', data }) }
 
-// Companies (多公司管理)
+// =========================================================================
+// 2. Companies — 多公司管理
+// =========================================================================
+/** 公司列表（支持分页/搜索）*/
 export function getCompanies(params) { return request({ url: '/companies', method: 'get', params }) }
+/** 公司详情 */
 export function getCompany(id) { return request({ url: `/companies/${id}`, method: 'get' }) }
+/** 新建公司 */
 export function createCompany(data) { return request({ url: '/companies', method: 'post', data }) }
+/** 更新公司信息 */
 export function updateCompany(id, data) { return request({ url: `/companies/${id}`, method: 'put', data }) }
+/** 删除公司 */
 export function deleteCompany(id) { return request({ url: `/companies/${id}`, method: 'delete' }) }
+/** 公司统计（房间数/合同数/出租率等）*/
 export function getCompanyStats(id) { return request({ url: `/companies/${id}/stats`, method: 'get' }) }
-// Users
+// =========================================================================
+// 3. Users — 用户管理
+// =========================================================================
+/** 用户列表（支持分页/角色筛选）*/
+/** 用户详情 */
 export function getUsers(params) { return request({ url: '/users', method: 'get', params }) }
 export function getUser(id) { return request({ url: `/users/${id}`, method: 'get' }) }
+/** 创建用户 */
 export function createUser(data) { return request({ url: '/users', method: 'post', data }) }
+/** 更新用户信息 */
 export function updateUser(id, data) { return request({ url: `/users/${id}`, method: 'put', data }) }
+/** 删除用户 */
 export function deleteUser(id) { return request({ url: `/users/${id}`, method: 'delete' }) }
+/** 设置我的默认公司（超管切换视角时持久化到数据库）*/
 export function setMyDefaultCompany(companyId) { return request({ url: '/users/me/defaultcompany', method: 'put', data: { companyId } }) }
 
-// Roles
+// =========================================================================
+// 4. Roles — 角色管理
+// =========================================================================
+/** 角色列表 */
+/** 角色详情 */
 export function getRoles(params) { return request({ url: '/roles', method: 'get', params }) }
 export function getRole(id) { return request({ url: `/roles/${id}`, method: 'get' }) }
+/** 创建角色 */
 export function createRole(data) { return request({ url: '/roles', method: 'post', data }) }
+/** 更新角色 */
 export function updateRole(id, data) { return request({ url: `/roles/${id}`, method: 'put', data }) }
+/** 删除角色 */
 export function deleteRole(id) { return request({ url: `/roles/${id}`, method: 'delete' }) }
+/** 获取角色的菜单权限 */
 export function getRoleMenus(id) { return request({ url: `/roles/${id}/menus`, method: 'get' }) }
+/** 更新角色的菜单权限（全量覆盖）*/
 export function updateRoleMenus(id, data) { return request({ url: `/roles/${id}/menus`, method: 'post', data }) }
 
-// Menus
+// =========================================================================
+// 5. Menus — 菜单管理
+// =========================================================================
+/** 菜单树（按层级排列）*/
 export function getMenus() { return request({ url: '/menus', method: 'get' }) }
+/** 创建菜单项 */
 export function createMenu(data) { return request({ url: '/menus', method: 'post', data }) }
+/** 更新菜单 */
 export function updateMenu(id, data) { return request({ url: `/menus/${id}`, method: 'put', data }) }
+/** 删除菜单 */
 export function deleteMenu(id) { return request({ url: `/menus/${id}`, method: 'delete' }) }
 
-// HousingUnits（房源）
+// =========================================================================
+// 6. HousingUnits — 房源管理
+// =========================================================================
+/** 房源列表（支持分页/搜索/状态筛选）*/
+/** 房源详情（含房间信息）*/
 export function getHousingUnits(params) { return request({ url: '/housingunits', method: 'get', params }) }
 export function getHousingUnit(id) { return request({ url: `/housingunits/${id}`, method: 'get' }) }
+/** 新建房源 */
 export function createHousingUnit(data) { return request({ url: '/housingunits', method: 'post', data }) }
+/** 更新房源 */
 export function updateHousingUnit(id, data) { return request({ url: `/housingunits/${id}`, method: 'put', data }) }
+/** 删除房源 */
 export function deleteHousingUnit(id) { return request({ url: `/housingunits/${id}`, method: 'delete' }) }
+/** 房源树（座→层→房）*/
 export function getHousingUnitTree() { return request({ url: '/housingunits/tree', method: 'get' }) }
+/** 座楼列表（下拉选择器用）*/
 export function getBuildingList() { return request({ url: '/housingunits/buildinglist', method: 'get' }) }
+/** 房源统计仪表盘 */
 export function getHousingUnitStats() { return request({ url: '/housingunits/stats', method: 'get' }) }
+/** 批量导入房源（Excel）*/
 export function importHousingUnits(data) { return request({ url: '/housingunits/import', method: 'post', data }) }
 
-// ===== 通用导入 =====
+// =========================================================================
+// 7. Imports — 通用导入（审批驱动）
+// =========================================================================
+/** 提交导入审批 */
 export function submitImport(data) { return request({ url: '/imports/submit', method: 'post', data }) }
+/** 获取导入批次详情（含行数据）*/
 export function getImportBatch(id) { return request({ url: `/imports/${id}`, method: 'get' }) }
+/** 导入批次列表 */
 export function getImportBatches(params) { return request({ url: '/imports', method: 'get', params }) }
 
-// Tenants
+// =========================================================================
+// 8. Tenants — 租客管理
+// =========================================================================
+/** 租客列表 */
+/** 租客详情（含房屋和月租金）*/
 export function getTenants(params) { return request({ url: '/tenants', method: 'get', params }) }
 export function getTenant(id) { return request({ url: `/tenants/${id}`, method: 'get' }) }
+/** 新建租客 */
 export function createTenant(data) { return request({ url: '/tenants', method: 'post', data }) }
+/** 更新租客 */
 export function updateTenant(id, data) { return request({ url: `/tenants/${id}`, method: 'put', data }) }
+/** 删除租客 */
 export function deleteTenant(id) { return request({ url: `/tenants/${id}`, method: 'delete' }) }
 
 // 合同租客管理
