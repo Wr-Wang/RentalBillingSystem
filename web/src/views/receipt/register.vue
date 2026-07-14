@@ -39,7 +39,7 @@ const contractOptions = ref([])
 const paymentChannels = ref([])
 
 function getEffectiveCompanyId() {
-  return userStore.effectiveCompanyId || userStore.homeCompanyId
+  return userStore.effectiveCompanyId || userStore.companyId
 }
 
 async function fetchContracts() {

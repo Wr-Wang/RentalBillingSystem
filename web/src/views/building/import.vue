@@ -495,9 +495,8 @@ function resetPage() {
 }
 
 function goToMyApprovals() {
-  // 检查用户是否有权限访问审批中心（非超级管理员都能访问）
-  const userStr = localStorage.getItem('user')
-  if (userStr) {
+  // 检查是否已登录（仅检查 token 存在性，不依赖 localStorage user）
+  if (localStorage.getItem('token')) {
     router.push('/approvals/myrequests')
   } else {
     ElMessage.info('请先登录')

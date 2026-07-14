@@ -187,7 +187,7 @@ async function fetchContracts() {
 async function fetchList() {
   loading.value = true
   try {
-    const companyId = userStore.effectiveCompanyId || userStore.homeCompanyId
+    const companyId = userStore.effectiveCompanyId || userStore.companyId
     const params = {
       companyId: companyId || undefined,
       period: search.period || undefined,

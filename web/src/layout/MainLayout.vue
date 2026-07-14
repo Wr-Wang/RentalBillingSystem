@@ -56,7 +56,7 @@
         </el-dropdown>
 
         <!-- 普通用户：只显示公司名称，不可切换 -->
-        <span v-else-if="userStore.homeCompanyId" class="company-tag">
+        <span v-else-if="userStore.companyId" class="company-tag">
           <el-tag size="small" type="info">{{ userStore.currentCompanyName }}</el-tag>
         </span>
 
@@ -255,10 +255,38 @@ function goToNotifications() {
   router.push('/notifications')
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // -----------------------------------------------------------------------
+  // 1. 加载用户资料（页面刷新后从后端重新获取）
+  //    仅当 localStorage 有 token 时才会真正请求
+  //    加载失败（token 过期）会触发 logout 并重定向到 /login
+  // -----------------------------------------------------------------------
+  try {
+    await userStore.loadUserProfile()
+  } catch {
+    // token 过期或无效 → 已跳转登录页
+    return
+  }
+
+  // -----------------------------------------------------------------------
+  // 2. 检查当前路由的 scope 权限（非超管访问 System 路由 → 重定向）
+  //    路由守卫中不再做此检查（因无法从 localStorage 拿 isSuperAdmin），
+  //    改为等用户资料加载完成后在这里统一处理
+  // -----------------------------------------------------------------------
+  const currentRoute = route.meta
+  if (currentRoute?.scope === 'System' && !userStore.isSuperAdmin) {
+    router.push('/dashboard')
+    return
+  }
+
+  // -----------------------------------------------------------------------
+  // 3. 初始化侧边栏菜单
+  // -----------------------------------------------------------------------
   menuStore.initFromRoutes(router.options.routes.find(r => r.path === '/')?.children || [])
+
   // 恢复上次的视角状态（超管切换公司）
   userStore.restoreView()
+
   // 启动通知轮询
   notifStore.fetchUnreadCounts()
   notifStore.startPolling()

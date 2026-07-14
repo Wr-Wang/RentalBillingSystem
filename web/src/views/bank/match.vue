@@ -120,7 +120,7 @@ async function loadRecons() {
 async function loadData() {
   loading.value = true
   try {
-    const companyId = userStore.effectiveCompanyId || userStore.homeCompanyId
+    const companyId = userStore.effectiveCompanyId || userStore.companyId
     const res = await getBankStatements({
       companyId: companyId || undefined,
       status: filterStatus.value || undefined
@@ -135,7 +135,7 @@ async function loadData() {
 
 async function loadReceipts() {
   try {
-    const companyId = userStore.effectiveCompanyId || userStore.homeCompanyId
+    const companyId = userStore.effectiveCompanyId || userStore.companyId
     const res = await getReceipts({ companyId: companyId || undefined })
     receipts.value = Array.isArray(res) ? res : (res.items || res.data || res || [])
   } catch { /* 静默 */ }

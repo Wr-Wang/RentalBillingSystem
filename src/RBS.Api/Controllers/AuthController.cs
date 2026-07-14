@@ -72,7 +72,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// 获取当前用户信息
+    /// 获取当前用户信息（含角色、权限、公司列表）
+    /// 前端页面刷新后调用，用于从后端重新加载用户资料
     /// </summary>
     [HttpGet("me")]
     [Authorize]
@@ -89,6 +90,12 @@ public class AuthController : ControllerBase
         var permissions = await _uow.Users.GetUserPermissionsAsync(userId, ct);
         var roles = await _uow.Roles.GetByUserIdAsync(userId, ct);
 
+        // 加载所有公司列表（供前端公司切换下拉框使用）
+        var allCompanies = await _uow.Companies.GetAllAsync(ct);
+        var companyList = allCompanies
+            .Select(c => new { c.Id, c.Name })
+            .ToList();
+
         return Ok(new
         {
             user.Id,
@@ -99,6 +106,7 @@ public class AuthController : ControllerBase
             user.CompanyId,
             DefaultCompanyId = user.DefaultCompanyId ?? user.CompanyId,
             user.IsSuperAdmin,
+            CompanyList = companyList,
             Roles = roles.Select(r => new { r.Id, r.Name, r.Code }),
             Permissions = permissions
         });

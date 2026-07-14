@@ -106,7 +106,7 @@ const fileInputRef = ref(null)
 const parsedData = ref([])
 
 function getEffectiveCompanyId() {
-  return userStore.effectiveCompanyId || userStore.homeCompanyId
+  return userStore.effectiveCompanyId || userStore.companyId
 }
 function statusType(s) {
   return { Draft: 'info', Confirmed: 'primary', Billed: 'success', Estimated: 'warning' }[s] || 'info'

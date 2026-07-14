@@ -12,6 +12,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
+import { getEffectiveCompanyId } from '../utils/requestContext'
 
 // ---------------------------------------------------------------------------
 // Axios 实例：所有 API 请求的基础配置
@@ -62,6 +63,7 @@ request.interceptors.request.use(
     // -----------------------------------------------------------------------
     // 1. 认证令牌：从 localStorage 读取 JWT Token，注入 Authorization 头
     //    token 在 login() 成功后写入，logout() 时清除
+    //    localStorage 存 token 是安全的（后端验签防篡改）
     // -----------------------------------------------------------------------
     const token = localStorage.getItem('token')
     if (token) {
@@ -71,34 +73,23 @@ request.interceptors.request.use(
     // -----------------------------------------------------------------------
     // 2. 多公司参数自动附加
     //
-    // 公司视角优先级（由高到低）：
-    //   a) currentCompanyId（超管手动切换的视角）→ 传该值
-    //   b) homeCompanyId（普通用户的所属公司）   → 传该值
-    //   c) 超管选择"全部数据"（currentCompanyId=null）→ 不传，后端不限制
+    //    从 requestContext 读取当前生效的 companyId（由 store 在
+    //    login/loadUserProfile/switchCompany 后写入），替代之前从
+    //    localStorage 解析 user 对象的方式。
     //
-    // 为什么从 localStorage 读而非 Pinia store？
-    //   避免循环依赖 — store 中 import request, request 中 import store 会死循环
+    //    为什么改为 requestContext？
+    //      避免在 localStorage 中持久化 user 和权限等敏感信息，
+    //      降低 XSS 篡改风险。user/permissions 改为 Pinia 内存态。
+    //
+    //    当前 companyId 判定逻辑（在 store 的 effectiveCompanyId 计算属性）：
+    //      a) 超管手动切换的公司 → currentCompanyId
+    //      b) 普通用户的所属公司 → companyId
+    //      c) 超管查看全部数据 → null（不传参，后端不限公司）
     // -----------------------------------------------------------------------
-    try {
-      const userStr = localStorage.getItem('user')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        const currentCompanyId = localStorage.getItem('currentCompanyId')
-
-        if (currentCompanyId) {
-          // 超管切换了公司视角 → 附加该 ID
-          config.params = config.params || {}
-          config.params.companyId = currentCompanyId
-        } else if (user.homeCompanyId && !user.isSuperAdmin) {
-          // 普通用户 → 自动带上所属公司
-          config.params = config.params || {}
-          config.params.companyId = user.homeCompanyId
-        }
-        // 超管选"全部数据": currentCompanyId 为 null → 不传 companyId
-      }
-    } catch (e) {
-      // localStorage.getItem 解析失败时静默跳过
-      // 通常在首次登录前或 localStorage 被清空时发生
+    const companyId = getEffectiveCompanyId()
+    if (companyId) {
+      config.params = config.params || {}
+      config.params.companyId = companyId
     }
 
     return config
@@ -138,7 +129,8 @@ request.interceptors.response.use(
         // ----- 401 Unauthorized：令牌过期或无效 -----
         case 401:
           localStorage.removeItem('token')
-          localStorage.removeItem('user')
+          localStorage.removeItem('userId')
+          localStorage.removeItem('currentCompanyId')
           router.push('/login')
           ElMessage.closeAll()
           ElMessage.error('登录已过期，请重新登录')

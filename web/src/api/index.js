@@ -82,6 +82,8 @@ export function createUser(data) { return request({ url: '/users', method: 'post
 export function updateUser(id, data) { return request({ url: `/users/${id}`, method: 'put', data }) }
 /** 删除用户 */
 export function deleteUser(id) { return request({ url: `/users/${id}`, method: 'delete' }) }
+/** 获取我的个人信息（含角色、权限、公司列表），页面刷新后加载 */
+export function getMyProfile() { return request({ url: '/auth/me', method: 'get' }) }
 /** 设置我的默认公司（超管切换视角时持久化到数据库）*/
 export function setMyDefaultCompany(companyId) { return request({ url: '/users/me/defaultcompany', method: 'put', data: { companyId } }) }
 

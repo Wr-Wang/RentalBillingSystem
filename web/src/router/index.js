@@ -580,10 +580,13 @@ const router = createRouter({
  * 守卫逻辑：
  *  1. 未登录（无 token）且目标非 /login → 跳 /login
  *  2. 已登录（有 token）且目标是 /login → 跳 /dashboard
- *  3. meta.scope === 'System' → 非超管跳 /dashboard
- *  4. 其他 → next()
+ *  3. 其他 → next()
  *
- * 注意：基于 localStorage 的 token 判断，非响应式（刷新页面时执行一次）
+ * 安全说明：
+ *  - localStorage 不再存储 user / permissions / isSuperAdmin 等敏感信息
+ *  - meta.scope === 'System' 的校验改为在 MainLayout 加载完用户资料后处理
+ *  - 真正的权限防护由后端做（403 响应会引导用户跳转）
+ *  - 路由守卫只负责未登录重定向，权限管控后置
  * =========================================================================
  */
 router.beforeEach((to, from, next) => {
@@ -593,16 +596,6 @@ router.beforeEach((to, from, next) => {
   } else if (to.path === '/login' && token) {
     next('/dashboard')
   } else {
-    // Scope 路由守卫：System 路由非超管不可访问
-    const meta = to.meta || {}
-    if (meta.scope === 'System') {
-      const userStr = localStorage.getItem('user')
-      const isSuperAdmin = userStr ? JSON.parse(userStr).isSuperAdmin : false
-      if (!isSuperAdmin) {
-        next('/dashboard')
-        return
-      }
-    }
     next()
   }
 })
