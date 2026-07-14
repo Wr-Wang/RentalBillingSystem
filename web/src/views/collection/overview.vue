@@ -107,7 +107,7 @@ function stageTagType(stage) {
 async function loadData() {
   loading.value = true
   try {
-    const companyId = userStore.effectiveCompanyId || userStore.companyId
+    const companyId = userStore.effectiveCompanyId
     const params = companyId ? { companyId } : {}
 
     // 加载逾期合同数据

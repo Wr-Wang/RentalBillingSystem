@@ -126,7 +126,7 @@ async function loadLateFeeConfig() {
 
 async function addStage() {
   if (!newStage.name) { ElMessage.warning('请输入阶段名称'); return }
-  const companyId = userStore.effectiveCompanyId || userStore.companyId
+  const companyId = userStore.effectiveCompanyId
   if (!companyId) { ElMessage.warning('请先选择公司'); return }
 
   stageSaving.value = true
@@ -154,7 +154,7 @@ async function toggleStage(row) {
       daysOverdue: row.daysOverdue,
       isActive: row.isActive,
       sortOrder: row.sortOrder || 0,
-      companyId: userStore.effectiveCompanyId || userStore.companyId
+      companyId: userStore.effectiveCompanyId
     })
   } catch { ElMessage.error('更新失败'); row.isActive = !row.isActive }
 }

@@ -87,7 +87,7 @@ const tenantForm = reactive({
 })
 
 function getEffectiveCompanyId() {
-  return userStore.effectiveCompanyId || userStore.companyId
+  return userStore.effectiveCompanyId
 }
 
 async function fetchList() {

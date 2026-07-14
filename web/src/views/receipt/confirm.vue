@@ -68,7 +68,7 @@ const pageSize = ref(10)
 const total = ref(0)
 
 function getEffectiveCompanyId() {
-  return userStore.effectiveCompanyId || userStore.companyId
+  return userStore.effectiveCompanyId
 }
 
 async function loadData() {

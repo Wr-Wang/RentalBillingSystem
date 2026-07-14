@@ -152,7 +152,7 @@ const unreconciledItems = computed(() => {
 async function loadData() {
   loading.value = true
   try {
-    const companyId = userStore.effectiveCompanyId || userStore.companyId
+    const companyId = userStore.effectiveCompanyId
     const [reconRes, stmtRes] = await Promise.all([
       getBankReconciliations({ companyId: companyId || undefined }),
       getBankStatements({ companyId: companyId || undefined })

@@ -12,7 +12,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
-import { getEffectiveCompanyId } from '../utils/requestContext'
+import { getEffectiveCompanyId, clearEffectiveCompanyId } from '../utils/requestContext'
 
 // ---------------------------------------------------------------------------
 // Axios 实例：所有 API 请求的基础配置
@@ -131,6 +131,7 @@ request.interceptors.response.use(
           localStorage.removeItem('token')
           localStorage.removeItem('userId')
           localStorage.removeItem('currentCompanyId')
+          clearEffectiveCompanyId()
           router.push('/login')
           ElMessage.closeAll()
           ElMessage.error('登录已过期，请重新登录')

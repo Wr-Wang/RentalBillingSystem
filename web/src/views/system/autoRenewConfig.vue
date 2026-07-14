@@ -74,7 +74,7 @@ const config = reactive({
 })
 
 async function fetchConfig() {
-  const companyId = userStore.effectiveCompanyId || userStore.companyId
+  const companyId = userStore.effectiveCompanyId
   if (!companyId) return
   loading.value = true
   try {
@@ -92,7 +92,7 @@ async function fetchConfig() {
 }
 
 async function saveConfig() {
-  const companyId = userStore.effectiveCompanyId || userStore.companyId
+  const companyId = userStore.effectiveCompanyId
   if (!companyId) { ElMessage.error('无法获取公司信息'); return }
   saving.value = true
   try {

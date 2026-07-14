@@ -193,11 +193,11 @@ export const useUserStore = defineStore('user', () => {
   // 同时同步到 requestContext 供请求拦截器使用
   // =========================================================================
   /** 切换到指定公司 */
-  async function switchToCompany(companyId) {
-    currentCompanyId.value = companyId
-    localStorage.setItem('currentCompanyId', companyId || '')
+  async function switchToCompany(targetId) {
+    currentCompanyId.value = targetId
+    localStorage.setItem('currentCompanyId', targetId || '')
     syncEffectiveCompanyId()
-    try { await setDefaultCompanyApi(companyId) } catch (e) { /* 静默 */ }
+    try { await setDefaultCompanyApi(targetId) } catch (e) { /* 静默 */ }
   }
 
   /** 切换到"全部数据"（超管专用）*/

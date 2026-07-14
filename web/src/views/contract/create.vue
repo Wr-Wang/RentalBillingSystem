@@ -502,7 +502,7 @@ function selectRoom(row) {
 // ---------------------------------------------------------------------------
 async function addNewTenant() {
   if (!newTenantForm.name) { ElMessage.warning('请输入姓名'); return }
-  const companyId = userStore.effectiveCompanyId || userStore.companyId
+  const companyId = userStore.effectiveCompanyId
   if (!companyId) { ElMessage.warning('请先选择公司'); return }
   creatingTenant.value = true
   try {
@@ -547,7 +547,7 @@ function feeCodeId(code) {
 // ---------------------------------------------------------------------------
 async function submitContract() {
   if (!selectedRoom.value || selectedTenants.value.length === 0) { ElMessage.warning('请完成所有步骤'); return }
-  const companyId = userStore.effectiveCompanyId || userStore.companyId
+  const companyId = userStore.effectiveCompanyId
   if (!companyId) { ElMessage.warning('请先选择公司'); return }
   if (!contractForm.startDate) { ElMessage.warning('请填写起租日期'); return }
 

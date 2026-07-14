@@ -260,7 +260,7 @@ function onSelectionChange(rows) {
 // ==================== Data Loading ====================
 
 function getEffectiveCompanyId() {
-  return userStore.effectiveCompanyId || userStore.companyId
+  return userStore.effectiveCompanyId
 }
 
 async function loadBuildings() {

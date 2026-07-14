@@ -192,7 +192,7 @@ function actionLabel(a) {
 // ========== 数据加载 ==========
 
 function getEffectiveCompanyId() {
-  return userStore.effectiveCompanyId || userStore.companyId
+  return userStore.effectiveCompanyId
 }
 
 async function fetchPaymentChannels() {
