@@ -162,7 +162,7 @@ public class ContractFeeConfigsController : ControllerBase
         // 查询费控配置对应的合同，检查是否有待审批
         using var conn = _db.CreateConnection(); conn.Open();
         var config = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            "SELECT ContractId, Amount FROM ContractFeeConfigs WHERE Id=@Id", new { Id = id });
+            _sql.Get("Contract.Select.FeeConfig.ContractIdAndAmountById"), new { Id = id });
         if (config == null) return NotFound();
         var contractId = (Guid)config.ContractId;
 
@@ -261,7 +261,7 @@ public class ContractFeeConfigsController : ControllerBase
     {
         if (string.IsNullOrEmpty(operatorName) && operatorId.HasValue)
             try { operatorName = await conn.QuerySingleOrDefaultAsync<string>(
-                "SELECT DisplayName FROM Users WHERE Id=@Id", new { Id = operatorId }, tx); } catch { }
+                _sql.Get("Contract.Select.User.DisplayNameById"), new { Id = operatorId }, tx); } catch { }
         await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
             new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType, Title = title,
                 Detail = detail, OldValue = oldValue, NewValue = newValue, EffectiveDate = effectiveDate,

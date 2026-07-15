@@ -133,14 +133,14 @@ public class SchedulerController : ControllerBase
 
         // 1. 加载排期
         var execution = await Dapper.SqlMapper.QuerySingleOrDefaultAsync<JobScheduleExecution>(conn,
-            "SELECT * FROM [JobScheduleExecutions] WHERE [Id]=@Id AND [Status]='Failed'",
+            _sql.Get("Scheduling.Select.Execution.FailedById"),
             new { Id = id });
         if (execution == null)
             return NotFound(new { error = "排期不存在或状态不是 Failed" });
 
         // 2. 加载任务定义
         var schedule = await Dapper.SqlMapper.QuerySingleOrDefaultAsync<JobSchedule>(conn,
-            "SELECT * FROM [JobSchedules] WHERE [Id]=@Id AND [IsActive]=1",
+            _sql.Get("Scheduling.Select.JobSchedule.ActiveById"),
             new { Id = jobId });
         if (schedule == null)
             return NotFound(new { error = "任务不存在或已停用" });
@@ -323,11 +323,7 @@ public class SchedulerController : ControllerBase
 
         // 安全检查：该期是否有收款
         var hasPayment = await conn.QuerySingleAsync<int>(
-            "SELECT COUNT(1) FROM JournalEntries je " +
-            "JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId " +
-            "WHERE s.Code = '1001' AND je.VoucherId IN " +
-            "(SELECT Id FROM Vouchers WHERE SourceEntityId IN " +
-            "(SELECT ContractId FROM ReceivablePlans WHERE Period = @P))", new { P = log.TargetMonth });
+            _sql.Get("Scheduling.Select.Receipt.HasPaymentByPeriod"), new { P = log.TargetMonth });
         if (hasPayment > 0)
             return BadRequest(new { error = $"该账期已有收款记录，禁止反转" });
 
@@ -337,27 +333,25 @@ public class SchedulerController : ControllerBase
 
         // 1. 标记账单为 Cancelled
         await conn.ExecuteAsync(
-            "UPDATE DebitNotes SET Status='Cancelled', CancelledAt=GETUTCDATE(), CancelReason=@Reason WHERE BillJobTaskLogId=@Id AND Status='Published'",
+            _sql.Get("Scheduling.Update.DebitNote.CancelByTaskLog"),
             new { Id = taskLogId, Reason = body?.Reason ?? "管理员反转" }, tx);
 
         // 2. 删除分录
         await conn.ExecuteAsync(
-            "DELETE je FROM JournalEntries je " +
-            "JOIN Vouchers v ON v.Id = je.VoucherId " +
-            "WHERE v.SourceEntityType='ReceivablePlan' AND v.CreatedAt >= @Start AND v.CreatedAt <= @End",
+            _sql.Get("Scheduling.Delete.JournalEntry.ByReceivablePlanTimeRange"),
             new { Start = taskStart, End = taskEnd }, tx);
         await conn.ExecuteAsync(
-            "DELETE FROM Vouchers WHERE SourceEntityType='ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End",
+            _sql.Get("Scheduling.Delete.Voucher.ByReceivablePlanTimeRange"),
             new { Start = taskStart, End = taskEnd }, tx);
 
         // 3. 删除应收计划
         await conn.ExecuteAsync(
-            "DELETE FROM ReceivablePlans WHERE Period=@P AND CreatedAt >= @Start AND CreatedAt <= @End",
+            _sql.Get("Scheduling.Delete.ReceivablePlan.ByPeriodTimeRange"),
             new { P = log.TargetMonth, Start = taskStart, End = taskEnd }, tx);
 
         // 4. 标记任务为 Reversed
         await conn.ExecuteAsync(
-            "UPDATE TaskLogs SET Status='Reversed' WHERE Id=@Id", new { Id = taskLogId }, tx);
+            _sql.Get("Scheduling.Update.TaskLog.Reversed"), new { Id = taskLogId }, tx);
 
         tx.Commit();
         return Ok(new { message = "反转成功，已删除该次出账数据" });

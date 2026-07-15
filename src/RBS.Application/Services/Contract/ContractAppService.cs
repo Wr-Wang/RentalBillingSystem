@@ -205,6 +205,12 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
     public async Task ActivateAsync(Guid id, CancellationToken ct = default)
     {
         var contract = await _uow.Contracts.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("合同不存在");
+
+        // 校验房间是否已有生效合同（应用层负责数据查询，领域服务只做状态变更）
+        var hasActive = await _uow.Contracts.HasActiveForHousingUnitAsync(contract.RoomId, ct);
+        if (hasActive)
+            throw new InvalidOperationException("该房屋单元已有生效合同");
+
         await _contractDomain.ActivateContractAsync(contract, ct);
         await _uow.Contracts.UpdateAsync(contract, ct);
         await _uow.CommitAsync(ct);

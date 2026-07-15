@@ -14,11 +14,13 @@ public class AuditController : ControllerBase
 {
     private readonly IAuditService _auditService;
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
-    public AuditController(IAuditService auditService, IDbConnectionFactory db)
+    public AuditController(IAuditService auditService, IDbConnectionFactory db, ISqlLoader sql)
     {
         _auditService = auditService;
         _db = db;
+        _sql = sql;
     }
 
     /// <summary>分页查询审计历史</summary>
@@ -74,13 +76,13 @@ public class AuditController : ControllerBase
 
         // 1. 检查审计表是否存在
         var tableExists = await conn.QuerySingleAsync<int>(
-            "SELECT COUNT(1) FROM sys.tables WHERE name = @Name", new { Name = auditTable });
+            _sql.Get("Common.Select.AuditTable.Exists"), new { Name = auditTable });
         if (tableExists == 0)
             return BadRequest(new { message = $"审计表 {auditTable} 不存在" });
 
         // 2. 读取指定版本的审计记录
         var auditRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            $"SELECT * FROM [{auditTable}] WHERE Id=@Id AND AuditVersionNo=@Ver",
+            string.Format(_sql.Get("Common.Select.AuditRecord.ByVersion"), auditTable),
             new { Id = recordId.Value.ToString(), Ver = versionNo.Value });
 
         if (auditRow == null)
@@ -88,7 +90,7 @@ public class AuditController : ControllerBase
 
         // 3. 获取最新版本（对比差异）
         var latestVersion = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            $"SELECT * FROM [{auditTable}] WHERE Id=@Id ORDER BY AuditVersionNo DESC",
+            string.Format(_sql.Get("Common.Select.AuditRecord.Latest"), auditTable),
             new { Id = recordId.Value.ToString() });
 
         var sourceRow = latestVersion ?? auditRow;

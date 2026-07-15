@@ -48,11 +48,7 @@ public class LedgerController : ControllerBase
         if (startDate.HasValue)
         {
             openingBalance = await conn.QuerySingleAsync<decimal>(
-                @"SELECT ISNULL(SUM(CASE WHEN je.Direction='Debit' THEN je.Amount ELSE -je.Amount END), 0)
-                  FROM JournalEntries je
-                  JOIN Vouchers v ON v.Id = je.VoucherId
-                  JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
-                  WHERE s.Code = @Code AND v.CompanyId = @Cid AND v.VoucherDate < @Date",
+                _sql.Get("Accounting.Select.Ledger.OpeningBalance"),
                 new { Code = subjectCode, Cid = companyId, Date = startDate.Value });
         }
 

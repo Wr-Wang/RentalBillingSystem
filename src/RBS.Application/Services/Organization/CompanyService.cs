@@ -49,10 +49,10 @@ public class CompanyService : ICompanyService
         parms.Add("@PageSize", query.PageSize);
 
         var total = await conn.QuerySingleAsync<int>(
-            $"SELECT COUNT(*) FROM Companies {whereClause}", parms);
+            string.Format(_sql.Get("Organization.Select.Company.CountPaged"), whereClause), parms);
 
         var items = await conn.QueryAsync<Company>(
-            $"SELECT * FROM Companies {whereClause} ORDER BY CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY",
+            string.Format(_sql.Get("Organization.Select.Company.ListPaged"), whereClause),
             parms);
 
         return new PagedResult<CompanyDto>
@@ -128,7 +128,7 @@ public class CompanyService : ICompanyService
         if (company == null) return null;
 
         var units = (await conn.QueryAsync<HousingUnit>(
-            "SELECT * FROM HousingUnits WHERE CompanyId=@Id", new { Id = id })).ToList();
+            _sql.Get("Property.Select.HousingUnit.ByCompanyId"), new { Id = id })).ToList();
         var totalRooms = units.Count;
         var rentedRooms = units.Count(u => u.IsRented);
 

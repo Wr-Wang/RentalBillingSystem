@@ -1,6 +1,8 @@
+using System.Data;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using RBS.Application.DTOs.Import;
+using RBS.Core.Common;
 using RBS.Core.Entities.Import;
 using RBS.Core.Entities.Property;
 using RBS.Core.Interfaces.Services;
@@ -11,10 +13,12 @@ namespace RBS.Application.Services.Import;
 public partial class HousingUnitImportHandler : IImportTypeHandler
 {
     private readonly IUnitOfWork _uow;
+    private readonly IBulkInserter _bulk;
 
-    public HousingUnitImportHandler(IUnitOfWork uow)
+    public HousingUnitImportHandler(IUnitOfWork uow, IBulkInserter bulk)
     {
         _uow = uow;
+        _bulk = bulk;
     }
 
     public string ImportType => "HousingUnit";
@@ -182,11 +186,12 @@ public partial class HousingUnitImportHandler : IImportTypeHandler
             existingUnits.Select(u => $"{u.BuildingName}|{u.FloorName}|{u.UnitNo}"),
             StringComparer.OrdinalIgnoreCase);
 
-        int created = 0;
+        // 收集所有待导入的房源
+        var units = new List<HousingUnit>();
         foreach (var item in batch.Items.OfType<ImportBatchItemHousingUnit>().Where(i => i.IsValid))
         {
             var key = $"{item.BuildingName}|{item.FloorName}|{item.UnitNo}";
-            if (existingKeys.Contains(key)) continue; // 二次检查唯一性
+            if (existingKeys.Contains(key)) continue;
 
             var unit = new HousingUnit(
                 item.BuildingName ?? "",
@@ -199,12 +204,51 @@ public partial class HousingUnitImportHandler : IImportTypeHandler
             unit.SetFullCode(item.FullCode ?? $"{item.BuildingName}-{item.FloorName}-{item.UnitNo}");
             unit.UpdateDetails(item.RoomTypeId, item.Area, item.Orientation, item.BaseRentAmount);
 
-            await _uow.HousingUnits.AddAsync(unit, ct);
+            units.Add(unit);
             existingKeys.Add(key);
-            created++;
         }
 
-        return created;
+        // 批量写入（≥ 100 条用 SqlBulkCopy，少量走正常 AddAsync）
+        if (units.Count >= 100)
+        {
+            var dt = BuildHousingUnitDataTable(units);
+            await _bulk.BulkInsertAsync("HousingUnits", dt, ct);
+        }
+        else
+        {
+            foreach (var unit in units)
+                await _uow.HousingUnits.AddAsync(unit, ct);
+        }
+
+        return units.Count;
+    }
+
+    /// <summary>构建 HousingUnit DataTable（匹配数据库表列名）</summary>
+    private static DataTable BuildHousingUnitDataTable(IReadOnlyList<HousingUnit> units)
+    {
+        var dt = new DataTable("HousingUnits");
+        dt.Columns.Add("Id", typeof(Guid));
+        dt.Columns.Add("BuildingName", typeof(string));
+        dt.Columns.Add("BuildingCode", typeof(string));
+        dt.Columns.Add("BuildingAddress", typeof(string));
+        dt.Columns.Add("CompanyId", typeof(Guid));
+        dt.Columns.Add("FloorName", typeof(string));
+        dt.Columns.Add("FloorSortOrder", typeof(int));
+        dt.Columns.Add("UnitNo", typeof(string));
+        dt.Columns.Add("FullCode", typeof(string));
+        dt.Columns.Add("RoomTypeId", typeof(Guid));
+        dt.Columns.Add("Area", typeof(decimal));
+        dt.Columns.Add("Orientation", typeof(string));
+        dt.Columns.Add("BaseRentAmount", typeof(decimal));
+        dt.Columns.Add("Status", typeof(string));
+
+        foreach (var u in units)
+            dt.Rows.Add(u.Id, u.BuildingName, u.BuildingCode, u.BuildingAddress, u.CompanyId,
+                u.FloorName, u.FloorSortOrder, u.UnitNo, u.FullCode, (object?)u.RoomTypeId ?? DBNull.Value,
+                (object?)u.Area ?? DBNull.Value, (object?)u.Orientation ?? DBNull.Value,
+                (object?)u.BaseRentAmount ?? DBNull.Value, u.Status.Code);
+
+        return dt;
     }
 
     // ==================== 工具方法 ====================

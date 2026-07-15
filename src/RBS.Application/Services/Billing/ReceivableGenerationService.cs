@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using RBS.Application.Common.Interfaces;
@@ -23,27 +24,25 @@ public class ReceivableGenerationService : IReceivableGenerationService
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IBulkInserter _bulk;
 
     /// <summary>
     /// 构造函数
     /// </summary>
-    /// <param name="uow">工作单元</param>
-    /// <param name="billingDomain">计费领域服务，用于计算应收计划</param>
-    /// <param name="db">数据库连接工厂</param>
-    /// <param name="sql">SQL 加载器</param>
-    /// <param name="serviceProvider">服务提供者（延迟获取 IJournalGenerationService）</param>
     public ReceivableGenerationService(
         IUnitOfWork uow,
         IBillingDomainService billingDomain,
         IDbConnectionFactory db,
         ISqlLoader sql,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IBulkInserter bulk)
     {
         _uow = uow;
         _billingDomain = billingDomain;
         _db = db;
         _sql = sql;
         _serviceProvider = serviceProvider;
+        _bulk = bulk;
     }
 
     /// <summary>
@@ -159,7 +158,11 @@ public class ReceivableGenerationService : IReceivableGenerationService
             }
         }
 
-        // 从起租月到当前月逐月生成
+        // 从起租月到当前月逐月生成 — 批量收集后集中写入
+        var planTable = BuildPlanDataTable();
+        var voucherTable = BuildVoucherDataTable();
+        var jeTable = BuildJournalEntryDataTable();
+
         var current = startPeriod;
         while (string.Compare(current, currentPeriod, StringComparison.Ordinal) <= 0)
         {
@@ -169,11 +172,9 @@ public class ReceivableGenerationService : IReceivableGenerationService
                 new { ContractId = contractId, Period = current });
             if (exists > 0) { current = NextPeriod(current); continue; }
 
-            var lastDay = DateTime.DaysInMonth(
-                int.Parse(current[..4]), int.Parse(current[5..7]));
+            var lastDay = DateTime.DaysInMonth(int.Parse(current[..4]), int.Parse(current[5..7]));
             var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
-            var dueDate = new DateOnly(
-                int.Parse(current[..4]), int.Parse(current[5..7]), dueDay);
+            var dueDate = new DateOnly(int.Parse(current[..4]), int.Parse(current[5..7]), dueDay);
             var periodStart = $"{current}-01";
             var periodEnd = $"{current}-{lastDay:D2}";
 
@@ -190,32 +191,28 @@ public class ReceivableGenerationService : IReceivableGenerationService
             foreach (var plan in plans)
             {
                 var planId = Guid.NewGuid();
-                await conn.ExecuteAsync(
-                    _sql.Get("Billing.Insert.ReceivablePlan.Default"),
-                    new { Id = planId, CId = contractId, FId = plan.FeeCodeId,
-                        P = current, Amt = plan.Amount, Due = dueDate, CBy = Guid.Empty });
+                planTable.Rows.Add(planId, contractId, plan.FeeCodeId, current, plan.Amount, dueDate, Guid.Empty);
 
-                // Voucher + JE (Type = "ContractActivation")
                 var voucherId = Guid.NewGuid();
-                await conn.ExecuteAsync(
-                    _sql.Get("Accounting.Insert.Voucher.BillJob"),
-                    new { Id = voucherId, No = $"ACT-{current}-{Guid.NewGuid():N}"[..32],
-                        Date = DateOnly.FromDateTime(today), Desc = $"合同激活初始化应收 {current}",
-                        SrcId = contractId, Type = "ContractActivation", CId = contractId, Period = current, CBy = Guid.Empty });
-                await conn.ExecuteAsync(
-                    _sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                    new { Id = Guid.NewGuid(), VId = voucherId, SId = receivableId,
-                        Dir = "Debit", Amt = plan.Amount, Sum = $"合同激活 {current} 应收", CBy = Guid.Empty });
-                await conn.ExecuteAsync(
-                    _sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                    new { Id = Guid.NewGuid(), VId = voucherId, SId = revenueId,
-                        Dir = "Credit", Amt = plan.Amount, Sum = $"合同激活 {current} 收入", CBy = Guid.Empty });
+                voucherTable.Rows.Add(voucherId, $"ACT-{current}-{Guid.NewGuid():N}"[..32],
+                    DateOnly.FromDateTime(today), "ContractActivation", contractId, contractId, current, Guid.Empty);
+
+                jeTable.Rows.Add(Guid.NewGuid(), voucherId, receivableId, "Debit", plan.Amount, $"合同激活 {current} 应收", Guid.Empty);
+                jeTable.Rows.Add(Guid.NewGuid(), voucherId, revenueId, "Credit", plan.Amount, $"合同激活 {current} 收入", Guid.Empty);
 
                 result.ReceivablePlansCreated++;
                 result.JournalEntriesCreated += 2;
             }
             result.PeriodsProcessed.Add(current);
             current = NextPeriod(current);
+        }
+
+        // 批量写入
+        if (planTable.Rows.Count > 0)
+        {
+            await _bulk.BulkInsertAsync("ReceivablePlans", planTable, ct);
+            await _bulk.BulkInsertAsync("Vouchers", voucherTable, ct);
+            await _bulk.BulkInsertAsync("JournalEntries", jeTable, ct);
         }
 
         result.Message = $"已生成 {result.PeriodsProcessed.Count} 个月应收";
@@ -225,6 +222,55 @@ public class ReceivableGenerationService : IReceivableGenerationService
     /// <summary>
     /// 切换到下一个月份
     /// </summary>
+    /// <summary>
+    /// 创建应收计划 DataTable（列匹配 Billing.Insert.ReceivablePlan.Default）
+    /// </summary>
+    private static DataTable BuildPlanDataTable()
+    {
+        var dt = new DataTable("ReceivablePlans");
+        dt.Columns.Add("Id", typeof(Guid));
+        dt.Columns.Add("ContractId", typeof(Guid));
+        dt.Columns.Add("FeeCodeId", typeof(Guid));
+        dt.Columns.Add("Period", typeof(string));
+        dt.Columns.Add("Amount", typeof(decimal));
+        dt.Columns.Add("DueDate", typeof(DateOnly));
+        dt.Columns.Add("CreatedBy", typeof(Guid));
+        return dt;
+    }
+
+    /// <summary>
+    /// 创建凭证 DataTable（列匹配 Accounting.Insert.Voucher.BillJob）
+    /// </summary>
+    private static DataTable BuildVoucherDataTable()
+    {
+        var dt = new DataTable("Vouchers");
+        dt.Columns.Add("Id", typeof(Guid));
+        dt.Columns.Add("VoucherNo", typeof(string));
+        dt.Columns.Add("VoucherDate", typeof(DateOnly));
+        dt.Columns.Add("SourceType", typeof(string));
+        dt.Columns.Add("SourceId", typeof(Guid));
+        dt.Columns.Add("ContractId", typeof(Guid));
+        dt.Columns.Add("Period", typeof(string));
+        dt.Columns.Add("CreatedBy", typeof(Guid));
+        return dt;
+    }
+
+    /// <summary>
+    /// 创建分录 DataTable（列匹配 Accounting.Insert.JournalEntry.Simple）
+    /// </summary>
+    private static DataTable BuildJournalEntryDataTable()
+    {
+        var dt = new DataTable("JournalEntries");
+        dt.Columns.Add("Id", typeof(Guid));
+        dt.Columns.Add("VoucherId", typeof(Guid));
+        dt.Columns.Add("AccountingSubjectId", typeof(Guid));
+        dt.Columns.Add("Direction", typeof(string));
+        dt.Columns.Add("Amount", typeof(decimal));
+        dt.Columns.Add("Summary", typeof(string));
+        dt.Columns.Add("CreatedBy", typeof(Guid));
+        return dt;
+    }
+
     private static string NextPeriod(string period)
     {
         var parts = period.Split('-');

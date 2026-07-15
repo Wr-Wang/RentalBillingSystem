@@ -46,8 +46,8 @@ public class SystemLogsController : ControllerBase
         parms.Add("@Offset", offset);
         parms.Add("@PageSize", pageSize);
 
-        var total = await conn.QuerySingleAsync<int>($"SELECT COUNT(*) FROM SystemLogs {w}", parms);
-        var items = await conn.QueryAsync($"SELECT {Columns} FROM SystemLogs {w} ORDER BY CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
+        var total = await conn.QuerySingleAsync<int>(string.Format(_sql.Get("Common.Select.SystemLog.Count"), w), parms);
+        var items = await conn.QueryAsync(string.Format(_sql.Get("Common.Select.SystemLog.Paged"), Columns, w), parms);
 
         return Ok(new { items, total, page, pageSize });
     }
@@ -59,7 +59,7 @@ public class SystemLogsController : ControllerBase
         if (auth != null) return auth;
 
         using var conn = _db.CreateConnection(); conn.Open();
-        var log = await conn.QuerySingleOrDefaultAsync($"SELECT {Columns} FROM SystemLogs WHERE Id = @Id", new { Id = id });
+        var log = await conn.QuerySingleOrDefaultAsync(string.Format(_sql.Get("Common.Select.SystemLog.ById"), Columns), new { Id = id });
         if (log == null) return NotFound();
         return Ok(log);
     }

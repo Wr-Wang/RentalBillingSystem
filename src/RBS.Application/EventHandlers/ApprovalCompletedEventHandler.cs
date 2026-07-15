@@ -170,8 +170,22 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 // 旧终止审批：直接 Terminate
                 if (bizData != null)
                 {
-                    await _contractDomainService.ExecuteContractTerminationAsync(
-                        bizData.ContractId, null, "FULL", request.Description ?? "合同终止", Guid.Empty, ct);
+                    var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
+                    var plans = contract != null
+                        ? await _uow.ReceivablePlans.GetByContractIdAsync(bizData.ContractId, ct)
+                        : new List<ReceivablePlan>();
+
+                    var result = _contractDomainService.ExecuteContractTermination(
+                        contract!, plans, null, request.Description ?? "合同终止");
+
+                    if (contract != null) await _uow.Contracts.UpdateAsync(contract, ct);
+                    foreach (var plan in plans.Where(p => p.Status is "Canceled" or "Frozen"))
+                        await _uow.ReceivablePlans.UpdateAsync(plan, ct);
+                    await _uow.ExecuteSqlRawAsync(
+                        _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
+                        new { ExpiryDate = result.EffectiveEndDate, ContractId = bizData.ContractId }, ct);
+                    await _uow.CommitAsync(ct);
+
             try { using (var conn2 = _db.CreateConnection()) { conn2.Open();
                     await conn2.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
                         new { Id = Guid.NewGuid(), ContractId = bizData.ContractId, ChangeType = "TERMINATE",
@@ -414,12 +428,23 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     {
         if (@event.Action != "Approved" || bizData == null) return;
 
-        await _contractDomainService.ExecuteContractTerminationAsync(
-            bizData.ContractId,
-            bizData.ActualEndDate,
-            bizData.DepositReturn ?? "FULL",
-            bizData.Reason ?? "合同终止",
-            Guid.Empty, ct);
+        // 应用层加载数据 → 领域层状态变更 → 应用层持久化
+        var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
+        var plans = contract != null
+            ? await _uow.ReceivablePlans.GetByContractIdAsync(bizData.ContractId, ct)
+            : new List<ReceivablePlan>();
+
+        var result = _contractDomainService.ExecuteContractTermination(
+            contract!, plans, bizData.ActualEndDate, bizData.Reason ?? "合同终止");
+
+        if (contract != null) await _uow.Contracts.UpdateAsync(contract, ct);
+        foreach (var plan in plans.Where(p => p.Status is "Canceled" or "Frozen"))
+            await _uow.ReceivablePlans.UpdateAsync(plan, ct);
+        await _uow.ExecuteSqlRawAsync(
+            _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
+            new { ExpiryDate = result.EffectiveEndDate, ContractId = bizData.ContractId }, ct);
+        await _uow.CommitAsync(ct);
+
         try { using var conn = _db.CreateConnection(); conn.Open();
             await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
                 new { Id = Guid.NewGuid(), ContractId = bizData.ContractId, ChangeType = "TERMINATE",
@@ -516,7 +541,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
 		            // 2. 房间竞争检查（同一事务内，防止并发）
 		            var hasActive = await conn.QuerySingleAsync<int>(
-		                "SELECT COUNT(1) FROM Contracts WHERE RoomId=@RoomId AND Status='Active'",
+		                _sql.Get("Lease.Select.Contract.HasActiveByRoom"),
 		                new { RoomId = request.RoomId }, tx);
 		            if (hasActive > 0) throw new InvalidOperationException("该房源已有生效合同");
 
@@ -839,7 +864,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         if (string.IsNullOrEmpty(operatorName) && operatorId.HasValue)
         {
             try { operatorName = await conn.QuerySingleOrDefaultAsync<string>(
-                "SELECT DisplayName FROM Users WHERE Id=@Id", new { Id = operatorId }, tx); } catch { }
+                _sql.Get("Identity.Select.User.DisplayName"), new { Id = operatorId }, tx); } catch { }
         }
         await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
             new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType,

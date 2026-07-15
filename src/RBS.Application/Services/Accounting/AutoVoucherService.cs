@@ -59,7 +59,7 @@ public class AutoVoucherService : IAutoVoucherService
     {
         // 1. 查收款单
         var receipt = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            "SELECT Id, ReceiptNo, Amount, ContractId, CompanyId FROM Receipts WHERE Id=@Id AND Status='Confirmed'",
+            _sql.Get("Collection.Select.Receipt.ConfirmedById"),
             new { Id = receiptId }, tx);
         if (receipt == null) return null;
 
@@ -68,7 +68,7 @@ public class AutoVoucherService : IAutoVoucherService
 
         // 2. 查会计科目
         var subjects = await conn.QueryAsync<(string Code, Guid Id)>(
-            "SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1122','2203')", transaction: tx);
+            _sql.Get("Accounting.Select.Subject.ReceiptCodes"), transaction: tx);
         var subjectDict = subjects.ToDictionary(r => r.Code, r => r.Id);
 
         if (!subjectDict.TryGetValue("1001", out var subject1001) ||

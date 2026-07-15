@@ -425,12 +425,24 @@ public class ContractsController : ControllerBase
         if (approvalType == null)
         {
             // 无审批配置 → 0 级直接执行
-            await _contractDomainService.ExecuteContractTerminationAsync(
-                id,
+            // 应用层加载数据 → 领域层做状态变更 → 应用层持久化
+            var contract = await _uow.Contracts.GetByIdAsync(id, ct);
+            if (contract == null) return NotFound();
+            var plans = await _uow.ReceivablePlans.GetByContractIdAsync(id, ct);
+
+            var result = _contractDomainService.ExecuteContractTermination(
+                contract, plans,
                 request.ActualEndDate.HasValue ? DateOnly.FromDateTime(request.ActualEndDate.Value) : null,
-                request.DepositReturn ?? "FULL",
-                request.Reason ?? "合同终止",
-                userId, ct);
+                request.Reason ?? "合同终止");
+
+            await _uow.Contracts.UpdateAsync(contract, ct);
+            foreach (var plan in plans.Where(p => p.Status is "Canceled" or "Frozen"))
+                await _uow.ReceivablePlans.UpdateAsync(plan, ct);
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
+                new { ExpiryDate = result.EffectiveEndDate, ContractId = id }, ct);
+            await _uow.CommitAsync(ct);
+
             try { using var conn = _db.CreateConnection(); conn.Open();
                 await InsertChangeHistoryAsync(conn, null, id, "TERMINATE",
                     "合同终止", request.Reason ?? "", null, null,
@@ -512,7 +524,7 @@ public class ContractsController : ControllerBase
 
         using var conn = _db.CreateConnection(); conn.Open();
         var pendingAmount = await conn.QuerySingleAsync<decimal>(
-            "SELECT ISNULL(SUM(Amount - Received), 0) FROM ReceivablePlans WHERE ContractId=@C AND Status IN ('Pending','Partial','Overdue')",
+            _sql.Get("Contract.Select.ReceivablePlan.PendingAmount"),
             new { C = id });
 
         var nextPeriods = new List<string>();
@@ -968,7 +980,7 @@ public class ContractsController : ControllerBase
         {
             contract.AddTenant(tenantId, request.IsPrimary); await _uow.CommitAsync(ct);
             try { using var c = _db.CreateConnection(); c.Open();
-                var n = await c.QuerySingleOrDefaultAsync<string>("SELECT Name FROM Tenants WHERE Id=@Id", new { Id = tenantId });
+                var n = await c.QuerySingleOrDefaultAsync<string>(_sql.Get("Contract.Select.Tenant.NameById"), new { Id = tenantId });
                 await InsertChangeHistoryAsync(c, null, id, "TENANT_ADD", "添加租客", $"添加租客: {n}", null, null, null, userId); } catch { }
             return Ok(new { status = "Completed", message = "租客已添加" });
         }
@@ -1023,7 +1035,7 @@ public class ContractsController : ControllerBase
         var userId = GetCurrentUserId();
         await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Update.ContractTenant.SetPrimary"), new { ContractId = id, TenantId = tenantId });
         try { using var c = _db.CreateConnection(); c.Open();
-            var n = await c.QuerySingleOrDefaultAsync<string>("SELECT Name FROM Tenants WHERE Id=@Id", new { Id = tenantId });
+            var n = await c.QuerySingleOrDefaultAsync<string>(_sql.Get("Contract.Select.Tenant.NameById"), new { Id = tenantId });
             await InsertChangeHistoryAsync(c, null, id, "TENANT_PRIMARY", "设置主租户", $"设置主租户: {n}", null, null, null, userId); } catch { }
         return Ok(new { message = "主租户已更新" });
     }
@@ -1072,7 +1084,7 @@ public class ContractsController : ControllerBase
         if (string.IsNullOrEmpty(operatorName) && operatorId.HasValue)
         {
             try { operatorName = await conn.QuerySingleOrDefaultAsync<string>(
-                "SELECT DisplayName FROM Users WHERE Id=@Id", new { Id = operatorId }, tx); } catch { }
+                _sql.Get("Contract.Select.User.DisplayNameById"), new { Id = operatorId }, tx); } catch { }
         }
         await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
             new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType,

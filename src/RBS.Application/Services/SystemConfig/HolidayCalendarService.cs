@@ -1,7 +1,9 @@
+using System.Data;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.SystemConfig;
+using RBS.Core.Common;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -12,11 +14,13 @@ public class HolidayCalendarService : IHolidayCalendarService
 {
     private readonly IUnitOfWork _uow;
     private readonly ITenantService _tenant;
+    private readonly IBulkInserter _bulk;
 
-    public HolidayCalendarService(IUnitOfWork uow, ITenantService tenant)
+    public HolidayCalendarService(IUnitOfWork uow, ITenantService tenant, IBulkInserter bulk)
     {
         _uow = uow;
         _tenant = tenant;
+        _bulk = bulk;
     }
 
     private Guid CurrentCompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
@@ -73,23 +77,28 @@ public class HolidayCalendarService : IHolidayCalendarService
         if (response == null)
             throw new InvalidOperationException("获取节假日数据失败，请检查网络或年份");
 
+        // 加载已有数据用于去重
+        var existing = await _uow.HolidayCalendars.GetByYearAsync(companyId, year, ct);
+        var existingDates = new HashSet<DateOnly>(existing.Select(h => h.HolidayDate));
+
+        var toInsert = new List<HolidayCalendar>();
         var imported = new List<HolidayCalendarDto>();
         var skipped = new List<HolidayCalendarDto>();
 
-        // 节假日（放假）
+        // 收集待插入数据（先不写库）
         foreach (var (dateStr, raw) in response.Holidays ?? new())
-        {
-            var ok = await ProcessDate(dateStr, raw, false, companyId, ct, imported, skipped);
-            if (!ok) continue;
-        }
-        // 调休上班
+            CollectDate(dateStr, raw, false, companyId, existingDates, toInsert, imported, skipped);
+
         foreach (var (dateStr, raw) in response.Workdays ?? new())
+            CollectDate(dateStr, raw, true, companyId, existingDates, toInsert, imported, skipped);
+
+        // 批量写入
+        if (toInsert.Count > 0)
         {
-            var ok = await ProcessDate(dateStr, raw, true, companyId, ct, imported, skipped);
-            if (!ok) continue;
+            var dt = BuildHolidayDataTable(toInsert);
+            await _bulk.BulkInsertAsync("HolidayCalendars", dt, ct);
         }
 
-        await _uow.CommitAsync(ct);
         return new ImportResult
         {
             Imported = imported,
@@ -99,19 +108,22 @@ public class HolidayCalendarService : IHolidayCalendarService
         };
     }
 
-    private async Task<bool> ProcessDate(string dateStr, string raw, bool isWorkingDay, Guid companyId,
-        CancellationToken ct, List<HolidayCalendarDto> imported, List<HolidayCalendarDto> skipped)
+    private static void CollectDate(string dateStr, string raw, bool isWorkingDay, Guid companyId,
+        HashSet<DateOnly> existingDates,
+        List<HolidayCalendar> toInsert, List<HolidayCalendarDto> imported, List<HolidayCalendarDto> skipped)
     {
-        if (!DateOnly.TryParse(dateStr, out var date)) return false;
+        if (!DateOnly.TryParse(dateStr, out var date)) return;
         var name = raw.Split(',').ElementAtOrDefault(1) ?? raw.Split(',').ElementAtOrDefault(0) ?? "节假日";
 
-        var exist = await _uow.HolidayCalendars.GetByDateAsync(companyId, date, ct);
-        if (exist != null) { skipped.Add(MapToDto(exist)); return false; }
+        if (existingDates.Contains(date))
+        {
+            skipped.Add(new HolidayCalendarDto { Id = Guid.Empty, HolidayDate = date, Name = name });
+            return;
+        }
 
         var holiday = new HolidayCalendar(date, name, isWorkingDay, companyId);
-        await _uow.HolidayCalendars.AddAsync(holiday, ct);
+        toInsert.Add(holiday);
         imported.Add(MapToDto(holiday));
-        return true;
     }
 
     private static HolidayCalendarDto MapToDto(HolidayCalendar h) => new()
@@ -122,6 +134,24 @@ public class HolidayCalendarService : IHolidayCalendarService
         IsWorkingDay = h.IsWorkingDay,
         CompanyId = h.CompanyId
     };
+
+    /// <summary>构建 HolidayCalendar DataTable</summary>
+    private static DataTable BuildHolidayDataTable(IReadOnlyList<HolidayCalendar> items)
+    {
+        var dt = new DataTable("HolidayCalendars");
+        dt.Columns.Add("Id", typeof(Guid));
+        dt.Columns.Add("HolidayDate", typeof(DateOnly));
+        dt.Columns.Add("Name", typeof(string));
+        dt.Columns.Add("IsWorkingDay", typeof(bool));
+        dt.Columns.Add("Year", typeof(int));
+        dt.Columns.Add("CompanyId", typeof(Guid));
+        dt.Columns.Add("CreatedAt", typeof(DateTime));
+
+        foreach (var h in items)
+            dt.Rows.Add(h.Id, h.HolidayDate, h.Name, h.IsWorkingDay, h.HolidayDate.Year, h.CompanyId, DateTime.UtcNow);
+
+        return dt;
+    }
 }
 
 /// <summary>chinese-days CDN 响应模型</summary>

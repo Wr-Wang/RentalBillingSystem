@@ -124,6 +124,9 @@ public static class DependencyInjection
         // 在 UoW 提交成功后自动分发聚合根上的领域事件
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
+        // ===== 批量插入器（Scoped，用 SqlBulkCopy 加速大数据量写入） =====
+        services.AddScoped<IBulkInserter, BulkInserter>();
+
         // ===== PDF 生成（Scoped） =====
         // 使用 QuestPDF 渲染欠款通知单
         services.AddScoped<IBillPdfGenerator, BillPdfGenerator>();

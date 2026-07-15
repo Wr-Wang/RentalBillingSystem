@@ -70,13 +70,13 @@ public class ReceiptsController : ControllerBase
         {
             // 1. 乐观锁更新收款单状态（仅 Pending 可确认）
             var updated = await conn.ExecuteAsync(
-                "UPDATE Receipts SET Status='Confirmed', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Pending'",
+                _sql.Get("Collection.Update.Receipt.Confirm"),
                 new { Id = id }, tx);
 
             if (updated == 0)
             {
                 var receipt = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                    "SELECT Status FROM Receipts WHERE Id=@Id", new { Id = id }, tx);
+                    _sql.Get("Collection.Select.Receipt.StatusById"), new { Id = id }, tx);
                 if (receipt == null) return NotFound();
                 return BadRequest(new { message = $"收款单状态为「{(string)receipt.Status}」，仅待确认状态可确认" });
             }

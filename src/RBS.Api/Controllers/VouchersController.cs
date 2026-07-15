@@ -37,8 +37,7 @@ public class VouchersController : ControllerBase
     {
         var today = DateTime.UtcNow.ToString("yyyyMMdd");
         var seq = await conn.QuerySingleAsync<int>(
-            "SELECT ISNULL(MAX(CAST(RIGHT(VoucherNo, 4) AS INT)), 0) + 1 FROM Vouchers " +
-            "WHERE VoucherNo LIKE @Pattern AND CreatedAt >= @Today",
+            _sql.Get("Accounting.Select.Voucher.NextSequenceNo"),
             new { Pattern = $"PZ-{today}-%", Today = DateOnly.FromDateTime(DateTime.UtcNow) }, tx);
         return $"PZ-{today}-{seq:D4}";
     }
@@ -141,7 +140,7 @@ public class VouchersController : ControllerBase
 
             // 删除旧分录
             await conn.ExecuteAsync(
-                "DELETE FROM JournalEntries WHERE VoucherId = @Id", new { Id = id }, tx);
+                _sql.Get("Accounting.Delete.JournalEntry.ByVoucherId"), new { Id = id }, tx);
 
             // 插入新分录
             foreach (var entry in voucher.Entries)
@@ -160,7 +159,7 @@ public class VouchersController : ControllerBase
             if (!string.IsNullOrEmpty(request.Description))
             {
                 await conn.ExecuteAsync(
-                    "UPDATE Vouchers SET Description = @Desc WHERE Id = @Id",
+                    _sql.Get("Accounting.Update.Voucher.Description"),
                     new { Desc = request.Description, Id = id }, tx);
             }
 

@@ -1588,4 +1588,190 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <update id="ReceivableGenerate.Update.Item.SetPlanIds">
     <![CDATA[UPDATE ReceivableGenerateRequestItems SET ReceivablePlanId=@ReceivablePlanId, VoucherId=@VoucherId WHERE Id=@Id]]>
   </update>
+
+  <!-- ================================================================
+       模块：Contract — 控制器级别 SQL（ContractsController）
+       ================================================================ -->
+  <select id="Contract.Select.ReceivablePlan.PendingAmount">
+    <![CDATA[SELECT ISNULL(SUM(Amount - Received), 0) FROM ReceivablePlans WHERE ContractId=@C AND Status IN ('Pending','Partial','Overdue')]]>
+  </select>
+  <select id="Contract.Select.Tenant.NameById">
+    <![CDATA[SELECT Name FROM Tenants WHERE Id=@Id]]>
+  </select>
+  <select id="Contract.Select.User.DisplayNameById">
+    <![CDATA[SELECT DisplayName FROM Users WHERE Id=@Id]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Scheduling — 控制器级别 SQL（SchedulerController）
+       ================================================================ -->
+  <select id="Scheduling.Select.Execution.FailedById">
+    <![CDATA[SELECT * FROM [JobScheduleExecutions] WHERE [Id]=@Id AND [Status]='Failed']]>
+  </select>
+  <select id="Scheduling.Select.JobSchedule.ActiveById">
+    <![CDATA[SELECT * FROM [JobSchedules] WHERE [Id]=@Id AND [IsActive]=1]]>
+  </select>
+  <select id="Scheduling.Select.Receipt.HasPaymentByPeriod">
+    <![CDATA[SELECT COUNT(1) FROM JournalEntries je
+      JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
+      WHERE s.Code = '1001' AND je.VoucherId IN
+      (SELECT Id FROM Vouchers WHERE SourceEntityId IN
+      (SELECT ContractId FROM ReceivablePlans WHERE Period = @P))]]>
+  </select>
+  <update id="Scheduling.Update.DebitNote.CancelByTaskLog">
+    <![CDATA[UPDATE DebitNotes SET Status='Cancelled', CancelledAt=GETUTCDATE(), CancelReason=@Reason WHERE BillJobTaskLogId=@Id AND Status='Published']]>
+  </update>
+  <delete id="Scheduling.Delete.JournalEntry.ByReceivablePlanTimeRange">
+    <![CDATA[DELETE je FROM JournalEntries je
+      JOIN Vouchers v ON v.Id = je.VoucherId
+      WHERE v.SourceEntityType='ReceivablePlan' AND v.CreatedAt >= @Start AND v.CreatedAt <= @End]]>
+  </delete>
+  <delete id="Scheduling.Delete.Voucher.ByReceivablePlanTimeRange">
+    <![CDATA[DELETE FROM Vouchers WHERE SourceEntityType='ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End]]>
+  </delete>
+  <delete id="Scheduling.Delete.ReceivablePlan.ByPeriodTimeRange">
+    <![CDATA[DELETE FROM ReceivablePlans WHERE Period=@P AND CreatedAt >= @Start AND CreatedAt <= @End]]>
+  </delete>
+  <update id="Scheduling.Update.TaskLog.Reversed">
+    <![CDATA[UPDATE TaskLogs SET Status='Reversed' WHERE Id=@Id]]>
+  </update>
+
+  <!-- ================================================================
+       模块：Accounting — 控制器级别 SQL（VouchersController / LedgerController）
+       ================================================================ -->
+  <select id="Accounting.Select.Voucher.NextSequenceNo">
+    <![CDATA[SELECT ISNULL(MAX(CAST(RIGHT(VoucherNo, 4) AS INT)), 0) + 1 FROM Vouchers WHERE VoucherNo LIKE @Pattern AND CreatedAt >= @Today]]>
+  </select>
+  <delete id="Accounting.Delete.JournalEntry.ByVoucherId">
+    <![CDATA[DELETE FROM JournalEntries WHERE VoucherId = @Id]]>
+  </delete>
+  <update id="Accounting.Update.Voucher.Description">
+    <![CDATA[UPDATE Vouchers SET Description = @Desc WHERE Id = @Id]]>
+  </update>
+  <select id="Accounting.Select.Ledger.OpeningBalance">
+    <![CDATA[SELECT ISNULL(SUM(CASE WHEN je.Direction='Debit' THEN je.Amount ELSE -je.Amount END), 0)
+      FROM JournalEntries je
+      JOIN Vouchers v ON v.Id = je.VoucherId
+      JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
+      WHERE s.Code = @Code AND v.CompanyId = @Cid AND v.VoucherDate < @Date]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Common — 控制器级别 SQL（SystemLogsController / AuditController）
+       ================================================================ -->
+  <select id="Common.Select.SystemLog.Count">
+    <![CDATA[SELECT COUNT(*) FROM SystemLogs {0}]]>
+  </select>
+  <select id="Common.Select.SystemLog.Paged">
+    <![CDATA[SELECT {0} FROM SystemLogs {1} ORDER BY CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
+  </select>
+  <select id="Common.Select.SystemLog.ById">
+    <![CDATA[SELECT {0} FROM SystemLogs WHERE Id = @Id]]>
+  </select>
+  <select id="Common.Select.AuditTable.Exists">
+    <![CDATA[SELECT COUNT(1) FROM sys.tables WHERE name = @Name]]>
+  </select>
+  <select id="Common.Select.AuditRecord.ByVersion">
+    <![CDATA[SELECT * FROM [{0}] WHERE Id=@Id AND AuditVersionNo=@Ver]]>
+  </select>
+  <select id="Common.Select.AuditRecord.Latest">
+    <![CDATA[SELECT * FROM [{0}] WHERE Id=@Id ORDER BY AuditVersionNo DESC]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Contract — 控制器级别 SQL（ContractFeeConfigsController）
+       ================================================================ -->
+  <select id="Contract.Select.FeeConfig.ContractIdAndAmountById">
+    <![CDATA[SELECT ContractId, Amount FROM ContractFeeConfigs WHERE Id=@Id]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Collection — 控制器级别 SQL（ReceiptsController）
+       ================================================================ -->
+  <update id="Collection.Update.Receipt.Confirm">
+    <![CDATA[UPDATE Receipts SET Status='Confirmed', UpdatedAt=GETUTCDATE() WHERE Id=@Id AND Status='Pending']]>
+  </update>
+  <select id="Collection.Select.Receipt.StatusById">
+    <![CDATA[SELECT Status FROM Receipts WHERE Id=@Id]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Tenant（租客 — 服务层补充）
+       ================================================================ -->
+  <select id="Rental.Select.Tenant.CountPaged">
+    <![CDATA[SELECT COUNT(1) FROM Tenants {0}]]>
+  </select>
+  <select id="Rental.Select.Tenant.ListPaged">
+    <![CDATA[SELECT Id, Name, IdentityNo AS IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants {0} ORDER BY Name OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
+  </select>
+  <select id="Rental.Select.Tenant.ById">
+    <![CDATA[SELECT Id, Name, IdentityNo AS IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants WHERE Id=@Id]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Company（公司 — 服务层补充分页）
+       ================================================================ -->
+  <select id="Organization.Select.Company.CountPaged">
+    <![CDATA[SELECT COUNT(*) FROM Companies {0}]]>
+  </select>
+  <select id="Organization.Select.Company.ListPaged">
+    <![CDATA[SELECT * FROM Companies {0} ORDER BY CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Property（房源）
+       ================================================================ -->
+  <select id="Property.Select.HousingUnit.ByCompanyId">
+    <![CDATA[SELECT * FROM HousingUnits WHERE CompanyId=@Id]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Receipt（收款 — 补充）
+       ================================================================ -->
+  <select id="Collection.Select.Receipt.ConfirmedById">
+    <![CDATA[SELECT Id, ReceiptNo, Amount, ContractId, CompanyId FROM Receipts WHERE Id=@Id AND Status='Confirmed']]>
+  </select>
+
+  <!-- ================================================================
+       模块：Accounting（会计 — 补充科目/分录）
+       ================================================================ -->
+  <select id="Accounting.Select.Subject.ReceiptCodes">
+    <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1122','2203')]]>
+  </select>
+  <select id="Billing.Select.JournalEntry.SupplementaryDue">
+    <![CDATA[SELECT je.VoucherId, je.Amount FROM JournalEntries je
+      JOIN Vouchers v ON v.Id = je.VoucherId
+      WHERE v.SourceEntityType='ContractFee.Supplementary'
+        AND v.SourceEntityId=@Cid
+        AND je.Direction='Debit'
+        AND NOT EXISTS (
+          SELECT 1 FROM ReceivablePlans rp
+          WHERE rp.ContractId=v.SourceEntityId
+            AND rp.Period=v.Period
+        )]]>
+  </select>
+
+  <!-- ================================================================
+       模块：Lease（租赁 — 补充）
+       ================================================================ -->
+  <select id="Lease.Select.Contract.HasActiveByRoom">
+    <![CDATA[SELECT COUNT(1) FROM Contracts WHERE RoomId=@RoomId AND Status='Active']]>
+  </select>
+
+  <!-- ================================================================
+       模块：Scheduling（调度 — JobSchedule 模板复制）
+       ================================================================ -->
+  <select id="Scheduling.Select.JobSchedule.GlobalTemplates">
+    <![CDATA[SELECT JobName, ScheduleType, Hour, Minute, DayOfMonth, TemplateCode,
+             IsActive, Description
+      FROM JobSchedules WHERE CompanyId IS NULL AND IsActive = 1]]>
+  </select>
+  <insert id="Scheduling.Insert.JobSchedule.FromTemplate">
+    <![CDATA[INSERT INTO JobSchedules
+      (Id, JobName, ScheduleType, Hour, Minute, DayOfMonth,
+       TemplateCode, IsActive, CompanyId, Description, CreatedBy, CreatedAt)
+      VALUES
+      (NEWID(), @JobName, @ScheduleType, @Hour, @Minute, @DayOfMonth,
+       @TemplateCode, @IsActive, @Cid, @Desc, @CBy, GETUTCDATE())]]>
+  </insert>
 </sqlMap>

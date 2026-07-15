@@ -38,13 +38,13 @@ public class TenantAppService : ITenantAppService
         }
 
         var total = await conn.QuerySingleAsync<int>(
-            $"SELECT COUNT(1) FROM Tenants {where}", parms);
+            string.Format(_sql.Get("Rental.Select.Tenant.CountPaged"), where), parms);
 
         var offset = (page - 1) * pageSize;
         parms.Add("@Offset", offset);
         parms.Add("@PageSize", pageSize);
         var rows = await conn.QueryAsync<TenantDto>(
-            $"SELECT Id, Name, IdentityNo AS IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants {where} ORDER BY Name OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
+            string.Format(_sql.Get("Rental.Select.Tenant.ListPaged"), where), parms);
 
         var list = rows.ToList();
         foreach (var t in list)
@@ -66,7 +66,7 @@ public class TenantAppService : ITenantAppService
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var tenant = await conn.QuerySingleOrDefaultAsync<TenantDto>(
-            "SELECT Id, Name, IdentityNo AS IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants WHERE Id=@Id",
+            _sql.Get("Rental.Select.Tenant.ById"),
             new { Id = id });
         if (tenant == null) return null;
 

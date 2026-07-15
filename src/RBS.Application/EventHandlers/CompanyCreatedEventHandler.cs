@@ -13,14 +13,17 @@ namespace RBS.Application.EventHandlers;
 public class CompanyCreatedEventHandler : IEventHandler<CompanyCreatedEvent>
 {
     private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
 
     /// <summary>
     /// 构造函数
     /// </summary>
     /// <param name="db">数据库连接工厂</param>
-    public CompanyCreatedEventHandler(IDbConnectionFactory db)
+    /// <param name="sql">SQL 加载器</param>
+    public CompanyCreatedEventHandler(IDbConnectionFactory db, ISqlLoader sql)
     {
         _db = db;
+        _sql = sql;
     }
 
     /// <summary>
@@ -33,19 +36,12 @@ public class CompanyCreatedEventHandler : IEventHandler<CompanyCreatedEvent>
 
         // 从全局模板（CompanyId IS NULL）复制任务调度配置到新公司
         var templates = await conn.QueryAsync<dynamic>(
-            @"SELECT JobName, ScheduleType, Hour, Minute, DayOfMonth, TemplateCode,
-                     IsActive, Description
-              FROM JobSchedules WHERE CompanyId IS NULL AND IsActive = 1");
+            _sql.Get("Scheduling.Select.JobSchedule.GlobalTemplates"));
 
         foreach (var t in templates)
         {
             await conn.ExecuteAsync(
-                @"INSERT INTO JobSchedules
-                    (Id, JobName, ScheduleType, Hour, Minute, DayOfMonth,
-                     TemplateCode, IsActive, CompanyId, Description, CreatedBy, CreatedAt)
-                  VALUES
-                    (NEWID(), @JobName, @ScheduleType, @Hour, @Minute, @DayOfMonth,
-                     @TemplateCode, @IsActive, @Cid, @Desc, @CBy, GETUTCDATE())",
+                _sql.Get("Scheduling.Insert.JobSchedule.FromTemplate"),
                 new
                 {
                     JobName = (string)t.JobName,

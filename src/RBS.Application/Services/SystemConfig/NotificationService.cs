@@ -75,16 +75,15 @@ public class NotificationService : INotificationService
 
         using var conn = _db.CreateConnection();
 
-        var countSql = $"SELECT COUNT(*) FROM [Notifications] WHERE {whereClause}";
+        var extraWhere = whereClause.StartsWith("UserId = @UserId")
+            ? whereClause.Substring("UserId = @UserId".Length).TrimStart(" AND".ToCharArray())
+            : whereClause;
+        var extraFormatted = string.IsNullOrEmpty(extraWhere) ? "" : "AND " + extraWhere;
+
+        var countSql = string.Format(_sql.Get("Notification.Select.Notification.PagedCount"), extraFormatted);
         var total = await conn.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var dataSql = $@"
-            SELECT [Id], [UserId], [Category], [Title], [Content],
-                   [ReferenceType], [ReferenceId], [IsRead], [CreatedAt]
-            FROM [Notifications]
-            WHERE {whereClause}
-            ORDER BY [IsRead] ASC, [CreatedAt] DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+        var dataSql = string.Format(_sql.Get("Notification.Select.Notification.Paged"), extraFormatted);
 
         var items = (await conn.QueryAsync<NotificationDto>(dataSql, parameters)).AsList();
 

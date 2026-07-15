@@ -53,7 +53,7 @@ public class ReceiptJob
         {
             var step01 = await _stepLogger.StartStepAsync(taskLogId, "ReceiptStep01", "查询收款单", null, null, ct);
             var receipt = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                "SELECT Id, ContractId, Amount, ReceiptNo FROM Receipts WHERE Id=@Id AND Status='Confirmed'",
+                _sql.Get("Collection.Select.Receipt.ConfirmedById"),
                 new { Id = receiptId }, tx);
             if (receipt == null) { await _stepLogger.FailStepAsync(step01, "收款单不存在或未确认", null, ct); return; }
             await _stepLogger.CompleteStepAsync(step01, 1, null, ct);
@@ -100,7 +100,7 @@ public class ReceiptJob
                 if (contractId.HasValue)
                 {
                     await conn.ExecuteAsync(
-                        "UPDATE Contracts SET PrepaidBalance = PrepaidBalance + @Amt WHERE Id = @Id",
+                        _sql.Get("Accounting.Update.Contract.PrepaidBalanceIncrement"),
                         new { Amt = overflow, Id = contractId.Value }, tx);
                 }
             }
@@ -138,7 +138,7 @@ public class ReceiptJob
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var rows = await conn.QueryAsync<(string Code, Guid Id)>(
-            "SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1122','2203')");
+            _sql.Get("Accounting.Select.Subject.ReceiptCodes"));
         return rows.ToDictionary(r => r.Code, r => r.Id);
     }
 }
