@@ -78,6 +78,12 @@ IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TaxRateConfigs
     DELETE FROM [TaxRateConfigs_Audit]
 GO
 
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Journals_Audit]'))
+    DELETE FROM [Journals_Audit]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances_Audit]'))
+    DELETE FROM [GeneralLedgerBalances_Audit]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[PrepaidDetails_Audit]'))
+    DELETE FROM [PrepaidDetails_Audit]
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans_Audit]'))
     DELETE FROM [ReceivablePlans_Audit]
 GO
@@ -242,6 +248,12 @@ IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[TaxRateConfigs
     DELETE FROM [TaxRateConfigs]
 GO
 
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Journals]'))
+    DELETE FROM [Journals]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances]'))
+    DELETE FROM [GeneralLedgerBalances]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[PrepaidDetails]'))
+    DELETE FROM [PrepaidDetails]
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans]'))
     DELETE FROM [ReceivablePlans]
 GO

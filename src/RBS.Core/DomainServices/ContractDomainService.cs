@@ -73,18 +73,18 @@ public class ContractDomainService : IContractDomainService
 
     /// <summary>
     /// 执行合同终止 — 仅做状态变更，不包含持久化。
+    /// Journal 为不可变记录，终止时通过创建冲销 Journal 来处理应收余额。
     /// 由应用层在调用前加载好数据，调用后统一提交事务。
     /// </summary>
     public TerminationResult ExecuteContractTermination(
-        Contract contract, IReadOnlyList<ReceivablePlan> receivablePlans,
+        Contract contract, IReadOnlyList<Journal> journals,
         DateOnly? actualEndDate, string reason)
     {
         // 1. 终止合同
         contract.Terminate(reason);
 
-        // 2. 取消未结清应收计划
-        foreach (var plan in receivablePlans.Where(p => p.Status is "Pending" or "Partial" or "Overdue"))
-            plan.Cancel("合同终止");
+        // 2. Journal 为不可变记录，无需取消操作
+        //    冲销通过 TerminateJob 生成负金额 Journal + GL 更新完成
 
         // 3. 计算费用配置到期日期（由应用层执行 SQL 更新）
         var effectiveEnd = actualEndDate?.ToString("yyyy-MM-dd")

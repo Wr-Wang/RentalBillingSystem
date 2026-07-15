@@ -336,17 +336,14 @@ public class SchedulerController : ControllerBase
             _sql.Get("Scheduling.Update.DebitNote.CancelByTaskLog"),
             new { Id = taskLogId, Reason = body?.Reason ?? "管理员反转" }, tx);
 
-        // 2. 删除分录
+        // 2. 删除 Journal
         await conn.ExecuteAsync(
-            _sql.Get("Scheduling.Delete.JournalEntry.ByReceivablePlanTimeRange"),
-            new { Start = taskStart, End = taskEnd }, tx);
-        await conn.ExecuteAsync(
-            _sql.Get("Scheduling.Delete.Voucher.ByReceivablePlanTimeRange"),
+            _sql.Get("Scheduling.Delete.Journal.ByTimeRange"),
             new { Start = taskStart, End = taskEnd }, tx);
 
-        // 3. 删除应收计划
+        // 3. 删除按账期和时间的 Journal
         await conn.ExecuteAsync(
-            _sql.Get("Scheduling.Delete.ReceivablePlan.ByPeriodTimeRange"),
+            _sql.Get("Scheduling.Delete.Journal.ByPeriodTimeRange"),
             new { P = log.TargetMonth, Start = taskStart, End = taskEnd }, tx);
 
         // 4. 标记任务为 Reversed

@@ -256,7 +256,7 @@ async function fetchData() {
 // 图表配置
 const collectionRateChart = computed(() => ({
   tooltip: { trigger: 'axis' },
-  grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+  grid: { left: '3%', right: '4%', bottom: '15%' },
   xAxis: {
     type: 'category',
     data: companyStats.value.filter(l => l.isActive).map(l => l.name),
@@ -280,7 +280,7 @@ const overdueChart = computed(() => {
   const sorted = [...companyStats.value].sort((a, b) => b.overdueAmount - a.overdueAmount)
   return {
     tooltip: { trigger: 'axis', formatter: params => `${params[0].name}<br/>逾期金额: ¥${Number(params[0].value).toLocaleString()}` },
-    grid: { left: '10%', right: '4%', bottom: '15%', containLabel: true },
+    grid: { left: '10%', right: '4%', bottom: '15%' },
     xAxis: {
       type: 'category',
       data: sorted.map(l => l.name),
@@ -301,7 +301,7 @@ const overdueChart = computed(() => {
 
 const occupancyChart = computed(() => ({
   tooltip: { trigger: 'axis' },
-  grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+  grid: { left: '3%', right: '4%', bottom: '15%' },
   xAxis: {
     type: 'category',
     data: companyStats.value.filter(l => l.isActive).map(l => l.name),
@@ -322,7 +322,7 @@ const occupancyChart = computed(() => ({
 const trendChart = computed(() => ({
   tooltip: { trigger: 'axis' },
   legend: { data: ['公司A', '公司B', '公司C'], bottom: 0 },
-  grid: { left: '3%', right: '4%', bottom: '25%', containLabel: true },
+  grid: { left: '3%', right: '4%', bottom: '25%' },
   xAxis: {
     type: 'category',
     data: ['1月', '2月', '3月', '4月', '5月', '6月']

@@ -32,7 +32,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly INotificationService _notificationService;
     private readonly ISqlLoader _sql;
     private readonly IDbConnectionFactory _db;
-    private readonly IJournalGenerationService _journalGen;
     private readonly ITerminateJob _terminateJob;
     private readonly IServiceProvider _serviceProvider;
 
@@ -59,7 +58,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         INotificationService notificationService,
         ISqlLoader sql,
         IDbConnectionFactory db,
-        IJournalGenerationService journalGen,
         ITerminateJob terminateJob,
         IServiceProvider serviceProvider)
     {
@@ -71,7 +69,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _notificationService = notificationService;
         _sql = sql;
         _db = db;
-        _journalGen = journalGen;
         _terminateJob = terminateJob;
         _serviceProvider = serviceProvider;
     }
@@ -171,16 +168,12 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 if (bizData != null)
                 {
                     var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
-                    var plans = contract != null
-                        ? await _uow.ReceivablePlans.GetByContractIdAsync(bizData.ContractId, ct)
-                        : new List<ReceivablePlan>();
+                    var journals = new List<Journal>();
 
                     var result = _contractDomainService.ExecuteContractTermination(
-                        contract!, plans, null, request.Description ?? "合同终止");
+                        contract!, journals, null, request.Description ?? "合同终止");
 
                     if (contract != null) await _uow.Contracts.UpdateAsync(contract, ct);
-                    foreach (var plan in plans.Where(p => p.Status is "Canceled" or "Frozen"))
-                        await _uow.ReceivablePlans.UpdateAsync(plan, ct);
                     await _uow.ExecuteSqlRawAsync(
                         _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
                         new { ExpiryDate = result.EffectiveEndDate, ContractId = bizData.ContractId }, ct);
@@ -312,9 +305,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             if (string.Compare(effMonth, currentMonth, StringComparison.Ordinal) <= 0 ||
                 effMonth == DateOnly.FromDateTime(ChinaTime.Now).AddMonths(1).ToString("yyyy-MM"))
             {
-                await _journalGen.GenerateSupplementaryAsync(
-                    item.ContractId, item.FeeCodeId, item.NewAmount, item.OldAmount,
-                    effDate, effMonth, ct);
+                // TODO: 生成补差 JE — 原 _journalGen.GenerateSupplementaryAsync 已移除
             }
         }
     }
@@ -413,11 +404,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         }
 
         // ★ Commit 后再生成 OneTime JE（FeeConfig 已落库，独立连接可正常读取）
-        //    仿 HandleContractFeeAdjustAsync 对 GenerateSupplementaryAsync 的处理模式
-        foreach (var (contractId, configId) in oneTimeJobs)
-        {
-            await _journalGen.GenerateOneTimeAsync(contractId, configId, ct);
-        }
+        //    TODO: 原 _journalGen.GenerateOneTimeAsync 已移除
     }
 
     /// <summary>
@@ -430,16 +417,12 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
         // 应用层加载数据 → 领域层状态变更 → 应用层持久化
         var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
-        var plans = contract != null
-            ? await _uow.ReceivablePlans.GetByContractIdAsync(bizData.ContractId, ct)
-            : new List<ReceivablePlan>();
+        var journals = new List<Journal>();
 
         var result = _contractDomainService.ExecuteContractTermination(
-            contract!, plans, bizData.ActualEndDate, bizData.Reason ?? "合同终止");
+            contract!, journals, bizData.ActualEndDate, bizData.Reason ?? "合同终止");
 
         if (contract != null) await _uow.Contracts.UpdateAsync(contract, ct);
-        foreach (var plan in plans.Where(p => p.Status is "Canceled" or "Frozen"))
-            await _uow.ReceivablePlans.UpdateAsync(plan, ct);
         await _uow.ExecuteSqlRawAsync(
             _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
             new { ExpiryDate = result.EffectiveEndDate, ContractId = bizData.ContractId }, ct);

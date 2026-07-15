@@ -285,6 +285,8 @@ onMounted(async () => {
 
   // -----------------------------------------------------------------------
   // 3. 初始化侧边栏菜单
+  //     initFromRoutes 内部会监听 userStore.profileLoaded，
+  //     在用户资料加载完成后自动重新构建菜单
   // -----------------------------------------------------------------------
   menuStore.initFromRoutes(router.options.routes.find(r => r.path === '/')?.children || [])
 

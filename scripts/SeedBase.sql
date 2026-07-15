@@ -984,13 +984,11 @@ DECLARE @M_Accounting_Subjects uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_Accounting_Subjects,N'科目表','accounting:subjects','/accounting/subjects',@M_Accounting,1,1,@SysUserId,@Now);
 
-DECLARE @M_Accounting_Journal uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_Journal,N'日记账','accounting:journal','/accounting/journal',@M_Accounting,2,1,@SysUserId,@Now);
+DECLARE @M_Journal uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_Journal,N'日记账','journal:view','/journals','Notebook',NULL,11,1,@SysUserId,@Now);
 
-DECLARE @M_Accounting_Vouchers uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_Vouchers,N'凭证管理','accounting:vouchers','/accounting/vouchers',@M_Accounting,3,1,@SysUserId,@Now);
+-- 凭证管理菜单已删除（系统不再使用 Voucher）
 
 DECLARE @M_Accounting_TrialBalance uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1425,9 +1423,9 @@ WHERE M.PermissionCode IN (
   'bill:list',
   'accounting:view',
   'accounting:subjects',
-  'accounting:journal',
-  'accounting:vouchers',
+  --'accounting:vouchers',（已删除）
   'accounting:trialbalance',
+  'journal:view',
   'report:view',
   'report:collectionrate',
   'report:overduedetail',
@@ -1458,7 +1456,7 @@ WHERE M.PermissionCode IN (
   'notification:view', 'notification:markallread',
   'receipt:view', 'receipt:list',
   'bill:view', 'bill:list',
-  'accounting:view', 'accounting:subjects', 'accounting:journal', 'accounting:vouchers', 'accounting:trialbalance', 'accounting:periods', 'accounting:ledger', 'accounting:balancesheet', 'accounting:incomestatement',
+  'journal:view', 'accounting:view', 'accounting:subjects', 'accounting:trialbalance', 'accounting:periods', 'accounting:ledger', 'accounting:balancesheet', 'accounting:incomestatement',
   'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
   'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )

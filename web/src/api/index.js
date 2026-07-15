@@ -213,11 +213,18 @@ export function updateMeterReading(id, data) { return request({ url: `/meterread
 export function confirmMeterReading(id) { return request({ url: `/meterreadings/${id}/confirm`, method: 'post' }) }
 export function importMeterReadings(data) { return request({ url: '/meterreadings/import', method: 'post', data }) }
 
-// Receivables
-export function getReceivables(params) { return request({ url: '/receivables', method: 'get', params }) }
-export function getReceivable(id) { return request({ url: `/receivables/${id}`, method: 'get' }) }
-export function getReceivablePlansByFee(contractId, feeCodeId) { return request({ url: `/receivables/byfee?contractId=${contractId}&feeCodeId=${feeCodeId}`, method: 'get' }) }
-export function generateReceivables(data) { return request({ url: '/receivables/generate', method: 'post', data }) }
+// Journals（日记账）
+export function getJournals(params) { return request({ url: '/journals', method: 'get', params }) }
+export function getJournal(id) { return request({ url: `/journals/${id}`, method: 'get' }) }
+export function getJournalsByContract(contractId) { return request({ url: `/journals/bycontract?contractId=${contractId}`, method: 'get' }) }
+export function generateJournals(data) { return request({ url: '/journals/generate', method: 'post', data }) }
+
+// GL（总账）
+export function getGLBalance(params) { return request({ url: '/gl', method: 'get', params }) }
+export function getTrialBalance(params) { return request({ url: '/gl/trialbalance', method: 'get', params }) }
+
+// Prepaid（预收明细）
+export function getPrepaids(params) { return request({ url: '/prepaids', method: 'get', params }) }
 
 // Receipts
 export function getReceipts(params) { return request({ url: '/receipts', method: 'get', params }) }
@@ -271,15 +278,6 @@ export function deleteAccountingSubject(id) { return request({ url: `/accounting
 export function getLedger(params) { return request({ url: '/ledger', method: 'get', params }) }
 export function getBalanceSheet(params) { return request({ url: '/financialstatements/balancesheet', method: 'get', params }) }
 export function getIncomeStatement(params) { return request({ url: '/financialstatements/incomestatement', method: 'get', params }) }
-export function getJournalEntries(params) { return request({ url: '/journalentries', method: 'get', params }) }
-export function getVouchers(params) { return request({ url: '/vouchers', method: 'get', params }) }
-export function getVoucher(id) { return request({ url: `/vouchers/${id}`, method: 'get' }) }
-export function createVoucher(data) { return request({ url: '/vouchers', method: 'post', data }) }
-export function updateVoucher(id, data) { return request({ url: `/vouchers/${id}`, method: 'put', data }) }
-export function postVoucher(id) { return request({ url: `/vouchers/${id}/post`, method: 'put' }) }
-export function reverseVoucher(id, data) { return request({ url: `/vouchers/${id}/reverse`, method: 'post', data }) }
-export function auditVoucher(id) { return request({ url: `/vouchers/${id}/audit`, method: 'put' }) }
-export function getTrialBalance(params) { return request({ url: '/trialbalance', method: 'get', params }) }
 export function getAccountingPeriods() { return request({ url: '/accountingperiods', method: 'get' }) }
 export function openAccountingPeriod(data) { return request({ url: '/accountingperiods', method: 'post', data }) }
 export function closeAccountingPeriod(id) { return request({ url: `/accountingperiods/${id}/close`, method: 'put' }) }

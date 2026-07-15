@@ -174,8 +174,7 @@ public class TaskMonitorService : ITaskMonitorService
 
         var hasPayment = await multi.ReadSingleAsync<int>();
         var debitNoteCount = await multi.ReadSingleAsync<int>();
-        var receivablePlanCount = await multi.ReadSingleAsync<int>();
-        var voucherCount = await multi.ReadSingleAsync<int>();
+        var journalCount = await multi.ReadSingleAsync<int>();
 
         return new ReversePreviewDto
         {
@@ -185,8 +184,7 @@ public class TaskMonitorService : ITaskMonitorService
             StartedAt = log.StartedAt,
             HasPayment = hasPayment > 0,
             DebitNoteCount = debitNoteCount,
-            ReceivablePlanCount = receivablePlanCount,
-            VoucherCount = voucherCount
+            JournalCount = journalCount
         };
     }
 

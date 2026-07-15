@@ -1829,7 +1829,8 @@ CREATE TABLE [Contracts] (
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Draft') , -- 合同状态,
     [PreviousContractId] UNIQUEIDENTIFIER , -- 上一份合同ID,
     [RenewalCount] INT NOT NULL DEFAULT (0) , -- 续签次数,
-    [PrepaidBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 预存金额,
+    [OutstandingBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 欠款余额（应收未收，出账+收款后实时更新）,
+    [PrepaidBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 预存金额（溢收未抵）,
     [OriginalContractId] UNIQUEIDENTIFIER , -- 原始合同ID,
     [MarketPriceAtRenewal] DECIMAL(18,2) , -- 续签市场价,
     [TerminatedAt] DATETIME2 , -- 终止时间,
@@ -3038,150 +3039,160 @@ CREATE UNIQUE INDEX [IX_TaxRateConfigs_Audit_Id_Version] ON [TaxRateConfigs_Audi
 
 
 -- ===================================================================
--- 36. ReceivablePlans 表：应收计划表
+-- 36. Journals 表：日记账表（不可变的出账记录，替代 ReceivablePlans）
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans]'))
-CREATE TABLE [ReceivablePlans] (
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans_Audit]')) DROP TABLE [ReceivablePlans_Audit]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans]')) DROP TABLE [ReceivablePlans]
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Journals]'))
+CREATE TABLE [Journals] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 合同ID,
-    [FeeCodeId] UNIQUEIDENTIFIER NOT NULL , -- 费用项目ID,
-    [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置实例ID（一次性费用关联到具体添加实例，NULL 为周期性费用）,
-    [Period] VARCHAR(7) NOT NULL , -- 账期(格式: yyyy-MM),
-    [Amount] DECIMAL(18,2) NOT NULL , -- 应收金额,
-    [Received] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 已收金额,
-    [LateFee] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 滞纳金,
+    [FeeCodeId] UNIQUEIDENTIFIER NOT NULL , -- 费用项目ID（租金/物业费/利息等）,
+    [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置实例ID（一次性费用幂等去重用，NULL为周期性费用）,
+    [AccountingSubjectId] UNIQUEIDENTIFIER NOT NULL , -- 会计科目ID（默认1122应收账款）,
+    [Period] VARCHAR(7) NOT NULL , -- 归属账期(格式: yyyy-MM),
+    [Amount] DECIMAL(18,2) NOT NULL , -- 金额（允许负数，用于冲销错误记录）,
     [DueDate] DATE NOT NULL , -- 到期日,
-    [Status] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 状态(Pending/Partial/Paid/Overdue/Cancelled/Frozen),
-    [IsBilled] BIT NOT NULL DEFAULT (0) , -- 是否已出账,
-    [DebitNoteId] UNIQUEIDENTIFIER , -- 账单ID,
-    [BilledAt] DATETIME2 , -- 出账时间,
-    [EntryType] VARCHAR(20) NOT NULL DEFAULT ('Normal') , -- 条目类型(Normal/Deposit/Supplementary),
-    [RowVersion] TIMESTAMP NOT NULL , -- 乐观锁,
+    [EntryType] VARCHAR(20) NOT NULL DEFAULT ('Normal') , -- 条目类型(Normal/Deposit/Supplementary/LateFee/Adjustment),
+    [GLPosted] BIT NOT NULL DEFAULT (0) , -- 是否已写入总账(0=未入账,1=已入账),
+    [PostedAt] DATETIME2 NULL , -- 总账写入时间,
+    [BilledAt] DATETIME2 NOT NULL , -- 出账时间,
+    [DebitNoteId] UNIQUEIDENTIFIER NULL , -- 关联账单ID,
+    [ParentJournalId] UNIQUEIDENTIFIER NULL , -- 关联源日记账ID（利息/调整/冲销指向被操作的源记录）,
+    [Summary] NVARCHAR(500) NULL , -- 摘要说明,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [CreatedIp] VARCHAR(45) , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
-    [UpdatedAt] DATETIME2 , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) -- 更新主机名
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
+    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
+    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
 )
 GO
 
--- 表说明：应收计划表
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收计划表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans'
+-- 表说明：日记账表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日记账表（不可变的出账记录）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals'
 GO
 
--- ReceivablePlans 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置实例ID（一次性费用关联到具体添加实例，NULL为周期性费用）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'账期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Period'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Amount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'已收金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Received'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'滞纳金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'LateFee'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'DueDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否已出账', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'IsBilled'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'账单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'DebitNoteId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'出账时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'BilledAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'条目类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'EntryType'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'乐观锁', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'RowVersion'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+-- Journals 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID（租金/物业费/利息等）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置实例ID（一次性费用幂等去重用，NULL为周期性费用）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计科目ID（默认1122应收账款）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'AccountingSubjectId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'归属账期(格式: yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额（允许负数，用于冲销错误记录）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'DueDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'条目类型(Normal/Deposit/Supplementary/LateFee/Adjustment)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'EntryType'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否已写入总账(0=未入账,1=已入账)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'GLPosted'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账写入时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'PostedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'出账时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'BilledAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'关联账单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'DebitNoteId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'关联源日记账ID（利息/调整/冲销指向被操作的源记录）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'ParentJournalId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'摘要说明', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'Summary'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'CreatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
--- 一次性费用唯一：同合同+同 FeeConfig 实例+同账期
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_FeeConfig_Period')
-CREATE UNIQUE INDEX [IX_ReceivablePlans_FeeConfig_Period] ON [ReceivablePlans]([ContractId],[FeeConfigId],[Period]) WHERE [FeeConfigId] IS NOT NULL
--- 周期性费用唯一：同合同+同费用类型+同账期（FeeConfigId=NULL 时沿用原逻辑）
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_FeeCode_Period')
-CREATE UNIQUE INDEX [IX_ReceivablePlans_FeeCode_Period] ON [ReceivablePlans]([ContractId],[FeeCodeId],[Period]) WHERE [FeeConfigId] IS NULL
--- 账期降序索引
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_Period')
-CREATE INDEX [IX_ReceivablePlans_Period] ON [ReceivablePlans]([Period] DESC)
--- 未出账查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans]') AND name=N'IX_ReceivablePlans_Contract_Billed')
-CREATE INDEX [IX_ReceivablePlans_Contract_Billed] ON [ReceivablePlans]([ContractId],[IsBilled]) WHERE [IsBilled] = 0
+-- 公司+账期查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Journals]') AND name=N'IX_Journals_Company_Period')
+CREATE INDEX [IX_Journals_Company_Period] ON [Journals]([CompanyId], [Period] DESC)
+-- 未入总账记录（结账校验用）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Journals]') AND name=N'IX_Journals_GLPosted')
+CREATE INDEX [IX_Journals_GLPosted] ON [Journals]([GLPosted]) WHERE [GLPosted] = 0
+-- 按合同查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Journals]') AND name=N'IX_Journals_ContractId')
+CREATE INDEX [IX_Journals_ContractId] ON [Journals]([ContractId])
+-- 一次性费用幂等去重索引（非唯一，允许多次）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Journals]') AND name=N'IX_Journals_FeeConfigId')
+CREATE INDEX [IX_Journals_FeeConfigId] ON [Journals]([FeeConfigId]) WHERE [FeeConfigId] IS NOT NULL
 
 -- ===================================================================
--- ReceivablePlans_Audit 表：应收计划表审计
+-- Journals_Audit 表：日记账表审计
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans_Audit]'))
-CREATE TABLE [ReceivablePlans_Audit] (
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Journals_Audit]'))
+CREATE TABLE [Journals_Audit] (
     [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY , -- 审计自增主键,
     [AuditAction] VARCHAR(20) NOT NULL , -- 审计操作类型,
     [AuditVersionNo] INT NOT NULL , -- 版本号,
     [AuditChangedAt] DATETIME2 NOT NULL , -- 操作时间,
     [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL , -- 操作人,
-    [AuditChangedHostname] VARCHAR(100) , -- 操作人主机名,
+    [AuditChangedHostname] VARCHAR(100) NULL , -- 操作人主机名,
     [Id] UNIQUEIDENTIFIER NOT NULL , -- 主键,
-    [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
-    [FeeCodeId] UNIQUEIDENTIFIER , -- 费用项目ID,
-    [Period] VARCHAR(7) , -- 账期,
-    [Amount] DECIMAL(18,2) , -- 应收金额,
-    [Received] DECIMAL(18,2) , -- 已收金额,
-    [LateFee] DECIMAL(18,2) , -- 滞纳金,
-    [DueDate] DATE , -- 到期日,
-    [Status] VARCHAR(20) , -- 状态,
-    [IsBilled] BIT , -- 是否已出账,
-    [DebitNoteId] UNIQUEIDENTIFIER , -- 账单ID,
-    [BilledAt] DATETIME2 , -- 出账时间,
-    [EntryType] VARCHAR(20) , -- 条目类型,
-    [CreatedBy] UNIQUEIDENTIFIER , -- 创建人,
-    [CreatedAt] DATETIME2 , -- 创建时间,
-    [CreatedIp] VARCHAR(45) , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
-    [UpdatedAt] DATETIME2 , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) -- 更新主机名
+    [CompanyId] UNIQUEIDENTIFIER NULL , -- 所属公司ID,
+    [ContractId] UNIQUEIDENTIFIER NULL , -- 合同ID,
+    [FeeCodeId] UNIQUEIDENTIFIER NULL , -- 费用项目ID,
+    [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置实例ID,
+    [AccountingSubjectId] UNIQUEIDENTIFIER NULL , -- 会计科目ID,
+    [Period] VARCHAR(7) NULL , -- 归属账期,
+    [Amount] DECIMAL(18,2) NULL , -- 金额,
+    [DueDate] DATE NULL , -- 到期日,
+    [EntryType] VARCHAR(20) NULL , -- 条目类型,
+    [GLPosted] BIT NULL , -- 是否已写入总账,
+    [PostedAt] DATETIME2 NULL , -- 总账写入时间,
+    [BilledAt] DATETIME2 NULL , -- 出账时间,
+    [DebitNoteId] UNIQUEIDENTIFIER NULL , -- 关联账单ID,
+    [ParentJournalId] UNIQUEIDENTIFIER NULL , -- 关联源日记账ID,
+    [Summary] NVARCHAR(500) NULL , -- 摘要说明,
+    [CreatedBy] UNIQUEIDENTIFIER NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NULL , -- 创建时间,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
+    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
+    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
 )
 GO
 
--- ReceivablePlans_Audit 表说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收计划表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit'
+-- Journals_Audit 表说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日记账表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit'
 GO
 
--- ReceivablePlans_Audit 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'账期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'Period'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'Amount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'已收金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'Received'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'滞纳金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'LateFee'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'DueDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否已出账', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'IsBilled'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'账单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'DebitNoteId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'出账时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'BilledAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'条目类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'EntryType'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceivablePlans_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+-- Journals_Audit 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用项目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'FeeCodeId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置实例ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计科目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'AccountingSubjectId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'归属账期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'DueDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'条目类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'EntryType'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否已写入总账', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'GLPosted'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账写入时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'PostedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'出账时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'BilledAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'关联账单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'DebitNoteId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'关联源日记账ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'ParentJournalId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'摘要说明', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'Summary'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
 
 -- 按记录ID+版本号唯一索引
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceivablePlans_Audit]') AND name=N'IX_ReceivablePlans_Audit_Id_Version')
-CREATE UNIQUE INDEX [IX_ReceivablePlans_Audit_Id_Version] ON [ReceivablePlans_Audit]([Id], [AuditVersionNo])
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Journals_Audit]') AND name=N'IX_Journals_Audit_Id_Version')
+CREATE UNIQUE INDEX [IX_Journals_Audit_Id_Version] ON [Journals_Audit]([Id], [AuditVersionNo])
 
 
 -- ===================================================================
@@ -3653,34 +3664,43 @@ CREATE UNIQUE INDEX [IX_Receipts_Audit_Id_Version] ON [Receipts_Audit]([Id], [Au
 
 
 -- ===================================================================
--- 42. ReceiptAllocations 表：收据分配表
+-- 42. ReceiptAllocations 表：收款分配表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]'))
 CREATE TABLE [ReceiptAllocations] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [ReceiptId] UNIQUEIDENTIFIER NOT NULL , -- 收据ID,
-    [ReceivablePlanId] UNIQUEIDENTIFIER NOT NULL , -- 应收计划ID,
-    [AllocatedAmount] DECIMAL(18,2) NOT NULL , -- 分配金额,
+    [ReceiptId] UNIQUEIDENTIFIER NOT NULL , -- 收款单ID,
+    [JournalId] UNIQUEIDENTIFIER NOT NULL , -- 日记账ID,
+    [Amount] DECIMAL(18,2) NOT NULL , -- 分配金额,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
 )
 GO
 
--- 表说明：收据分配表
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收据分配表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations'
+-- 表说明：收款分配表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款分配表（收款单与日记账的分配关系）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations'
 GO
 
 -- ReceiptAllocations 字段说明
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收据ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'ReceiptId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'应收计划ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'ReceivablePlanId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'分配金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'AllocatedAmount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'ReceiptId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日记账ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'JournalId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'分配金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'Amount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'CreatedAt'
 GO
--- 收据+应收唯一
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'IX_ReceiptAllocations_Receipt_Plan')
-CREATE UNIQUE INDEX [IX_ReceiptAllocations_Receipt_Plan] ON [ReceiptAllocations]([ReceiptId],[ReceivablePlanId])
+-- 迁移：如果旧字段 ReceivablePlanId 存在则重命名为 JournalId（兼容已有数据库）
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'ReceivablePlanId')
+    EXEC sp_rename 'ReceiptAllocations.ReceivablePlanId', 'JournalId', 'COLUMN'
+-- 迁移：如果旧字段 AllocatedAmount 存在则重命名为 Amount
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'AllocatedAmount')
+    EXEC sp_rename 'ReceiptAllocations.AllocatedAmount', 'Amount', 'COLUMN'
+-- 收款+日记账唯一
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'IX_ReceiptAllocations_Receipt_Journal')
+CREATE UNIQUE INDEX [IX_ReceiptAllocations_Receipt_Journal] ON [ReceiptAllocations]([ReceiptId],[JournalId])
+-- 删除旧索引（如果存在且字段已改名）
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'IX_ReceiptAllocations_Receipt_Plan')
+    DROP INDEX [IX_ReceiptAllocations_Receipt_Plan] ON [ReceiptAllocations]
 
 
 -- 43. DepositLogs 表：押金记录表
@@ -4088,191 +4108,172 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Accounting
 CREATE UNIQUE INDEX [IX_AccountingSubjects_Audit_Id_Version] ON [AccountingSubjects_Audit]([Id], [AuditVersionNo])
 
 
+-- 清理旧会计表（Vouchers + 旧 JournalEntries 已废弃）
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JournalEntries_Audit]')) DROP TABLE [JournalEntries_Audit]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JournalEntries]')) DROP TABLE [JournalEntries]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers_Audit]')) DROP TABLE [Vouchers_Audit]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers]')) DROP TABLE [Vouchers]
+
 -- ===================================================================
--- 47. Vouchers 表：会计凭证表
+-- 47. GeneralLedgerBalances 表：总账余额表（期间汇总）
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers]'))
-CREATE TABLE [Vouchers] (
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances]'))
+CREATE TABLE [GeneralLedgerBalances] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [VoucherNo] VARCHAR(100) NOT NULL , -- 凭证编号,
-    [VoucherDate] DATE NOT NULL , -- 凭证日期,
-    [TotalDebit] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 借方总额,
-    [TotalCredit] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 贷方总额,
-    [SourceType] VARCHAR(50) NOT NULL , -- 来源类型,
-    [SourceId] UNIQUEIDENTIFIER NOT NULL , -- 来源ID,
-    [Status] VARCHAR(20) NOT NULL DEFAULT ('Draft') , -- 状态,
-    [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
-    [ApprovedBy] UNIQUEIDENTIFIER , -- 审核人,
-    [ApprovedAt] DATETIME2 , -- 审核时间,
-    [RowVersion] TIMESTAMP NOT NULL , -- 乐观锁,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
-    [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置实例ID（一次性费用 JE 幂等去重用，NULL 为周期性/补差凭证）,
-    [Period] VARCHAR(7) NULL , -- 会计期间(yyyy-MM),
+    [Period] VARCHAR(7) NOT NULL , -- 会计期间(格式: yyyy-MM),
+    [OpeningBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 期初应收余额（上期期末结转）,
+    [TotalBilled] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 本期出账总额（汇总Journal.Amount）,
+    [TotalReceived] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 本期收款总额（汇总ReceiptAllocation.Amount）,
+    [ClosingBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 期末应收余额(=OpeningBalance+TotalBilled-TotalReceived),
+    [CalculatedAt] DATETIME2 NOT NULL , -- 本条快照计算时间,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [CreatedIp] VARCHAR(45) , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
-    [UpdatedAt] DATETIME2 , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) -- 更新主机名
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
 )
 GO
 
--- 表说明：会计凭证表
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计凭证表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers'
+-- 表说明：总账余额表（追加式快照，不可变）
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账余额表（追加式快照，不可变）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances'
 GO
 
--- Vouchers 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证编号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'VoucherNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'VoucherDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'借方总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'TotalDebit'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'贷方总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'TotalCredit'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'SourceType'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'SourceId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审核人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'ApprovedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审核时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'ApprovedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'乐观锁', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'RowVersion'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CompanyId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'费用配置实例ID（一次性费用 JE 幂等去重用，NULL 为周期性/补差凭证）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'FeeConfigId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+-- GeneralLedgerBalances 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间(格式: yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期初应收余额（上期期末结转）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'OpeningBalance'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期出账总额（汇总Journal.Amount）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'TotalBilled'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期收款总额（汇总ReceiptAllocation.Amount）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'TotalReceived'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期末应收余额(=OpeningBalance+TotalBilled-TotalReceived)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'ClosingBalance'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本条快照计算时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CalculatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CreatedAt'
 GO
--- 凭证编号唯一
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Vouchers]') AND name=N'IX_Vouchers_VoucherNo')
-CREATE UNIQUE INDEX [IX_Vouchers_VoucherNo] ON [Vouchers]([VoucherNo])
--- 按状态查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Vouchers]') AND name=N'IX_Vouchers_Status')
-CREATE INDEX [IX_Vouchers_Status] ON [Vouchers]([Status])
--- 按合同查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Vouchers]') AND name=N'IX_Vouchers_ContractId')
-CREATE INDEX [IX_Vouchers_ContractId] ON [Vouchers]([ContractId])
--- 一次性费用 JE 幂等去重
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Vouchers]') AND name=N'IX_Vouchers_FeeConfigId')
-CREATE UNIQUE INDEX [IX_Vouchers_FeeConfigId] ON [Vouchers]([FeeConfigId]) WHERE [FeeConfigId] IS NOT NULL
+-- 公司+期间查询（追加式快照，每次事件写入一条，取最新一条作为当前状态）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances]') AND name=N'IX_GL_Company_Period')
+CREATE INDEX [IX_GL_Company_Period] ON [GeneralLedgerBalances]([CompanyId], [Period] DESC)
 
 -- ===================================================================
--- Vouchers_Audit 表：会计凭证表审计
+-- GeneralLedgerBalances_Audit 表：总账余额表审计
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers_Audit]'))
-CREATE TABLE [Vouchers_Audit] (
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances_Audit]'))
+CREATE TABLE [GeneralLedgerBalances_Audit] (
     [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY , -- 审计自增主键,
     [AuditAction] VARCHAR(20) NOT NULL , -- 审计操作类型,
     [AuditVersionNo] INT NOT NULL , -- 版本号,
     [AuditChangedAt] DATETIME2 NOT NULL , -- 操作时间,
     [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL , -- 操作人,
-    [AuditChangedHostname] VARCHAR(100) , -- 操作人主机名,
+    [AuditChangedHostname] VARCHAR(100) NULL , -- 操作人主机名,
     [Id] UNIQUEIDENTIFIER NOT NULL , -- 主键,
-    [VoucherNo] VARCHAR(100) , -- 凭证编号,
-    [VoucherDate] DATE , -- 凭证日期,
-    [TotalDebit] DECIMAL(18,2) , -- 借方总额,
-    [TotalCredit] DECIMAL(18,2) , -- 贷方总额,
-    [SourceType] VARCHAR(50) , -- 来源类型,
-    [SourceId] UNIQUEIDENTIFIER , -- 来源ID,
-    [Status] VARCHAR(20) , -- 状态,
-    [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
-    [ApprovedBy] UNIQUEIDENTIFIER , -- 审核人,
-    [ApprovedAt] DATETIME2 , -- 审核时间,
-    [CompanyId] UNIQUEIDENTIFIER , -- 所属公司ID,
-    [CreatedBy] UNIQUEIDENTIFIER , -- 创建人,
-    [CreatedAt] DATETIME2 , -- 创建时间,
-    [CreatedIp] VARCHAR(45) , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
-    [UpdatedAt] DATETIME2 , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) -- 更新主机名
+    [CompanyId] UNIQUEIDENTIFIER NULL , -- 所属公司ID,
+    [Period] VARCHAR(7) NULL , -- 会计期间,
+    [OpeningBalance] DECIMAL(18,2) NULL , -- 期初应收余额,
+    [TotalBilled] DECIMAL(18,2) NULL , -- 本期出账总额,
+    [TotalReceived] DECIMAL(18,2) NULL , -- 本期收款总额,
+    [ClosingBalance] DECIMAL(18,2) NULL , -- 期末应收余额,
+    [LastCalculatedAt] DATETIME2 NULL , -- 最后计算时间,
+    [CreatedBy] UNIQUEIDENTIFIER NULL , -- 创建人,
+    [CreatedAt] DATETIME2 NULL , -- 创建时间,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
+    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
+    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
 )
 GO
 
--- Vouchers_Audit 表说明：会计凭证表审计
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计凭证表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit'
+-- GeneralLedgerBalances_Audit 表说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账余额表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit'
 GO
 
--- Vouchers_Audit 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证编号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'VoucherNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'VoucherDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'借方总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'TotalDebit'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'贷方总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'TotalCredit'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'SourceType'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'SourceId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审核人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'ApprovedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审核时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'ApprovedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'CompanyId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Vouchers_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+-- GeneralLedgerBalances_Audit 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期初应收余额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'OpeningBalance'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期出账总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'TotalBilled'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期收款总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'TotalReceived'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期末应收余额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'ClosingBalance'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'最后计算时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'LastCalculatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
 
 -- 按记录ID+版本号唯一索引
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Vouchers_Audit]') AND name=N'IX_Vouchers_Audit_Id_Version')
-CREATE UNIQUE INDEX [IX_Vouchers_Audit_Id_Version] ON [Vouchers_Audit]([Id], [AuditVersionNo])
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances_Audit]') AND name=N'IX_GL_Audit_Id_Version')
+CREATE UNIQUE INDEX [IX_GL_Audit_Id_Version] ON [GeneralLedgerBalances_Audit]([Id], [AuditVersionNo])
 
 
 -- ===================================================================
--- 48. JournalEntries 表：日记账分录明细表
+-- 48. PrepaidDetails 表：预收账款明细账
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JournalEntries]'))
-CREATE TABLE [JournalEntries] (
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[PrepaidDetails]'))
+CREATE TABLE [PrepaidDetails] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [VoucherId] UNIQUEIDENTIFIER NOT NULL , -- 凭证ID,
-    [AccountingSubjectId] UNIQUEIDENTIFIER NOT NULL , -- 科目ID,
-    [EntryNo] INT NOT NULL , -- 行号,
-    [Direction] VARCHAR(10) NOT NULL , -- 借贷方向,
-    [Amount] DECIMAL(18,2) NOT NULL , -- 金额,
-    [Summary] NVARCHAR(500) , -- 摘要,
-    [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
+    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
+    [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 合同ID（预收归属于特定合同）,
+    [ReceiptId] UNIQUEIDENTIFIER NOT NULL , -- 来源收款单ID,
+    [JournalId] UNIQUEIDENTIFIER NULL , -- 被冲抵的日记账ID（Direction=Out时指向被冲应收）,
+    [Period] VARCHAR(7) NOT NULL , -- 发生期间(格式: yyyy-MM),
+    [Amount] DECIMAL(18,2) NOT NULL , -- 预收金额（正数）,
+    [AppliedAmount] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 已冲抵金额,
+    [Balance] DECIMAL(18,2) NOT NULL , -- 余额(=Amount-AppliedAmount),
+    [Direction] VARCHAR(10) NOT NULL , -- 方向(In=收入预收,Out=冲抵应收),
+    [Status] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 状态(Pending=未冲抵,Partial=部分冲抵,Applied=全部冲抵),
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [CreatedIp] VARCHAR(45) , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
-    [UpdatedAt] DATETIME2 , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) -- 更新主机名
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
+    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
+    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
 )
 GO
 
--- 表说明：日记账分录明细表
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日记账分录明细表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries'
+-- 表说明：预收账款明细账
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'预收账款明细账（追踪预收款的来源和冲抵去向）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails'
 GO
 
--- JournalEntries 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'VoucherId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'科目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'AccountingSubjectId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'行号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'EntryNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'借贷方向', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'Direction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'Amount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'摘要', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'Summary'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+-- PrepaidDetails 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID（预收归属于特定合同）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源收款单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'ReceiptId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'被冲抵的日记账ID（Direction=Out时指向被冲应收）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'JournalId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'发生期间(格式: yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'预收金额（正数）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'已冲抵金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'AppliedAmount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'余额(=Amount-AppliedAmount)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Balance'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'方向(In=收入预收,Out=冲抵应收)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Direction'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态(Pending=未冲抵,Partial=部分冲抵,Applied=全部冲抵)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Status'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+GO
+-- 按合同查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[PrepaidDetails]') AND name=N'IX_Prepaid_Contract')
+CREATE INDEX [IX_Prepaid_Contract] ON [PrepaidDetails]([CompanyId], [ContractId], [Status])
+-- 按收款单查询
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[PrepaidDetails]') AND name=N'IX_Prepaid_Receipt')
+CREATE INDEX [IX_Prepaid_Receipt] ON [PrepaidDetails]([ReceiptId])
 -- 49. AccountingPeriods 表：会计期间表
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[AccountingPeriods]'))
 CREATE TABLE [AccountingPeriods] (
@@ -4301,75 +4302,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
--- 凭证内行号唯一
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[JournalEntries]') AND name=N'IX_JournalEntries_VoucherId_EntryNo')
-CREATE UNIQUE INDEX [IX_JournalEntries_VoucherId_EntryNo] ON [JournalEntries]([VoucherId],[EntryNo])
--- 按合同查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[JournalEntries]') AND name=N'IX_JournalEntries_ContractId')
-CREATE INDEX [IX_JournalEntries_ContractId] ON [JournalEntries]([ContractId])
-
--- ===================================================================
--- JournalEntries_Audit 表：日记账分录明细表审计
--- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JournalEntries_Audit]'))
-CREATE TABLE [JournalEntries_Audit] (
-    [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY , -- 审计自增主键,
-    [AuditAction] VARCHAR(20) NOT NULL , -- 审计操作类型,
-    [AuditVersionNo] INT NOT NULL , -- 版本号,
-    [AuditChangedAt] DATETIME2 NOT NULL , -- 操作时间,
-    [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL , -- 操作人,
-    [AuditChangedHostname] VARCHAR(100) , -- 操作人主机名,
-    [Id] UNIQUEIDENTIFIER NOT NULL , -- 主键,
-    [VoucherId] UNIQUEIDENTIFIER , -- 凭证ID,
-    [AccountingSubjectId] UNIQUEIDENTIFIER , -- 科目ID,
-    [EntryNo] INT , -- 行号,
-    [Direction] VARCHAR(10) , -- 借贷方向,
-    [Amount] DECIMAL(18,2) , -- 金额,
-    [Summary] NVARCHAR(500) , -- 摘要,
-    [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
-    [CreatedBy] UNIQUEIDENTIFIER , -- 创建人,
-    [CreatedAt] DATETIME2 , -- 创建时间,
-    [CreatedIp] VARCHAR(45) , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
-    [UpdatedAt] DATETIME2 , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) -- 更新主机名
-)
-GO
-
--- JournalEntries_Audit 表说明：日记账分录明细表审计
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日记账分录明细表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit'
-GO
-
--- JournalEntries_Audit 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'凭证ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'VoucherId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'科目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'AccountingSubjectId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'行号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'EntryNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'借贷方向', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'Direction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'Amount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'摘要', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'Summary'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
-GO
-
--- 按记录ID+版本号唯一索引
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[JournalEntries_Audit]') AND name=N'IX_JournalEntries_Audit_Id_Version')
-CREATE UNIQUE INDEX [IX_JournalEntries_Audit_Id_Version] ON [JournalEntries_Audit]([Id], [AuditVersionNo])
+-- PrepaidDetails 索引已在上方定义
 
 
 -- ===================================================================

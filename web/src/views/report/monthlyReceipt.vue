@@ -67,7 +67,7 @@ const chartOption = computed(() => ({
     data: dailyData.value,
     itemStyle: { color: '#409eff', borderRadius: [4, 4, 0, 0] }
   }],
-  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true }
+  grid: { left: '3%', right: '4%', bottom: '3%',  }
 }))
 
 async function loadData() {

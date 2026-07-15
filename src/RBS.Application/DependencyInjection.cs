@@ -59,9 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IReceiptService, ReceiptService>();
         services.AddScoped<IBankingService, BankingService>();
         services.AddScoped<IContractTimelineService, ContractTimelineService>();
-        services.AddScoped<IAutoVoucherService, AutoVoucherService>();
         services.AddScoped<IReportingService, ReportingService>();
-		services.AddScoped<IJournalGenerationService, JournalGenerationService>();
 		services.AddScoped<ITerminateJob, TerminateJob>();
 
         // 调度执行监控

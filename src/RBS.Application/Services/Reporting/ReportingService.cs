@@ -23,7 +23,7 @@ public class ReportingService : IReportingService
     {
         using var conn = _db.CreateConnection(); conn.Open();
         return await conn.QueryAsync(
-            _sql.Get("Billing.Select.ReceivablePlan.CollectionRate"),
+            _sql.Get("Billing.Select.Journal.CollectionRate"),
             new { Period = period });
     }
 
@@ -32,31 +32,31 @@ public class ReportingService : IReportingService
         if (!companyId.HasValue)
         {
             using var conn0 = _db.CreateConnection(); conn0.Open();
-            var all = await conn0.QueryAsync(_sql.Get("Receivable.Select.Plan.OverdueDetail"));
+            var all = await conn0.QueryAsync(_sql.Get("Billing.Select.Journal.OverdueDetail"));
             var result0 = all.ToList();
             if (!string.IsNullOrEmpty(period)) result0 = result0.Where(p => (string)p.Period == period).ToList();
             return result0;
         }
 
         using var conn = _db.CreateConnection(); conn.Open();
-        var raw = await _uow.ReceivablePlans.GetOverdueAsync(companyId.Value, ct);
-        if (!string.IsNullOrEmpty(period)) raw = raw.Where(p => p.Period == period).ToList();
+        var raw = (await conn.QueryAsync<dynamic>(
+            _sql.Get("Billing.Select.Journal.OverdueByCompany"),
+            new { CompanyId = companyId.Value })).ToList();
+        if (!string.IsNullOrEmpty(period)) raw = raw.Where(p => (string)p.Period == period).ToList();
 
-        var ids = raw.Select(p => p.ContractId).Distinct().ToList();
+        var ids = raw.Select(p => (Guid)p.ContractId).Distinct().ToList();
         var contracts = await conn.QueryAsync<(Guid, string, string, string)>(
             _sql.Get("Billing.Select.Contract.OverdueData"), new { Ids = ids });
         var contractDict = contracts.ToDictionary(c => c.Item1);
 
         var enriched = raw.Select(p =>
         {
-            var info = contractDict.GetValueOrDefault(p.ContractId);
+            var info = contractDict.GetValueOrDefault((Guid)p.ContractId);
             return new
             {
-                p.Id, p.ContractId, p.FeeCodeId, p.Period, p.Amount, p.Received,
-                p.DueDate, p.Status, p.LateFee, p.DaysOverdue, p.IsOverdue,
-                ContractNo = info.Item2 ?? "",
-                TenantName = info.Item3 ?? "",
-                RoomFullCode = info.Item4 ?? ""
+                Id = (Guid)p.Id, ContractId = (Guid)p.ContractId, FeeCodeId = (Guid)p.FeeCodeId,
+                Period = (string)p.Period, Amount = (decimal)p.Amount,
+                DueDate = (DateOnly)p.DueDate, DaysOverdue = (int)p.DaysOverdue
             };
         }).OrderByDescending(p => p.DaysOverdue).ToList();
 
@@ -81,8 +81,8 @@ public class ReportingService : IReportingService
 
         // 月度汇总
         var plans = await conn.QueryAsync(
-            _sql.Get("Billing.Select.ReceivablePlan.MonthlySummary"),
-            new { P = p });
+            _sql.Get("Billing.Select.Journal.CollectionRate"),
+            new { Period = p });
 
         // 每日收款明细（用于趋势图）
         var daily = await conn.QueryAsync(

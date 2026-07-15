@@ -123,7 +123,7 @@ public sealed record ContractSuspendedEvent : IDomainEvent
 ///
 /// 触发时机：财务人员确认收到款项，将收款单状态改为 Confirmed 时发出。
 /// 预期响应：
-/// - 更新对应应收计划（ReceivablePlan）的已收金额
+/// - 更新对应 Journal 的 GL 入账状态
 /// - 如果应收计划全部结清，将其状态更新为 Paid
 /// - 更新合同的最新收款日期和累计收款金额
 /// - 通知租户收款已确认
@@ -192,7 +192,7 @@ public sealed record PaymentRejectedEvent : IDomainEvent
 
 // ============================================================
 // 应收领域事件（Receivable Domain Events）
-// 应收计划（ReceivablePlan）按月生成，代表每个月应收取的费用。
+// Journal 按月生成，代表每个月应收取的费用。
 // 这些事件由定时任务（逾期检测）或收款确认时触发。
 // ============================================================
 

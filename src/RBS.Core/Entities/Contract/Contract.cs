@@ -32,6 +32,7 @@ public class Contract : AggregateRoot, IHasCompany
     public int RenewalCount { get; private set; }
     /// <summary>预存金额（独立于日记账），用于 SettleJob 预收抵应收的判断和扣减逻辑</summary>
     public decimal PrepaidBalance { get; private set; }
+    public decimal OutstandingBalance { get; private set; }
     /// <summary>原始合同标识，整个续签链指向最初的首份合同</summary>
     public Guid? OriginalContractId { get; private set; }
     /// <summary>续签时的市场参考价格，用于审计和定价决策追溯</summary>
@@ -434,5 +435,36 @@ public class Contract : AggregateRoot, IHasCompany
         var target = ContractStatus.FromCode(targetStatus);
         if (!current.CanTransitionTo(target))
             throw new InvalidOperationException($"不允许从 {Status} 变更为 {targetStatus}");
+    }
+    // ===== 余额管理 =====
+
+    /// <summary>增加欠款（出账时调用）</summary>
+    public void AddOutstanding(decimal amount)
+    {
+        if (amount <= 0) throw new ArgumentException("金额必须大于0");
+        OutstandingBalance += amount;
+    }
+
+    /// <summary>减少欠款（收款确认时调用）</summary>
+    public void ReduceOutstanding(decimal amount)
+    {
+        if (amount <= 0) throw new ArgumentException("金额必须大于0");
+        OutstandingBalance -= amount;
+        if (OutstandingBalance < 0) OutstandingBalance = 0;
+    }
+
+    /// <summary>增加预存（收款溢出时调用）</summary>
+    public void AddPrepaid(decimal amount)
+    {
+        if (amount <= 0) throw new ArgumentException("金额必须大于0");
+        PrepaidBalance += amount;
+    }
+
+    /// <summary>减少预存（预收冲抵时调用）</summary>
+    public void ReducePrepaid(decimal amount)
+    {
+        if (amount <= 0) throw new ArgumentException("金额必须大于0");
+        PrepaidBalance -= amount;
+        if (PrepaidBalance < 0) PrepaidBalance = 0;
     }
 }

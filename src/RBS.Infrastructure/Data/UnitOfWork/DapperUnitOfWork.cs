@@ -83,7 +83,8 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new DapperRepository<LateFeeConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AutoRenewConfig> AutoRenewConfigs => _autoRenewConfigs ??= new DapperRepository<AutoRenewConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db, _auditWriter, tracker: this, tenant: _tenant);
-    public IRepository<Voucher> Vouchers => _vouchers ??= new DapperRepository<Voucher>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<GeneralLedgerBalance> GeneralLedgerBalances => _generalLedgerBalances ??= new DapperRepository<GeneralLedgerBalance>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<PrepaidDetail> PrepaidDetails => _prepaidDetails ??= new DapperRepository<PrepaidDetail>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AccountingPeriod> AccountingPeriods => _accountingPeriods ??= new DapperRepository<AccountingPeriod>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new DapperRepository<JobSchedule>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new DapperRepository<JobTemplate>(_db, _auditWriter, tracker: this, tenant: _tenant);
@@ -92,7 +93,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IRepository<ImportBatchItem> ImportBatchItems => _importBatchItems ??= new DapperRepository<ImportBatchItem>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<RoomPricingStandard> RoomPricingStandards => _roomPricingStandards ??= new DapperRepository<RoomPricingStandard>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public ITenantRepository Tenants => _tenants ??= new DapperTenantRepository(_db, _sql, _auditWriter, this, _tenant);
-    public IReceivablePlanRepository ReceivablePlans => _receivablePlans ??= new DapperReceivablePlanRepository(_db, _sql, _auditWriter, this, _tenant);
+    public IRepository<Journal> Journals => _journals ??= new DapperRepository<Journal>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IReceiptRepository Receipts => _receipts ??= new DapperReceiptRepository(_db, _sql, _auditWriter, this, _tenant);
     public IRepository<BankStatement> BankStatements => _bankStatements ??= new DapperRepository<BankStatement>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<BankReconciliation> BankReconciliations => _bankReconciliations ??= new DapperRepository<BankReconciliation>(_db, _auditWriter, tracker: this, tenant: _tenant);
@@ -136,7 +137,8 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IRepository<LateFeeConfig>? _lateFeeConfigs;
     private IRepository<AutoRenewConfig>? _autoRenewConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
-    private IRepository<Voucher>? _vouchers;
+    private IRepository<GeneralLedgerBalance>? _generalLedgerBalances;
+    private IRepository<PrepaidDetail>? _prepaidDetails;
     private IRepository<AccountingPeriod>? _accountingPeriods;
     private IRepository<JobSchedule>? _jobSchedules;
     private IRepository<JobTemplate>? _jobTemplates;
@@ -145,7 +147,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IRepository<ImportBatchItem>? _importBatchItems;
     private IRepository<RoomPricingStandard>? _roomPricingStandards;
     private ITenantRepository? _tenants;
-    private IReceivablePlanRepository? _receivablePlans;
+    private IRepository<Journal>? _journals;
     private IReceiptRepository? _receipts;
     private IRepository<BankStatement>? _bankStatements;
     private IRepository<BankReconciliation>? _bankReconciliations;

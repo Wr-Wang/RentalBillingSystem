@@ -112,10 +112,8 @@ public static class DependencyInjection
         services.AddScoped<IContractDomainService, ContractDomainService>();
         services.AddScoped<IBillingDomainService, BillingDomainService>();
         services.AddScoped<IApprovalDomainService, ApprovalDomainService>();
-        services.AddScoped<IAccountingDomainService, AccountingDomainService>();
         services.AddScoped<IPropertyDomainService, PropertyDomainService>();
         services.AddScoped<IReceiptDomainService, ReceiptDomainService>();
-        services.AddScoped<IDepositSettlementDomainService, DepositSettlementDomainService>();
 
         // ===== 通知服务（Scoped） =====
         services.AddScoped<INotificationService, NotificationService>();

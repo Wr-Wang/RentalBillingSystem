@@ -13,9 +13,9 @@ using ContractEntity = RBS.Core.Entities.Contract.Contract;
 namespace RBS.Application.Services.Billing;
 
 /// <summary>
-/// 应收生成编排服务实现 — 批量按合同生成应收计划，去重后写入
-/// 合同激活时同步生成应收计划及对应的会计凭证（Voucher + JournalEntry）
-/// 依赖 IBillingDomainService 领域服务计算按月分摊的应收计划
+/// 应收生成编排服务实现 — 批量按合同生成 Journal，去重后写入
+/// 合同激活时同步生成 Journal 及 GL 更新
+/// 依赖 IBillingDomainService 领域服务计算按月分摊的应收
 /// </summary>
 public class ReceivableGenerationService : IReceivableGenerationService
 {
@@ -46,13 +46,13 @@ public class ReceivableGenerationService : IReceivableGenerationService
     }
 
     /// <summary>
-    /// 为指定合同在指定账期范围内生成应收计划（去重：同一合同+账期+费用类型只生成一次）
+    /// 为指定合同在指定账期范围内生成 Journal（去重：同一合同+账期+费用类型只生成一次）
     /// </summary>
     /// <param name="contractId">合同 ID</param>
     /// <param name="periodFrom">起始账期 (yyyy-MM)，null 表示合同起租月</param>
     /// <param name="periodTo">截止账期 (yyyy-MM)，null 表示合同结束月</param>
     /// <param name="ct">取消令牌</param>
-    /// <returns>本次新生成的应收计划数量</returns>
+    /// <returns>本次新生成的 Journal 数量</returns>
     /// <exception cref="InvalidOperationException">合同不存在或非生效中时抛出</exception>
     public async Task<int> GenerateAsync(Guid contractId, string? periodFrom, string? periodTo, CancellationToken ct)
     {
@@ -79,22 +79,27 @@ public class ReceivableGenerationService : IReceivableGenerationService
         // 3. 逐月生成（去重：同一合同+账期+费用类型只生成一次）
         int totalCreated = 0;
 
+        using var conn = _db.CreateConnection();
+        conn.Open();
+
         foreach (var period in matched)
         {
             var dueDate = CalculateDueDate(period, contract);
 
-            var plans = _billingDomain.GenerateReceivablePlans(contract, period, dueDate);
+            var journals = _billingDomain.GenerateJournals(contract, period, dueDate,
+                contract.CompanyId, Guid.Empty, DateTime.UtcNow);
 
-            foreach (var plan in plans)
+            foreach (var journal in journals)
             {
                 // 去重检查
-                var existing = await _uow.ReceivablePlans
-                    .GetByContractPeriodFeeAsync(contractId, period, plan.FeeCodeId, ct);
+                var exists = await conn.QuerySingleAsync<int>(
+                    _sql.Get("Billing.Select.Journal.ExistsByKey"),
+                    new { C = contractId, F = journal.FeeCodeId, P = period });
 
-                if (existing != null)
+                if (exists > 0)
                     continue; // 已存在则跳过
 
-                await _uow.ReceivablePlans.AddAsync(plan, ct);
+                await _uow.Journals.AddAsync(journal, ct);
                 totalCreated++;
             }
         }
@@ -104,12 +109,12 @@ public class ReceivableGenerationService : IReceivableGenerationService
     }
 
     /// <summary>
-    /// 合同激活时初始化生成所有应收（含财务日记账）
-    /// 从合同起租月补全到当前月的应收计划 + 凭证，一次性费用另行生成 JE
+    /// 合同激活时初始化生成所有应收（Journal + GL）
+    /// 从合同起租月补全到当前月的 Journal，一次性费用另行生成
     /// </summary>
     /// <param name="contractId">合同 ID</param>
     /// <param name="ct">取消令牌</param>
-    /// <returns>初始化结果，包含生成的应收数量和处理的账期列表</returns>
+    /// <returns>初始化结果，包含生成的 Journal 数量和处理的账期列表</returns>
     public async Task<ActivationInitResult> GenerateForActivationAsync(Guid contractId, CancellationToken ct)
     {
         var contract = await _uow.Contracts.GetByIdAsync(contractId, ct)
@@ -144,131 +149,61 @@ public class ReceivableGenerationService : IReceivableGenerationService
             string chargeType = fc.ChargeType ?? "Recurring";
             if (chargeType == "OneTime")
             {
-                try
-                {
-                    var journalGen = _serviceProvider.GetRequiredService<IJournalGenerationService>();
-                    await journalGen.GenerateOneTimeAsync(contractId, fc.Id, ct);
-                    result.OneTimeFeeGenerated = true;
-                }
-                catch
-                {
-                    // 单个 JE 生成失败不影响激活主流程，可后续手动重试
-                    // GenerateOneTimeAsync 已具备幂等性，重试调用不会产生重复 JE
-                }
+                // 一次性费用：INSERT Journal(EntryType='Deposit') + Update GL
+                var jId = Guid.NewGuid();
+                var dueDate = DateOnly.FromDateTime(today.AddDays(30));
+                var depositSubjectId = subjects.GetValueOrDefault("1122", receivableId);
+                await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
+                    new { Id = jId, CoId = contract.CompanyId, CId = contractId, FId = (Guid)fc.FeeCodeId,
+                        FConfigId = (Guid)fc.Id, SubjId = depositSubjectId, Period = currentPeriod,
+                        Amt = (decimal)fc.Amount, Due = dueDate, EntryType = "Deposit",
+                        BilledAt = today, DNId = (Guid?)null, ParentId = (Guid?)null,
+                        Summary = $"一次性 {(string)fc.Name}", CBy = Guid.Empty });
             }
-        }
-
-        // 从起租月到当前月逐月生成 — 批量收集后集中写入
-        var planTable = BuildPlanDataTable();
-        var voucherTable = BuildVoucherDataTable();
-        var jeTable = BuildJournalEntryDataTable();
-
-        var current = startPeriod;
-        while (string.Compare(current, currentPeriod, StringComparison.Ordinal) <= 0)
-        {
-            // 去重：该月是否已有应收
-            var exists = await conn.QuerySingleAsync<int>(
-                _sql.Get("Billing.Select.ReceivablePlan.ExistsByContractAndPeriod"),
-                new { ContractId = contractId, Period = current });
-            if (exists > 0) { current = NextPeriod(current); continue; }
-
-            var lastDay = DateTime.DaysInMonth(int.Parse(current[..4]), int.Parse(current[5..7]));
-            var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
-            var dueDate = new DateOnly(int.Parse(current[..4]), int.Parse(current[5..7]), dueDay);
-            var periodStart = $"{current}-01";
-            var periodEnd = $"{current}-{lastDay:D2}";
-
-            var activeFees = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
-                _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
-                new { ContractId = contractId, PeriodStart = periodStart, PeriodEnd = periodEnd })).ToList();
-
-            if (activeFees.Count == 0) { current = NextPeriod(current); continue; }
-
-            var plans = _billingDomain.GenerateProratedReceivablePlans(
-                activeFees.Select(f => (f.FeeCodeId, f.Amount, f.EffDate, f.ExpDate, f.FeeName)).ToList(),
-                contractId, current, dueDate);
-
-            foreach (var plan in plans)
-            {
-                var planId = Guid.NewGuid();
-                planTable.Rows.Add(planId, contractId, plan.FeeCodeId, current, plan.Amount, dueDate, Guid.Empty);
-
-                var voucherId = Guid.NewGuid();
-                voucherTable.Rows.Add(voucherId, $"ACT-{current}-{Guid.NewGuid():N}"[..32],
-                    DateOnly.FromDateTime(today), "ContractActivation", contractId, contractId, current, Guid.Empty);
-
-                jeTable.Rows.Add(Guid.NewGuid(), voucherId, receivableId, "Debit", plan.Amount, $"合同激活 {current} 应收", Guid.Empty);
-                jeTable.Rows.Add(Guid.NewGuid(), voucherId, revenueId, "Credit", plan.Amount, $"合同激活 {current} 收入", Guid.Empty);
-
-                result.ReceivablePlansCreated++;
-                result.JournalEntriesCreated += 2;
+                result.OneTimeFeeGenerated = true;
             }
-            result.PeriodsProcessed.Add(current);
-            current = NextPeriod(current);
+            return result;
         }
 
-        // 批量写入
-        if (planTable.Rows.Count > 0)
-        {
-            await _bulk.BulkInsertAsync("ReceivablePlans", planTable, ct);
-            await _bulk.BulkInsertAsync("Vouchers", voucherTable, ct);
-            await _bulk.BulkInsertAsync("JournalEntries", jeTable, ct);
-        }
-
-        result.Message = $"已生成 {result.PeriodsProcessed.Count} 个月应收";
-        return result;
-    }
 
     /// <summary>
-    /// 切换到下一个月份
+    /// 创建 Journal DataTable（列匹配 Billing.Insert.Journal.Default）
     /// </summary>
-    /// <summary>
-    /// 创建应收计划 DataTable（列匹配 Billing.Insert.ReceivablePlan.Default）
-    /// </summary>
-    private static DataTable BuildPlanDataTable()
+    private static DataTable BuildJournalDataTable()
     {
-        var dt = new DataTable("ReceivablePlans");
+        var dt = new DataTable("Journals");
         dt.Columns.Add("Id", typeof(Guid));
+        dt.Columns.Add("CompanyId", typeof(Guid));
         dt.Columns.Add("ContractId", typeof(Guid));
         dt.Columns.Add("FeeCodeId", typeof(Guid));
+        dt.Columns.Add("FeeConfigId", typeof(Guid));
+        dt.Columns.Add("AccountingSubjectId", typeof(Guid));
         dt.Columns.Add("Period", typeof(string));
         dt.Columns.Add("Amount", typeof(decimal));
         dt.Columns.Add("DueDate", typeof(DateOnly));
-        dt.Columns.Add("CreatedBy", typeof(Guid));
-        return dt;
-    }
-
-    /// <summary>
-    /// 创建凭证 DataTable（列匹配 Accounting.Insert.Voucher.BillJob）
-    /// </summary>
-    private static DataTable BuildVoucherDataTable()
-    {
-        var dt = new DataTable("Vouchers");
-        dt.Columns.Add("Id", typeof(Guid));
-        dt.Columns.Add("VoucherNo", typeof(string));
-        dt.Columns.Add("VoucherDate", typeof(DateOnly));
-        dt.Columns.Add("SourceType", typeof(string));
-        dt.Columns.Add("SourceId", typeof(Guid));
-        dt.Columns.Add("ContractId", typeof(Guid));
-        dt.Columns.Add("Period", typeof(string));
-        dt.Columns.Add("CreatedBy", typeof(Guid));
-        return dt;
-    }
-
-    /// <summary>
-    /// 创建分录 DataTable（列匹配 Accounting.Insert.JournalEntry.Simple）
-    /// </summary>
-    private static DataTable BuildJournalEntryDataTable()
-    {
-        var dt = new DataTable("JournalEntries");
-        dt.Columns.Add("Id", typeof(Guid));
-        dt.Columns.Add("VoucherId", typeof(Guid));
-        dt.Columns.Add("AccountingSubjectId", typeof(Guid));
-        dt.Columns.Add("Direction", typeof(string));
-        dt.Columns.Add("Amount", typeof(decimal));
+        dt.Columns.Add("EntryType", typeof(string));
+        dt.Columns.Add("BilledAt", typeof(DateTime));
+        dt.Columns.Add("DebitNoteId", typeof(Guid));
+        dt.Columns.Add("ParentJournalId", typeof(Guid));
         dt.Columns.Add("Summary", typeof(string));
         dt.Columns.Add("CreatedBy", typeof(Guid));
         return dt;
+    }
+
+    /// <summary>静态版 SplitPeriods，供控制器预览用</summary>
+    public static List<string> SplitPeriodsStatic(ContractEntity contract)
+    {
+        var start = contract.StartDate;
+        var periods = new List<string>();
+        if (contract.EndDate == null) { periods.Add($"{start.Year}-{start.Month:D2}"); return periods; }
+        var curYear = start.Year; var curMonth = start.Month;
+        var endYear = contract.EndDate.Value.Year; var endMonth = contract.EndDate.Value.Month;
+        while (curYear < endYear || (curYear == endYear && curMonth <= endMonth))
+        {
+            periods.Add($"{curYear}-{curMonth:D2}");
+            curMonth++; if (curMonth > 12) { curYear++; curMonth = 1; }
+        }
+        return periods;
     }
 
     private static string NextPeriod(string period)
@@ -311,4 +246,6 @@ public class ReceivableGenerationService : IReceivableGenerationService
         var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
         return new DateOnly(period.Year, period.Month, dueDay);
     }
+
+    /// <summary>获取前一账期的期末余额作为当前账期的期初余额</summary>
 }

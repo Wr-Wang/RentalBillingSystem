@@ -36,7 +36,7 @@ public class ContractResumedEventHandler : IEventHandler<ContractResumedEvent>
     {
         // 解冻应收：Frozen → Pending
         await _uow.ExecuteSqlRawAsync(
-            _sql.Get("Contract.Update.ReceivablePlan.UnfreezeByContract"),
+            _sql.Get("Contract.Update.Journal.UnfreezeByContract"),
             new { ContractId = @event.ContractId }, ct);
 
         await _uow.CommitAsync(ct);

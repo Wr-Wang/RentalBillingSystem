@@ -13,7 +13,7 @@ public interface IAuditLogWriter
     /// 将实体的变更操作信息异步写入审计表中，
     /// 通过显式传入操作人 ID 以支持后台任务等非用户触发场景的审计。
     /// </summary>
-    /// <param name="tableName">实体表名（如 Contracts、ReceivablePlans）</param>
+    /// <param name="tableName">实体表名（如 Contracts）</param>
     /// <param name="entityId">实体主键值的字符串表示</param>
     /// <param name="action">操作类型（Insert/Update/Delete）</param>
     /// <param name="changes">变更的字段名→值字典</param>

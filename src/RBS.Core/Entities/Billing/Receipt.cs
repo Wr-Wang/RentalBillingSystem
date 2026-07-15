@@ -156,12 +156,12 @@ public class Receipt : AggregateRoot, IHasCompany
         ContractId = contractId;
     }
 
-    /// <summary>分配收款到指定应收计划，创建 ReceiptAllocation 关联记录</summary>
-    /// <param name="receivablePlanId">应收计划标识</param>
+    /// <summary>分配收款到指定日记账，创建 ReceiptAllocation 关联记录</summary>
+    /// <param name="journalId">日记账标识</param>
     /// <param name="amount">分配金额，必须大于 0 且不超过未分配余额</param>
     /// <exception cref="InvalidOperationException">只有已确认（Confirmed）的收款才能分配</exception>
     /// <exception cref="ArgumentException">分配金额小于等于 0 时抛出</exception>
-    public void AllocateTo(Guid receivablePlanId, decimal amount)
+    public void AllocateTo(Guid journalId, decimal amount)
     {
         if (Status != "Confirmed")
             throw new InvalidOperationException("只有已确认的收款才能分配");
@@ -169,7 +169,7 @@ public class Receipt : AggregateRoot, IHasCompany
         if (AllocatedAmount + amount > Amount)
             throw new InvalidOperationException($"可分配余额不足（剩余 {UnallocatedAmount}）");
 
-        _allocations.Add(new ReceiptAllocation(Id, receivablePlanId, amount));
+        _allocations.Add(new ReceiptAllocation(Id, journalId, amount));
     }
 
     /// <summary>取消分配，移除指定分配记录</summary>

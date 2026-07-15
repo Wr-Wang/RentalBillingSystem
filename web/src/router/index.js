@@ -222,6 +222,14 @@ const routes = [
         meta: { title: '导入批次详情', hidden: true }
       },
       // =====================================================================
+      // 日记账（一级菜单）
+      {
+        path: 'journals',
+        name: 'JournalList',
+        component: () => import('../views/journal/index.vue'),
+        meta: { title: '日记账', icon: 'Notebook', roles: ['Admin', 'OpsSupervisor', 'FinanceSupervisor', 'FinanceDirector', 'Accountant'] }
+      },
+      // =====================================================================
       // 会计管理
       {
         path: 'accounting',
@@ -236,16 +244,10 @@ const routes = [
             meta: { title: '科目表', icon: 'List' }
           },
           {
-            path: 'journal',
-            name: 'AccountingJournal',
-            component: () => import('../views/accounting/journal.vue'),
-            meta: { title: '日记账', icon: 'DocumentCopy' }
-          },
-          {
-            path: 'vouchers',
-            name: 'AccountingVouchers',
-            component: () => import('../views/accounting/vouchers.vue'),
-            meta: { title: '凭证管理', icon: 'Files' }
+            path: 'gl',
+            name: 'GLBalance',
+            component: () => import('../views/accounting/gl.vue'),
+            meta: { title: '总账', icon: 'DataBoard' }
           },
           {
             path: 'trialbalance',
@@ -424,7 +426,7 @@ const routes = [
       { path: 'history', redirect: '/approvals/history', meta: { hidden: true } },
       { path: 'subjects', redirect: '/accounting/subjects', meta: { hidden: true } },
       { path: 'journal', redirect: '/accounting/journal', meta: { hidden: true } },
-      { path: 'vouchers', redirect: '/accounting/vouchers', meta: { hidden: true } },
+      // { path: 'vouchers', redirect: '/accounting/vouchers', meta: { hidden: true } }, // 已删除
       { path: 'ledger', redirect: '/accounting/ledger', meta: { hidden: true } },
       { path: 'balancesheet', redirect: '/accounting/balancesheet', meta: { hidden: true } },
       { path: 'incomestatement', redirect: '/accounting/incomestatement', meta: { hidden: true } },

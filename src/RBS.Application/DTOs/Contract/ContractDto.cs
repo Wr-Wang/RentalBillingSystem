@@ -132,3 +132,31 @@ public class ContractFeeDto
     /// <summary>计费方式</summary>
     public string BillingMode { get; set; } = "FixedAmount";
 }
+
+/// <summary>
+/// 费用调价请求 — 批量调整合同费用项的金额/单价
+/// </summary>
+public class FeeAdjustRequest
+{
+    /// <summary>待调价的费用项列表</summary>
+    public List<FeeAdjustItem> Items { get; set; } = new();
+}
+
+/// <summary>
+/// 费用调价单项
+/// </summary>
+public class FeeAdjustItem
+{
+    /// <summary>费用代码 ID</summary>
+    public Guid FeeCodeId { get; set; }
+    /// <summary>费用名称（展示用）</summary>
+    public string FeeName { get; set; } = string.Empty;
+    /// <summary>原金额</summary>
+    public decimal OldAmount { get; set; }
+    /// <summary>新金额</summary>
+    public decimal NewAmount { get; set; }
+    /// <summary>生效日期（yyyy-MM-dd）</summary>
+    public string? EffectiveDate { get; set; }
+    /// <summary>计费方式：FixedAmount / MeterBased</summary>
+    public string? BillingMode { get; set; }
+}

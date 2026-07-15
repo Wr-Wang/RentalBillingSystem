@@ -17,10 +17,8 @@ public class SupplementaryFeeRequestItem : AuditableEntity
     public int DaysInMonth { get; private set; }
     /// <summary>当期覆盖天数（收费期间落在此月的实际天数）</summary>
     public int CoveredDays { get; private set; }
-    /// <summary>分摊后生成的应收计划标识，null 表示尚未生成</summary>
-    public Guid? ReceivablePlanId { get; private set; }
-    /// <summary>分摊后生成的凭证标识，null 表示尚未生成</summary>
-    public Guid? VoucherId { get; private set; }
+    /// <summary>分摊后生成的日记账标识，null 表示尚未生成</summary>
+    public Guid? JournalId { get; private set; }
 
     /// <summary>仅供 EF Core 反序列化使用</summary>
     private SupplementaryFeeRequestItem() { }
@@ -41,12 +39,11 @@ public class SupplementaryFeeRequestItem : AuditableEntity
     }
 
     /// <summary>
-    /// 设置生成的应收计划和凭证标识（审批通过生成单据后调用）
+    /// 设置生成的日记账标识（审批通过生成单据后调用）
     /// </summary>
-    /// <param name="receivablePlanId">应收计划标识</param>
-    /// <param name="voucherId">凭证标识</param>
-    public void SetPlanIds(Guid receivablePlanId, Guid voucherId)
+    /// <param name="journalId">日记账标识</param>
+    public void SetJournalId(Guid journalId)
     {
-        ReceivablePlanId = receivablePlanId; VoucherId = voucherId;
+        JournalId = journalId;
     }
 }

@@ -51,9 +51,9 @@ public class DebitNoteService : IDebitNoteService
         var contract = await _uow.Contracts.GetByIdAsync(contractId, ct)
             ?? throw new InvalidOperationException($"合同 {contractId} 不存在");
 
-        var plans = await _uow.ReceivablePlans.GetByContractIdAsync(contractId, ct);
-        var periodPlans = plans.Where(p => p.Period == period).ToList();
-        if (periodPlans.Count == 0)
+        var allJournals = await _uow.Journals.GetAllAsync(ct);
+        var periodJournals = allJournals.Where(j => j.ContractId == contractId && j.Period == period).ToList();
+        if (periodJournals.Count == 0)
             throw new InvalidOperationException($"账期 {period} 无应收记录");
 
 
@@ -62,18 +62,19 @@ public class DebitNoteService : IDebitNoteService
         var note = new DebitNote(noteNo, contractId, period);
         await _uow.DebitNotes.AddAsync(note, ct);
 
-        var total = periodPlans.Sum(p => p.Amount);
+        var total = periodJournals.Sum(p => Math.Abs(p.Amount));
         note.SetTotalAmount(total);
 
         // 4. 写入 DebitNoteItems
-        foreach (var plan in periodPlans)
+        foreach (var journal in periodJournals)
         {
+            if (journal.Amount <= 0) continue; // 只取正数（借方）
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Billing.Insert.DebitNoteItem.Default"),
-                new object[] { Guid.NewGuid(), note.Id, plan.FeeCodeId, plan.Amount, Guid.Empty, DateTime.UtcNow },
+                new object[] { Guid.NewGuid(), note.Id, journal.FeeCodeId, journal.Amount, Guid.Empty, DateTime.UtcNow },
                 ct);
         }
-        note.LoadItems(periodPlans.Select(p => new DebitNoteItem(note.Id, p.FeeCodeId, p.Amount)).ToList());
+        note.LoadItems(periodJournals.Where(j => j.Amount > 0).Select(j => new DebitNoteItem(note.Id, j.FeeCodeId, j.Amount)).ToList());
         return note;
     }
 

@@ -98,13 +98,18 @@ public class CollectionJob : IScheduledJob
 {
     public string JobName => "CollectionJob";
     private readonly IUnitOfWork _uow;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
     private readonly ITaskStepLogger _stepLogger;
     private readonly JobExecutionContext _jobContext;
 
     public CollectionJob(IUnitOfWork uow,
+        IDbConnectionFactory db, ISqlLoader sql,
         ITaskStepLogger stepLogger, JobExecutionContext jobContext)
     {
         _uow = uow;
+        _db = db;
+        _sql = sql;
         _stepLogger = stepLogger;
         _jobContext = jobContext;
     }
@@ -118,11 +123,14 @@ public class CollectionJob : IScheduledJob
             "Collection.Load", "加载逾期应收和催缴阶段配置", null, null, ct);
 
         var stages = await _uow.CollectionStages.GetAllAsync(ct);
-        var overduePlans = await _uow.ReceivablePlans.GetOverdueAsync(companyId, ct);
+        using var conn = _db.CreateConnection(); conn.Open();
+        var overdueJournals = (await conn.QueryAsync(
+            _sql.Get("Billing.Select.Journal.OverdueByCompany"),
+            new { CompanyId = companyId })).ToList();
 
-        await _stepLogger.CompleteStepAsync(stepLoad, overduePlans.Count, null, ct);
+        await _stepLogger.CompleteStepAsync(stepLoad, overdueJournals.Count, null, ct);
 
-        if (overduePlans.Count == 0)
+        if (overdueJournals.Count == 0)
             return "无逾期应收";
 
         // Step: 创建催缴
@@ -132,9 +140,9 @@ public class CollectionJob : IScheduledJob
         var today = DateOnly.FromDateTime(ChinaTime.Now);
         int created = 0;
 
-        foreach (var plan in overduePlans)
+        foreach (var journal in overdueJournals)
         {
-            var daysOverdue = today.DayNumber - plan.DueDate.DayNumber;
+            var daysOverdue = today.DayNumber - ((DateOnly)journal.DueDate).DayNumber;
 
             var stage = stages
                 .Where(s => s.IsAuto && daysOverdue >= s.OverdueDaysFrom && daysOverdue <= s.OverdueDaysTo)
@@ -145,7 +153,7 @@ public class CollectionJob : IScheduledJob
 
             var existingRecords = await _uow.CollectionRecords.GetAllAsync(ct);
             var alreadyExists = existingRecords.Any(r =>
-                r.ContractId == plan.ContractId && r.StageNo == stage.StageNo);
+                r.ContractId == (Guid)journal.ContractId && r.StageNo == stage.StageNo);
 
             if (!alreadyExists)
             {
@@ -158,7 +166,7 @@ public class CollectionJob : IScheduledJob
                     _ => "SMS"
                 };
                 var content = $"{stage.StageName} - 逾期{daysOverdue}天";
-                var record = new CollectionRecord(plan.ContractId, stage.StageNo, channel, content, companyId);
+                var record = new CollectionRecord((Guid)journal.ContractId, stage.StageNo, channel, content, companyId);
                 await _uow.CollectionRecords.AddAsync(record, ct);
                 created++;
             }

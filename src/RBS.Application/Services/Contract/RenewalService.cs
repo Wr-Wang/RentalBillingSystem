@@ -68,7 +68,7 @@ public class RenewalService : IRenewalService
 
         // 欠费检查
         var outstanding = await conn.QuerySingleAsync<decimal>(
-            _sql.Get("Billing.Select.ReceivablePlan.OutstandingByContract"),
+            _sql.Get("Billing.Select.Journal.OutstandingByContract"),
             new { Id = contractId });
         dto.Checks.PaymentStatus = new PaymentStatusDto
         {
@@ -160,7 +160,7 @@ public class RenewalService : IRenewalService
         {
             conn.Open();
             var outstanding = await conn.QuerySingleAsync<decimal>(
-                _sql.Get("Billing.Select.ReceivablePlan.OutstandingByContract"),
+                _sql.Get("Billing.Select.Journal.OutstandingByContract"),
                 new { Id = request.ContractId });
 
             if (outstanding > 0)
@@ -450,42 +450,6 @@ public class RenewalService : IRenewalService
                 new { NewContractId = newId, renewal.Id, Now = now }, tx);
 
             tx.Commit();
-
-            // 6.5 ★ 为新合同生成所有一次性费用的 JE（Commit 后执行，不影响续签主流程）
-            try
-            {
-                var journalGen = _serviceProvider.GetRequiredService<IJournalGenerationService>();
-
-                // 押金 JE（原有逻辑）
-                if (depositAmount > 0)
-                {
-                    var depositFeeConfigId = await conn.QuerySingleOrDefaultAsync<Guid>(
-                        _sql.Get("Contract.Select.FeeConfig.IdByContractAndCode"),
-                        new { Cid = newId, Code = "DEPOSIT" });
-                    if (depositFeeConfigId != Guid.Empty)
-                    {
-                        await journalGen.GenerateOneTimeAsync(newId, depositFeeConfigId, ct);
-                    }
-                }
-
-                // 其他一次性费用 JE（非押金的一次性收费项）
-                var oneTimeFees = await conn.QueryAsync<dynamic>(
-                    _sql.Get("Lease.Select.ContractFeeConfig.WithFeeCodeByContract"),
-                    new { ContractId = newId });
-                foreach (var otf in oneTimeFees)
-                {
-                    var otChargeType = (string)(otf.ChargeType ?? "Recurring");
-                    var otCode = (string)(otf.Code ?? "");
-                    if (otChargeType == "OneTime" && otCode != "DEPOSIT")
-                    {
-                        await journalGen.GenerateOneTimeAsync(newId, otf.Id, ct);
-                    }
-                }
-            }
-            catch
-            {
-                // JE 生成失败不影响续签完成，可后续通过 Job 重试
-            }
 
             // 7. 写 ChangeHistory（续签完成后记录）
             try

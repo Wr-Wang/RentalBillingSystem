@@ -55,21 +55,17 @@ public class ContractTimelineService : IContractTimelineService
             events.Add(new TimelineEvent { Time = (DateTime)r.CreatedAt, Type = "Renewal",
                 Title = $"续签（{(string)r.Status}）", Description = $"新租金 ¥{(decimal)r.NewRent}" });
 
-        // 收款事件
-        var plans = await conn.QueryAsync(_sql.Get("Lease.Select.Contract.ReceivablePlans"),
-            new { Id = contractId });
-        foreach (var p in plans)
+        // 收款/逾期事件（基于 Journal）
+        var journals = await conn.QueryAsync(_sql.Get("Billing.Select.Journal.ByContract"),
+            new { CId = contractId });
+        foreach (var j in journals)
         {
-            if ((string)p.Status == "Paid")
-                events.Add(new TimelineEvent { Time = DateTime.Parse($"{p.Period}-01"), Type = "Payment",
-                    Title = $"收款完成：{p.Period}", Description = $"¥{(decimal)p.Amount}" });
-            if (p.DueDate != null && (string)p.Status != "Paid" && (string)p.Status != "Cancelled")
-            {
-                var dueDate = (DateOnly)p.DueDate;
-                if (dueDate < DateOnly.FromDateTime(DateTime.UtcNow))
-                    events.Add(new TimelineEvent { Time = dueDate.ToDateTime(TimeOnly.MinValue), Type = "Overdue",
-                        Title = $"逾期：{p.Period}", Description = $"到期日 {dueDate}" });
-            }
+            events.Add(new TimelineEvent { Time = DateTime.Parse($"{j.Period}-01"), Type = "Payment",
+                Title = $"应收：{j.Period}", Description = $"¥{(decimal)j.Amount}" });
+            var dueDate = (DateOnly)j.DueDate;
+            if (dueDate < DateOnly.FromDateTime(DateTime.UtcNow))
+                events.Add(new TimelineEvent { Time = dueDate.ToDateTime(TimeOnly.MinValue), Type = "Overdue",
+                    Title = $"逾期：{j.Period}", Description = $"到期日 {dueDate}" });
         }
 
         return events.OrderBy(e => e.Time).ToList();

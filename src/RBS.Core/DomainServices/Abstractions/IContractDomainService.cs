@@ -45,12 +45,12 @@ public interface IContractDomainService
     decimal CalculateProratedAmount(decimal monthlyAmount, DateOnly startDate, DateOnly endDate, DateOnly periodStart, DateOnly periodEnd);
 
     /// <summary>
-    /// 执行合同终止 — 校验并变更合同和应收计划状态。
+    /// 执行合同终止 — 校验并变更合同状态。
     /// </summary>
     /// <param name="contract">已加载的合同聚合根</param>
-    /// <param name="receivablePlans">该合同下的全部应收计划（已加载）</param>
+    /// <param name="journals">该合同下的全部 Journal（已加载）</param>
     /// <param name="actualEndDate">实际终止日期</param>
     /// <param name="reason">终止原因</param>
     /// <returns>终止结果，含费用配置到期日期</returns>
-    TerminationResult ExecuteContractTermination(Contract contract, IReadOnlyList<ReceivablePlan> receivablePlans, DateOnly? actualEndDate, string reason);
+    TerminationResult ExecuteContractTermination(Contract contract, IReadOnlyList<Journal> journals, DateOnly? actualEndDate, string reason);
 }

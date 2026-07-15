@@ -1,33 +1,6 @@
 namespace RBS.Application.DTOs.Billing;
 
 /// <summary>
-/// 应收计划数据传输对象 — 按合同+账期拆分的应收明细
-/// </summary>
-public class ReceivablePlanDto
-{
-    /// <summary>应收计划 ID</summary>
-    public Guid Id { get; set; }
-    /// <summary>合同 ID</summary>
-    public Guid ContractId { get; set; }
-    /// <summary>费用代码 ID</summary>
-    public Guid FeeCodeId { get; set; }
-    /// <summary>费用代码名称</summary>
-    public string? FeeCodeName { get; set; }
-    /// <summary>账期 (yyyy-MM)</summary>
-    public string Period { get; set; } = string.Empty;
-    /// <summary>应收金额</summary>
-    public decimal Amount { get; set; }
-    /// <summary>已收金额</summary>
-    public decimal Received { get; set; }
-    /// <summary>余额（应收 - 已收）</summary>
-    public decimal Balance { get; set; }
-    /// <summary>到期日</summary>
-    public DateOnly DueDate { get; set; }
-    /// <summary>状态：Pending / Frozen / Paid / Overdue</summary>
-    public string Status { get; set; } = "Pending";
-}
-
-/// <summary>
 /// 收款记录数据传输对象
 /// </summary>
 public class ReceiptDto
@@ -53,6 +26,10 @@ public class ReceiptDto
 /// </summary>
 public class CreateReceiptRequest
 {
+    /// <summary>收款单号</summary>
+    public string ReceiptNo { get; set; } = string.Empty;
+    /// <summary>合同 ID（可为空）</summary>
+    public Guid? ContractId { get; set; }
     /// <summary>收款金额</summary>
     public decimal Amount { get; set; }
     /// <summary>收款日期</summary>

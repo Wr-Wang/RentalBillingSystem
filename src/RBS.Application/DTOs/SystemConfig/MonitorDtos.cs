@@ -121,8 +121,7 @@ public class ReversePreviewDto
     public DateTime StartedAt { get; set; }
     public bool HasPayment { get; set; }
     public int DebitNoteCount { get; set; }
-    public int ReceivablePlanCount { get; set; }
-    public int VoucherCount { get; set; }
+    public int JournalCount { get; set; }
 }
 
 // 分页结果复用 RBS.Core.Interfaces.Repositories.PagedResult<T>

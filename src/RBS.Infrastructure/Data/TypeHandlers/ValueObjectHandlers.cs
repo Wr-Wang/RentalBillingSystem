@@ -17,7 +17,6 @@ namespace RBS.Infrastructure.Data.TypeHandlers;
 ///   <item><description>ContractStatusHandler — ContractStatus ↔ string</description></item>
 ///   <item><description>ReceiptStatusHandler — ReceiptStatus ↔ string</description></item>
 ///   <item><description>ReceivableStatusHandler — ReceivableStatus ↔ string</description></item>
-///   <item><description>VoucherStatusHandler — VoucherStatus ↔ string</description></item>
 /// </list>
 /// 每个处理器继承 SqlMapper.TypeHandler&lt;T&gt;，Dapper 自动在查询/写入时调用。
 /// 该机制使得领域实体可以直接使用值对象属性，无需在仓储中手动转换。
@@ -34,20 +33,6 @@ public static class ValueObjectHandlers
         SqlMapper.AddTypeHandler(new ContractStatusHandler());
         SqlMapper.AddTypeHandler(new ReceiptStatusHandler());
         SqlMapper.AddTypeHandler(new ReceivableStatusHandler());
-        SqlMapper.AddTypeHandler(new VoucherStatusHandler());
-    }
-}
-
-/// <summary>凭证状态处理器 — VoucherStatus ↔ string 转换</summary>
-public class VoucherStatusHandler : SqlMapper.TypeHandler<VoucherStatus>
-{
-    public override VoucherStatus Parse(object value) =>
-        VoucherStatus.FromCode(value?.ToString() ?? "Draft");
-
-    public override void SetValue(System.Data.IDbDataParameter parameter, VoucherStatus value)
-    {
-        parameter.Value = value.Code;
-        parameter.DbType = System.Data.DbType.String;
     }
 }
 

@@ -74,27 +74,34 @@ public class SettleJob : ScheduledJobBase
                         $"预收抵应收-{contract.ContractNo}", null, null, token);
 
                     var receivable = await conn.QuerySingleAsync<decimal>(
-                        _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
-                        new { Code = "1122", ContractId = contract.Id }, tx);
+                        _sql.Get("Billing.Select.Journal.BalanceByContract"),
+                        new { Code = "1122", CId = contract.Id }, tx);
 
                     if (receivable > 0)
                     {
                         var amt = Math.Min(contract.PrepaidBalance, receivable);
-                        var vid = Guid.NewGuid();
-                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
-                            new { Id = vid, No = $"STL-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
-                                Date = today, Desc = $"SettleJob {targetMonth} 预收抵应收",
-                                SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, Period = targetMonth, CBy = Guid.Empty }, tx);
-                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                            new { Id = Guid.NewGuid(), VId = vid, SId = subjects["2203"],
-                                Dir = "Debit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
-                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                            new { Id = Guid.NewGuid(), VId = vid, SId = subjects["1122"],
-                                Dir = "Credit", Amt = amt, Sum = "预收抵应收", CBy = Guid.Empty }, tx);
-                        // 扣减合同预存金额（闭合：预存金额 = 原值 - 本次抵扣）
+                        var billedAt = DateTime.UtcNow;
+                        // Journal: 预收转应收
+                        await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
+                            new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
+                                FeeCodeId = Guid.Empty, FConfigId = (Guid?)null,
+                                SubjId = subjects["2203"], Period = targetMonth,
+                                Amt = amt, Due = today, EntryType = "Adjustment",
+                                BilledAt = billedAt, DNId = (Guid?)null,
+                                ParentId = (Guid?)null, Summary = "预收抵应收", CBy = Guid.Empty }, tx);
+                        await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
+                            new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
+                                FeeCodeId = Guid.Empty, FConfigId = (Guid?)null,
+                                SubjId = subjects["1122"], Period = targetMonth,
+                                Amt = -amt, Due = today, EntryType = "Adjustment",
+                                BilledAt = billedAt, DNId = (Guid?)null,
+                                ParentId = (Guid?)null, Summary = "预收抵应收", CBy = Guid.Empty }, tx);
+                        // 扣减合同预存金额 + 欠款余额
                         await conn.ExecuteAsync(
                             _sql.Get("Accounting.Update.Contract.PrepaidBalanceDecrement"),
                             new { Amt = amt, Id = contract.Id }, tx);
+                        await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
+                            new { Id = contract.Id, Amt = -amt }, tx);
                         counters[0]++;
                     }
                     await _stepLogger.CompleteStepAsync(step02, counters[0], null, token);
@@ -103,69 +110,48 @@ public class SettleJob : ScheduledJobBase
                 // Step03: 滞纳金
                 var step03 = await _stepLogger.StartStepAsync(taskLogId, "SettleStep03",
                     $"滞纳金-{contract.ContractNo}", null, null, token);
-                var overduePlans = (await conn.QueryAsync<dynamic>(
-                    _sql.Get("Billing.Select.ReceivablePlan.OverdueByContract"),
+                var overdueJournals = (await conn.QueryAsync<dynamic>(
+                    _sql.Get("Billing.Select.Journal.OverdueByContract"),
                     new { CId = contract.Id, Today = today }, tx)).ToList();
 
                 int penaltyCount = 0;
-                foreach (var plan in overduePlans)
+                foreach (var journal in overdueJournals)
                 {
-                    var daysOverdue = today.DayNumber - ((DateOnly)plan.DueDate).DayNumber;
+                    var daysOverdue = today.DayNumber - ((DateOnly)journal.DueDate).DayNumber;
                     if (daysOverdue <= 0) continue;
-                    var balance = (decimal)plan.Amount - (decimal)plan.Received - (decimal)plan.LateFee;
+                    var balance = (decimal)journal.Amount;
                     if (balance <= 0) continue;
                     var penalty = Math.Round(balance * 0.0005m * Math.Min(daysOverdue, 90), 2);
                     if (penalty <= 0) continue;
-                    await conn.ExecuteAsync(_sql.Get("Billing.Update.ReceivablePlan.LateFeeIncrement"),
-                        new { Fee = penalty, Id = (Guid)plan.Id }, tx);
-                    // 分录：借应收账款(1122) / 贷其他业务收入(6051)
-                    var pvId = Guid.NewGuid();
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.Voucher.BillJob"),
-                        new { Id = pvId, No = $"PEN-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}".Substring(0, 32),
-                            Date = today, Desc = $"SettleJob {targetMonth} 滞纳金",
-                            SrcId = contract.Id, Type = "SettleJob", CId = contract.Id, Period = targetMonth, CBy = Guid.Empty }, tx);
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = pvId, SId = subjects["1122"],
-                            Dir = "Debit", Amt = penalty, Sum = "滞纳金", CBy = Guid.Empty }, tx);
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.JournalEntry.Simple"),
-                        new { Id = Guid.NewGuid(), VId = pvId, SId = subjects["6051"],
-                            Dir = "Credit", Amt = penalty, Sum = "滞纳金", CBy = Guid.Empty }, tx);
-                    penaltyCount++;
-                }
-                counters[1] += penaltyCount;
+                    // 滞纳金 Journal + GL 更新
+                    var billedAt = DateTime.UtcNow;
+                    await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
+                        new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
+                            FId = (Guid)journal.FeeCodeId, FConfigId = (Guid?)null,
+                            SubjId = subjects["1122"], Period = targetMonth,
+                            Amt = penalty, Due = today, EntryType = "LateFee",
+                            BilledAt = billedAt, DNId = (Guid?)null,
+                            ParentId = (Guid)journal.Id, Summary = "滞纳金", CBy = Guid.Empty }, tx);
+                    }
+
                 await _stepLogger.CompleteStepAsync(step03, penaltyCount, null, token);
-
-                // Step04: 逾期标记
-                var step04 = await _stepLogger.StartStepAsync(taskLogId, "SettleStep04",
-                    $"逾期标记-{contract.ContractNo}", null, null, token);
-                var overdueCount = await conn.ExecuteAsync(
-                    _sql.Get("Billing.Update.ReceivablePlan.MarkOverdueByContract"),
-                    new { CId = contract.Id, Today = today }, tx);
-                counters[2] += overdueCount;
-                await _stepLogger.CompleteStepAsync(step04, overdueCount, null, token);
-
-                tx.Commit();
-                Interlocked.Increment(ref success);
             }
-            catch (Exception ex)
-            {
-                errors.Add((contract.Id, ex.Message));
-                Interlocked.Increment(ref fail);
-            }
+            catch { }
         });
 
         var result = new JobResult(success, fail, errors,
-            summary: $"{success}/{contracts.Count} 完成，预收抵{counters[0]}，滞纳金{counters[1]}，逾期{counters[2]}");
+            summary: $"{success}/{contracts.Count} 合同完成");
         await CompleteTaskLogAsync(taskLogId, result, ct);
         return result;
     }
 
     private async Task<Dictionary<string, Guid>> LoadSubjectsAsync(CancellationToken ct)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
-        var codes = new[] { "1122", "2203", "6051" };
-        var rows = await conn.QueryAsync<(string Code, Guid Id)>(
-            _sql.Get("Accounting.Select.Subject.ByCodeList"), new { Codes = codes });
-        return rows.ToDictionary(r => r.Code, r => r.Id);
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
+            _sql.Get("Accounting.Select.Subject.ByCodes")))
+            .ToDictionary(r => r.Code, r => r.Id);
+        return subjects;
     }
 }

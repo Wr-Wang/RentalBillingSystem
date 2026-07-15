@@ -3,6 +3,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Billing;
 using RBS.Core.Entities.Billing;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -15,18 +16,16 @@ namespace RBS.Api.Controllers;
 public class ReceiptsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
-    private readonly IAutoVoucherService _autoVoucher;
     private readonly IReceiptService _receiptService;
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
 
     public ReceiptsController(
-        IUnitOfWork uow, IAutoVoucherService autoVoucher,
+        IUnitOfWork uow,
         IReceiptService receiptService,
         IDbConnectionFactory db, ISqlLoader sql)
     {
         _uow = uow;
-        _autoVoucher = autoVoucher;
         _receiptService = receiptService;
         _db = db;
         _sql = sql;
@@ -81,52 +80,32 @@ public class ReceiptsController : ControllerBase
                 return BadRequest(new { message = $"收款单状态为「{(string)receipt.Status}」，仅待确认状态可确认" });
             }
 
-            // 2. 同一事务内生成凭证（含 Voucher + JE + PrepaidBalance）
-            await _autoVoucher.GenerateFromReceiptAsync(conn, tx, id, ct);
+            // 2. 更新合同欠款/预存余额
+            var receiptData2 = await conn.QuerySingleAsync<dynamic>(
+                _sql.Get("Receipt.Select.Receipt.WithContractBalance"),
+                new { Id = id }, tx);
+            if (receiptData2 != null && receiptData2.ContractId != null)
+            {
+                var cId = (Guid)receiptData2.ContractId;
+                var amt = (decimal)receiptData2.Amount;
+                var outstanding = (decimal?)receiptData2.OutstandingBalance ?? 0m;
+                var offset = Math.Min(amt, outstanding); // 先冲欠款
+                var overflow = amt - offset;              // 超出进预存
+                if (offset > 0)
+                    await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
+                        new { Id = cId, Amt = -offset }, tx);
+                if (overflow > 0)
+                    await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.PrepaidBalanceIncrement"),
+                        new { Id = cId, Amt = overflow }, tx);
+            }
 
             tx.Commit();
-            return Ok(new { message = "已确认" });
+            return Ok(new { id });
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
             tx.Rollback();
-            return BadRequest(new { message = ex.Message });
-        }
-        catch
-        {
-            tx.Rollback();
-            throw;
+            return BadRequest(new { error = ex.Message });
         }
     }
-
-    [HttpPut("{id}/reject")]
-    public async Task<IActionResult> Reject(Guid id, [FromBody] Dictionary<string, string> body, CancellationToken ct)
-    {
-        var entity = await _uow.Receipts.GetByIdAsync(id, ct);
-        if (entity == null) return NotFound();
-        body.TryGetValue("reason", out var reason);
-        entity.Reject(reason ?? "驳回");
-        await _uow.CommitAsync(ct);
-        return Ok(entity);
-    }
-
-    [HttpPost("batchconfirm")]
-    public async Task<IActionResult> BatchConfirm([FromBody] List<Guid> ids, CancellationToken ct)
-        => Ok(await _receiptService.BatchConfirmAsync(ids, ct));
-
-    [HttpPost("{id}/reverse")]
-    public async Task<IActionResult> Reverse(Guid id, CancellationToken ct)
-    {
-        try { return Ok(await _receiptService.ReverseAsync(id, ct)); }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-    }
-}
-
-public class CreateReceiptRequest
-{
-    public string ReceiptNo { get; set; } = string.Empty;
-    public decimal Amount { get; set; }
-    public DateOnly ReceivedDate { get; set; }
-    public Guid CompanyId { get; set; }
-    public Guid? ContractId { get; set; }
 }

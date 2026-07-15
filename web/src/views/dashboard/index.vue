@@ -179,7 +179,7 @@ const trendOption = computed(() => ({
   xAxis: { type: 'category', data: trendLabels.value },
   yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
   series: [{ name: '收款金额', type: 'bar', data: trendData.value, itemStyle: { color: '#409eff', borderRadius: [4, 4, 0, 0] }, barMaxWidth: 30 }],
-  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true }
+  grid: { left: '3%', right: '4%', bottom: '3%' }
 }))
 const trendLabels = computed(() => { const d = []; for (let i = 6; i >= 0; i--) { const dt = new Date(); dt.setDate(dt.getDate() - i); d.push(`${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`) }; return d })
 const trendData = ref([0, 0, 0, 0, 0, 0, 0])

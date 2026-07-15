@@ -738,11 +738,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { toGuidId } from '@/utils'
 import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel,
   getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract,
-  feeAdjust, getReceivables, generateReceivables as apiGenerateReceivables, getDeposits,
+  feeAdjust, getJournals, getJournalsByContract, generateJournals as apiGenerateReceivables, getDeposits,
   getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig,
   getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal,
   getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges,
-  getReceivablePlansByFee, handleApiError } from '@/api/index.js'
+  handleApiError } from '@/api/index.js'
 
 // ---------------------------------------------------------------------------
 // ★ 一次性收费展开行状态管理
@@ -931,24 +931,25 @@ async function fetchContract() {
       }))
     } catch { /* 押金接口暂不可用，保留空列表 */ }
 
-    // 应收时间线
+    // 应收时间线（基于 Journal，已收/余额通过 ReceiptAllocation 汇总计算）
     try {
-      const recRes = await getReceivables({ contractId: route.params.id, pageSize: 12 })
+      const recRes = await getJournals({ contractId: route.params.id, pageSize: 12 })
       const recItems = recRes.items || recRes.data || recRes || []
-      receivableTimeline.value = recItems.map(r => ({
-        id: r.id,
-        period: r.period || '',
-        dueDate: r.dueDate || '',
-        amount: r.amount || 0,
-        received: r.received || 0,
-        status: r.status || 'Pending',
-        details: (r.details || r.items || []).map(d => ({
-          feeName: d.feeName || d.feeCodeName || '',
-          amount: d.amount || 0,
-          received: d.received || 0,
-          description: d.description || ''
-        }))
-      }))
+      receivableTimeline.value = recItems.map(r => {
+        const received = r.receivedAmount || r.received || 0
+        const balance = r.amount - received
+        const isPaid = balance <= 0
+        const isOver = !isPaid && r.dueDate && new Date(r.dueDate) < new Date()
+        return {
+          id: r.id,
+          period: r.period || '',
+          dueDate: r.dueDate || '',
+          amount: r.amount || 0,
+          received,
+          status: isPaid ? 'Paid' : isOver ? 'Overdue' : 'Pending',
+          details: []
+        }
+      })
     } catch { /* 应收接口暂不可用，保留空列表 */ }
 
     // 加载费用配置
@@ -1107,21 +1108,22 @@ async function onOneTimeExpand(row) {
 async function loadOneTimeReceivablePlans(st, contractId, feeCodeId) {
   st.loadingPlans = true
   try {
-    const plans = await getReceivablePlansByFee(contractId, feeCodeId)
-    st.receivablePlans = (plans || []).map(p => ({
-      period: p.period || '',
-      amount: p.amount || 0,
-      dueDate: p.dueDate || '-',
-      status: p.status || 'Pending',
-      statusLabel: p.status === 'Pending' ? '待收'
-        : p.status === 'Partial' ? '部分收款'
-        : p.status === 'Paid' ? '已收款'
-        : p.status === 'Overdue' ? '逾期'
-        : p.status === 'Frozen' ? '冻结'
-        : p.status || '待收',
-      received: p.received || 0,
-      balance: (p.amount || 0) - (p.received || 0)
-    }))
+    const plans = await getJournalsByContract(contractId)
+    st.receivablePlans = (plans || []).map(p => {
+      const received = p.received || 0
+      const balance = p.balance || p.amount - received
+      const isPaid = balance <= 0
+      const isOverdue = !isPaid && p.dueDate && new Date(p.dueDate) < new Date()
+      return {
+        period: p.period || '',
+        amount: p.amount || 0,
+        dueDate: p.dueDate || '-',
+        status: isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending',
+        statusLabel: isPaid ? '已收款' : isOverdue ? '逾期' : '待收',
+        received,
+        balance
+      }
+    })
   } catch { /* 静默 */ }
   st.loadingPlans = false
 }
@@ -1764,11 +1766,10 @@ async function submitRemoveTenant() {
 }
 
 async function generateReceivables() {
-  // Show preview dialog and load preview data
   showReceivablePreviewDialog.value = true
   receivablePreviewLoading.value = true
   try {
-    const res = await fetch('/api/receivables/preview', {
+    const res = await fetch('/api/journals/preview', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId: contract.value.id })
     }).then(r => r.json())
@@ -1784,14 +1785,14 @@ async function generateReceivables() {
 async function submitReceivableGenerate() {
   receivableSubmitting.value = true
   try {
-    const res = await fetch('/api/receivables/generaterequest', {
+    const res = await fetch('/api/journals/generaterequest', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId: contract.value.id })
     }).then(r => r.json())
     if (res.status === 'PendingApproval' || res.message) {
       ElMessage.success(res.message || '应收生成请求已提交审批')
       showReceivablePreviewDialog.value = false
-      await fetchReceivables()
+      await fetchContract()
     } else {
       ElMessage.error(res.message || '提交失败')
     }

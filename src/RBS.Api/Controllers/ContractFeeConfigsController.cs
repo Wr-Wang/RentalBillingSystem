@@ -21,17 +21,14 @@ public class ContractFeeConfigsController : ControllerBase
     private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _uow;
     private readonly IApprovalService _approvalService;
-    private readonly IJournalGenerationService _journalGen;
 
-    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser,
-        IUnitOfWork uow, IApprovalService approvalService, IJournalGenerationService journalGen)
+    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser, IUnitOfWork uow, IApprovalService approvalService)
     {
         _db = db;
         _sql = sql;
         _currentUser = currentUser;
         _uow = uow;
         _approvalService = approvalService;
-        _journalGen = journalGen;
     }
 
     [HttpGet]
@@ -150,7 +147,6 @@ public class ContractFeeConfigsController : ControllerBase
         // ★ 一次性收费落地后立即生成 JE（草稿合同激活时也会补生成，此处先发可提前记账）
         if (isOneTime)
         {
-            try { await _journalGen.GenerateOneTimeAsync(request.ContractId, id, ct); } catch { /* JE 生成失败不影响 FeeConfig 落库 */ }
         }
 
         return Ok(new { id });

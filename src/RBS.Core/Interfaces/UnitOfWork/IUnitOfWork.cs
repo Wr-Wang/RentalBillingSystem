@@ -56,8 +56,12 @@ public interface IUnitOfWork : IDisposable
     IFeeCodeRepository FeeCodes { get; }
     /// <summary>费用模板仓储</summary>
     IRepository<FeeCodeTemplate> FeeCodeTemplates { get; }
-    /// <summary>应收计划仓储</summary>
-    IReceivablePlanRepository ReceivablePlans { get; }
+    /// <summary>日记账仓储（不可变的出账记录）</summary>
+    IRepository<Journal> Journals { get; }
+    /// <summary>总账余额仓储</summary>
+    IRepository<GeneralLedgerBalance> GeneralLedgerBalances { get; }
+    /// <summary>预收账款明细仓储</summary>
+    IRepository<PrepaidDetail> PrepaidDetails { get; }
 
     // ===== 收款 =====
 
@@ -158,8 +162,6 @@ public interface IUnitOfWork : IDisposable
 
     // ===== 会计 =====
 
-    /// <summary>会计凭证仓储</summary>
-    IRepository<Voucher> Vouchers { get; }
     /// <summary>会计期间仓储</summary>
     IRepository<AccountingPeriod> AccountingPeriods { get; }
 

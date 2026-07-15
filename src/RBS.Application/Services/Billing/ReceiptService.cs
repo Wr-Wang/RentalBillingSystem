@@ -50,10 +50,16 @@ public class ReceiptService : IReceiptService
 
         foreach (var row in allocRows)
         {
-            var plan = await _uow.ReceivablePlans.GetByIdAsync((Guid)row.ReceivablePlanId, ct);
-            if (plan != null)
+            var journal = await _uow.Journals.GetByIdAsync((Guid)row.JournalId, ct);
+            if (journal != null)
             {
-                plan.ReversePayment((decimal)row.Amount);
+                // Journal 为不可变记录，冲销通过创建负数金额的 Journal 实现
+                var reverseEntry = new RBS.Core.Entities.Billing.Journal(
+                    journal.CompanyId, journal.ContractId, journal.FeeCodeId,
+                    journal.FeeConfigId, journal.AccountingSubjectId,
+                    journal.Period, -(decimal)row.Amount, journal.DueDate,
+                    "Adjustment", DateTime.UtcNow, null, journal.Id, "收款冲销");
+                await _uow.Journals.AddAsync(reverseEntry, ct);
             }
         }
 

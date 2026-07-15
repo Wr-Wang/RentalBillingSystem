@@ -551,23 +551,7 @@ public class DapperReceiptRepository : DapperRepository<Receipt>, IReceiptReposi
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<decimal>(_sql.Get("Collection.Select.Receipt.TotalConfirmed"), new { Id = contractId }); }
 }
 
-/// <summary>
-/// Dapper 应收计划仓储实现 — 继承泛型仓储，增加按合同/合同+期间+费用/逾期查询
-/// </summary>
-public class DapperReceivablePlanRepository : DapperRepository<ReceivablePlan>, IReceivablePlanRepository
-{
-    private readonly ISqlLoader _sql;
-    public DapperReceivablePlanRepository(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, IChangeTracker? tracker = null, ITenantService? tenant = null) : base(db, auditWriter, tracker: tracker, tenant: tenant)
-    {
-        _sql = sql;
-    }
-    public async Task<List<ReceivablePlan>> GetByContractIdAsync(Guid contractId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>(_sql.Get("Receivable.Select.Plan.ByContractId"), new { Id = contractId })).ToList(); }
-    public async Task<ReceivablePlan?> GetByContractPeriodFeeAsync(Guid contractId, string period, Guid feeCodeId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<ReceivablePlan>(_sql.Get("Receivable.Select.Plan.ByContractPeriodFee"), new { Id = contractId, P = period, F = feeCodeId }); }
-    public async Task<List<ReceivablePlan>> GetOverdueAsync(Guid companyId, CancellationToken ct = default)
-        { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<ReceivablePlan>(_sql.Get("Receivable.Select.Plan.Overdue"))).ToList(); }
-}
+// DapperReceivablePlanRepository 已删除（由 Journals 替代）
 
 /// <summary>
 /// Dapper 抄表读数仓储实现 — 继承泛型仓储，增加最新读数/历史记录/存在性查询

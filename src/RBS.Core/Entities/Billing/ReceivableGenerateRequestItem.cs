@@ -48,16 +48,10 @@ public class ReceivableGenerateRequestItem : AuditableEntity
     public string EntryType { get; private set; } = "Normal";
 
     /// <summary>
-    /// 应收计划ID — 审批通过并正式生成应收后，关联的应收计划记录标识。
+    /// 日记账ID — 审批通过并正式生成应收后，关联的 Journal 记录标识。
     /// 为 null 时表示尚未正式生成应收。
     /// </summary>
-    public Guid? ReceivablePlanId { get; private set; }
-
-    /// <summary>
-    /// 凭证ID — 审批通过并正式生成应收后，关联的会计凭证记录标识。
-    /// 为 null 时表示尚未生成凭证。
-    /// </summary>
-    public Guid? VoucherId { get; private set; }
+    public Guid? JournalId { get; private set; }
 
     /// <summary>
     /// 私有无参构造函数 — 供 EF Core 等 ORM 框架使用，禁止外部直接调用。
@@ -82,13 +76,12 @@ public class ReceivableGenerateRequestItem : AuditableEntity
     }
 
     /// <summary>
-    /// 设置计划关联ID — 在应收审批通过正式生成应收记录后，关联应收计划记录和会计凭证记录。
+    /// 设置计划关联ID — 在应收审批通过正式生成应收记录后，关联 Journal 记录。
     /// 此方法通常在 <see cref="ReceivableGenerateRequest.Complete"/> 流程中被调用。
     /// </summary>
-    /// <param name="receivablePlanId">应收计划ID，正式生成的应收计划记录标识。</param>
-    /// <param name="voucherId">凭证ID，正式生成的会计凭证记录标识。</param>
-    public void SetPlanIds(Guid receivablePlanId, Guid voucherId)
+    /// <param name="journalId">Journal ID，正式生成的日记账记录标识。</param>
+    public void SetJournalId(Guid journalId)
     {
-        ReceivablePlanId = receivablePlanId; VoucherId = voucherId;
+        JournalId = journalId;
     }
 }
