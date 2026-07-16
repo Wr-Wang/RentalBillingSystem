@@ -1,7 +1,6 @@
 using Dapper;
-using RBS.Application.Common.Interfaces;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.Persistence;
-using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Contract;
 
@@ -18,6 +17,13 @@ public class TimelineEvent
 public interface IContractTimelineService
 {
     Task<List<TimelineEvent>> GetTimelineAsync(Guid contractId, CancellationToken ct = default);
+
+    /// <summary>获取合同变更历史</summary>
+    Task<IEnumerable<object>> GetChangesAsync(Guid contractId, CancellationToken ct = default);
+
+    /// <summary>插入合同变更历史记录</summary>
+    Task InsertChangeHistoryAsync(Guid contractId, string changeType, string title, string detail,
+        decimal? oldValue, decimal? newValue, string? effectiveDate, Guid? operatorId, string? operatorName = null, CancellationToken ct = default);
 }
 
 public class ContractTimelineService : IContractTimelineService
@@ -63,12 +69,35 @@ public class ContractTimelineService : IContractTimelineService
             events.Add(new TimelineEvent { Time = DateTime.Parse($"{j.Period}-01"), Type = "Payment",
                 Title = $"应收：{j.Period}", Description = $"¥{(decimal)j.Amount}" });
             var dueDate = (DateOnly)j.DueDate;
-            if (dueDate < DateOnly.FromDateTime(DateTime.UtcNow))
+            if (dueDate < DateOnly.FromDateTime(ChinaTime.Now))
                 events.Add(new TimelineEvent { Time = dueDate.ToDateTime(TimeOnly.MinValue), Type = "Overdue",
                     Title = $"逾期：{j.Period}", Description = $"到期日 {dueDate}" });
         }
 
         return events.OrderBy(e => e.Time).ToList();
+    }
+
+    public async Task<IEnumerable<object>> GetChangesAsync(Guid contractId, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var items = await conn.QueryAsync(
+            _sql.Get("Contract.Select.ChangeHistory.ByContract"), new { ContractId = contractId });
+        return items;
+    }
+
+    public async Task InsertChangeHistoryAsync(Guid contractId, string changeType, string title, string detail,
+        decimal? oldValue, decimal? newValue, string? effectiveDate, Guid? operatorId, string? operatorName = null, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        if (string.IsNullOrEmpty(operatorName) && operatorId.HasValue)
+            try { operatorName = await conn.QuerySingleOrDefaultAsync<string>(
+                _sql.Get("Contract.Select.User.DisplayNameById"), new { Id = operatorId }); } catch { }
+        await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+            new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType, Title = title,
+                Detail = detail, OldValue = oldValue, NewValue = newValue, EffectiveDate = effectiveDate,
+                OperatorId = operatorId, OperatorName = operatorName ?? "" });
     }
 }
 

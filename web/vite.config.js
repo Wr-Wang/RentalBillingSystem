@@ -17,7 +17,7 @@ export default defineConfig({
         target: 'http://localhost:5178',
         changeOrigin: true
       }
-    }
-  },
-  appType: 'spa'
+    },
+    historyApiFallback: true
+  }
 })

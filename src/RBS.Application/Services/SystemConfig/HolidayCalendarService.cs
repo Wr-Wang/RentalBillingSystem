@@ -148,7 +148,7 @@ public class HolidayCalendarService : IHolidayCalendarService
         dt.Columns.Add("CreatedAt", typeof(DateTime));
 
         foreach (var h in items)
-            dt.Rows.Add(h.Id, h.HolidayDate, h.Name, h.IsWorkingDay, h.HolidayDate.Year, h.CompanyId, DateTime.UtcNow);
+            dt.Rows.Add(h.Id, h.HolidayDate, h.Name, h.IsWorkingDay, h.HolidayDate.Year, h.CompanyId, ChinaTime.Now);
 
         return dt;
     }

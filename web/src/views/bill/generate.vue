@@ -203,6 +203,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import { getContracts, getBuildingList, getHousingUnits, generateDebitNotes, getDebitNotes, exportDebitNotePdf } from '@/api'
+import { chinaTime } from '@/utils/chinaTime'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -211,7 +212,7 @@ const loading = ref(false)
 
 // ==================== Filters ====================
 const filters = reactive({
-  period: new Date(),
+  period: chinaTime.now(),
   buildingId: '',
   roomId: '',
   contractStatus: ''
@@ -229,7 +230,7 @@ const filteredRooms = computed(() => {
 const allContracts = ref([])
 
 function getPeriodLabel(d) {
-  if (!d) { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}` }
+  if (!d) { const n = chinaTime.now(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}` }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
@@ -414,7 +415,7 @@ function searchContracts() {
 }
 
 function resetFilters() {
-  filters.period = new Date()
+  filters.period = chinaTime.now()
   filters.buildingId = ''
   filters.roomId = ''
   filters.contractStatus = ''

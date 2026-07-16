@@ -1,6 +1,7 @@
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Reporting;
@@ -66,7 +67,7 @@ public class ReportingService : IReportingService
     public async Task<object> GetDailyReceiptAsync(DateOnly? date, CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var d = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var d = date ?? DateOnly.FromDateTime(ChinaTime.Now);
         var result = await conn.QueryAsync(
             _sql.Get("Billing.Select.Receipt.DailyReceipt"),
             new { D = d });
@@ -75,7 +76,7 @@ public class ReportingService : IReportingService
 
     public async Task<object> GetMonthlyReceiptAsync(string? period, CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
+        var now = ChinaTime.Now;
         var p = period ?? $"{now.Year}-{now.Month:D2}";
         using var conn = _db.CreateConnection(); conn.Open();
 

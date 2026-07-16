@@ -92,11 +92,12 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
+import { chinaTime } from '@/utils/chinaTime'
 import { getMeterReadings, createMeterReading, updateMeterReading, confirmMeterReading, importMeterReadings } from '@/api'
 import * as XLSX from 'xlsx'
 
 const userStore = useUserStore()
-const search = reactive({ month: new Date(), feeCode: '', keyword: '' })
+const search = reactive({ month: chinaTime.now(), feeCode: '', keyword: '' })
 const meterReadings = ref([])
 const loading = ref(false)
 const showBatchImport = ref(false)
@@ -132,7 +133,7 @@ async function fetchList() {
   if (!companyId) { meterReadings.value = []; return }
   loading.value = true
   try {
-    const dt = search.month || new Date()
+    const dt = search.month || chinaTime.now()
     const year = dt.getFullYear(); const month = dt.getMonth() + 1
     const res = await getMeterReadings({ companyId, year, month })
     let items = Array.isArray(res) ? res : (res.items || res.data || res || [])
@@ -203,8 +204,8 @@ async function submitImport() {
     // 构造 MeterReading 数据发送到后端
     const readings = parsedData.value.map(p => ({
       contractFeeConfigId: p.roomCode, // 导入时用房屋编码对应，由后端解析
-      year: (search.month || new Date()).getFullYear(),
-      month: (search.month || new Date()).getMonth() + 1,
+      year: (search.month || chinaTime.now()).getFullYear(),
+      month: (search.month || chinaTime.now()).getMonth() + 1,
       previousReading: p.prev,
       currentReading: p.curr
     }))

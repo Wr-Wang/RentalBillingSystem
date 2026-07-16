@@ -592,6 +592,9 @@
   <select id="Billing.Select.Journal.ExistsByKey">
     <![CDATA[SELECT COUNT(1) FROM Journals WHERE ContractId=@C AND FeeCodeId=@F AND Period=@P]]>
   </select>
+  <select id="Billing.Select.Journal.PeriodFeePairsByContract">
+    <![CDATA[SELECT Period, FeeCodeId FROM Journals WHERE ContractId=@CId]]>
+  </select>
   <select id="Billing.Select.Journal.ExistsByContractAndPeriod">
     <![CDATA[SELECT COUNT(1) FROM Journals WHERE ContractId=@ContractId AND Period=@Period]]>
   </select>
@@ -1625,7 +1628,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       VALUES (@Id, @ContractId, @CompanyId, @PeriodFrom, @PeriodTo, @Status, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="ReceivableGenerate.Update.Request.Submit">
-    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='PendingApproval' WHERE Id=@Id AND Status='Draft']]>
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='PendingApproval', ApprovalRequestId=@ApprovalRequestId, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Draft']]>
   </update>
   <update id="ReceivableGenerate.Update.Request.Complete">
     <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Completed', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Executing']]>
@@ -1643,9 +1646,22 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <select id="ReceivableGenerate.Select.Items.ByRequestId">
     <![CDATA[SELECT * FROM ReceivableGenerateRequestItems WHERE RequestId=@RequestId ORDER BY Period, FeeCodeId]]>
   </select>
+  <select id="ReceivableGenerate.Select.Items.WithChargeTypeByRequestId">
+    <![CDATA[SELECT i.*, fc.ChargeType
+      FROM ReceivableGenerateRequestItems i
+      LEFT JOIN FeeCodes fc ON fc.Id = i.FeeCodeId
+      WHERE i.RequestId=@RequestId ORDER BY i.Period, i.FeeCodeId]]>
+  </select>
   <update id="ReceivableGenerate.Update.Item.SetPlanIds">
     <![CDATA[UPDATE ReceivableGenerateRequestItems SET ReceivablePlanId=@ReceivablePlanId, VoucherId=@VoucherId WHERE Id=@Id]]>
   </update>
+  <select id="ReceivableGenerate.Select.Request.PendingCountByContract">
+    <![CDATA[SELECT COUNT(1) FROM ReceivableGenerateRequests WHERE ContractId=@CId AND Status='PendingApproval']]>
+  </select>
+  <insert id="ReceivableGenerate.Insert.ApprovalBizData.Default">
+    <![CDATA[INSERT INTO ApprovalBizData (Id, ApprovalRequestId, ContractId, ContractNo, CompanyId, ChangeType, NewAmount, Reason, IsProcessed, CreatedBy, CreatedAt)
+      VALUES (@Id, @ApprovalRequestId, @ContractId, @ContractNo, @CompanyId, 'RECEIVABLE_GENERATE', @NewAmount, @Reason, 0, @CreatedBy, @CreatedAt)]]>
+  </insert>
 
   <!-- ================================================================
        模块：Contract — 控制器级别 SQL（ContractsController）

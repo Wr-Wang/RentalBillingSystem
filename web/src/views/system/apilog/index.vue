@@ -135,6 +135,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 import { getApiLogs, getApiLog, deleteApiLog, clearApiLogs } from '../../../api/index'
 
 const loading = ref(false)
@@ -146,7 +147,7 @@ const filter = reactive({ method: '', path: '', statusCode: '', startDate: '', e
 
 // 默认近 7 天
 function initDefaultDateRange() {
-  const now = new Date()
+  const now = chinaTime.now()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   filter.startDate = sevenDaysAgo.toISOString().slice(0, 16)
   filter.endDate = now.toISOString().slice(0, 16)
@@ -248,7 +249,7 @@ async function handleExport() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `API日志_${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `API日志_${chinaTime.today()}.csv`
     a.click()
     URL.revokeObjectURL(url)
     ElMessage.success(`导出成功，共 ${items.length} 条`)

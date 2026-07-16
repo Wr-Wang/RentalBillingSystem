@@ -2,6 +2,7 @@ using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.SystemConfig;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.Repositories;
 
 namespace RBS.Application.Services.SystemConfig;
@@ -160,7 +161,7 @@ public class TaskMonitorService : ITaskMonitorService
         conn.Open();
 
         var taskStart = log.StartedAt;
-        var taskEnd = log.CompletedAt ?? DateTime.UtcNow;
+        var taskEnd = log.CompletedAt ?? ChinaTime.Now;
 
         using var multi = await conn.QueryMultipleAsync(
             _sql.Get("Monitor.Select.TaskLog.PreviewReverse"),

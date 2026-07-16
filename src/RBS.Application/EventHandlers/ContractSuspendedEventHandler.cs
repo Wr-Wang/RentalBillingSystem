@@ -35,7 +35,7 @@ public class ContractSuspendedEventHandler : IEventHandler<ContractSuspendedEven
     public async Task HandleAsync(ContractSuspendedEvent @event, CancellationToken ct)
     {
         // 冻结未来应收：当前月份及之后的 Pending 应收改为 Frozen
-        var currentPeriod = DateTime.UtcNow.ToString("yyyy-MM");
+        var currentPeriod = ChinaTime.Now.ToString("yyyy-MM");
         await _uow.ExecuteSqlRawAsync(
             _sql.Get("Contract.Update.Journal.FreezeByContract"),
             new { ContractId = @event.ContractId, Period = currentPeriod }, ct);

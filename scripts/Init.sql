@@ -5474,3 +5474,52 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCr
 ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedHostname] NVARCHAR(128) NULL
 GO
 
+-- =================================================================
+-- v2026.07.16: RECEIVABLE_GENERATE 审批类型 + 三级审批配置
+-- =================================================================
+DECLARE @CompanyId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM Companies)
+DECLARE @SysUserId UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000000'
+DECLARE @Now DATETIME2 = GETUTCDATE()
+
+-- 审批类型
+IF NOT EXISTS (SELECT 1 FROM ApprovalTypes WHERE Code = 'RECEIVABLE_GENERATE')
+BEGIN
+  INSERT INTO ApprovalTypes (Id, Code, Name, Description, RoutingStrategy, IsActive, CompanyId, CreatedBy, CreatedAt)
+  VALUES (NEWID(), 'RECEIVABLE_GENERATE', '应收生成', '手动触发生成应收，按金额路由审批级别', 'Fixed', 1, @CompanyId, @SysUserId, @Now)
+END
+GO
+
+-- 三级审批级别配置
+DECLARE @TypeId UNIQUEIDENTIFIER = (SELECT Id FROM ApprovalTypes WHERE Code = 'RECEIVABLE_GENERATE')
+DECLARE @CompanyId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM Companies)
+DECLARE @SysUserId UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000000'
+DECLARE @Now DATETIME2 = GETUTCDATE()
+
+-- Level 1: 运营主管（≤10万）
+IF NOT EXISTS (SELECT 1 FROM ApprovalLevelConfigs WHERE ApprovalTypeId = @TypeId AND LevelNo = 1)
+BEGIN
+  INSERT INTO ApprovalLevelConfigs (Id, ApprovalTypeId, LevelNo, ApproverRoleId, RoleId, Level, ApprovalMode,
+    MinAmount, MaxAmount, IsCumulativeCheck, CumulativeWindowDays, CompanyId, CreatedBy, CreatedAt)
+  SELECT NEWID(), @TypeId, 1, r.Id, r.Id, 1, 'AnyOne', 0, 100000, 0, 0, @CompanyId, @SysUserId, @Now
+  FROM Roles r WHERE r.Code = 'OpsSupervisor'
+END
+
+-- Level 2: 部门经理（10万~50万）
+IF NOT EXISTS (SELECT 1 FROM ApprovalLevelConfigs WHERE ApprovalTypeId = @TypeId AND LevelNo = 2)
+BEGIN
+  INSERT INTO ApprovalLevelConfigs (Id, ApprovalTypeId, LevelNo, ApproverRoleId, RoleId, Level, ApprovalMode,
+    MinAmount, MaxAmount, IsCumulativeCheck, CumulativeWindowDays, CompanyId, CreatedBy, CreatedAt)
+  SELECT NEWID(), @TypeId, 2, r.Id, r.Id, 2, 'AnyOne', 100000.01, 500000, 0, 0, @CompanyId, @SysUserId, @Now
+  FROM Roles r WHERE r.Code = 'DeptManager'
+END
+
+-- Level 3: 总经理（>50万）
+IF NOT EXISTS (SELECT 1 FROM ApprovalLevelConfigs WHERE ApprovalTypeId = @TypeId AND LevelNo = 3)
+BEGIN
+  INSERT INTO ApprovalLevelConfigs (Id, ApprovalTypeId, LevelNo, ApproverRoleId, RoleId, Level, ApprovalMode,
+    MinAmount, MaxAmount, IsCumulativeCheck, CumulativeWindowDays, CompanyId, CreatedBy, CreatedAt)
+  SELECT NEWID(), @TypeId, 3, r.Id, r.Id, 3, 'AnyOne', 500000.01, 999999999, 0, 0, @CompanyId, @SysUserId, @Now
+  FROM Roles r WHERE r.Code = 'GeneralManager'
+END
+GO
+

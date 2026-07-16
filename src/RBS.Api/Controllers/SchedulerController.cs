@@ -329,7 +329,7 @@ public class SchedulerController : ControllerBase
 
         // 反转：删除本次出账产生的数据
         var taskStart = log.StartedAt;
-        var taskEnd = log.CompletedAt ?? DateTime.UtcNow;
+        var taskEnd = log.CompletedAt ?? ChinaTime.Now;
 
         // 1. 标记账单为 Cancelled
         await conn.ExecuteAsync(

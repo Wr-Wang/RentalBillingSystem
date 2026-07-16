@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Api.Models;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.Persistence;
 
 namespace RBS.Api.Controllers;
@@ -42,11 +43,13 @@ public class ApiLogsController : ControllerBase
         if (statusCode.HasValue) { where.Add("StatusCode = @StatusCode"); parms.Add("@StatusCode", statusCode.Value); }
         if (userId.HasValue) { where.Add("UserId = @UserId"); parms.Add("@UserId", userId.Value); }
 
-        // 默认近 7 天日期范围，避免全表扫描
-        startDate ??= DateTime.UtcNow.AddDays(-7);
-        endDate ??= DateTime.UtcNow.AddDays(1);
-        where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value);
-        where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value);
+        // 默认近 7 天日期范围，避免全表扫描（使用东八区时间）
+        var chinaNow = ChinaTime.Now;
+        startDate ??= chinaNow.AddDays(-7);
+        endDate ??= chinaNow.AddDays(1);
+        // 前端传东八区时间，转 UTC 后比对（数据库存 UTC）
+        where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value.AddHours(-8));
+        where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value.AddHours(-8));
 
         var w = "WHERE " + string.Join(" AND ", where);
         var offset = (page - 1) * pageSize;
@@ -76,7 +79,7 @@ public class ApiLogsController : ControllerBase
                 ipAddress = r.ClientIp,
                 userId = r.UserId,
                 userDisplayName = (string?)null,
-                createdAt = r.RequestAt
+                createdAt = r.RequestAt.AddHours(8)  // UTC 转东八区
             }),
             total, page, pageSize
         });
@@ -109,7 +112,7 @@ public class ApiLogsController : ControllerBase
             ipAddress = log.ClientIp,
             userAgent = log.UserAgent,
             userDisplayName = log.UserDisplayName,
-            createdAt = log.RequestAt
+            createdAt = log.RequestAt.AddHours(8)  // UTC 转东八区
         });
     }
 
@@ -135,8 +138,8 @@ public class ApiLogsController : ControllerBase
         using var conn = _db.CreateConnection(); conn.Open();
         var where = new List<string>();
         var parms = new DynamicParameters();
-        if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
-        if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
+        if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value.AddHours(-8)); }
+        if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value.AddHours(-8)); }
         var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
 
         // 批次删除，每次最多 1000 条，避免锁表

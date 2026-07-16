@@ -4,6 +4,7 @@ using RBS.Application.Common.Interfaces;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Services;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Scheduling;
@@ -48,7 +49,7 @@ public class TerminateJob : ITerminateJob
             if (contract == null) throw new InvalidOperationException("合同不存在");
 
             var companyId = (Guid)contract.CompanyId;
-            var now = DateTime.UtcNow;
+            var now = ChinaTime.Now;
             var period = $"{now.Year:D4}-{now.Month:D2}";
             await _stepLogger.CompleteStepAsync(step01, 1, null, ct);
 
@@ -80,8 +81,8 @@ public class TerminateJob : ITerminateJob
             var offsetAmt = Math.Min(receivableBal, depositAmt);
             var refundAmt = depositAmt - offsetAmt - deduction;
 
-            var nowUtc = DateTime.UtcNow;
-            var billedAt = DateTime.UtcNow;
+            var nowUtc = ChinaTime.Now;
+            var billedAt = ChinaTime.Now;
             var dueDate = DateOnly.FromDateTime(now);
 
             // 借方：2241 押金（全额冲减）— Journal 记录

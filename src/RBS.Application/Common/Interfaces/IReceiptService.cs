@@ -14,6 +14,14 @@ public interface IReceiptService
     Task<object> BatchConfirmAsync(List<Guid> ids, CancellationToken ct);
 
     /// <summary>
+    /// 确认单笔收款记录（含更新合同欠款/预存余额）
+    /// </summary>
+    /// <param name="id">收款记录 ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>确认结果</returns>
+    Task<object> ConfirmReceiptAsync(Guid id, CancellationToken ct);
+
+    /// <summary>
     /// 冲销指定收款记录
     /// </summary>
     /// <param name="id">要冲销的收款记录 ID</param>

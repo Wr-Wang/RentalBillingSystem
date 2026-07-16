@@ -11,25 +11,24 @@ public class BillingDomainService : IBillingDomainService
 {
     /// <summary>
     /// 为合同批量生成指定账期的 Journal（日记账出账记录）。
-    /// 遍历合同下所有费用配置，筛选在账期内有效的配置项，
+    /// 遍历费用配置列表，筛选在账期内有效的配置项，
     /// 为每个符合条件的费用项目生成一条 Journal 条目。
     /// </summary>
-    public List<Journal> GenerateJournals(Contract contract, string period, DateOnly dueDate,
-        Guid companyId, Guid defaultSubjectId, DateTime billedAt)
+    public List<Journal> GenerateJournals(
+        List<(Guid FeeCodeId, decimal Amount, string? EffectiveDate, string? ExpiryDate)> feeConfigs,
+        Guid contractId, Guid companyId, string period, DateOnly dueDate,
+        Guid defaultSubjectId, DateTime billedAt)
     {
-        if (contract.Status != "Active")
-            throw new InvalidOperationException("只有生效中的合同才能生成出账记录");
-
         var journals = new List<Journal>();
 
-        foreach (var feeConfig in contract.FeeConfigs)
+        foreach (var fc in feeConfigs)
         {
-            if (!IsFeeEffectiveForPeriod(feeConfig, period))
+            if (!IsFeeEffectiveForPeriod(fc.EffectiveDate, fc.ExpiryDate, period))
                 continue;
 
             var journal = new Journal(
-                companyId, contract.Id, feeConfig.FeeCodeId, null,
-                defaultSubjectId, period, feeConfig.Amount, dueDate,
+                companyId, contractId, fc.FeeCodeId, null,
+                defaultSubjectId, period, fc.Amount, dueDate,
                 "Normal", billedAt, null, null, null);
 
             journals.Add(journal);
@@ -38,19 +37,19 @@ public class BillingDomainService : IBillingDomainService
         return journals;
     }
 
-    private static bool IsFeeEffectiveForPeriod(ContractFeeConfig feeConfig, string period)
+    private static bool IsFeeEffectiveForPeriod(string? effectiveDate, string? expiryDate, string period)
     {
         var periodStart = DateOnly.Parse($"{period}-01");
         var periodEnd = periodStart.AddDays(DateTime.DaysInMonth(periodStart.Year, periodStart.Month) - 1);
 
-        if (feeConfig.EffectiveDate != null)
+        if (effectiveDate != null)
         {
-            var eff = DateOnly.Parse(feeConfig.EffectiveDate);
+            var eff = DateOnly.Parse(effectiveDate);
             if (periodEnd < eff) return false;
         }
-        if (feeConfig.ExpiryDate != null)
+        if (expiryDate != null)
         {
-            var exp = DateOnly.Parse(feeConfig.ExpiryDate);
+            var exp = DateOnly.Parse(expiryDate);
             if (periodStart > exp) return false;
         }
         return true;

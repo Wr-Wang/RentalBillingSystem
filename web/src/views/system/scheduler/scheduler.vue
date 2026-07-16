@@ -178,6 +178,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 import { getSchedulerJobs, getSchedulerTemplates, createSchedulerJob, updateSchedulerJob, deleteSchedulerJob,
   getExecutions, createExecution, updateExecution, deleteExecution, generateExecutions,
   executeJob, deleteFutureExecutions, retryExecution,
@@ -243,7 +244,7 @@ async function doExecute() {
   if (!execJob.value) return
   execRunning.value = true
   try {
-    const r = await executeJob(execJob.value.jobName, { mode:'execute', companyId:'00000000-0000-0000-0000-000000000000', targetMonth:new Date().toISOString().slice(0,7) })
+    const r = await executeJob(execJob.value.jobName, { mode:'execute', companyId:'00000000-0000-0000-0000-000000000000', targetMonth: chinaTime.currentMonth() })
     ElMessage.success(r?.result||'任务已触发')
     execConfirmVisible.value = false
   } catch {

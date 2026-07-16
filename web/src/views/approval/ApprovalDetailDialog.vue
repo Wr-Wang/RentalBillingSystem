@@ -377,9 +377,42 @@
                   </el-table>
                 </el-card>
 
-                <!-- ===== 4. [终止专用] 终止详情已合并至变更摘要，无需重复展示 ===== -->
+                <!-- ===== 4. [应收生成专用] 费用明细（区分周期/一次性） ===== -->
+                <template v-if="bizDetail.bizType === 'RECEIVABLE_GENERATE' && bizDetail.feeItems?.length">
+                  <el-card v-if="recurringItems.length" shadow="never" class="section-card" style="margin-top:14px;">
+                    <template #header>
+                      <span style="font-weight:600;">周期性收费</span>
+                      <span style="float:right;font-size:13px;color:#909399;">
+                        小计: <strong style="color:#e6a23c;">¥{{ recurringTotal.toLocaleString() }}</strong>
+                      </span>
+                    </template>
+                    <el-table :data="recurringItems" stripe size="small">
+                      <el-table-column prop="feeName" label="收费项目" min-width="120" />
+                      <el-table-column prop="effectiveDate" label="账期" width="90" />
+                      <el-table-column label="金额" width="130" align="right">
+                        <template #default="{ row }">¥{{ Number(row.newAmount).toLocaleString() }}</template>
+                      </el-table-column>
+                    </el-table>
+                  </el-card>
+                  <el-card v-if="oneTimeItems.length" shadow="never" class="section-card" style="margin-top:14px;">
+                    <template #header>
+                      <span style="font-weight:600;">一次性收费</span>
+                      <span style="float:right;font-size:13px;color:#909399;">
+                        小计: <strong style="color:#e6a23c;">¥{{ oneTimeTotal.toLocaleString() }}</strong>
+                      </span>
+                    </template>
+                    <el-table :data="oneTimeItems" stripe size="small">
+                      <el-table-column prop="feeName" label="收费项目" min-width="120" />
+                      <el-table-column label="金额" width="130" align="right">
+                        <template #default="{ row }">¥{{ Number(row.newAmount).toLocaleString() }}</template>
+                      </el-table-column>
+                    </el-table>
+                  </el-card>
+                </template>
 
-                <!-- ===== 4. 无业务字段时的兜底提示 ===== -->
+                <!-- ===== 5. [终止专用] 终止详情已合并至变更摘要，无需重复展示 ===== -->
+
+                <!-- ===== 6. 无业务字段时的兜底提示 ===== -->
                 <el-empty v-if="!bizDetail.fields?.length && !bizDetail.feeItems?.length"
                   description="暂无结构化业务数据" :image-size="60" />
               </template>
@@ -606,6 +639,23 @@ const canCancel = computed(() => {
 const showImportTab = computed(() => data.value?.targetEntityType === 'Import')
 /** 是否显示业务数据 Tab（Import 已有独立 Tab，跳过） */
 const showBizTab = computed(() => data.value && data.value?.targetEntityType !== 'Import')
+
+/** 周期费用明细（用于 RECEIVABLE_GENERATE 按类型分组展示） */
+const recurringItems = computed(() =>
+  (bizDetail.value?.feeItems || []).filter(i => i.chargeType !== 'OneTime')
+)
+/** 一次性费用明细 */
+const oneTimeItems = computed(() =>
+  (bizDetail.value?.feeItems || []).filter(i => i.chargeType === 'OneTime')
+)
+/** 周期费用小计 */
+const recurringTotal = computed(() =>
+  recurringItems.value.reduce((s, i) => s + (Number(i.newAmount) || 0), 0)
+)
+/** 一次性费用小计 */
+const oneTimeTotal = computed(() =>
+  oneTimeItems.value.reduce((s, i) => s + (Number(i.newAmount) || 0), 0)
+)
 
 /** 排序后的审批记录（时间正序） */
 const sortedRecords = computed(() => {

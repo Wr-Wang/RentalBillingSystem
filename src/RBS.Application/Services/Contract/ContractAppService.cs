@@ -1,7 +1,11 @@
 using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Contract;
+using RBS.Core.Common;
 using RBS.Core.DomainServices;
+using RBS.Core.Entities.Approval;
+using RBS.Core.Entities.Base;
+using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -20,14 +24,18 @@ public class ContractAppService : IContractService
     private readonly ISqlLoader _sql;
     private readonly IUnitOfWork _uow;
     private readonly IContractDomainService _contractDomain;
+    private readonly IReceivableGenerationService _receivableGen;
+
     /// <summary>
     /// 构造函数
     /// </summary>
-    /// <param name="uow">工作单元</param>
-    /// <param name="db">数据库连接工厂</param>
-    /// <param name="sql">SQL 加载器</param>
-    /// <param name="contractDomain">合同领域服务</param>
-    public ContractAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql, IContractDomainService contractDomain) { _uow = uow; _db = db; _sql = sql; _contractDomain = contractDomain; }
+    public ContractAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql,
+        IContractDomainService contractDomain,
+        IReceivableGenerationService receivableGen)
+    {
+        _uow = uow; _db = db; _sql = sql; _contractDomain = contractDomain;
+        _receivableGen = receivableGen;
+    }
 
     /// <summary>
     /// 获取指定公司的合同列表（含主租客信息）
@@ -249,4 +257,193 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         await _uow.CommitAsync(ct);
     }
 
+    public async Task SubmitContractCreateRequestStatusAsync(Guid requestId, CancellationToken ct = default)
+    {
+        await _uow.ExecuteSqlRawAsync(_sql.Get("ContractCreate.Update.Request.Submit"),
+            new { Id = requestId }, ct);
+    }
+
+    public async Task SetApprovalRequestContractIdAsync(Guid approvalRequestId, Guid contractId, CancellationToken ct = default)
+    {
+        await _uow.ExecuteSqlRawAsync(_sql.Get("Approval.Update.Request.SetContractId"),
+            new { Id = approvalRequestId, ContractId = contractId }, ct);
+    }
+
+    /// <summary>
+    /// 检查合同是否有待审批的调价申请，有则抛出 InvalidOperationException
+    /// </summary>
+    public async Task EnsureNoPendingForContractAsync(Guid contractId, CancellationToken ct = default)
+    {
+        var pending = await _uow.ExecuteSqlRawAsync(
+            _sql.Get("Approval.Select.Request.HasPendingByContract"),
+            new { ContractId = contractId, TargetEntityType = "ContractFeeAdjust" }, ct);
+        if (pending > 0)
+            throw new InvalidOperationException("该合同已有待审批的调价申请");
+    }
+
+    /// <summary>
+    /// 直接执行合同创建（从审批跳过或直接创建时调用）
+    /// </summary>
+    public async Task<Guid> ExecuteContractCreationAsync(Guid requestId, Guid userId, CancellationToken ct = default)
+    {
+        var request = await _uow.ContractCreateRequests.GetByIdAsync(requestId, ct);
+        if (request == null) throw new InvalidOperationException("请求不存在");
+
+        var allTenants = await _uow.ContractCreateRequestTenants.GetAllAsync(ct);
+        var tenants = allTenants.Where(t => t.RequestId == requestId).ToList();
+        var allFees = await _uow.ContractCreateRequestFees.GetAllAsync(ct);
+        var feeList = allFees.Where(f => f.RequestId == requestId).ToList();
+        var now = ChinaTime.Now;
+        var contractId = Guid.NewGuid();
+
+        await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.Contract.Default"),
+            new
+            {
+                Id = contractId, ContractNo = request.ContractNo, RoomId = request.RoomId,
+                StartDate = request.StartDate, EndDate = request.EndDate,
+                PaymentCycle = request.PaymentCycle, Status = "Active", CompanyId = request.CompanyId,
+                CreatedBy = userId, CreatedAt = now
+            }, ct);
+        foreach (var t in tenants)
+            await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.ContractTenant.Default"),
+                new { ContractId = contractId, t.TenantId, t.IsPrimary,
+                    CreatedBy = userId, CreatedAt = now }, ct);
+        foreach (var f in feeList)
+            await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
+                new
+                {
+                    Id = Guid.NewGuid(), ContractId = contractId, f.FeeCodeId,
+                    BillingMode = f.BillingMode, Amount = f.Amount,
+                    EffectiveDate = f.EffectiveDate ?? request.StartDate.ToString("yyyy-MM-dd"),
+                    CreatedBy = userId, CreatedAt = now
+                }, ct);
+
+        var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
+        if (contract != null) { contract.Activate(); await _uow.CommitAsync(ct); }
+        try { await _receivableGen.GenerateForActivationAsync(contractId, ct); } catch { }
+        return contractId;
+    }
+
+    /// <summary>
+    /// 执行费用调价（无审批配置时直接执行）
+    /// </summary>
+    public async Task<object> FeeAdjustAsync(Guid contractId, FeeAdjustRequest request, Guid userId, CancellationToken ct = default)
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
+        if (contract == null) throw new KeyNotFoundException("合同不存在");
+
+        // 找审批类型
+        var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_FEE_CHANGE", ct);
+
+        if (approvalType == null)
+        {
+            using var innerConn = _db.CreateConnection(); innerConn.Open();
+            using var innerTx = innerConn.BeginTransaction();
+            try
+            {
+                foreach (var item in request.Items)
+                {
+                    var effDate = item.EffectiveDate ?? "";
+                    if (string.IsNullOrEmpty(effDate)) continue;
+
+                    var current = await innerConn.QuerySingleOrDefaultAsync(
+                        _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
+                        new { ContractId = contractId, FeeCodeId = item.FeeCodeId }, innerTx);
+
+                    var overlap = await innerConn.QuerySingleAsync<int>(
+                        _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
+                        new
+                        {
+                            ContractId = contractId, FeeCodeId = item.FeeCodeId,
+                            EffectiveDate = effDate, ExpiryDate = (string?)null,
+                            ExcludeId = current != null ? (Guid)((dynamic)current).Id : (Guid?)null
+                        }, innerTx);
+                    if (overlap > 0)
+                        throw new InvalidOperationException("费用项 " + item.FeeName + " 的生效日期与已有记录冲突");
+
+                    var expiryDate = DateTime.Parse(effDate).AddDays(-1).ToString("yyyy-MM-dd");
+                    if (current != null)
+                    {
+                        await innerConn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
+                            new { Id = (Guid)((dynamic)current).Id, ExpiryDate = expiryDate }, innerTx);
+                        await innerConn.ExecuteAsync(_sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
+                            new { ExpiryDate = expiryDate, ContractId = contractId, FeeCodeId = item.FeeCodeId }, innerTx);
+                    }
+                    await innerConn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
+                        new
+                        {
+                            Id = Guid.NewGuid(), ContractId = contractId, FeeCodeId = item.FeeCodeId,
+                            BillingMode = item.BillingMode ?? "FixedAmount", Amount = item.NewAmount,
+                            EffectiveDate = effDate, CreatedBy = userId, Now = ChinaTime.Now
+                        }, innerTx);
+                }
+                innerTx.Commit();
+            }
+            catch (Exception ex)
+            {
+                innerTx.Rollback();
+                throw new InvalidOperationException("[Tx] " + ex.Message);
+            }
+
+            // 以下为 Commit 后的操作（独立 try，失败不影响调价）
+            try
+            {
+                foreach (var item in request.Items)
+                {
+                    var effDateStr = item.EffectiveDate ?? "";
+                    if (!string.IsNullOrEmpty(effDateStr))
+                    {
+                        using (var hisConn = _db.CreateConnection())
+                        {
+                            hisConn.Open();
+                            var operatorName = await hisConn.QuerySingleOrDefaultAsync<string>(
+                                _sql.Get("Contract.Select.User.DisplayNameById"), new { Id = userId });
+                            await hisConn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+                                new
+                                {
+                                    Id = Guid.NewGuid(), ContractId = contractId, ChangeType = "FEE_ADJUST",
+                                    Title = "费用调价",
+                                    Detail = item.FeeName + ": " + item.OldAmount.ToString("F2") + " -> " + item.NewAmount.ToString("F2") + "，生效 " + effDateStr,
+                                    OldValue = item.OldAmount, NewValue = item.NewAmount,
+                                    EffectiveDate = effDateStr, OperatorId = userId,
+                                    OperatorName = operatorName ?? ""
+                                });
+                        }
+                    }
+                }
+
+                using var journalConn = _db.CreateConnection();
+                journalConn.Open();
+                foreach (var item in request.Items)
+                {
+                    var effDateStr = item.EffectiveDate ?? "";
+                    if (!string.IsNullOrEmpty(effDateStr))
+                    {
+                        var diffAmt = Math.Round(item.NewAmount - item.OldAmount, 2);
+                        if (diffAmt != 0)
+                        {
+                            var subj = await journalConn.QuerySingleOrDefaultAsync(
+                                _sql.Get("Accounting.Select.Subject.ByCode"), new { Code = "1122" });
+                            var sId = subj != null ? (Guid)((dynamic)subj).Id : Guid.Empty;
+                            var effM = effDateStr[..7];
+                            await journalConn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
+                                new
+                                {
+                                    Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contractId,
+                                    FId = item.FeeCodeId, FConfigId = (Guid?)null, SubjId = sId,
+                                    Period = effM, Amt = Math.Abs(diffAmt),
+                                    Due = DateOnly.FromDateTime(ChinaTime.Now).AddDays(30),
+                                    EntryType = "Supplementary", BilledAt = ChinaTime.Now,
+                                    DNId = (Guid?)null, ParentId = (Guid?)null,
+                                    Summary = $"{item.FeeName}调价补差", CBy = userId
+                                });
+                        }
+                    }
+                }
+            }
+            catch { /* TODO: 补差 JE 失败不阻断调价 */ }
+        }
+
+        return new { contractId };
+    }
 }

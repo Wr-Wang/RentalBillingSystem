@@ -511,6 +511,35 @@ public class ApprovalService : IApprovalService
                 }
                 break;
 
+            case "RECEIVABLE_GENERATE":
+                dto.BizType = "RECEIVABLE_GENERATE";
+                dto.Fields = new List<BizFieldDto>
+                {
+                    new() { Label = "合同号",   NewValue = bizData.ContractNo },
+                    new() { Label = "应收合计", NewValue = bizData.NewAmount.HasValue ? $"¥{bizData.NewAmount:N2}" : "-", IsChanged = true },
+                    new() { Label = "账期范围", NewValue = bizData.Reason },
+                };
+
+                // 加载费用明细（带 ChargeType 区分周期/一次性）
+                using (var conn = _connectionFactory.CreateConnection())
+                {
+                    conn.Open();
+                    var items = conn.Query<dynamic>(
+                        _sql.Get("ReceivableGenerate.Select.Items.WithChargeTypeByRequestId"),
+                        new { RequestId = approval.TargetEntityId }).ToList();
+                    if (items.Count > 0)
+                    {
+                        dto.FeeItems = items.Select(i => new BizFeeItemDto
+                        {
+                            FeeName = (string)i.FeeName,
+                            NewAmount = (decimal)i.Amount,
+                            EffectiveDate = (string)i.Period,
+                            ChargeType = (string)(i.ChargeType ?? "Recurring"),
+                        }).ToList();
+                    }
+                }
+                break;
+
             case "TERMINATE":
                 dto.BizType = "TERMINATE";
                 dto.Fields = new List<BizFieldDto>

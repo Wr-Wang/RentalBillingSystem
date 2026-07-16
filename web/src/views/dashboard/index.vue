@@ -91,6 +91,7 @@
 import { ref, computed, onMounted } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
+import { chinaTime } from '@/utils/chinaTime'
 import { CanvasRenderer } from 'echarts/renderers'
 import { PieChart, BarChart, LineChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
@@ -112,7 +113,7 @@ function formatMoney(val) { return (val || 0).toLocaleString('zh-CN', { minimumF
 
 async function loadData() {
   const p = currentDate.value ? `${currentDate.value.getFullYear()}-${String(currentDate.value.getMonth() + 1).padStart(2, '0')}` : undefined
-  const today = new Date().toISOString().slice(0, 10)
+  const today = chinaTime.today()
 
   // 今日收款
   try { const dr = await getDailyReceipt({ date: today }); const details = dr.details || dr || []; const totalReceived = details.reduce((s, r) => s + (r.total || 0), 0); const totalCount = details.reduce((s, r) => s + (r.cnt || 0), 0); todayStats.value = { received: totalReceived, count: totalCount } } catch {}
@@ -147,9 +148,9 @@ async function loadData() {
 async function loadDailyTrend() {
   const data = []
   for (let i = 6; i >= 0; i--) {
-    const dt = new Date()
+    const dt = chinaTime.now()
     dt.setDate(dt.getDate() - i)
-    const dateStr = dt.toISOString().slice(0, 10)
+    const dateStr = chinaTime.today()
     try {
       const dr = await getDailyReceipt({ date: dateStr })
       const details = dr.details || dr || []
@@ -181,7 +182,7 @@ const trendOption = computed(() => ({
   series: [{ name: '收款金额', type: 'bar', data: trendData.value, itemStyle: { color: '#409eff', borderRadius: [4, 4, 0, 0] }, barMaxWidth: 30 }],
   grid: { left: '3%', right: '4%', bottom: '3%' }
 }))
-const trendLabels = computed(() => { const d = []; for (let i = 6; i >= 0; i--) { const dt = new Date(); dt.setDate(dt.getDate() - i); d.push(`${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`) }; return d })
+const trendLabels = computed(() => { const d = []; for (let i = 6; i >= 0; i--) { const dt = chinaTime.now(); dt.setDate(dt.getDate() - i); d.push(`${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`) }; return d })
 const trendData = ref([0, 0, 0, 0, 0, 0, 0])
 
 onMounted(loadData)

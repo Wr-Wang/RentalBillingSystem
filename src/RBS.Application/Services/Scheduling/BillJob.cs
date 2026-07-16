@@ -89,7 +89,7 @@ public class BillJob : ScheduledJobBase
                 var plans = _billingDomain.GenerateProratedJournals(
                     feeConfigs.Select(f => (f.FeeCodeId, f.Amount, f.EffDate, f.ExpDate, f.FeeName)).ToList(),
                     contract.Id, targetMonth, dueDate, contract.CompanyId,
-                    subjects.GetValueOrDefault("1122", Guid.Empty), DateTime.UtcNow);
+                    subjects.GetValueOrDefault("1122", Guid.Empty), ChinaTime.Now);
 
                 foreach (var journal in plans)
                 {
@@ -213,7 +213,7 @@ public class BillJob : ScheduledJobBase
         foreach (var c in matched)
         {
             var fees = (await conn.QueryAsync(_sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
-                new { ContractId = c.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{DateTime.DaysInMonth(DateTime.Now.Year, DateTime.Now.Month)}" })).ToList();
+                new { ContractId = c.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{DateTime.DaysInMonth(ChinaTime.Now.Year, ChinaTime.Now.Month)}" })).ToList();
             totalFees += fees.Count;
             if (fees.Count == 0) warnings.Add($"合同 {c.ContractNo} 无生效费用配置");
         }

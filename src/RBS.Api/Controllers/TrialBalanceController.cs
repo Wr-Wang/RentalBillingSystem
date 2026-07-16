@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
@@ -23,7 +24,7 @@ public class TrialBalanceController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] DateOnly? endDate, CancellationToken ct)
     {
-        var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = endDate ?? DateOnly.FromDateTime(ChinaTime.Now);
 
         using var conn = _db.CreateConnection(); conn.Open();
 

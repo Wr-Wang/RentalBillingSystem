@@ -88,6 +88,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 import { getContracts, previewRenewal as apiPreviewRenewal } from '@/api'
 
 const router = useRouter()
@@ -107,7 +108,7 @@ function statusType(s) { return statusTypeMap[s] || 'info' }
 function statusLabel(s) { return statusLabelMap[s] || s }
 
 // 今天日期
-const today = new Date()
+const today = chinaTime.now()
 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
 // 距离到期天数

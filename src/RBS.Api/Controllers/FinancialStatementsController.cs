@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
@@ -30,7 +31,7 @@ public class FinancialStatementsController : ControllerBase
     [HttpGet("balancesheet")]
     public async Task<IActionResult> BalanceSheet([FromQuery] DateOnly? endDate, CancellationToken ct)
     {
-        var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = endDate ?? DateOnly.FromDateTime(ChinaTime.Now);
         using var conn = _db.CreateConnection(); conn.Open();
 
         // 取所有叶子科目
@@ -109,7 +110,7 @@ public class FinancialStatementsController : ControllerBase
         [FromQuery] DateOnly? endDate,
         CancellationToken ct)
     {
-        var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = endDate ?? DateOnly.FromDateTime(ChinaTime.Now);
         var start = startDate ?? new DateOnly(end.Year, end.Month, 1); // 默认当月
 
         using var conn = _db.CreateConnection(); conn.Open();

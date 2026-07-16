@@ -85,11 +85,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 import { getHolidayCalendars, createHolidayCalendar, updateHolidayCalendar, deleteHolidayCalendar, importHolidayYear } from '../../api/index'
 
 const loading = ref(false); const list = ref([])
-const searchYear = ref(new Date().getFullYear())
-const yearOptions = computed(() => { const y = new Date().getFullYear(); return [y - 1, y, y + 1, y + 2] })
+const searchYear = ref(chinaTime.now().getFullYear())
+const yearOptions = computed(() => { const y = chinaTime.now().getFullYear(); return [y - 1, y, y + 1, y + 2] })
 const viewMode = ref('calendar')
 const weekDays = ['一','二','三','四','五','六','日']
 

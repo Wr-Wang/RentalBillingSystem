@@ -80,7 +80,7 @@ public class SettleJob : ScheduledJobBase
                     if (receivable > 0)
                     {
                         var amt = Math.Min(contract.PrepaidBalance, receivable);
-                        var billedAt = DateTime.UtcNow;
+                        var billedAt = ChinaTime.Now;
                         // Journal: 预收转应收
                         await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
                             new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
@@ -124,7 +124,7 @@ public class SettleJob : ScheduledJobBase
                     var penalty = Math.Round(balance * 0.0005m * Math.Min(daysOverdue, 90), 2);
                     if (penalty <= 0) continue;
                     // 滞纳金 Journal + GL 更新
-                    var billedAt = DateTime.UtcNow;
+                    var billedAt = ChinaTime.Now;
                     await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
                         new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
                             FId = (Guid)journal.FeeCodeId, FConfigId = (Guid?)null,

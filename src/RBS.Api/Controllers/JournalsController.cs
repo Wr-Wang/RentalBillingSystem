@@ -1,14 +1,7 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
-using RBS.Application.DTOs.Approval;
-using RBS.Application.Services.Billing;
-using RBS.Application.Services.Contract;
-using RBS.Core.Common;
-using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
-using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
 
@@ -17,24 +10,17 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class JournalsController : ControllerBase
 {
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
+    private readonly IJournalAppService _journalAppService;
     private readonly ITenantService _tenant;
-    private readonly IUnitOfWork _uow;
-    private readonly ICurrentUserService _currentUser;
     private readonly IApprovalService _approvalService;
     private readonly IReceivableGenerationService _receivableGen;
 
-    public JournalsController(IDbConnectionFactory db, ISqlLoader sql, ITenantService tenant,
-        IUnitOfWork uow, ICurrentUserService currentUser,
-        IApprovalService approvalService,
+    public JournalsController(IJournalAppService journalAppService,
+        ITenantService tenant, IApprovalService approvalService,
         IReceivableGenerationService receivableGen)
     {
-        _db = db;
-        _sql = sql;
+        _journalAppService = journalAppService;
         _tenant = tenant;
-        _uow = uow;
-        _currentUser = currentUser;
         _approvalService = approvalService;
         _receivableGen = receivableGen;
     }
@@ -51,24 +37,14 @@ public class JournalsController : ControllerBase
         CancellationToken ct = default)
     {
         var companyId = _tenant.EffectiveCompanyId;
-        if (companyId == null) return Ok(new { items = new List<object>(), total = 0 });
-
-        using var conn = _db.CreateConnection();
-        conn.Open();
-        var items = await conn.QueryAsync(_sql.Get("Billing.Select.Journal.Paged"),
-            new { CoId = companyId, Period = period, CNo = $"%{contractNo}%", FId = feeCodeId, GLP = glPosted, CId = contractId, Offset = (page - 1) * pageSize, PageSize = pageSize });
-        var total = await conn.QuerySingleAsync<int>(_sql.Get("Billing.Select.Journal.PagedCount"),
-            new { CoId = companyId, Period = period, CNo = $"%{contractNo}%", FId = feeCodeId, GLP = glPosted, CId = contractId });
-        return Ok(new { items, total, page, pageSize });
+        var result = await _journalAppService.GetPagedAsync(companyId, period, contractNo, feeCodeId, glPosted, contractId, page, pageSize);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        using var conn = _db.CreateConnection();
-        conn.Open();
-        var item = await conn.QuerySingleOrDefaultAsync(
-            _sql.Get("Billing.Select.Journal.ById"), new { Id = id });
+        var item = await _journalAppService.GetByIdAsync(id);
         if (item == null) return NotFound();
         return Ok(item);
     }
@@ -76,11 +52,7 @@ public class JournalsController : ControllerBase
     [HttpGet("bycontract")]
     public async Task<IActionResult> GetByContract([FromQuery] Guid contractId, CancellationToken ct)
     {
-        using var conn = _db.CreateConnection();
-        conn.Open();
-        var items = await conn.QueryAsync(
-            _sql.Get("Billing.Select.Journal.ByContractWithPayment"),
-            new { CId = contractId });
+        var items = await _journalAppService.GetByContractAsync(contractId);
         return Ok(items);
     }
 
@@ -88,90 +60,24 @@ public class JournalsController : ControllerBase
     [HttpPost("preview")]
     public async Task<IActionResult> Preview([FromBody] PreviewRequest request, CancellationToken ct)
     {
-        var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
-        if (contract == null) return NotFound(new { message = "合同不存在" });
-        if (contract.Status != "Active")
-            return BadRequest(new { message = "只有生效中的合同才能生成应收" });
-
-        // 取合同有效期内的所有账期
-        var allPeriods = ReceivableGenerationService.SplitPeriodsStatic(contract);
-        // 过滤已存在的 Journal
-        using var conn = _db.CreateConnection();
-        conn.Open();
-        var existing = (await conn.QueryAsync<string>(
-            "SELECT DISTINCT Period FROM Journals WHERE ContractId = @CId", new { CId = request.ContractId })).ToHashSet();
-        var missing = allPeriods.Where(p => !existing.Contains(p)).ToList();
-
-        // 估算每个缺漏账期的金额
-        var items = new List<object>();
-        foreach (var period in missing)
-        {
-            var lastDay = DateTime.DaysInMonth(int.Parse(period[..4]), int.Parse(period[5..7]));
-            var dueDay = contract.EndDate.HasValue ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
-            decimal totalAmt = 0;
-            var feeConfigs = contract.FeeConfigs?.Where(f => IsFeeEffectiveForPeriod(f, period)).ToList() ?? new();
-            foreach (var fc in feeConfigs) totalAmt += fc.Amount;
-            items.Add(new { period, dueDate = $"{period}-{dueDay:D2}", amount = totalAmt, feeCount = feeConfigs.Count });
-        }
-
-        return Ok(new { items, totalAmount = items.Sum(i => (decimal)((dynamic)i).amount), missingCount = missing.Count });
+        var result = await _journalAppService.PreviewAsync(request.ContractId);
+        return Ok(result);
     }
 
     /// <summary>提交生成应收 — 直接创建或走审批</summary>
     [HttpPost("generaterequest")]
     public async Task<IActionResult> GenerateRequest([FromBody] PreviewRequest request, CancellationToken ct)
     {
-        var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
-        if (contract == null) return NotFound(new { message = "合同不存在" });
-
-        // 检查是否有应收生成审批类型
-        var approvalType = await _uow.FindApprovalTypeByCodeAsync("RECEIVABLE_GENERATE", ct);
-        if (approvalType != null && contract.Status == "Active")
+        try
         {
-            // 走审批流
-            var userId = _currentUser.UserId;
-            var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
-            {
-                ApprovalTypeId = approvalType.Id,
-                Title = $"[应收生成] {contract.ContractNo}",
-                Description = $"手动触发生成应收",
-                TargetEntityId = request.ContractId,
-                TargetEntityType = "ReceivableGeneration"
-            }, ct);
-            await _uow.CommitAsync(ct);
-            return Ok(new { status = "PendingApproval", id = approvalResult.Id, message = "应收生成请求已提交审批" });
+            var userId = GetCurrentUserId();
+            var result = await _journalAppService.GenerateRequestAsync(request.ContractId, userId);
+            return Ok(result);
         }
-
-        // 无审批配置或 Draft 合同 → 直接执行
-        var created = await _receivableGen.GenerateAsync(request.ContractId, null, null, ct);
-        if (created > 0)
+        catch (InvalidOperationException ex)
         {
-            var now = ChinaTime.Now;
-            var period = $"{now.Year}-{now.Month:D2}";
-            using var conn = _db.CreateConnection();
-            conn.Open();
-
-            // 1. 更新合同欠款余额
-            var totalBilled = await conn.QuerySingleAsync<decimal>(
-                _sql.Get("Billing.Select.Journal.SumAmountByContractPeriod"),
-                new { CId = request.ContractId, P = period });
-            await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
-                new { Id = request.ContractId, Amt = totalBilled });
-
-            // 2. 更新 GL（追加式快照）
-            var latest = await conn.QuerySingleOrDefaultAsync(
-                _sql.Get("Accounting.Select.GL.LatestByPeriod"),
-                new { CoId = contract.CompanyId, Period = period });
-            var prevBilled = latest != null ? (decimal)((dynamic)latest).TotalBilled : 0m;
-            var prevReceived = latest != null ? (decimal)((dynamic)latest).TotalReceived : 0m;
-            var opening = latest != null ? (decimal)((dynamic)latest).OpeningBalance : 0m;
-            var newBilled = prevBilled + totalBilled;
-            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Default"),
-                new { Id = Guid.NewGuid(), CoId = contract.CompanyId, Period = period,
-                    Opening = opening, Billed = newBilled, Received = prevReceived,
-                    Closing = opening + newBilled - prevReceived, CBy = Guid.Empty });
+            return Conflict(new { code = "PENDING_APPROVAL_EXISTS", message = ex.Message });
         }
-        return Ok(new { message = $"已生成 {created} 条应收记录", count = created });
     }
 
     [HttpPost("generate")]
@@ -180,22 +86,12 @@ public class JournalsController : ControllerBase
         return Ok(new { message = "出账任务已触发" });
     }
 
-    private static bool IsFeeEffectiveForPeriod(Core.Entities.Contract.ContractFeeConfig feeConfig, string period)
+    private Guid GetCurrentUserId()
     {
-        var periodStart = DateOnly.Parse($"{period}-01");
-        var daysInMonth = DateTime.DaysInMonth(periodStart.Year, periodStart.Month);
-        var periodEnd = periodStart.AddDays(daysInMonth - 1);
-        if (feeConfig.EffectiveDate != null)
-        {
-            var eff = DateOnly.Parse(feeConfig.EffectiveDate);
-            if (periodEnd < eff) return false;
-        }
-        if (feeConfig.ExpiryDate != null)
-        {
-            var exp = DateOnly.Parse(feeConfig.ExpiryDate);
-            if (periodStart > exp) return false;
-        }
-        return true;
+        var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (claim != null && Guid.TryParse(claim.Value, out var userId))
+            return userId;
+        return Guid.Empty;
     }
 }
 

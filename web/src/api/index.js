@@ -218,6 +218,8 @@ export function getJournals(params) { return request({ url: '/journals', method:
 export function getJournal(id) { return request({ url: `/journals/${id}`, method: 'get' }) }
 export function getJournalsByContract(contractId) { return request({ url: `/journals/bycontract?contractId=${contractId}`, method: 'get' }) }
 export function generateJournals(data) { return request({ url: '/journals/generate', method: 'post', data }) }
+export function previewJournals(data) { return request({ url: '/journals/preview', method: 'post', data }) }
+export function generateJournalRequest(data) { return request({ url: '/journals/generaterequest', method: 'post', data }) }
 
 // GL（总账）
 export function getGLBalance(params) { return request({ url: '/gl', method: 'get', params }) }

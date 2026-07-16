@@ -275,7 +275,7 @@
               应收合计: <strong style="color:#e6a23c;">¥{{ receivableStats.totalAmount.toLocaleString() }}</strong>
               | 未收: <strong style="color:#f56c6c;">¥{{ receivableStats.totalDue.toLocaleString() }}</strong>
             </span>
-            <el-button type="primary" size="small" @click="showReceivablePreviewDialog = true">生成应收</el-button>
+            <el-button type="primary" size="small" @click="generateReceivables()">生成应收</el-button>
             <el-button size="small" @click="showSupplementaryFee = true">补充收费</el-button>
           </div>
         </div>
@@ -633,25 +633,81 @@
     </el-dialog>
 
     <!-- Receivable Preview Dialog -->
-    <el-dialog v-model="showReceivablePreviewDialog" title="生成应收 — 预览" width="700px">
-      <el-descriptions :column="2" border style="margin-bottom:16px;">
-        <el-descriptions-item label="合同号">{{ contract.contractNo }}</el-descriptions-item>
-        <el-descriptions-item label="账期范围">{{ contract.startDate }} ~ {{ contract.endDate || '不限' }}</el-descriptions-item>
-      </el-descriptions>
-      <div v-if="receivablePreviewLoading" style="text-align:center;padding:20px;">加载中...</div>
+    <el-dialog v-model="showReceivablePreviewDialog" title="生成应收 — 预览" width="720px">
+      <!-- Loading -->
+      <div v-if="receivablePreviewLoading" style="text-align:center;padding:40px 0;">
+        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+        <p style="margin-top:12px;color:#909399;">正在计算应收...</p>
+      </div>
+
       <template v-else>
-        <el-table :data="receivablePreviewItems" stripe size="small" v-if="receivablePreviewItems.length > 0">
-          <el-table-column prop="period" label="账期" width="80" />
-          <el-table-column prop="feeName" label="费用项目" width="100" />
-          <el-table-column label="金额" width="120" align="right">
-            <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
-          </el-table-column>
-          <el-table-column prop="dueDate" label="到期日" width="95" />
-        </el-table>
-        <div style="text-align:right;margin-top:12px;font-size:15px;">
-          应收合计: <strong style="color:#e6a23c;">¥{{ receivablePreviewTotal.toLocaleString() }}</strong>
+        <!-- Info Card -->
+        <div style="padding:12px 16px;background:#f5f7fa;border-radius:6px;margin-bottom:20px;">
+          <el-row :gutter="24">
+            <el-col :span="12"><span style="color:#909399;font-size:13px;">合同号</span><br><strong>{{ contract.contractNo }}</strong></el-col>
+            <el-col :span="12"><span style="color:#909399;font-size:13px;">房屋</span><br><strong>{{ contract.roomName }}</strong></el-col>
+          </el-row>
+          <el-row :gutter="24" style="margin-top:8px;">
+            <el-col :span="12"><span style="color:#909399;font-size:13px;">租客</span><br><strong>{{ contract.tenantName }}</strong></el-col>
+            <el-col :span="12"><span style="color:#909399;font-size:13px;">付款周期</span><br><strong>{{ contract.paymentCycle === 'Monthly' ? '月付' : contract.paymentCycle === 'Quarterly' ? '季付' : contract.paymentCycle || '月付' }}</strong></el-col>
+          </el-row>
+        </div>
+
+        <!-- 周期性收费 -->
+        <div v-if="recurringPreviewItems.length > 0" style="margin-bottom:20px;">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px;">
+            <span style="font-weight:600;font-size:15px;">周期性收费</span>
+            <span style="font-size:13px;color:#909399;">账期 {{ contract.startDate }} ~ {{ recurringPeriodEnd }}</span>
+          </div>
+          <div style="height:1px;background:#e4e7ed;margin-bottom:12px;"></div>
+          <el-table :data="recurringPreviewItems" stripe size="small">
+            <el-table-column prop="period" label="账期" width="80" />
+            <el-table-column prop="feeName" label="费用项目" min-width="110" />
+            <el-table-column label="金额" width="130" align="right">
+              <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+            </el-table-column>
+            <el-table-column label="生效期" min-width="160">
+              <template #default="{ row }">{{ row.effStart }} ~ {{ row.effEnd }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- 一次性收费 -->
+        <div v-if="oneTimePreviewItems.length > 0" style="margin-bottom:20px;">
+          <div style="font-weight:600;font-size:15px;margin-bottom:6px;">一次性收费</div>
+          <div style="height:1px;background:#e4e7ed;margin-bottom:12px;"></div>
+          <el-table :data="oneTimePreviewItems" stripe size="small">
+            <el-table-column prop="feeName" label="费用项目" min-width="110" />
+            <el-table-column label="金额" width="130" align="right">
+              <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- Empty -->
+        <div v-if="receivablePreviewItems.length === 0" style="text-align:center;padding:40px 0;color:#909399;">
+          <el-icon :size="32"><CircleCheckFilled /></el-icon>
+          <p style="margin-top:8px;">无可生成的应收项目</p>
+        </div>
+
+        <!-- Summary Panel -->
+        <div v-if="receivablePreviewItems.length > 0" style="padding:12px 20px;background:#f5f7fa;border-radius:6px;margin-top:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:4px 0;">
+            <span style="color:#606266;">周期性收费</span>
+            <span>¥{{ recurringSubtotal.toLocaleString() }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:4px 0;">
+            <span style="color:#606266;">一次性收费</span>
+            <span>¥{{ oneTimeSubtotal.toLocaleString() }}</span>
+          </div>
+          <el-divider style="margin:8px 0;" />
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:700;">
+            <span>应收合计</span>
+            <span style="color:#e6a23c;">¥{{ receivablePreviewTotal.toLocaleString() }}</span>
+          </div>
         </div>
       </template>
+
       <template #footer>
         <el-button @click="showReceivablePreviewDialog = false">取消</el-button>
         <el-button type="primary" @click="submitReceivableGenerate" :loading="receivableSubmitting">提交审批</el-button>
@@ -742,7 +798,7 @@ import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createA
   getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig,
   getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal,
   getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges,
-  handleApiError } from '@/api/index.js'
+  handleApiError, previewJournals, generateJournalRequest } from '@/api/index.js'
 
 // ---------------------------------------------------------------------------
 // ★ 一次性收费展开行状态管理
@@ -842,6 +898,32 @@ const receivableStats = computed(() => {
   const totalReceived = receivableTimeline.value.reduce((s, r) => s + (r.received || 0), 0)
   return { totalAmount, totalDue: totalAmount - totalReceived }
 })
+/** 按收费类型拆分预览项 */
+const recurringPreviewItems = computed(() =>
+  receivablePreviewItems.value.filter(i => i.chargeType === 'Recurring')
+)
+const oneTimePreviewItems = computed(() =>
+  receivablePreviewItems.value.filter(i => i.chargeType === 'OneTime')
+)
+/** 周期收费的账期截止日：有合同到期日则用，无则取最后账期所在月月末 */
+const recurringPeriodEnd = computed(() => {
+  if (contract.value.endDate) return contract.value.endDate
+  const periods = [...new Set(recurringPreviewItems.value.map(i => i.period))].sort()
+  if (periods.length > 0) {
+    const last = periods[periods.length - 1]
+    const [y, m] = last.split('-').map(Number)
+    const lastDay = new Date(y, m, 0).getDate()
+    return `${last}-${String(lastDay).padStart(2, '0')}`
+  }
+  return '不限'
+})
+/** 预览小计 */
+const recurringSubtotal = computed(() =>
+  recurringPreviewItems.value.reduce((s, i) => s + (i.amount || 0), 0)
+)
+const oneTimeSubtotal = computed(() =>
+  oneTimePreviewItems.value.reduce((s, i) => s + (i.amount || 0), 0)
+)
 const recurringConfigs = computed(() => {
   const map = new Map()
   for (const f of feeConfigs.value) {
@@ -1769,15 +1851,13 @@ async function generateReceivables() {
   showReceivablePreviewDialog.value = true
   receivablePreviewLoading.value = true
   try {
-    const res = await fetch('/api/journals/preview', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contractId: contract.value.id })
-    }).then(r => r.json())
+    const res = await previewJournals({ contractId: contract.value.id })
     receivablePreviewItems.value = res.items || []
     receivablePreviewTotal.value = res.totalAmount || 0
   } catch (e) {
     receivablePreviewItems.value = []
     receivablePreviewTotal.value = 0
+    ElMessage.error('加载应收预览失败: ' + (e?.response?.data?.message || e.message || '未知错误'))
   }
   receivablePreviewLoading.value = false
 }
@@ -1785,18 +1865,20 @@ async function generateReceivables() {
 async function submitReceivableGenerate() {
   receivableSubmitting.value = true
   try {
-    const res = await fetch('/api/journals/generaterequest', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contractId: contract.value.id })
-    }).then(r => r.json())
-    if (res.status === 'PendingApproval' || res.message) {
-      ElMessage.success(res.message || '应收生成请求已提交审批')
-      showReceivablePreviewDialog.value = false
-      await fetchContract()
+    const res = await generateJournalRequest({ contractId: contract.value.id })
+    if (res.status === 'PendingApproval') {
+      ElMessage.success('应收生成请求已提交审批，等待审核')
+    } else if (res.count !== undefined) {
+      ElMessage.success(`已成功生成 ${res.count} 条应收记录`)
     } else {
-      ElMessage.error(res.message || '提交失败')
+      ElMessage.success(res.message || '操作成功')
     }
-  } catch (e) { ElMessage.error('提交失败') }
+    showReceivablePreviewDialog.value = false
+    await fetchContract()
+  } catch (e) {
+    ElMessage.closeAll()
+    ElMessage.error(e?.response?.data?.message || e?.response?.data?.error || '提交失败')
+  }
   receivableSubmitting.value = false
 }
 

@@ -366,7 +366,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     // 插入 ReceivablePlan（一次性费用应收计划，关联到 FeeConfig 实例以支持同费用多次添加）
                     var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
                     await conn.ExecuteAsync(
-                        _sql.Get("Billing.Insert.ReceivablePlan.ForOneTimeFee"),
+                        _sql.Get("Billing.Insert.Journal.Default"),
                         new
                         {
                             Id = Guid.NewGuid(),
@@ -587,9 +587,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	        var request = await _uow.ReceivableGenerateRequests.GetByIdAsync(@event.TargetEntityId, ct);
 	        if (request == null || request.Status != "PendingApproval") return;
 
-	        var locked = await _uow.ExecuteSqlRawAsync(
+	        using var lockConn = _db.CreateConnection(); lockConn.Open();
+	        var locked = await lockConn.ExecuteAsync(
 	            _sql.Get("ReceivableGenerate.Update.Request.LockExecuting"),
-	            new { Id = request.Id, Now = ChinaTime.Now }, ct);
+	            new { Id = request.Id, Now = ChinaTime.Now });
 	        if (locked == 0) return;
 
 	        List<dynamic> items;
@@ -603,7 +604,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	        try
 	        {
 	            var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
-	                _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+	                _sql.Get("Accounting.Select.Subject.ByCodes"), null, tx)).ToDictionary(r => r.Code, r => r.Id);
 	            var receivableId = subjects.GetValueOrDefault("1122", Guid.Empty);
 	            var revenueId = subjects.GetValueOrDefault("6001", subjects.GetValueOrDefault("6051", Guid.Empty));
 	            var now = ChinaTime.Now;
@@ -611,35 +612,28 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	            foreach (var item in items)
 	            {
 	                var exists = await conn.QuerySingleAsync<int>(
-	                    _sql.Get("Billing.Select.ReceivablePlan.ExistsByKey"),
+	                    _sql.Get("Billing.Select.Journal.ExistsByKey"),
 	                    new { C = request.ContractId, F = (Guid)item.FeeCodeId, P = (string)item.Period }, tx);
 	                if (exists > 0) continue;
 
-	                var planId = Guid.NewGuid();
+	                var jId = Guid.NewGuid();
 	                await conn.ExecuteAsync(
-	                    _sql.Get("Billing.Insert.ReceivablePlan.Default"),
-	                    new { Id = planId, CId = request.ContractId, FId = (Guid)item.FeeCodeId,
-	                        P = (string)item.Period, Amt = (decimal)item.Amount, Due = (DateOnly)item.DueDate, CBy = Guid.Empty }, tx);
+	                    _sql.Get("Billing.Insert.Journal.Default"),
+	                    new
+		                        {
+		                            Id = jId, CoId = request.CompanyId, CId = request.ContractId,
+		                            FId = (Guid)item.FeeCodeId, FConfigId = (Guid?)null,
+		                            SubjId = Guid.Empty, Period = (string)item.Period,
+		                            Amt = (decimal)item.Amount, Due = DateOnly.FromDateTime((DateTime)item.DueDate),
+		                            EntryType = "Normal", BilledAt = ChinaTime.Now,
+		                            DNId = (Guid?)null, ParentId = (Guid?)null,
+		                            Summary = $"生成应收 {item.Period}", CBy = Guid.Empty
+		                        }, tx);
 
-	                var vid = Guid.NewGuid();
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Accounting.Insert.Voucher.BillJob"),
-	                    new { Id = vid, No = $"GEN-{item.Period}-{Guid.NewGuid():N}"[..32],
-	                        Date = DateOnly.FromDateTime(now), Desc = $"手动生成应收 {item.Period}",
-	                        SrcId = request.ContractId, Type = "ReceivableGeneration",
-	                        CId = request.ContractId, CBy = Guid.Empty }, tx);
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Accounting.Insert.JournalEntry.Simple"),
-	                    new { Id = Guid.NewGuid(), VId = vid, SId = receivableId,
-	                        Dir = "Debit", Amt = item.Amount, Sum = $"{item.Period} 应收", CBy = Guid.Empty }, tx);
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Accounting.Insert.JournalEntry.Simple"),
-	                    new { Id = Guid.NewGuid(), VId = vid, SId = revenueId,
-	                        Dir = "Credit", Amt = item.Amount, Sum = $"{item.Period} 收入", CBy = Guid.Empty }, tx);
-
+	               
 	                await conn.ExecuteAsync(
 	                    _sql.Get("ReceivableGenerate.Update.Item.SetPlanIds"),
-	                    new { Id = (Guid)item.Id, ReceivablePlanId = planId, VoucherId = vid }, tx);
+	                    new { Id = (Guid)item.Id, ReceivablePlanId = jId, VoucherId = (Guid?)null }, tx);
 	            }
 
 	            await conn.ExecuteAsync(
@@ -755,44 +749,35 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	                    CreatedBy = request.CreatedBy, CreatedAt = ChinaTime.Now }, tx);
 
 	            var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
-	                _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+	                _sql.Get("Accounting.Select.Subject.ByCodes"), null, tx)).ToDictionary(r => r.Code, r => r.Id);
 	            var receivableId = subjects.GetValueOrDefault("1122", Guid.Empty);
 	            var revenueId = subjects.GetValueOrDefault("6001", subjects.GetValueOrDefault("6051", Guid.Empty));
 
 	            foreach (var item in items)
 	            {
 	                var exists = await conn.QuerySingleAsync<int>(
-	                    _sql.Get("Billing.Select.ReceivablePlan.ExistsByKey"),
+	                    _sql.Get("Billing.Select.Journal.ExistsByKey"),
 	                    new { C = request.ContractId, F = request.FeeCodeId, P = (string)item.Period }, tx);
 	                if (exists > 0) continue;
 
-	                var planId = Guid.NewGuid();
+	                var jId = Guid.NewGuid();
 	                await conn.ExecuteAsync(
-	                    _sql.Get("Billing.Insert.ReceivablePlan.Default"),
-	                    new { Id = planId, CId = request.ContractId, FId = request.FeeCodeId,
-	                        P = (string)item.Period, Amt = (decimal)item.ProratedAmount,
-	                        Due = DateOnly.FromDateTime(ChinaTime.Now), CBy = Guid.Empty }, tx);
+	                    _sql.Get("Billing.Insert.Journal.Default"),
+	                    new
+		                        {
+		                            Id = jId, CoId = request.CompanyId, CId = request.ContractId,
+		                            FId = request.FeeCodeId, FConfigId = configId,
+		                            SubjId = Guid.Empty, Period = (string)item.Period,
+		                            Amt = (decimal)item.ProratedAmount, Due = DateOnly.FromDateTime(ChinaTime.Now),
+		                            EntryType = "Normal", BilledAt = ChinaTime.Now,
+		                            DNId = (Guid?)null, ParentId = (Guid?)null,
+		                            Summary = $"补充收费 {item.Period}", CBy = Guid.Empty
+		                        }, tx);
 
-	                var vid = Guid.NewGuid();
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Accounting.Insert.Voucher.BillJob"),
-	                    new { Id = vid, No = $"SUP-{item.Period}-{Guid.NewGuid():N}"[..32],
-	                        Date = DateOnly.FromDateTime(ChinaTime.Now),
-	                        Desc = $"补充收费 {request.EffectiveDate}",
-	                        SrcId = request.ContractId, Type = "SupplementaryFee",
-	                        CId = request.ContractId, CBy = Guid.Empty }, tx);
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Accounting.Insert.JournalEntry.Simple"),
-	                    new { Id = Guid.NewGuid(), VId = vid, SId = receivableId, Dir = "Debit",
-	                        Amt = item.ProratedAmount, Sum = $"补充收费 {item.Period}", CBy = Guid.Empty }, tx);
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Accounting.Insert.JournalEntry.Simple"),
-	                    new { Id = Guid.NewGuid(), VId = vid, SId = revenueId, Dir = "Credit",
-	                        Amt = item.ProratedAmount, Sum = $"补充收费 {item.Period}", CBy = Guid.Empty }, tx);
-
+	               
 	                await conn.ExecuteAsync(
 	                    _sql.Get("SupplementaryFee.Update.Item.SetPlanIds"),
-	                    new { Id = (Guid)item.Id, ReceivablePlanId = planId, VoucherId = vid }, tx);
+	                    new { Id = (Guid)item.Id, ReceivablePlanId = jId, VoucherId = (Guid?)null }, tx);
 	            }
 
 	            await conn.ExecuteAsync(

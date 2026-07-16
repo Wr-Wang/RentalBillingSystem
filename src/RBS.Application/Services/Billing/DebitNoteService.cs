@@ -1,6 +1,7 @@
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Billing;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Billing;
@@ -71,7 +72,7 @@ public class DebitNoteService : IDebitNoteService
             if (journal.Amount <= 0) continue; // 只取正数（借方）
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Billing.Insert.DebitNoteItem.Default"),
-                new object[] { Guid.NewGuid(), note.Id, journal.FeeCodeId, journal.Amount, Guid.Empty, DateTime.UtcNow },
+                new object[] { Guid.NewGuid(), note.Id, journal.FeeCodeId, journal.Amount, Guid.Empty, ChinaTime.Now },
                 ct);
         }
         note.LoadItems(periodJournals.Where(j => j.Amount > 0).Select(j => new DebitNoteItem(note.Id, j.FeeCodeId, j.Amount)).ToList());

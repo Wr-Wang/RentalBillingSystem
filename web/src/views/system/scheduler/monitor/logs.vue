@@ -145,6 +145,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 import {
   queryMonitorLogs, getMonitorLogDetail,
   previewReverse
@@ -241,7 +242,7 @@ async function handleRetry(row) {
     await executeJob(row.taskName, {
       mode: 'execute',
       companyId: '00000000-0000-0000-0000-000000000000',
-      targetMonth: row.targetMonth || new Date().toISOString().slice(0, 7)
+      targetMonth: row.targetMonth || chinaTime.currentMonth()
     })
     ElMessage.success('重试任务已触发')
     await fetchLogs()

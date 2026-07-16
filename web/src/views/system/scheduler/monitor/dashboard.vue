@@ -113,6 +113,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 import * as echarts from 'echarts'
 import {
   getMonitorDashboard, getMonitorTrend, getMonitorDuration,
@@ -215,7 +216,7 @@ async function fetchErrorLogs() {
   logsLoading.value = true
   try {
     // 今日失败的日志
-    const today = new Date()
+    const today = chinaTime.now()
     const startStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}T00:00:00Z`
     const r = await queryMonitorLogs({
       status: 'Failed', startTime: startStr, pageSize: 20

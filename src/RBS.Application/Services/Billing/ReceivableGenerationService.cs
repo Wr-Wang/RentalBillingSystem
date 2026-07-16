@@ -82,12 +82,24 @@ public class ReceivableGenerationService : IReceivableGenerationService
         using var conn = _db.CreateConnection();
         conn.Open();
 
+        // 读取费用配置（Dapper 泛型 GetByIdAsync 不含 FeeConfigs 导航属性）
+        var feeConfigRows = (await conn.QueryAsync(
+            _sql.Get("Lease.Select.ContractFeeConfig.WithFeeCodeByContract"),
+            new { ContractId = contractId })).ToList();
+
+        var feeConfigs = feeConfigRows.Select(f => (
+            FeeCodeId: (Guid)f.FeeCodeId,
+            Amount: (decimal)f.Amount,
+            EffectiveDate: (string?)f.EffectiveDate,
+            ExpiryDate: (string?)f.ExpiryDate
+        )).ToList();
+
         foreach (var period in matched)
         {
             var dueDate = CalculateDueDate(period, contract);
 
-            var journals = _billingDomain.GenerateJournals(contract, period, dueDate,
-                contract.CompanyId, Guid.Empty, DateTime.UtcNow);
+            var journals = _billingDomain.GenerateJournals(feeConfigs, contract.Id,
+                contract.CompanyId, period, dueDate, Guid.Empty, ChinaTime.Now);
 
             foreach (var journal in journals)
             {
@@ -159,12 +171,11 @@ public class ReceivableGenerationService : IReceivableGenerationService
                         Amt = (decimal)fc.Amount, Due = dueDate, EntryType = "Deposit",
                         BilledAt = today, DNId = (Guid?)null, ParentId = (Guid?)null,
                         Summary = $"一次性 {(string)fc.Name}", CBy = Guid.Empty });
-            }
                 result.OneTimeFeeGenerated = true;
             }
-            return result;
         }
-
+        return result;
+    }
 
     /// <summary>
     /// 创建 Journal DataTable（列匹配 Billing.Insert.Journal.Default）
@@ -195,9 +206,16 @@ public class ReceivableGenerationService : IReceivableGenerationService
     {
         var start = contract.StartDate;
         var periods = new List<string>();
-        if (contract.EndDate == null) { periods.Add($"{start.Year}-{start.Month:D2}"); return periods; }
+
+        // 结束月份：有 EndDate 用 EndDate，null 表示长期合同，用当前月兜底
+        DateOnly endDate;
+        if (contract.EndDate != null)
+            endDate = contract.EndDate.Value;
+        else
+            endDate = DateOnly.FromDateTime(ChinaTime.Now);
+
         var curYear = start.Year; var curMonth = start.Month;
-        var endYear = contract.EndDate.Value.Year; var endMonth = contract.EndDate.Value.Month;
+        var endYear = endDate.Year; var endMonth = endDate.Month;
         while (curYear < endYear || (curYear == endYear && curMonth <= endMonth))
         {
             periods.Add($"{curYear}-{curMonth:D2}");
@@ -224,8 +242,16 @@ public class ReceivableGenerationService : IReceivableGenerationService
         var periods = new List<string>();
 
         var current = new Period(start.Year, start.Month);
-        if (contract.EndDate == null) { periods.Add(current.ToString()); return periods; }
-        var endPeriod = new Period(contract.EndDate.Value.Year, contract.EndDate.Value.Month);
+
+        // 结束月份：有 EndDate 用 EndDate，null 表示长期合同，用当前月兜底
+        Period endPeriod;
+        if (contract.EndDate != null)
+            endPeriod = new Period(contract.EndDate.Value.Year, contract.EndDate.Value.Month);
+        else
+        {
+            var now = ChinaTime.Now;
+            endPeriod = new Period(now.Year, now.Month);
+        }
 
         while (current.Year < endPeriod.Year || (current.Year == endPeriod.Year && current.Month <= endPeriod.Month))
         {

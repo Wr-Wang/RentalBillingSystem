@@ -10,8 +10,10 @@ using RBS.Core.Entities.SystemConfig;
 public interface IBillingDomainService
 {
     /// <summary>为合同批量生成指定账期的 Journal 出账记录。</summary>
-    List<Journal> GenerateJournals(Contract contract, string period, DateOnly dueDate,
-        Guid companyId, Guid defaultSubjectId, DateTime billedAt);
+    List<Journal> GenerateJournals(
+        List<(Guid FeeCodeId, decimal Amount, string? EffectiveDate, string? ExpiryDate)> feeConfigs,
+        Guid contractId, Guid companyId, string period, DateOnly dueDate,
+        Guid defaultSubjectId, DateTime billedAt);
 
     /// <summary>计算利息（滞纳金）。</summary>
     decimal CalculateLateFee(decimal amount, decimal received, DateOnly dueDate,

@@ -82,4 +82,29 @@ public interface IContractService
     /// <param name="id">合同 ID</param>
     /// <param name="ct">取消令牌</param>
     Task ResumeAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// 检查合同是否有待审批的调价申请，有则抛出 InvalidOperationException
+    /// </summary>
+    Task EnsureNoPendingForContractAsync(Guid contractId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 执行合同创建（绕过审批，直接执行）
+    /// </summary>
+    Task<Guid> ExecuteContractCreationAsync(Guid requestId, Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 提交合同创建请求状态更新
+    /// </summary>
+    Task SubmitContractCreateRequestStatusAsync(Guid requestId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 设置审批请求关联的合同 ID
+    /// </summary>
+    Task SetApprovalRequestContractIdAsync(Guid approvalRequestId, Guid contractId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 执行费用调价
+    /// </summary>
+    Task<object> FeeAdjustAsync(Guid contractId, FeeAdjustRequest request, Guid userId, CancellationToken ct = default);
 }
