@@ -295,8 +295,8 @@ public class SchedulerController : ControllerBase
             var execResult = await baseJob.ExecuteWithOptionsAsync(request, ct);
             return Ok(new { mode = "execute", result = execResult });
         }
-        var execResult2 = await job.ExecuteAsync(request.CompanyId, request.TargetMonth, ct);
-        return Ok(new { mode = "execute", result = execResult2 });
+        var jobResult = await job.ExecuteAsync(request.CompanyId, request.TargetMonth, ct);
+        return Ok(new { mode = "execute", result = jobResult });
     }
 
     [HttpDelete("jobs/{jobId}/executions/future")]

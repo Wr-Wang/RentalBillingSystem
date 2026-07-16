@@ -81,16 +81,16 @@ public class ReceiptsController : ControllerBase
             }
 
             // 2. 更新合同欠款/预存余额
-            var receiptData2 = await conn.QuerySingleAsync<dynamic>(
+            var receiptInfo = await conn.QuerySingleAsync<dynamic>(
                 _sql.Get("Receipt.Select.Receipt.WithContractBalance"),
                 new { Id = id }, tx);
-            if (receiptData2 != null)
+            if (receiptInfo != null)
             {
-                var contractId = (Guid?)receiptData2.ContractId;
-                if (contractId == null) { tx.Commit(); return Ok(new { id }); }
-                var cId = contractId.Value;
-                var amt = (decimal)receiptData2.Amount;
-                var outstanding = (decimal?)receiptData2.OutstandingBalance ?? 0m;
+                var rContractId = (Guid?)receiptInfo.ContractId;
+                if (rContractId == null) { tx.Commit(); return Ok(new { id }); }
+                var cId = rContractId.Value;
+                var amt = (decimal)receiptInfo.Amount;
+                var outstanding = (decimal?)receiptInfo.OutstandingBalance ?? 0m;
                 var offset = Math.Min(amt, outstanding); // 先冲欠款
                 var overflow = amt - offset;              // 超出进预存
                 if (offset > 0)

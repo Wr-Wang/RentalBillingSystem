@@ -70,8 +70,8 @@ public class ContractsController : ControllerBase
         }
 
         if (companyId == null) return Ok(new { items = new List<object>(), total = 0, page = 1, pageSize = 10, totalPages = 0 });
-        var result2 = await _contractService.GetPagedListAsync(companyId.Value, page, pageSize, keyword, status, roomId, ct);
-        return Ok(result2);
+        var pagedResult = await _contractService.GetPagedListAsync(companyId.Value, page, pageSize, keyword, status, roomId, ct);
+        return Ok(pagedResult);
     }
 
     [HttpGet("{id}")]
@@ -253,8 +253,8 @@ public class ContractsController : ControllerBase
         // 无审批配置 → 0 级直接执行
                 if (approvalType == null)
         {
-            using var conn2 = _db.CreateConnection(); conn2.Open();
-            using var tx2 = conn2.BeginTransaction();
+            using var innerConn = _db.CreateConnection(); innerConn.Open();
+            using var innerTx = innerConn.BeginTransaction();
             try
             {
                 foreach (var item in request.Items)
@@ -262,36 +262,36 @@ public class ContractsController : ControllerBase
                     var effDate = item.EffectiveDate ?? "";
                     if (string.IsNullOrEmpty(effDate)) continue;
 
-                    var current = await conn2.QuerySingleOrDefaultAsync(
+                    var current = await innerConn.QuerySingleOrDefaultAsync(
                         _sql.Get("Lease.Select.ContractFeeConfig.CurrentByContractAndFee"),
-                        new { ContractId = id, FeeCodeId = item.FeeCodeId }, tx2);
+                        new { ContractId = id, FeeCodeId = item.FeeCodeId }, innerTx);
 
-                    var overlap = await conn2.QuerySingleAsync<int>(
+                    var overlap = await innerConn.QuerySingleAsync<int>(
                         _sql.Get("Lease.Select.ContractFeeConfig.CheckOverlap"),
                         new { ContractId = id, FeeCodeId = item.FeeCodeId,
                             EffectiveDate = effDate, ExpiryDate = (string?)null,
-                            ExcludeId = current != null ? (Guid)((dynamic)current).Id : (Guid?)null }, tx2);
+                            ExcludeId = current != null ? (Guid)((dynamic)current).Id : (Guid?)null }, innerTx);
                     if (overlap > 0)
                         throw new InvalidOperationException("费用项 " + item.FeeName + " 的生效日期与已有记录冲突");
 
                     var expiryDate = DateTime.Parse(effDate).AddDays(-1).ToString("yyyy-MM-dd");
                     if (current != null)
                     {
-                        await conn2.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
-                            new { Id = (Guid)((dynamic)current).Id, ExpiryDate = expiryDate }, tx2);
-                        await conn2.ExecuteAsync(_sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
-                            new { ExpiryDate = expiryDate, ContractId = id, FeeCodeId = item.FeeCodeId }, tx2);
+                        await innerConn.ExecuteAsync(_sql.Get("Lease.Update.ContractFeeConfig.ExpiryDate"),
+                            new { Id = (Guid)((dynamic)current).Id, ExpiryDate = expiryDate }, innerTx);
+                        await innerConn.ExecuteAsync(_sql.Get("Contract.Update.ContractFeeConfig.ExpireByCodeId"),
+                            new { ExpiryDate = expiryDate, ContractId = id, FeeCodeId = item.FeeCodeId }, innerTx);
                     }
-                    await conn2.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
+                    await innerConn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
                         new { Id = Guid.NewGuid(), ContractId = id, FeeCodeId = item.FeeCodeId,
                             BillingMode = item.BillingMode ?? "FixedAmount", Amount = item.NewAmount,
-                            EffectiveDate = effDate, CreatedBy = userId, Now = ChinaTime.Now }, tx2);
+                            EffectiveDate = effDate, CreatedBy = userId, Now = ChinaTime.Now }, innerTx);
                 }
-                tx2.Commit();
+                innerTx.Commit();
             }
             catch (Exception ex)
             {
-                tx2.Rollback();
+                innerTx.Rollback();
                 return BadRequest(new { error = "[Tx] " + ex.Message });
             }
 
@@ -300,35 +300,35 @@ public class ContractsController : ControllerBase
             {
                 foreach (var item in request.Items)
                 {
-                    var effDate2 = item.EffectiveDate ?? "";
-                    if (!string.IsNullOrEmpty(effDate2))
+                    var effDateStr = item.EffectiveDate ?? "";
+                    if (!string.IsNullOrEmpty(effDateStr))
                         await InsertChangeHistoryAsync(_db.CreateConnection(), null, id, "FEE_ADJUST",
-                            "费用调价", item.FeeName + ": " + item.OldAmount.ToString("F2") + " -> " + item.NewAmount.ToString("F2") + "，生效 " + effDate2,
-                            item.OldAmount, item.NewAmount, effDate2, userId);
+                            "费用调价", item.FeeName + ": " + item.OldAmount.ToString("F2") + " -> " + item.NewAmount.ToString("F2") + "，生效 " + effDateStr,
+                            item.OldAmount, item.NewAmount, effDateStr, userId);
                 }
 
                 var currentMonth = DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM");
                 foreach (var item in request.Items)
                 {
-                    var effDate2 = item.EffectiveDate ?? "";
-                    if (!string.IsNullOrEmpty(effDate2))
+                    var effDateStr = item.EffectiveDate ?? "";
+                    if (!string.IsNullOrEmpty(effDateStr))
                     {
                         // 调价补差：INSERT Journal + Update GL
                         var diffAmt = Math.Round(item.NewAmount - item.OldAmount, 2);
                         if (diffAmt != 0)
                         {
-                            var subj = await conn2.QuerySingleOrDefaultAsync(
+                            var subj = await innerConn.QuerySingleOrDefaultAsync(
                                 _sql.Get("Accounting.Select.Subject.ByCode"), new { Code = "1122" });
                             var sId = subj != null ? (Guid)((dynamic)subj).Id : Guid.Empty;
-                            var effM = effDate2.Substring(0, 7);
-                            await conn2.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
+                            var effM = effDateStr.Substring(0, 7);
+                            await innerConn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
                                 new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = id,
                                     FId = item.FeeCodeId, FConfigId = (Guid?)null, SubjId = sId,
                                     Period = effM, Amt = Math.Abs(diffAmt),
                                     Due = DateOnly.FromDateTime(ChinaTime.Now).AddDays(30),
                                     EntryType = "Supplementary", BilledAt = ChinaTime.Now,
                                     DNId = (Guid?)null, ParentId = (Guid?)null,
-                                    Summary = $"{item.FeeName}调价补差", CBy = userId }, tx2);
+                                    Summary = $"{item.FeeName}调价补差", CBy = userId }, innerTx);
                             // TODO: GL 更新 — 原 glLatest 逻辑已移除
                         }
                     }
