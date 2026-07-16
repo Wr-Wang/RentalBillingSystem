@@ -84,9 +84,11 @@ public class ReceiptsController : ControllerBase
             var receiptData2 = await conn.QuerySingleAsync<dynamic>(
                 _sql.Get("Receipt.Select.Receipt.WithContractBalance"),
                 new { Id = id }, tx);
-            if (receiptData2 != null && receiptData2.ContractId != null)
+            if (receiptData2 != null)
             {
-                var cId = (Guid)receiptData2.ContractId;
+                var contractId = (Guid?)receiptData2.ContractId;
+                if (contractId == null) { tx.Commit(); return Ok(new { id }); }
+                var cId = contractId.Value;
                 var amt = (decimal)receiptData2.Amount;
                 var outstanding = (decimal?)receiptData2.OutstandingBalance ?? 0m;
                 var offset = Math.Min(amt, outstanding); // 先冲欠款

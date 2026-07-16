@@ -404,7 +404,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
             {
                 return await CommitAsync(ct);
             }
-            catch (Exception ex) when (attempt < maxRetries)
+            catch (Exception) when (attempt < maxRetries)
             {
                 // 短暂等待后重试，首次重试无延迟
                 if (attempt > 1)

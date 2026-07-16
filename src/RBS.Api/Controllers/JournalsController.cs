@@ -146,23 +146,26 @@ public class JournalsController : ControllerBase
         var created = await _receivableGen.GenerateAsync(request.ContractId, null, null, ct);
         if (created > 0)
         {
-            // 更新 GL（追加式快照）
             var now = ChinaTime.Now;
             var period = $"{now.Year}-{now.Month:D2}";
             using var conn = _db.CreateConnection();
             conn.Open();
+
+            // 1. 更新合同欠款余额
+            var totalBilled = await conn.QuerySingleAsync<decimal>(
+                _sql.Get("Billing.Select.Journal.SumAmountByContractPeriod"),
+                new { CId = request.ContractId, P = period });
+            await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
+                new { Id = request.ContractId, Amt = totalBilled });
+
+            // 2. 更新 GL（追加式快照）
             var latest = await conn.QuerySingleOrDefaultAsync(
                 _sql.Get("Accounting.Select.GL.LatestByPeriod"),
                 new { CoId = contract.CompanyId, Period = period });
             var prevBilled = latest != null ? (decimal)((dynamic)latest).TotalBilled : 0m;
             var prevReceived = latest != null ? (decimal)((dynamic)latest).TotalReceived : 0m;
             var opening = latest != null ? (decimal)((dynamic)latest).OpeningBalance : 0m;
-            // 需要汇总本次新增的金额
-            var sumAmt = 0m; using var c2 = _db.CreateConnection(); c2.Open();
-            sumAmt = await c2.QuerySingleAsync<decimal>(
-                "SELECT ISNULL(SUM(Amount),0) FROM Journals WHERE ContractId=@CId AND Period=@P AND CreatedAt>=DATEADD(MINUTE,-1,GETUTCDATE())",
-                new { CId = request.ContractId, P = period });
-            var newBilled = prevBilled + sumAmt;
+            var newBilled = prevBilled + totalBilled;
             await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Default"),
                 new { Id = Guid.NewGuid(), CoId = contract.CompanyId, Period = period,
                     Opening = opening, Billed = newBilled, Received = prevReceived,

@@ -743,6 +743,9 @@
   <select id="Accounting.Select.GL.OpeningBalanceByPeriod">
     <![CDATA[SELECT TOP 1 ClosingBalance FROM GeneralLedgerBalances WHERE CompanyId=@CoId AND Period=@Period ORDER BY CalculatedAt DESC]]>
   </select>
+  <select id="Billing.Select.Journal.SumAmountByContractPeriod">
+    <![CDATA[SELECT ISNULL(SUM(Amount),0) FROM Journals WHERE ContractId=@CId AND Period=@P]]>
+  </select>
 
   <!-- ===== Prepaid（预收明细）===== -->
   <insert id="Billing.Insert.Prepaid.Default">
