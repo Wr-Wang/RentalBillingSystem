@@ -29,4 +29,9 @@ public interface IJournalAppService
     /// 提交生成应收 — 直接创建或走审批
     /// </summary>
     Task<object> GenerateRequestAsync(Guid contractId, Guid userId);
+
+    /// <summary>
+    /// 手动过账 — 将 GLPosted=0 的 Journal 标记为已过账并写入 GL 分录
+    /// </summary>
+    Task<object> PostAsync(List<Guid> ids);
 }

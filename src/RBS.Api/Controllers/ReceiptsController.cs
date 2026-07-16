@@ -67,4 +67,29 @@ public class ReceiptsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpPost("{id}/reverse")]
+    public async Task<IActionResult> Reverse(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _receiptService.ReverseAsync(id, ct);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("batchconfirm")]
+    public async Task<IActionResult> BatchConfirm([FromBody] List<Guid> ids, CancellationToken ct)
+    {
+        var result = await _receiptService.BatchConfirmAsync(ids, ct);
+        return Ok(result);
+    }
 }

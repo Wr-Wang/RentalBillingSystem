@@ -58,10 +58,6 @@ public interface IUnitOfWork : IDisposable
     IRepository<FeeCodeTemplate> FeeCodeTemplates { get; }
     /// <summary>日记账仓储（不可变的出账记录）</summary>
     IRepository<Journal> Journals { get; }
-    /// <summary>总账余额仓储</summary>
-    IRepository<GeneralLedgerBalance> GeneralLedgerBalances { get; }
-    /// <summary>预收账款明细仓储</summary>
-    IRepository<PrepaidDetail> PrepaidDetails { get; }
 
     // ===== 收款 =====
 

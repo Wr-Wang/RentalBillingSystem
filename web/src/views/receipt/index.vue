@@ -95,7 +95,6 @@
               <el-button text size="small" type="success" v-if="row.status === 'Pending'" @click="confirmSingle(row)">确认</el-button>
               <el-button text size="small" type="warning" v-if="row.status === 'Pending'" @click="rejectSingle(row)">驳回</el-button>
               <el-button text size="small" type="danger" v-if="row.status === 'Confirmed'" @click="reverseSingle(row)">冲销</el-button>
-              <el-button text size="small" type="danger" v-if="row.status === 'Confirmed'" @click="refundSingle(row)">退款</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -146,7 +145,7 @@ import { useUserStore } from '@/store/user'
 import {
   getReceipts, getDeposits, createReceipt,
   confirmReceipt as apiConfirm, rejectReceipt as apiReject,
-  reverseReceipt as apiReverse, refundReceipt as apiRefund,
+  reverseReceipt as apiReverse,
   batchConfirmReceipts, getContracts, getPaymentChannels
 } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -318,15 +317,6 @@ async function rejectSingle(row) {
 }
 
 async function reverseSingle(row) {
-  try {
-    await ElMessageBox.confirm(`确定冲销收据 ${row.receiptNo} 吗？`, '提示', { type: 'warning' })
-    await apiReverse(row.id, { reason: '手动冲销' })
-    ElMessage.success('冲销成功')
-    await fetchReceipts()
-  } catch (e) { if (e !== 'cancel') ElMessage.error(e?.response?.data?.message || '冲销失败') }
-}
-
-async function refundSingle(row) {
   try {
     const { value } = await ElMessageBox.prompt(`退款金额（最多 ¥${(row.amount || 0).toLocaleString()}）：`, '退款', {
       confirmButtonText: '确定', cancelButtonText: '取消',

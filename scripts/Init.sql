@@ -3664,43 +3664,6 @@ CREATE UNIQUE INDEX [IX_Receipts_Audit_Id_Version] ON [Receipts_Audit]([Id], [Au
 
 
 -- ===================================================================
--- 42. ReceiptAllocations 表：收款分配表
--- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]'))
-CREATE TABLE [ReceiptAllocations] (
-    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [ReceiptId] UNIQUEIDENTIFIER NOT NULL , -- 收款单ID,
-    [JournalId] UNIQUEIDENTIFIER NOT NULL , -- 日记账ID,
-    [Amount] DECIMAL(18,2) NOT NULL , -- 分配金额,
-    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
-)
-GO
-
--- 表说明：收款分配表
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款分配表（收款单与日记账的分配关系）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations'
-GO
-
--- ReceiptAllocations 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'ReceiptId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日记账ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'JournalId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'分配金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'Amount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ReceiptAllocations', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-GO
--- 迁移：如果旧字段 ReceivablePlanId 存在则重命名为 JournalId（兼容已有数据库）
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'ReceivablePlanId')
-    EXEC sp_rename 'ReceiptAllocations.ReceivablePlanId', 'JournalId', 'COLUMN'
--- 迁移：如果旧字段 AllocatedAmount 存在则重命名为 Amount
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'AllocatedAmount')
-    EXEC sp_rename 'ReceiptAllocations.AllocatedAmount', 'Amount', 'COLUMN'
--- 收款+日记账唯一
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'IX_ReceiptAllocations_Receipt_Journal')
-CREATE UNIQUE INDEX [IX_ReceiptAllocations_Receipt_Journal] ON [ReceiptAllocations]([ReceiptId],[JournalId])
--- 删除旧索引（如果存在且字段已改名）
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ReceiptAllocations]') AND name=N'IX_ReceiptAllocations_Receipt_Plan')
-    DROP INDEX [IX_ReceiptAllocations_Receipt_Plan] ON [ReceiptAllocations]
 
 
 -- 43. DepositLogs 表：押金记录表
@@ -4115,231 +4078,64 @@ IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers_Audit
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers]')) DROP TABLE [Vouchers]
 
 -- ===================================================================
--- 47. GeneralLedgerBalances 表：总账余额表（期间汇总）
+
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances]'))
-CREATE TABLE [GeneralLedgerBalances] (
-    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
-    [Period] VARCHAR(7) NOT NULL , -- 会计期间(格式: yyyy-MM),
-    [OpeningBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 期初应收余额（上期期末结转）,
-    [TotalBilled] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 本期出账总额（汇总Journal.Amount）,
-    [TotalReceived] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 本期收款总额（汇总ReceiptAllocation.Amount）,
-    [ClosingBalance] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 期末应收余额(=OpeningBalance+TotalBilled-TotalReceived),
-    [CalculatedAt] DATETIME2 NOT NULL , -- 本条快照计算时间,
-    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+-- 48. GeneralLedgerEntries 表：总账分录表
+-- 记录每笔业务事件的科目级借贷变动
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerEntries]'))
+CREATE TABLE [GeneralLedgerEntries] (
+    [Id]          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [CompanyId]   UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
+    [ContractId]  UNIQUEIDENTIFIER NULL     , -- 关联合同ID,
+    [ContractNo]  NVARCHAR(64)     NULL     , -- 合同号（冗余）,
+    [Period]      NVARCHAR(10)     NOT NULL , -- 会计期间 yyyy-MM,
+    [SubjectId]   UNIQUEIDENTIFIER NOT NULL , -- 会计科目ID,
+    [SubjectCode] NVARCHAR(32)     NOT NULL , -- 科目编码,
+    [Direction]   NVARCHAR(8)      NOT NULL , -- Debit | Credit,
+    [Amount]      DECIMAL(18,2)    NOT NULL , -- 金额,
+    [SourceType]  NVARCHAR(32)     NOT NULL , -- BillJob | JournalPost | Receipt | SettleOffset,
+    [SourceId]    UNIQUEIDENTIFIER NULL     , -- 来源单据ID,
+    [Description] NVARCHAR(128)    NULL     , -- 摘要,
+    [CreatedBy]   UNIQUEIDENTIFIER NOT NULL , -- 创建人,
+    [CreatedAt]   DATETIME2        NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间（东八区）,
+    [UpdatedAt]   DATETIME2        NULL      -- 更新时间
 )
 GO
 
--- 表说明：总账余额表（追加式快照，不可变）
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账余额表（追加式快照，不可变）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账分录表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries'
 GO
 
--- GeneralLedgerBalances 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CompanyId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间(格式: yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'Period'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期初应收余额（上期期末结转）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'OpeningBalance'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期出账总额（汇总Journal.Amount）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'TotalBilled'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期收款总额（汇总ReceiptAllocation.Amount）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'TotalReceived'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期末应收余额(=OpeningBalance+TotalBilled-TotalReceived)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'ClosingBalance'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本条快照计算时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CalculatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-GO
--- 公司+期间查询（追加式快照，每次事件写入一条，取最新一条作为当前状态）
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances]') AND name=N'IX_GL_Company_Period')
-CREATE INDEX [IX_GL_Company_Period] ON [GeneralLedgerBalances]([CompanyId], [Period] DESC)
-
--- ===================================================================
--- GeneralLedgerBalances_Audit 表：总账余额表审计
--- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances_Audit]'))
-CREATE TABLE [GeneralLedgerBalances_Audit] (
-    [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY , -- 审计自增主键,
-    [AuditAction] VARCHAR(20) NOT NULL , -- 审计操作类型,
-    [AuditVersionNo] INT NOT NULL , -- 版本号,
-    [AuditChangedAt] DATETIME2 NOT NULL , -- 操作时间,
-    [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL , -- 操作人,
-    [AuditChangedHostname] VARCHAR(100) NULL , -- 操作人主机名,
-    [Id] UNIQUEIDENTIFIER NOT NULL , -- 主键,
-    [CompanyId] UNIQUEIDENTIFIER NULL , -- 所属公司ID,
-    [Period] VARCHAR(7) NULL , -- 会计期间,
-    [OpeningBalance] DECIMAL(18,2) NULL , -- 期初应收余额,
-    [TotalBilled] DECIMAL(18,2) NULL , -- 本期出账总额,
-    [TotalReceived] DECIMAL(18,2) NULL , -- 本期收款总额,
-    [ClosingBalance] DECIMAL(18,2) NULL , -- 期末应收余额,
-    [LastCalculatedAt] DATETIME2 NULL , -- 最后计算时间,
-    [CreatedBy] UNIQUEIDENTIFIER NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NULL , -- 创建时间,
-    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
-    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
-)
+-- GeneralLedgerEntries 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'关联合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同号（冗余，便于查询）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'ContractNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间 yyyy-MM', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'Period'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计科目ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'SubjectId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'科目编码（冗余，便于查询）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'SubjectCode'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'借贷方向: Debit | Credit', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'Direction'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源类型: BillJob | JournalPost | Receipt | SettleOffset', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'SourceType'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源单据ID（JournalId / ReceiptId）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'SourceId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'摘要', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'Description'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间（东八区）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerEntries', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
 GO
 
--- GeneralLedgerBalances_Audit 表说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账余额表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit'
+-- 索引
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[GeneralLedgerEntries]') AND name=N'IX_GLE_Company_Period')
+CREATE INDEX [IX_GLE_Company_Period] ON [GeneralLedgerEntries]([CompanyId], [Period] DESC)
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[GeneralLedgerEntries]') AND name=N'IX_GLE_Source')
+CREATE INDEX [IX_GLE_Source] ON [GeneralLedgerEntries]([SourceType], [SourceId])
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[GeneralLedgerEntries]') AND name=N'IX_GLE_Contract')
+CREATE INDEX [IX_GLE_Contract] ON [GeneralLedgerEntries]([ContractId])
 GO
 
--- GeneralLedgerBalances_Audit 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CompanyId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'Period'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期初应收余额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'OpeningBalance'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期出账总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'TotalBilled'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'本期收款总额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'TotalReceived'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'期末应收余额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'ClosingBalance'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'最后计算时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'LastCalculatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'GeneralLedgerBalances_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
-GO
-
--- 按记录ID+版本号唯一索引
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances_Audit]') AND name=N'IX_GL_Audit_Id_Version')
-CREATE UNIQUE INDEX [IX_GL_Audit_Id_Version] ON [GeneralLedgerBalances_Audit]([Id], [AuditVersionNo])
-
-
--- ===================================================================
--- 48. PrepaidDetails 表：预收账款明细账
--- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[PrepaidDetails]'))
-CREATE TABLE [PrepaidDetails] (
-    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
-    [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 合同ID（预收归属于特定合同）,
-    [ReceiptId] UNIQUEIDENTIFIER NOT NULL , -- 来源收款单ID,
-    [JournalId] UNIQUEIDENTIFIER NULL , -- 被冲抵的日记账ID（Direction=Out时指向被冲应收）,
-    [Period] VARCHAR(7) NOT NULL , -- 发生期间(格式: yyyy-MM),
-    [Amount] DECIMAL(18,2) NOT NULL , -- 预收金额（正数）,
-    [AppliedAmount] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 已冲抵金额,
-    [Balance] DECIMAL(18,2) NOT NULL , -- 余额(=Amount-AppliedAmount),
-    [Direction] VARCHAR(10) NOT NULL , -- 方向(In=收入预收,Out=冲抵应收),
-    [Status] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 状态(Pending=未冲抵,Partial=部分冲抵,Applied=全部冲抵),
-    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
-    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
-    [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
-    [UpdatedAt] DATETIME2 NULL , -- 更新时间,
-    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
-)
-GO
-
--- 表说明：预收账款明细账
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'预收账款明细账（追踪预收款的来源和冲抵去向）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails'
-GO
-
--- PrepaidDetails 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CompanyId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID（预收归属于特定合同）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'来源收款单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'ReceiptId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'被冲抵的日记账ID（Direction=Out时指向被冲应收）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'JournalId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'发生期间(格式: yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Period'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'预收金额（正数）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Amount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'已冲抵金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'AppliedAmount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'余额(=Amount-AppliedAmount)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Balance'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'方向(In=收入预收,Out=冲抵应收)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Direction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态(Pending=未冲抵,Partial=部分冲抵,Applied=全部冲抵)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PrepaidDetails', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
-GO
--- 按合同查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[PrepaidDetails]') AND name=N'IX_Prepaid_Contract')
-CREATE INDEX [IX_Prepaid_Contract] ON [PrepaidDetails]([CompanyId], [ContractId], [Status])
--- 按收款单查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[PrepaidDetails]') AND name=N'IX_Prepaid_Receipt')
-CREATE INDEX [IX_Prepaid_Receipt] ON [PrepaidDetails]([ReceiptId])
--- 49. AccountingPeriods 表：会计期间表
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[AccountingPeriods]'))
-CREATE TABLE [AccountingPeriods] (
-    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()),
-    [CompanyId] UNIQUEIDENTIFIER NOT NULL,
-    [Period] VARCHAR(7) NOT NULL,
-    [Status] VARCHAR(20) NOT NULL DEFAULT ('Open'),
-    [OpenedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
-    [OpenedBy] UNIQUEIDENTIFIER NOT NULL,
-    [ClosedAt] DATETIME2 NULL,
-    [ClosedBy] UNIQUEIDENTIFIER NULL,
-    [CreatedBy] UNIQUEIDENTIFIER NOT NULL,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
-    [UpdatedBy] UNIQUEIDENTIFIER NULL,
-    [UpdatedAt] DATETIME2 NULL,
-    [UpdatedIp] VARCHAR(45),
-    [UpdatedHostname] VARCHAR(100)
-)
-GO
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计期间表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'AccountingPeriods'
-GO
-
-
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JournalEntries', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
-GO
--- PrepaidDetails 索引已在上方定义
-
-
--- ===================================================================
--- 49. BankMatches 表：银行匹配记录表
--- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[BankMatches]'))
-CREATE TABLE [BankMatches] (
-    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
-    [BankStatementId] UNIQUEIDENTIFIER NOT NULL , -- 银行流水ID,
-    [InternalDocumentId] UNIQUEIDENTIFIER NOT NULL , -- 内部单据ID,
-    [DocumentType] VARCHAR(20) NOT NULL DEFAULT ('Receipt') , -- 单据类型,
-    [MatchedAmount] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 匹配金额,
-    [MatchMethod] VARCHAR(20) NOT NULL DEFAULT ('Manual') , -- 匹配方式,
-    [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
-)
-GO
-
--- 表说明：银行匹配记录表
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'银行匹配记录表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches'
-GO
-
--- BankMatches 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'银行流水ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'BankStatementId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'内部单据ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'InternalDocumentId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'单据类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'DocumentType'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'匹配金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'MatchedAmount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'匹配方式', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'MatchMethod'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BankMatches', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-GO
--- 按流水查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[BankMatches]') AND name=N'IX_BankMatches_BankStatementId')
-CREATE INDEX [IX_BankMatches_BankStatementId] ON [BankMatches]([BankStatementId])
-
--- 50. BankReconciliations 表：银行余额调节表
+-- ===================================================================-- 50. BankReconciliations 表：银行余额调节表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[BankReconciliations]'))
 CREATE TABLE [BankReconciliations] (

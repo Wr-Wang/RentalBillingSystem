@@ -83,8 +83,6 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new DapperRepository<LateFeeConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AutoRenewConfig> AutoRenewConfigs => _autoRenewConfigs ??= new DapperRepository<AutoRenewConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db, _auditWriter, tracker: this, tenant: _tenant);
-    public IRepository<GeneralLedgerBalance> GeneralLedgerBalances => _generalLedgerBalances ??= new DapperRepository<GeneralLedgerBalance>(_db, _auditWriter, tracker: this, tenant: _tenant);
-    public IRepository<PrepaidDetail> PrepaidDetails => _prepaidDetails ??= new DapperRepository<PrepaidDetail>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AccountingPeriod> AccountingPeriods => _accountingPeriods ??= new DapperRepository<AccountingPeriod>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<JobSchedule> JobSchedules => _jobSchedules ??= new DapperRepository<JobSchedule>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<JobTemplate> JobTemplates => _jobTemplates ??= new DapperRepository<JobTemplate>(_db, _auditWriter, tracker: this, tenant: _tenant);
@@ -137,8 +135,6 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IRepository<LateFeeConfig>? _lateFeeConfigs;
     private IRepository<AutoRenewConfig>? _autoRenewConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
-    private IRepository<GeneralLedgerBalance>? _generalLedgerBalances;
-    private IRepository<PrepaidDetail>? _prepaidDetails;
     private IRepository<AccountingPeriod>? _accountingPeriods;
     private IRepository<JobSchedule>? _jobSchedules;
     private IRepository<JobTemplate>? _jobTemplates;

@@ -220,6 +220,7 @@ export function getJournalsByContract(contractId) { return request({ url: `/jour
 export function generateJournals(data) { return request({ url: '/journals/generate', method: 'post', data }) }
 export function previewJournals(data) { return request({ url: '/journals/preview', method: 'post', data }) }
 export function generateJournalRequest(data) { return request({ url: '/journals/generaterequest', method: 'post', data }) }
+export function postJournals(ids) { return request({ url: '/journals/post', method: 'post', data: ids }) }
 
 // GL（总账）
 export function getGLBalance(params) { return request({ url: '/gl', method: 'get', params }) }
@@ -234,7 +235,6 @@ export function createReceipt(data) { return request({ url: '/receipts', method:
 export function confirmReceipt(id) { return request({ url: `/receipts/${id}/confirm`, method: 'put' }) }
 export function rejectReceipt(id, data) { return request({ url: `/receipts/${id}/reject`, method: 'put', data }) }
 export function reverseReceipt(id, data) { return request({ url: `/receipts/${id}/reverse`, method: 'post', data }) }
-export function refundReceipt(id, data) { return request({ url: `/receipts/${id}/refund`, method: 'post', data }) }
 export function batchConfirmReceipts(data) { return request({ url: '/receipts/batchconfirm', method: 'post', data }) }
 
 // Deposits

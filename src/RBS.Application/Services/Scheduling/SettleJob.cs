@@ -80,22 +80,22 @@ public class SettleJob : ScheduledJobBase
                     if (receivable > 0)
                     {
                         var amt = Math.Min(contract.PrepaidBalance, receivable);
-                        var billedAt = ChinaTime.Now;
-                        // Journal: 预收转应收
-                        await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
-                            new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
-                                FeeCodeId = Guid.Empty, FConfigId = (Guid?)null,
-                                SubjId = subjects["2203"], Period = targetMonth,
-                                Amt = amt, Due = today, EntryType = "Adjustment",
-                                BilledAt = billedAt, DNId = (Guid?)null,
-                                ParentId = (Guid?)null, Summary = "预收抵应收", CBy = Guid.Empty }, tx);
-                        await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
-                            new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
-                                FeeCodeId = Guid.Empty, FConfigId = (Guid?)null,
-                                SubjId = subjects["1122"], Period = targetMonth,
-                                Amt = -amt, Due = today, EntryType = "Adjustment",
-                                BilledAt = billedAt, DNId = (Guid?)null,
-                                ParentId = (Guid?)null, Summary = "预收抵应收", CBy = Guid.Empty }, tx);
+                        // 写 GL 分录（不生成 Journal）
+                        if (subjects.ContainsKey("2203") && subjects.ContainsKey("1122"))
+                        {
+                            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                                new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
+                                    CNo = contract.ContractNo ?? "", Period = targetMonth,
+                                    SId = subjects["2203"], SCode = "2203", Dir = "Debit",
+                                    Amt = amt, SrcType = "SettleOffset", SrcId = (Guid?)null,
+                                    Desc = "", CBy = Guid.Empty }, tx);
+                            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                                new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
+                                    CNo = contract.ContractNo ?? "", Period = targetMonth,
+                                    SId = subjects["1122"], SCode = "1122", Dir = "Credit",
+                                    Amt = amt, SrcType = "SettleOffset", SrcId = (Guid?)null,
+                                    Desc = "", CBy = Guid.Empty }, tx);
+                        }
                         // 扣减合同预存金额 + 欠款余额
                         await conn.ExecuteAsync(
                             _sql.Get("Accounting.Update.Contract.PrepaidBalanceDecrement"),
@@ -107,34 +107,34 @@ public class SettleJob : ScheduledJobBase
                     await _stepLogger.CompleteStepAsync(step02, counters[0], null, token);
                 }
 
-                // Step03: 滞纳金
+                // Step03: 利息
                 var step03 = await _stepLogger.StartStepAsync(taskLogId, "SettleStep03",
-                    $"滞纳金-{contract.ContractNo}", null, null, token);
+                    $"利息-{contract.ContractNo}", null, null, token);
                 var overdueJournals = (await conn.QueryAsync<dynamic>(
                     _sql.Get("Billing.Select.Journal.OverdueByContract"),
                     new { CId = contract.Id, Today = today }, tx)).ToList();
 
-                int penaltyCount = 0;
+                int interestCount = 0;
                 foreach (var journal in overdueJournals)
                 {
                     var daysOverdue = today.DayNumber - ((DateOnly)journal.DueDate).DayNumber;
                     if (daysOverdue <= 0) continue;
                     var balance = (decimal)journal.Amount;
                     if (balance <= 0) continue;
-                    var penalty = Math.Round(balance * 0.0005m * Math.Min(daysOverdue, 90), 2);
-                    if (penalty <= 0) continue;
-                    // 滞纳金 Journal + GL 更新
+                    var interest = Math.Round(balance * 0.0005m * Math.Min(daysOverdue, 90), 2);
+                    if (interest <= 0) continue;
                     var billedAt = ChinaTime.Now;
-                    await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
+                    await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Interest"),
                         new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
                             FId = (Guid)journal.FeeCodeId, FConfigId = (Guid?)null,
                             SubjId = subjects["1122"], Period = targetMonth,
-                            Amt = penalty, Due = today, EntryType = "LateFee",
+                            Amt = interest, Due = today,
                             BilledAt = billedAt, DNId = (Guid?)null,
-                            ParentId = (Guid)journal.Id, Summary = "滞纳金", CBy = Guid.Empty }, tx);
+                            ParentId = (Guid)journal.Id, Summary = "", CBy = Guid.Empty }, tx);
+                    interestCount++;
                     }
 
-                await _stepLogger.CompleteStepAsync(step03, penaltyCount, null, token);
+                await _stepLogger.CompleteStepAsync(step03, interestCount, null, token);
             }
             catch { }
         });

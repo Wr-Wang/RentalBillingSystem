@@ -329,23 +329,56 @@ public class JournalAppService : IJournalAppService
                 new { CId = contractId, P = period });
             await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
                 new { Id = contractId, Amt = totalBilled });
-
-            // 2. 更新 GL（追加式快照）
-            var latest = await conn.QuerySingleOrDefaultAsync(
-                _sql.Get("Accounting.Select.GL.LatestByPeriod"),
-                new { CoId = contract.CompanyId, Period = period });
-            var prevBilled = latest != null ? (decimal)((dynamic)latest).TotalBilled : 0m;
-            var prevReceived = latest != null ? (decimal)((dynamic)latest).TotalReceived : 0m;
-            var opening = latest != null ? (decimal)((dynamic)latest).OpeningBalance : 0m;
-            var newBilled = prevBilled + totalBilled;
-            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Default"),
-                new
-                {
-                    Id = Guid.NewGuid(), CoId = contract.CompanyId, Period = period,
-                    Opening = opening, Billed = newBilled, Received = prevReceived,
-                    Closing = opening + newBilled - prevReceived, CBy = Guid.Empty
-                });
         }
         return new { message = $"已生成 {created} 条应收记录", count = created };
+    }
+
+    public async Task<object> PostAsync(List<Guid> ids)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        using var tx = conn.BeginTransaction();
+        int count = 0;
+        var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
+            _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+
+        foreach (var id in ids)
+        {
+            var updated = await conn.ExecuteAsync(
+                _sql.Get("Billing.Update.Journal.Post"), new { Id = id }, tx);
+            if (updated == 0) continue;
+
+            var j = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                _sql.Get("Billing.Select.Journal.WithContractNo"),
+                new { Id = id }, tx);
+            if (j == null) continue;
+            var jAmt = (decimal)(j.Amount ?? 0);
+            if (jAmt <= 0) continue;
+
+            // 写 GL 分录
+            var coId = (Guid)(j.CompanyId ?? Guid.Empty);
+            var cId = (Guid)(j.ContractId ?? Guid.Empty);
+            var period = (string)(j.Period ?? "");
+            var cNo = (string)(j.ContractNo ?? "");
+            if (coId == Guid.Empty || cId == Guid.Empty) continue;
+
+            if (subjects.ContainsKey("1122"))
+                await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                    new { Id = Guid.NewGuid(), CoId = coId, CId = cId,
+                        CNo = cNo, Period = period,
+                        SId = subjects["1122"], SCode = "1122", Dir = "Debit",
+                        Amt = jAmt, SrcType = "JournalPost", SrcId = id,
+                        Desc = "", CBy = Guid.Empty }, tx);
+            if (subjects.ContainsKey("6001"))
+                await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                    new { Id = Guid.NewGuid(), CoId = coId, CId = cId,
+                        CNo = cNo, Period = period,
+                        SId = subjects["6001"], SCode = "6001", Dir = "Credit",
+                        Amt = jAmt, SrcType = "JournalPost", SrcId = id,
+                        Desc = "", CBy = Guid.Empty }, tx);
+            count++;
+        }
+
+        tx.Commit();
+        return new { posted = count };
     }
 }

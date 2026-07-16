@@ -1013,7 +1013,7 @@ async function fetchContract() {
       }))
     } catch { /* 押金接口暂不可用，保留空列表 */ }
 
-    // 应收时间线（基于 Journal，已收/余额通过 ReceiptAllocation 汇总计算）
+    // 应收时间线（基于 Journal）
     try {
       const recRes = await getJournals({ contractId: route.params.id, pageSize: 12 })
       const recItems = recRes.items || recRes.data || recRes || []

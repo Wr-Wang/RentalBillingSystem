@@ -110,17 +110,52 @@ public class BillJob : ScheduledJobBase
                         }, tx);
                     created++;
                     if (journal.Amount > 0) totalAmount += journal.Amount;
+
+                    // GL入口
+                    if (journal.Amount > 0 && subjects.ContainsKey("1122") && subjects.ContainsKey("6001"))
+                    {
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                            new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
+                                CNo = contract.ContractNo ?? "", Period = targetMonth,
+                                SId = subjects["1122"], SCode = "1122", Dir = "Debit",
+                                Amt = journal.Amount, SrcType = "BillJob", SrcId = journal.Id,
+                                Desc = "", CBy = Guid.Empty }, tx);
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                            new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
+                                CNo = contract.ContractNo ?? "", Period = targetMonth,
+                                SId = subjects["6001"], SCode = "6001", Dir = "Credit",
+                                Amt = journal.Amount, SrcType = "BillJob", SrcId = journal.Id,
+                                Desc = "", CBy = Guid.Empty }, tx);
+                    }
                 }
 
-                // Step03b: 汇总未结清的 Supplementary Journal
-                var suppEntries = (await conn.QueryAsync<(Guid JournalId, decimal Amount)>(
-                    _sql.Get("Billing.Select.Journal.SupplementaryDue"),
-                    new { Cid = contract.Id }, tx)).ToList();
+                // 拾取历史未入账单Journal GLPosted=0自动过账
+                var unbilled = (await conn.QueryAsync<dynamic>(
+                    _sql.Get("Billing.Select.Journal.UnbilledByContract"),
+                    new { CId = contract.Id }, tx)).ToList();
 
-                foreach (var (journalId, amt) in suppEntries)
+                foreach (var ub in unbilled)
                 {
-                    totalAmount += amt;
-                    created++;
+                    var ubAmt = (decimal)ub.Amount;
+                    totalAmount += ubAmt;
+
+                    if ((bool)ub.GLPosted == false && ubAmt > 0 && subjects.ContainsKey("1122") && subjects.ContainsKey("6001"))
+                    {
+                        await conn.ExecuteAsync(_sql.Get("Billing.Update.Journal.Post"),
+                            new { Id = (Guid)ub.Id }, tx);
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                            new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
+                                CNo = contract.ContractNo ?? "", Period = targetMonth,
+                                SId = subjects["1122"], SCode = "1122", Dir = "Debit",
+                                Amt = ubAmt, SrcType = "BillJob", SrcId = (Guid)ub.Id,
+                                Desc = "", CBy = Guid.Empty }, tx);
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                            new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
+                                CNo = contract.ContractNo ?? "", Period = targetMonth,
+                                SId = subjects["6001"], SCode = "6001", Dir = "Credit",
+                                Amt = ubAmt, SrcType = "BillJob", SrcId = (Guid)ub.Id,
+                                Desc = "", CBy = Guid.Empty }, tx);
+                    }
                 }
 
                 await _stepLogger.CompleteStepAsync(step03, created, null, token);
@@ -129,8 +164,26 @@ public class BillJob : ScheduledJobBase
                 {
                     var step04 = await _stepLogger.StartStepAsync(taskLogId, "BillStep04",
                         $"生成账单-{contract.ContractNo}", null, null, token);
-                    await PersistDebitNoteAsync(conn, contract.Id, contract.ContractNo ?? "",
-                        companyId, targetMonth, totalAmount, taskLogId, false, null, tx, token);
+
+                    // 查询合同预存余额
+                    var prepaid = contract.PrepaidBalance;
+                    var dnId = Guid.NewGuid();
+                    await PersistDebitNoteAsync(conn, dnId, contract.Id, contract.ContractNo ?? "",
+                        companyId, targetMonth, totalAmount, prepaid, taskLogId, false, null, tx, token);
+
+                    // 回写 DNId 到所有 Journals
+                    foreach (var j in plans)
+                    {
+                        if (j.Amount > 0)
+                            await conn.ExecuteAsync(_sql.Get("Billing.Update.Journal.SetDebitNoteId"),
+                                new { DNId = dnId, Id = j.Id }, tx);
+                    }
+                    foreach (var ub in unbilled)
+                    {
+                        await conn.ExecuteAsync(_sql.Get("Billing.Update.Journal.SetDebitNoteId"),
+                            new { DNId = dnId, Id = (Guid)ub.Id }, tx);
+                    }
+
                     await _stepLogger.CompleteStepAsync(step04, 1, null, token);
                 }
 
@@ -139,23 +192,6 @@ public class BillJob : ScheduledJobBase
                 {
                     await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
                         new { Id = contract.Id, Amt = totalAmount }, tx);
-                }
-
-                // 写入 GL（追加式快照，按合同累加本期出账总额）
-                if (created > 0)
-                {
-                    var glLatest = await conn.QuerySingleOrDefaultAsync(
-                        _sql.Get("Accounting.Select.GL.LatestByPeriod"),
-                        new { CoId = companyId, Period = targetMonth }, tx);
-                    var prevBilled = glLatest != null ? (decimal)((dynamic)glLatest).TotalBilled : 0m;
-                    var prevReceived = glLatest != null ? (decimal)((dynamic)glLatest).TotalReceived : 0m;
-                    var opening = glLatest != null ? (decimal)((dynamic)glLatest).OpeningBalance
-                        : await GetOpeningFromPrevPeriod(companyId, targetMonth, conn, tx);
-                    var totalBilled = prevBilled + totalAmount;
-                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Default"),
-                        new { Id = Guid.NewGuid(), CoId = companyId, Period = targetMonth,
-                            Opening = opening, Billed = totalBilled, Received = prevReceived,
-                            Closing = opening + totalBilled - prevReceived, CBy = Guid.Empty }, tx);
                 }
 
                 tx.Commit();
@@ -182,8 +218,8 @@ public class BillJob : ScheduledJobBase
         return rows.ToDictionary(r => r.Code, r => r.Id);
     }
 
-    private async Task PersistDebitNoteAsync(IDbConnection conn, Guid contractId,
-        string contractNo, Guid companyId, string period, decimal totalAmount,
+    private async Task PersistDebitNoteAsync(IDbConnection conn, Guid dnId, Guid contractId,
+        string contractNo, Guid companyId, string period, decimal totalAmount, decimal prepaid,
         Guid taskLogId, bool isHistorical, DateOnly? dueDate, IDbTransaction tx, CancellationToken ct)
     {
         var roomCode = await conn.QuerySingleOrDefaultAsync<string>(
@@ -194,10 +230,10 @@ public class BillJob : ScheduledJobBase
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.DebitNote.FromBillJob"),
             new
             {
-                Id = Guid.NewGuid(), NoteNo = $"DN-{contractNo}-{period.Replace("-", "")}",
+                Id = dnId, NoteNo = $"DN-{contractNo}-{period.Replace("-", "")}",
                 CId = contractId, CNo = contractNo ?? "", Period = period, CoId = companyId,
                 Room = roomCode ?? "", Tenant = tenantName ?? "", Amt = totalAmount,
-                IsHist = isHistorical, Due = dueDate,
+                Prepaid = prepaid, IsHist = isHistorical, Due = dueDate,
                 TaskLogId = taskLogId, CBy = Guid.Empty
             }, tx);
     }
@@ -220,16 +256,5 @@ public class BillJob : ScheduledJobBase
         var report = new { totalContracts = matched.Count, totalFeeConfigs = totalFees,
             estimatedReceivables = totalFees, estimatedBills = matched.Count, warnings };
         return JsonSerializer.Serialize(report);
-    }
-
-    private async Task<decimal> GetOpeningFromPrevPeriod(Guid companyId, string period, IDbConnection conn, IDbTransaction? tx)
-    {
-        var parts = period.Split('-');
-        var py = int.Parse(parts[0]); var pm = int.Parse(parts[1]) - 1;
-        if (pm == 0) { py--; pm = 12; }
-        var prev = await conn.QuerySingleOrDefaultAsync(
-            _sql.Get("Accounting.Select.GL.OpeningBalanceByPeriod"),
-            new { CoId = companyId, Period = $"{py:D4}-{pm:D2}" }, tx);
-        return prev != null ? (decimal)((dynamic)prev).ClosingBalance : 0m;
     }
 }

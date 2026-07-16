@@ -329,14 +329,12 @@
   <select id="Billing.Select.Receipt.DailyByMonth">
     <![CDATA[SELECT DAY(ReceivedDate) AS D, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE FORMAT(ReceivedDate, 'yyyy-MM')=@P GROUP BY DAY(ReceivedDate) ORDER BY D]]>
   </select>
-  <select id="Billing.Select.ReceiptAllocation.ByReceiptId">
-    <![CDATA[SELECT JournalId, Amount FROM ReceiptAllocations WHERE ReceiptId=@Id]]>
-  </select>
+  
 
   <!-- 应收报表查询 -->
   <select id="Billing.Select.Journal.CollectionRate">
     <![CDATA[SELECT j.Period, COUNT(1) AS TotalPlans, SUM(j.Amount) AS TotalAmount,
-      COALESCE((SELECT SUM(ra.Amount) FROM ReceiptAllocations ra JOIN Receipts r ON r.Id = ra.ReceiptId WHERE ra.JournalId IN (SELECT j2.Id FROM Journals j2 WHERE j2.Period = j.Period) AND r.Status = 'Confirmed'), 0) AS TotalReceived
+      0 AS TotalReceived
       FROM Journals j WHERE (@Period IS NULL OR j.Period = @Period) GROUP BY j.Period ORDER BY j.Period DESC]]>
   </select>
   <select id="Billing.Select.Contract.OverdueData">
@@ -346,7 +344,7 @@
   </select>
   <select id="Billing.Select.Journal.OutstandingByContract">
     <![CDATA[SELECT ISNULL(SUM(j.Amount - COALESCE(ra.Received, 0)), 0)
-      FROM Journals j LEFT JOIN (SELECT JournalId, SUM(Amount) AS Received FROM ReceiptAllocations ra WHERE ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled') GROUP BY JournalId) ra ON ra.JournalId = j.Id
+      FROM Journals j LEFT JOIN (SELECT NULL AS JournalId, 0 AS Received) ra ON 1=0
       WHERE j.ContractId = @Id AND j.Amount > COALESCE(ra.Received, 0)]]>
   </select>
 
@@ -630,7 +628,7 @@
       COALESCE(r.Received, 0) AS Received,
       DATEDIFF(DAY, j.DueDate, CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)) AS DaysOverdue
       FROM Journals j
-      OUTER APPLY (SELECT SUM(Amount) AS Received FROM ReceiptAllocations WHERE JournalId = j.Id AND ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')) r
+      OUTER APPLY (SELECT 0 AS Received) r
       WHERE j.CompanyId = @CompanyId AND j.DueDate < CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
         AND j.Amount > COALESCE(r.Received, 0)]]>
   </select>
@@ -648,7 +646,7 @@
       RoomFullCode, TenantName, TotalAmount, TotalReceived, TotalPrepaid, BalanceDue,
       IsHistorical, DueDate, Status, GeneratedAt, BillJobTaskLogId, CreatedBy, CreatedAt)
       VALUES (@Id, @NoteNo, @CId, @CNo, @Period, @CoId,
-      @Room, @Tenant, @Amt, 0, 0, @Amt,
+      @Room, @Tenant, @Amt, 0, @Prepaid, @Amt - @Prepaid,
       @IsHist, @Due, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @TaskLogId, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
 
@@ -679,7 +677,7 @@
       FROM Journals j
       LEFT JOIN Contracts c ON c.Id = j.ContractId
       LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
-      OUTER APPLY (SELECT SUM(Amount) AS Received FROM ReceiptAllocations WHERE JournalId = j.Id AND ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')) ra
+      OUTER APPLY (SELECT 0 AS Received) ra
       WHERE j.Id = @Id]]>
   </select>
   <select id="Billing.Select.Journal.ByContractWithPayment">
@@ -690,7 +688,7 @@
       FROM Journals j
       LEFT JOIN Contracts c ON c.Id = j.ContractId
       LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
-      OUTER APPLY (SELECT SUM(Amount) AS Received FROM ReceiptAllocations WHERE JournalId = j.Id AND ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')) ra
+      OUTER APPLY (SELECT 0 AS Received) ra
       WHERE j.ContractId = @CId ORDER BY j.Period]]>
   </select>
   <insert id="Billing.Insert.Journal.Default">
@@ -698,13 +696,13 @@
       AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, @Due, @EntryType, 0, @BilledAt,
+      @SubjId, @Period, @Amt, @Due, @EntryType, 1, @BilledAt,
       @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
   <select id="Billing.Select.Journal.ByCompanyPeriod">
     <![CDATA[SELECT j.*, COALESCE(SUM(ra.Amount), 0) AS ReceivedAmount
       FROM Journals j
-      LEFT JOIN ReceiptAllocations ra ON ra.JournalId = j.Id AND ra.ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')
+      LEFT JOIN (SELECT NULL AS JournalId, 0 AS Amount) ra ON 1=0
       WHERE j.CompanyId = @CoId AND j.Period = @Period
       GROUP BY j.Id, j.CompanyId, j.ContractId, j.FeeCodeId, j.FeeConfigId,
         j.AccountingSubjectId, j.Period, j.Amount, j.DueDate, j.EntryType,
@@ -719,7 +717,7 @@
   <select id="Billing.Select.Journal.UnsettledByContract">
     <![CDATA[SELECT j.Id, j.Amount, j.DueDate, COALESCE(SUM(ra.Amount), 0) AS ReceivedAmount
       FROM Journals j
-      LEFT JOIN ReceiptAllocations ra ON ra.JournalId = j.Id AND ra.ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')
+      LEFT JOIN (SELECT NULL AS JournalId, 0 AS Amount) ra ON 1=0
       WHERE j.ContractId = @CId
       GROUP BY j.Id, j.Amount, j.DueDate
       HAVING j.Amount > COALESCE(SUM(ra.Amount), 0)]]>
@@ -730,15 +728,34 @@
   <update id="Billing.Update.Journal.MarkPostedByPeriod">
     <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE CompanyId = @CoId AND Period = @Period AND GLPosted = 0]]>
   </update>
+  <update id="Billing.Update.Journal.Post">
+    <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND GLPosted = 0]]>
+  </update>
+  <select id="Billing.Select.Journal.UnbilledByContract">
+    <![CDATA[SELECT Id, Amount, GLPosted, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND DebitNoteId IS NULL]]>
+  </select>
+  <update id="Billing.Update.Journal.SetDebitNoteId">
+    <![CDATA[UPDATE Journals SET DebitNoteId = @DNId WHERE Id = @Id AND DebitNoteId IS NULL]]>
+  </update>
+
 
   <!-- ===== GL（总账）===== -->
-  <insert id="Accounting.Insert.GL.Default">
-    <![CDATA[INSERT INTO GeneralLedgerBalances (Id, CompanyId, Period, OpeningBalance, TotalBilled, TotalReceived, ClosingBalance, CalculatedAt, CreatedBy, CreatedAt)
-      VALUES (@Id, @CoId, @Period, @Opening, @Billed, @Received, @Closing, DATEADD(HOUR, 8, GETUTCDATE()), @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+  
+  <insert id="Accounting.Insert.GL.Entry">
+    <![CDATA[INSERT INTO GeneralLedgerEntries (Id, CompanyId, ContractId, ContractNo, Period, SubjectId, SubjectCode, Direction, Amount, SourceType, SourceId, Description, CreatedBy, CreatedAt)
+      VALUES (@Id, @CoId, @CId, @CNo, @Period, @SId, @SCode, @Dir, @Amt, @SrcType, @SrcId, @Desc, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
-  <select id="Accounting.Select.GL.LatestByPeriod">
-    <![CDATA[SELECT TOP 1 * FROM GeneralLedgerBalances WHERE CompanyId = @CoId AND Period = @Period ORDER BY CalculatedAt DESC]]>
-  </select>
+  <insert id="Billing.Insert.Journal.Interest">
+    <![CDATA[INSERT INTO Journals (Id, CompanyId, ContractId, FeeCodeId, FeeConfigId,
+      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt,
+      DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
+      VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
+      @SubjId, @Period, @Amt, @Due, 'Interest', 0, @BilledAt,
+      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+  </insert>
+
+
+  
   <select id="Accounting.Select.GL.AllByCompany">
     <![CDATA[SELECT * FROM GeneralLedgerBalances WHERE CompanyId = @CoId ORDER BY Period DESC, CalculatedAt DESC]]>
   </select>
@@ -752,9 +769,13 @@
   <select id="Receipt.Select.Receipt.WithContractBalance">
     <![CDATA[SELECT r.Amount, r.ContractId, c.OutstandingBalance FROM Receipts r LEFT JOIN Contracts c ON c.Id = r.ContractId WHERE r.Id = @Id]]>
   </select>
-  <select id="Accounting.Select.GL.OpeningBalanceByPeriod">
-    <![CDATA[SELECT TOP 1 ClosingBalance FROM GeneralLedgerBalances WHERE CompanyId=@CoId AND Period=@Period ORDER BY CalculatedAt DESC]]>
+  <select id="Receipt.Select.Receipt.WithContractInfo">
+    <![CDATA[SELECT r.Amount, r.ContractId, r.ReceivedDate, r.CompanyId, r.ReceiptNo, c.ContractNo FROM Receipts r LEFT JOIN Contracts c ON c.Id = r.ContractId WHERE r.Id = @Id]]>
   </select>
+  <select id="Billing.Select.Journal.WithContractNo">
+    <![CDATA[SELECT j.Id, j.Amount, j.CompanyId, j.ContractId, j.Period, c.ContractNo FROM Journals j LEFT JOIN Contracts c ON c.Id = j.ContractId WHERE j.Id = @Id]]>
+  </select>
+  
   <select id="Billing.Select.Journal.SumAmountByContractPeriod">
     <![CDATA[SELECT ISNULL(SUM(Amount),0) FROM Journals WHERE ContractId=@CId AND Period=@P]]>
   </select>
@@ -1051,9 +1072,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[UPDATE Contracts SET Status='Terminated', TerminationReason=@Reason WHERE Id=@Id]]>
   </update>
 
-  <delete id="Lease.Delete.ReceiptAllocation.ByReceiptId">
-    <![CDATA[DELETE FROM ReceiptAllocations WHERE ReceiptId=@Id]]>
-  </delete>
+  
 
   <!-- DepositLog（押金日志） -->
   <insert id="Contract.Insert.DepositLog.Refund">
@@ -1187,7 +1206,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       JOIN Contracts c ON c.Id = j.ContractId
       LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
       LEFT JOIN Tenants t ON t.Id = ct.TenantId
-      OUTER APPLY (SELECT SUM(Amount) AS Received FROM ReceiptAllocations WHERE JournalId = j.Id AND ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')) r
+      OUTER APPLY (SELECT 0 AS Received) r
       LEFT JOIN HousingUnits h ON h.Id = c.RoomId
       WHERE j.DueDate < CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
         AND j.Amount > COALESCE(r.Received, 0)

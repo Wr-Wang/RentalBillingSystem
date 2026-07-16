@@ -5,6 +5,9 @@
       <div class="page-actions">
         <el-button size="small" @click="fetchData"><el-icon><Refresh /></el-icon>刷新</el-button>
         <el-button type="primary" size="small" @click="handleGenerate">+ 出账</el-button>
+        <el-button v-if="selectedIds.length > 0" type="warning" size="small" :loading="posting" @click="handlePost">
+          过账（{{ selectedIds.length }}）
+        </el-button>
       </div>
     </div>
 
@@ -45,7 +48,8 @@
         </div>
       </template>
 
-      <el-table :data="list" v-loading="loading" stripe style="width:100%;" @row-click="viewDetail" highlight-current-row>
+      <el-table :data="list" v-loading="loading" stripe style="width:100%;" @row-click="viewDetail" highlight-current-row @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="40" :selectable="r => !r.glPosted" />
         <el-table-column type="index" label="#" width="45" fixed />
         <el-table-column prop="contractNo" label="合同号" width="140" fixed>
           <template #default="{ row }">
@@ -96,7 +100,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getJournals, generateJournals, getFeeCodes } from '@/api'
+import { ElMessage } from 'element-plus'
+import { getJournals, generateJournals, getFeeCodes, postJournals } from '@/api'
 import { Refresh } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 
@@ -109,6 +114,8 @@ const pageSize = ref(20)
 const total = ref(0)
 const feeCodes = ref([])
 const filters = ref({ period: '', contractNo: '', feeCodeId: null, glPosted: null })
+const selectedIds = ref([])
+const posting = ref(false)
 
 const totalAmount = computed(() =>
   list.value.reduce((s, r) => s + (r.amount || 0), 0)
@@ -165,7 +172,24 @@ const resetFilters = () => {
 }
 
 function viewDetail(row) {
-  // Click row - could navigate to contract detail or voucher detail
+}
+
+function onSelectionChange(rows) {
+  selectedIds.value = rows.map(r => r.id)
+}
+
+async function handlePost() {
+  if (selectedIds.value.length === 0) return
+  posting.value = true
+  try {
+    const res = await postJournals(selectedIds.value)
+    ElMessage.success(`已过账 ${res.posted} 条`)
+    selectedIds.value = []
+    await fetchData()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '过账失败')
+  }
+  finally { posting.value = false }
 }
 
 onMounted(() => {

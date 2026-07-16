@@ -79,6 +79,40 @@ public class ReceiptService : IReceiptService
                 if (overflow > 0)
                     await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.PrepaidBalanceIncrement"),
                         new { Id = cId, Amt = overflow }, tx);
+
+                // 3. 写 GL 分录
+                var receiptFull = await conn.QuerySingleAsync<dynamic>(
+                    _sql.Get("Receipt.Select.Receipt.WithContractInfo"),
+                    new { Id = id }, tx);
+                if (receiptFull != null)
+                {
+                    var companyId = (Guid)receiptFull.CompanyId;
+                    var period = ((string)receiptFull.ReceivedDate)[..7];
+                    var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
+                        _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+
+                    if (subjects.ContainsKey("1002"))
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                            new { Id = Guid.NewGuid(), CoId = companyId, CId = cId,
+                                CNo = (string)receiptFull.ContractNo ?? "", Period = period,
+                                SId = subjects["1002"], SCode = "1002", Dir = "Debit",
+                                Amt = amt, SrcType = "Receipt", SrcId = id,
+                                Desc = (string)receiptFull.ReceiptNo, CBy = Guid.Empty }, tx);
+                    if (offset > 0 && subjects.ContainsKey("1122"))
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                            new { Id = Guid.NewGuid(), CoId = companyId, CId = cId,
+                                CNo = (string)receiptFull.ContractNo ?? "", Period = period,
+                                SId = subjects["1122"], SCode = "1122", Dir = "Credit",
+                                Amt = offset, SrcType = "Receipt", SrcId = id,
+                                Desc = (string)receiptFull.ReceiptNo, CBy = Guid.Empty }, tx);
+                    if (overflow > 0 && subjects.ContainsKey("2203"))
+                        await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                            new { Id = Guid.NewGuid(), CoId = companyId, CId = cId,
+                                CNo = (string)receiptFull.ContractNo ?? "", Period = period,
+                                SId = subjects["2203"], SCode = "2203", Dir = "Credit",
+                                Amt = overflow, SrcType = "Receipt", SrcId = id,
+                                Desc = (string)receiptFull.ReceiptNo, CBy = Guid.Empty }, tx);
+                }
             }
 
             tx.Commit();
@@ -97,28 +131,68 @@ public class ReceiptService : IReceiptService
         if (entity == null) throw new KeyNotFoundException("收款不存在");
 
         using var conn = _db.CreateConnection(); conn.Open();
-        var allocRows = await conn.QueryAsync(
-            _sql.Get("Billing.Select.ReceiptAllocation.ByReceiptId"),
-            new { Id = id });
+        using var tx = conn.BeginTransaction();
 
-        foreach (var row in allocRows)
+        var receiptFull = await conn.QuerySingleAsync<dynamic>(
+            _sql.Get("Receipt.Select.Receipt.WithContractInfo"),
+            new { Id = id }, tx);
+        if (receiptFull == null) throw new KeyNotFoundException("收款信息不存在");
+
+        var companyId = (Guid)receiptFull.CompanyId;
+        var period = ((string)receiptFull.ReceivedDate)[..7];
+        var cId = (Guid)receiptFull.ContractId;
+        var amt = (decimal)receiptFull.Amount;
+
+        // 从 GL 分录反查 offset/overflow
+        var entries = await conn.QueryAsync<dynamic>(
+            "SELECT Direction, Amount, SubjectCode FROM GeneralLedgerEntries WHERE SourceType='Receipt' AND SourceId=@Id",
+            new { Id = id }, tx);
+        decimal offset = 0, overflow = 0;
+        foreach (var e in entries)
         {
-            var journal = await _uow.Journals.GetByIdAsync((Guid)row.JournalId, ct);
-            if (journal != null)
-            {
-                // Journal 为不可变记录，冲销通过创建负数金额的 Journal 实现
-                var reverseEntry = new RBS.Core.Entities.Billing.Journal(
-                    journal.CompanyId, journal.ContractId, journal.FeeCodeId,
-                    journal.FeeConfigId, journal.AccountingSubjectId,
-                    journal.Period, -(decimal)row.Amount, journal.DueDate,
-                    "Adjustment", ChinaTime.Now, null, journal.Id, "收款冲销");
-                await _uow.Journals.AddAsync(reverseEntry, ct);
-            }
+            if ((string)e.SubjectCode == "1122" && (string)e.Direction == "Credit")
+                offset = (decimal)e.Amount;
+            if ((string)e.SubjectCode == "2203" && (string)e.Direction == "Credit")
+                overflow = (decimal)e.Amount;
         }
 
-        await conn.ExecuteAsync(_sql.Get("Lease.Delete.ReceiptAllocation.ByReceiptId"), new { Id = id });
+        var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
+            _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+
+        // 反向 GL 分录
+        if (subjects.ContainsKey("1002"))
+            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                new { Id = Guid.NewGuid(), CoId = companyId, CId = cId,
+                    CNo = (string)receiptFull.ContractNo ?? "", Period = period,
+                    SId = subjects["1002"], SCode = "1002", Dir = "Credit",
+                    Amt = amt, SrcType = "Reverse", SrcId = id,
+                    Desc = (string)receiptFull.ReceiptNo, CBy = Guid.Empty }, tx);
+        if (offset > 0 && subjects.ContainsKey("1122"))
+            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                new { Id = Guid.NewGuid(), CoId = companyId, CId = cId,
+                    CNo = (string)receiptFull.ContractNo ?? "", Period = period,
+                    SId = subjects["1122"], SCode = "1122", Dir = "Debit",
+                    Amt = offset, SrcType = "Reverse", SrcId = id,
+                    Desc = (string)receiptFull.ReceiptNo, CBy = Guid.Empty }, tx);
+        if (overflow > 0 && subjects.ContainsKey("2203"))
+            await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                new { Id = Guid.NewGuid(), CoId = companyId, CId = cId,
+                    CNo = (string)receiptFull.ContractNo ?? "", Period = period,
+                    SId = subjects["2203"], SCode = "2203", Dir = "Debit",
+                    Amt = overflow, SrcType = "Reverse", SrcId = id,
+                    Desc = (string)receiptFull.ReceiptNo, CBy = Guid.Empty }, tx);
+
+        // 恢复合同余额
+        if (offset > 0)
+            await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
+                new { Id = cId, Amt = offset }, tx);
+        if (overflow > 0)
+            await conn.ExecuteAsync(_sql.Get("Accounting.Update.Contract.PrepaidBalanceDecrement"),
+                new { Id = cId, Amt = overflow }, tx);
+
         entity.Cancel();
-        await _uow.CommitAsync(ct);
+        await _uow.Receipts.UpdateAsync(entity, ct);
+        tx.Commit();
 
         return new { message = "冲销成功", receiptId = id };
     }

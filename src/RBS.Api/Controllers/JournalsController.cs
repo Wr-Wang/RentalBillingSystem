@@ -86,6 +86,13 @@ public class JournalsController : ControllerBase
         return Ok(new { message = "出账任务已触发" });
     }
 
+    [HttpPost("post")]
+    public async Task<IActionResult> Post([FromBody] List<Guid> ids, CancellationToken ct)
+    {
+        var result = await _journalAppService.PostAsync(ids);
+        return Ok(result);
+    }
+
     private Guid GetCurrentUserId()
     {
         var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
