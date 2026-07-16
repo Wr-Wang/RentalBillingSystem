@@ -1,17 +1,63 @@
+# Claude AI
 .claude/
 
 # .NET build artifacts
 **/bin/
 **/obj/
 /tmp_build/
+/tempbuild_out/
 *.user
 *.suo
+*.DotSettings
+*.csproj.user
+
+# NuGet
+**/packages/
+*.nupkg
 
 # IDE
 .vs/
 .idea/
 *.swp
+*.sln.docstates
+.vscode/
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Node.js
+node_modules/
+dist/
+**/web/dist/
+*.tsbuildinfo
+
+# Logs
+**/logs/
+*.log
+nohup.out
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# User-specific
+/appsettings.Development.json
+/secrets.json
+
+# Temp files
+/tmp/
+/temp/
+/tmp_build/
+/build_out/
+*.tmp
+
+# Python generated
+*.pyc
+__pycache__/
+fix_params.py
+
+# Database migration temp
+*.sql.bak

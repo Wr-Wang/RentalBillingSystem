@@ -654,7 +654,11 @@
 
   <!-- ===== Journal（日记账）===== -->
   <select id="Billing.Select.Journal.Paged">
-    <![CDATA[SELECT j.* FROM Journals j WHERE j.CompanyId = @CoId
+    <![CDATA[SELECT j.*, c.ContractNo, fc.Name AS FeeName, fc.ChargeType
+      FROM Journals j
+      LEFT JOIN Contracts c ON c.Id = j.ContractId
+      LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
+      WHERE j.CompanyId = @CoId
       AND (@Period IS NULL OR j.Period = @Period)
       AND (@CNo IS NULL OR j.ContractId IN (SELECT Id FROM Contracts WHERE ContractNo LIKE @CNo))
       AND (@FId IS NULL OR j.FeeCodeId = @FId)
@@ -671,16 +675,21 @@
       AND (@CId IS NULL OR j.ContractId = @CId)]]>
   </select>
   <select id="Billing.Select.Journal.ById">
-    <![CDATA[SELECT j.*, COALESCE(ra.Received, 0) AS ReceivedAmount
+    <![CDATA[SELECT j.*, c.ContractNo, fc.Name AS FeeName, fc.ChargeType, COALESCE(ra.Received, 0) AS ReceivedAmount
       FROM Journals j
+      LEFT JOIN Contracts c ON c.Id = j.ContractId
+      LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
       OUTER APPLY (SELECT SUM(Amount) AS Received FROM ReceiptAllocations WHERE JournalId = j.Id AND ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')) ra
       WHERE j.Id = @Id]]>
   </select>
   <select id="Billing.Select.Journal.ByContractWithPayment">
     <![CDATA[SELECT j.Id, j.ContractId, j.FeeCodeId, j.Period, j.Amount, j.DueDate, j.EntryType,
+      c.ContractNo, fc.Name AS FeeName, fc.ChargeType,
       COALESCE(ra.Received, 0) AS Received,
       j.Amount - COALESCE(ra.Received, 0) AS Balance
       FROM Journals j
+      LEFT JOIN Contracts c ON c.Id = j.ContractId
+      LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
       OUTER APPLY (SELECT SUM(Amount) AS Received FROM ReceiptAllocations WHERE JournalId = j.Id AND ReceiptId IN (SELECT Id FROM Receipts WHERE Status != 'Cancelled')) ra
       WHERE j.ContractId = @CId ORDER BY j.Period]]>
   </select>
