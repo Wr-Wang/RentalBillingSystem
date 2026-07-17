@@ -52,8 +52,11 @@ public class ContractDomainService : IContractDomainService
 
     /// <summary>
     /// 续签合同：校验旧合同状态、标记已续签、创建新合同。
+    /// 注意：合同编号应通过 IContractNumberGenerator 生成后传入。
+    /// 此方法已废弃，请使用 RenewalService 的续签流程。
     /// </summary>
-    public async Task<Contract> RenewContractAsync(Contract oldContract, DateOnly newEndDate, CancellationToken ct = default)
+    [Obsolete("Use RenewalService with IContractNumberGenerator instead")]
+    public async Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateOnly newEndDate, CancellationToken ct = default)
     {
         if (oldContract.Status != "Active" && oldContract.Status != "Expired")
             throw new InvalidOperationException("只有生效中或已到期的合同可以续签");
@@ -61,7 +64,7 @@ public class ContractDomainService : IContractDomainService
 
         oldContract.MarkAsRenewed();
         var newContract = new Contract(
-            $"{oldContract.ContractNo}-R{new Random().Next(1, 99)}",
+            contractNo,
             oldContract.RoomId,
             oldContract.CompanyId);
         newContract.SetPeriod(oldContract.EndDate.Value.AddDays(1), newEndDate);

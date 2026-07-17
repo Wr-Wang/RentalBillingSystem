@@ -22,14 +22,16 @@ public class RenewalService : IRenewalService
     private readonly IDbConnectionFactory _db;
     private readonly IApprovalService _approvalService;
     private readonly ISqlLoader _sql;
+    private readonly IContractNumberGenerator _contractNoGenerator;
     private readonly IServiceProvider _serviceProvider;
 
-    public RenewalService(IUnitOfWork uow, IDbConnectionFactory db, IApprovalService approvalService, ISqlLoader sql, IServiceProvider serviceProvider)
+    public RenewalService(IUnitOfWork uow, IDbConnectionFactory db, IApprovalService approvalService, ISqlLoader sql, IContractNumberGenerator contractNoGenerator, IServiceProvider serviceProvider)
     {
         _uow = uow;
         _db = db;
         _approvalService = approvalService;
         _sql = sql;
+        _contractNoGenerator = contractNoGenerator;
         _serviceProvider = serviceProvider;
     }
 
@@ -178,9 +180,9 @@ public class RenewalService : IRenewalService
         if (parsedNewEndDate <= newStartDate)
             throw new InvalidOperationException($"新合同到期日期必须晚于起租日期（{newStartDate:yyyy-MM-dd}），当前到期日 {parsedNewEndDate:yyyy-MM-dd} 无效");
 
-        // 6. 生成新合同号：剥离已有 -R{n} 后缀，基于原始号 + 续签次数
-        var baseNo = oldContract.ContractNo.Split("-R").First();
-        var newContractNo = $"{baseNo}-R{oldContract.RenewalCount + 1}";
+        // 6. 生成新合同号：剥离已有 R{n} 后缀，基于原始号 + 续签次数
+        var newContractNo = _contractNoGenerator.GenerateRenewalContractNo(
+            oldContract.ContractNo, oldContract.RenewalCount + 1);
 
         // 7. 创建 RenewalRequest
         using var rentConn = _db.CreateConnection(); rentConn.Open();

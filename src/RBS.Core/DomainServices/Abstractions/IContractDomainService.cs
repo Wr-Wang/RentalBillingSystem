@@ -36,8 +36,11 @@ public interface IContractDomainService
 
     /// <summary>
     /// 续签合同：创建新合同，关联旧合同。
+    /// 注意：合同编号应通过 IContractNumberGenerator 生成后传入，
+    /// 此方法已废弃，请使用 RenewalService 的续签流程。
     /// </summary>
-    Task<Contract> RenewContractAsync(Contract oldContract, DateOnly newEndDate, CancellationToken ct = default);
+    [Obsolete("Use RenewalService with IContractNumberGenerator instead")]
+    Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateOnly newEndDate, CancellationToken ct = default);
 
     /// <summary>
     /// 按天分摊计算应收金额。

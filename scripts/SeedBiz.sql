@@ -292,17 +292,17 @@ DECLARE @Contract3 uniqueidentifier;
 
 SET @Contract1 = NEWID();
 INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract1,'HT-2026-001',Id,'2026-01-01','2027-12-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+SELECT @Contract1,'CT2026010100000000001',Id,'2026-01-01','2027-12-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='101' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 SET @Contract2 = NEWID();
 INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract2,'HT-2026-002',Id,'2026-02-01','2027-01-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+SELECT @Contract2,'CT2026020100000000002',Id,'2026-02-01','2027-01-31','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='102' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 SET @Contract3 = NEWID();
 INSERT INTO [Contracts] ([Id],[ContractNo],[RoomId],[StartDate],[EndDate],[PaymentCycle],[Status],[CompanyId],[CreatedBy],[CreatedAt])
-SELECT @Contract3,'HT-2026-003',Id,'2026-03-15','2027-03-14','Monthly','Active',@Cid,@ZhangsanUserId,@Now
+SELECT @Contract3,'CT2026031500000000003',Id,'2026-03-15','2027-03-14','Monthly','Active',@Cid,@ZhangsanUserId,@Now
 FROM HousingUnits WHERE UnitNo='201' AND CompanyId=@Cid ORDER BY FullCode OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
 
 

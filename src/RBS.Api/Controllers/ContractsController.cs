@@ -31,6 +31,7 @@ public class ContractsController : ControllerBase
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUserService _currentUser;
     private readonly IReceivableGenerationService _receivableGen;
+    private readonly IContractNumberGenerator _contractNoGenerator;
     private readonly IServiceProvider _serviceProvider;
 
     public ContractsController(IContractService contractService, IRenewalService renewalService,
@@ -38,6 +39,7 @@ public class ContractsController : ControllerBase
         IContractTimelineService timelineService, IUnitOfWork uow,
         ICurrentUserService currentUser,
         IReceivableGenerationService receivableGen,
+        IContractNumberGenerator contractNoGenerator,
         IServiceProvider serviceProvider)
     {
         _contractService = contractService;
@@ -48,6 +50,7 @@ public class ContractsController : ControllerBase
         _uow = uow;
         _currentUser = currentUser;
         _receivableGen = receivableGen;
+        _contractNoGenerator = contractNoGenerator;
         _serviceProvider = serviceProvider;
     }
 
@@ -192,7 +195,7 @@ public class ContractsController : ControllerBase
         // ----- 创建暂存请求 -----
         var userId = GetCurrentUserId();
         var now = ChinaTime.Now;
-        var contractNo = $"CT-{now:yyyyMMdd}-{Guid.NewGuid():N}"[..32];
+        var contractNo = _contractNoGenerator.GenerateNewContractNo();
 
         var createReq = new ContractCreateRequest(contractNo, request.RoomId, request.StartDate, request.EndDate, request.PaymentCycle, request.CompanyId);
         createReq.SetCreated(userId, now, null, null);
