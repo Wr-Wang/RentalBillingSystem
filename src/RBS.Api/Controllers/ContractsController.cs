@@ -88,6 +88,16 @@ public class ContractsController : ControllerBase
     }
 
     // =====================================================================
+    // GET /api/contracts/{id}/tenants — 合同租客列表
+    // =====================================================================
+    [HttpGet("{id}/tenants")]
+    public async Task<IActionResult> GetTenants(Guid id, CancellationToken ct)
+    {
+        var tenants = await _contractService.GetTenantsAsync(id, ct);
+        return Ok(new { tenants });
+    }
+
+    // =====================================================================
     // POST /api/contracts — 创建合同
     // 创建成功后写入变更历史（审计追踪）
     // =====================================================================

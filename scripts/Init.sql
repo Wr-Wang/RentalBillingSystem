@@ -1660,7 +1660,7 @@ CREATE TABLE [Tenants] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
     [Name] NVARCHAR(200) NOT NULL , -- 租客姓名,
     [IdentityType] VARCHAR(20) NOT NULL DEFAULT ('PRC_ID') , -- 证件类型,
-    [IdentityNo] VARCHAR(50) NOT NULL , -- 证件号码,
+    [IdCard] VARCHAR(50) NOT NULL , -- 证件号码,
     [Phone] VARCHAR(20) NOT NULL , -- 手机号,
     [Email] VARCHAR(200) , -- 邮箱,
     [Address] NVARCHAR(500) , -- 通讯地址,
@@ -1685,7 +1685,7 @@ GO
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'Id'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'租客姓名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'Name'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'证件类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'IdentityType'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'证件号码', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'IdentityNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'证件号码', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'IdCard'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'手机号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'Phone'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'邮箱', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'Email'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'通讯地址', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'Address'
@@ -1701,8 +1701,8 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP',
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
 -- 证件号查询
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Tenants]') AND name=N'IX_Tenants_IdentityNo')
-CREATE INDEX [IX_Tenants_IdentityNo] ON [Tenants]([IdentityNo])
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Tenants]') AND name=N'IX_Tenants_IdCard')
+CREATE INDEX [IX_Tenants_IdCard] ON [Tenants]([IdCard])
 -- 手机号查询
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Tenants]') AND name=N'IX_Tenants_Phone')
 CREATE INDEX [IX_Tenants_Phone] ON [Tenants]([Phone])
@@ -1721,7 +1721,7 @@ CREATE TABLE [Tenants_Audit] (
     [Id] UNIQUEIDENTIFIER NOT NULL , -- 主键,
     [Name] NVARCHAR(200) , -- 租客姓名,
     [IdentityType] VARCHAR(20) , -- 证件类型,
-    [IdentityNo] VARCHAR(50) , -- 证件号码,
+    [IdCard] VARCHAR(50) , -- 证件号码,
     [Phone] VARCHAR(20) , -- 手机号,
     [Email] VARCHAR(200) , -- 邮箱,
     [Address] NVARCHAR(500) , -- 通讯地址,
@@ -1752,7 +1752,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'Id'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'租客姓名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'Name'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'证件类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'IdentityType'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'证件号码', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'IdentityNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'证件号码', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'IdCard'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'手机号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'Phone'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'邮箱', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'Email'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'通讯地址', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Tenants_Audit', @level2type = N'COLUMN', @level2name = N'Address'

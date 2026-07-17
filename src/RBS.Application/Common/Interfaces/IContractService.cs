@@ -47,6 +47,11 @@ public interface IContractService
     Task<ContractDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
     /// <summary>
+    /// 获取合同租客列表（含详细信息）
+    /// </summary>
+    Task<List<ContractTenantInfoDto>> GetTenantsAsync(Guid contractId, CancellationToken ct = default);
+
+    /// <summary>
     /// 创建新合同
     /// </summary>
     /// <param name="request">创建合同请求</param>

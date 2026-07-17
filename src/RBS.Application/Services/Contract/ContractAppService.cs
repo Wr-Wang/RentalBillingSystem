@@ -196,6 +196,18 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
     }
 
     /// <summary>
+    /// 获取合同租客列表（含电话、身份证、邮箱等详细信息）
+    /// </summary>
+    public async Task<List<ContractTenantInfoDto>> GetTenantsAsync(Guid contractId, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var tenants = (await conn.QueryAsync<ContractTenantInfoDto>(
+            _sql.Get("Lease.Select.ContractTenant.WithDetailByContract"),
+            new { Id = contractId })).ToList();
+        return tenants;
+    }
+
+    /// <summary>
     /// 创建新合同（仅写入主表，不含租客关联和费用配置）
     /// </summary>
     public async Task<ContractDto> CreateAsync(CreateContractRequest request, CancellationToken ct = default)

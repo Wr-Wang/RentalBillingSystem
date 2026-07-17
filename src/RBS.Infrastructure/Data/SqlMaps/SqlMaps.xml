@@ -1051,6 +1051,9 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <select id="Lease.Select.ContractTenant.WithNameByContract">
     <![CDATA[SELECT ct.TenantId, t.Name AS TenantName, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id]]>
   </select>
+  <select id="Lease.Select.ContractTenant.WithDetailByContract">
+    <![CDATA[SELECT ct.TenantId, t.Name AS TenantName, t.Phone AS TenantPhone, t.IdCard, t.Email, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id]]>
+  </select>
   <select id="Lease.Select.ContractFeeConfig.ActiveWithFeeName">
     <![CDATA[SELECT cf.FeeCodeId, fc.Name AS FeeName, fc.Code AS FeeCode, fc.ChargeType, cf.Amount, cf.BillingMode, cf.Unit, cf.UnitPrice
       FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE cf.ContractId = @Id AND cf.IsActive = 1]]>
@@ -1582,7 +1585,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
 
   <!-- ===== 租客相关 SQL（Tenant Tab + 多租客改造） ===== -->
   <select id="Lease.Select.ContractTenant.DetailByContract">
-    <![CDATA[SELECT ct.TenantId, ct.IsPrimary, t.Name AS TenantName, t.Phone AS TenantPhone, t.IdentityNo AS IdCard, t.Email, t.Wechat
+    <![CDATA[SELECT ct.TenantId, ct.IsPrimary, t.Name AS TenantName, t.Phone AS TenantPhone, t.IdCard, t.Email, t.Wechat
       FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId
       WHERE ct.ContractId = @ContractId ORDER BY ct.IsPrimary DESC, t.Name]]>
   </select>
@@ -1875,10 +1878,10 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT COUNT(1) FROM Tenants {0}]]>
   </select>
   <select id="Rental.Select.Tenant.ListPaged">
-    <![CDATA[SELECT Id, Name, IdentityNo AS IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants {0} ORDER BY Name OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
+    <![CDATA[SELECT Id, Name, IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants {0} ORDER BY Name OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
   </select>
   <select id="Rental.Select.Tenant.ById">
-    <![CDATA[SELECT Id, Name, IdentityNo AS IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants WHERE Id=@Id]]>
+    <![CDATA[SELECT Id, Name, IdCard, Phone, Email, IsActive, Wechat, EmergencyContact, EmergencyPhone, Address, Remarks AS Remark FROM Tenants WHERE Id=@Id]]>
   </select>
 
   <!-- ================================================================

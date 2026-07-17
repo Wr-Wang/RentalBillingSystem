@@ -271,17 +271,17 @@ DECLARE @TenantLS uniqueidentifier;
 DECLARE @TenantWW uniqueidentifier;
 
 IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'张三')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdentityNo],[CompanyId],[CreatedBy],[CreatedAt])
+    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),N'张三',N'13800138001',N'310101199001011234',@Cid,@SysUserId,@Now);
 SELECT @TenantZS = [Id] FROM [Tenants] WHERE [Name]=N'张三';
 
 IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'李四')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdentityNo],[CompanyId],[CreatedBy],[CreatedAt])
+    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),N'李四',N'13800138002',N'310101199002022345',@Cid,@SysUserId,@Now);
 SELECT @TenantLS = [Id] FROM [Tenants] WHERE [Name]=N'李四';
 
 IF NOT EXISTS (SELECT 1 FROM [Tenants] WHERE [Name]=N'王五')
-    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdentityNo],[CompanyId],[CreatedBy],[CreatedAt])
+    INSERT INTO [Tenants] ([Id],[Name],[Phone],[IdCard],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),N'王五',N'13800138003',N'310101199003033456',@Cid,@SysUserId,@Now);
 SELECT @TenantWW = [Id] FROM [Tenants] WHERE [Name]=N'王五';
 
