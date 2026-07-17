@@ -15,4 +15,7 @@ public record FeeMonthSegment
 
     /// <summary>是否启用</summary>
     public bool IsActive { get; init; }
+
+    /// <summary>该分段的金额（分摊期按天折算，全额期不变）</summary>
+    public decimal Amount { get; init; }
 }

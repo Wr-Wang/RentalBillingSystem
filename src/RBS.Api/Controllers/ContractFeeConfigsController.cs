@@ -141,6 +141,7 @@ public class ContractFeeConfigsController : ControllerBase
         {
             // 周期费用：按月拆分
             var segments = _billingDomain.CalculateMonthlySplit(
+                request.Amount,
                 request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"), ChinaTime.Now);
             var ids = new List<Guid>();
             foreach (var seg in segments)
@@ -148,7 +149,7 @@ public class ContractFeeConfigsController : ControllerBase
                 var segId = Guid.NewGuid();
                 await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.WithExpiry"),
                     new { Id = segId, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
-                        BillingMode = request.BillingMode ?? "FixedAmount", Amount = request.Amount,
+                        BillingMode = request.BillingMode ?? "FixedAmount", Amount = seg.Amount,
                         Unit = request.Unit, UnitPrice = request.UnitPrice,
                         IsActive = seg.IsActive, EffectiveDate = seg.EffectiveDate,
                         ExpiryDate = seg.ExpiryDate,

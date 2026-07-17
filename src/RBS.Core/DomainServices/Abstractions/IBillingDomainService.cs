@@ -28,6 +28,6 @@ public interface IBillingDomainService
         Guid contractId, string period, DateOnly dueDate,
         Guid companyId, Guid defaultSubjectId, DateTime billedAt);
 
-    /// <summary>计算周期收费的月份拆分方案。</summary>
-    List<FeeMonthSegment> CalculateMonthlySplit(string effectiveDate, DateTime now);
+    /// <summary>计算周期收费的月份拆分方案（首段按天分摊）。</summary>
+    List<FeeMonthSegment> CalculateMonthlySplit(decimal monthlyAmount, string effectiveDate, DateTime now);
 }

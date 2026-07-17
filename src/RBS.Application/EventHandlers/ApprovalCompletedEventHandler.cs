@@ -362,6 +362,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 {
                     // 周期费用：按月拆分（从生效日到当前月逐月生成独立配置）
                     var segments = _billingDomain.CalculateMonthlySplit(
+                        item.NewAmount,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                         ChinaTime.Now);
                     configIds = new List<Guid>();
@@ -377,7 +378,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                                 ContractId = item.ContractId,
                                 FeeCodeId = item.FeeCodeId,
                                 BillingMode = item.BillingMode,
-                                Amount = item.NewAmount,
+                                Amount = seg.Amount,
                                 Unit = item.Unit,
                                 UnitPrice = (decimal?)null,
                                 IsActive = seg.IsActive,
@@ -387,7 +388,42 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                                 Now = ChinaTime.Now
                             }, tx);
                         configIds.Add(segId);
-                    }
+                    }                                    // 周期费用：拆分配置后，立即生成当月分摊应收 Journal（GLPosted=0）
+                                    // 后续月份由 BillJob 正常生成
+                                    var firstSeg = segments[0];
+                                    if (firstSeg.ExpiryDate != null)
+                                    {
+                                        // 首段有到期日 → 当月分摊期
+                                        var segEffDate = DateOnly.Parse(firstSeg.EffectiveDate);
+                                        var segExpDate = DateOnly.Parse(firstSeg.ExpiryDate);
+                                        var daysInMonth = DateTime.DaysInMonth(segEffDate.Year, segEffDate.Month);
+                                        var occupiedDays = segExpDate.DayNumber - segEffDate.DayNumber + 1;
+                                        var proratedAmt = _billingDomain.CalculateProratedAmount(
+                                            item.NewAmount, daysInMonth, occupiedDays);
+                
+                                        var period = segEffDate.ToString("yyyy-MM");
+                                        await conn.ExecuteAsync(
+                    _sql.Get("Billing.Insert.Journal.Unposted"),
+                                            new
+                                            {
+                                                Id = Guid.NewGuid(),
+                                                CoId = companyId,
+                                                CId = item.ContractId,
+                                                FId = item.FeeCodeId,
+                                                FConfigId = configIds[0],
+                                                SubjId = Guid.Empty,
+                                                Period = period,
+                                                Amt = firstSeg.Amount,
+                                                Due = DateOnly.FromDateTime(ChinaTime.Now),
+                                                EntryType = "Normal",
+                                                BilledAt = ChinaTime.Now,
+                                                DNId = (Guid?)null,
+                                                ParentId = (Guid?)null,
+                                                Summary = $"应收 {item.FeeName} {period}",
+                                                CBy = Guid.Empty
+                                            }, tx);
+                                    }
+
                 }
                 else
                 {
@@ -616,7 +652,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 		                if (feeChargeType == "Recurring")
 		                {
 		                    var effDate = f.EffectiveDate ?? request.StartDate.ToString("yyyy-MM-dd");
-		                    var segments = _billingDomain.CalculateMonthlySplit(effDate, ChinaTime.Now);
+		                    var segments = _billingDomain.CalculateMonthlySplit((decimal)f.Amount, effDate, ChinaTime.Now);
 		                    foreach (var seg in segments)
 		                    {
 		                        var segId = Guid.NewGuid();
@@ -626,7 +662,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 		                            {
 		                                Id = segId, ContractId = contractId,
 		                                FeeCodeId = f.FeeCodeId, BillingMode = f.BillingMode,
-		                                Amount = f.Amount, Unit = f.Unit,
+		                                Amount = seg.Amount, Unit = f.Unit,
 		                                UnitPrice = f.UnitPrice, IsActive = seg.IsActive,
 		                                EffectiveDate = seg.EffectiveDate,
 		                                ExpiryDate = seg.ExpiryDate,
@@ -837,7 +873,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	            if (feeChargeType == "Recurring")
 	            {
 	                var segments = _billingDomain.CalculateMonthlySplit(
-	                    request.EffectiveDate, ChinaTime.Now);
+	                    request.Amount, request.EffectiveDate, ChinaTime.Now);
 	                var segIds = new List<Guid>();
 	                foreach (var seg in segments)
 	                {
@@ -848,7 +884,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	                        {
 	                            Id = segId, ContractId = request.ContractId,
 	                            FeeCodeId = request.FeeCodeId, BillingMode = request.BillingMode,
-	                            Amount = request.Amount, Unit = (string?)null,
+	                            Amount = seg.Amount, Unit = (string?)null,
 	                            UnitPrice = (decimal?)null, IsActive = seg.IsActive,
 	                            EffectiveDate = seg.EffectiveDate, ExpiryDate = seg.ExpiryDate,
 	                            CreatedBy = request.CreatedBy, Now = ChinaTime.Now
