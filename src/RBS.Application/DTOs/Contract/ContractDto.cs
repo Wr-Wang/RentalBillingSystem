@@ -41,6 +41,10 @@ public class ContractDto
     public bool AutoRenew { get; set; } = true;
     /// <summary>月租金（冗余展示）</summary>
     public decimal? RentAmount { get; set; }
+    /// <summary>欠款余额（应收未收）</summary>
+    public decimal OutstandingBalance { get; set; }
+    /// <summary>预存金额（溢收未抵）</summary>
+    public decimal PrepaidBalance { get; set; }
     /// <summary>租客列表</summary>
     public List<ContractTenantDto> Tenants { get; set; } = new();
     /// <summary>费用配置列表</summary>

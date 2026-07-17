@@ -827,6 +827,12 @@
   <update id="Contract.Update.Contract.PrepaidBalanceIncrement">
     <![CDATA[UPDATE Contracts SET PrepaidBalance = PrepaidBalance + @Amt WHERE Id = @Id]]>
   </update>
+  <update id="Contract.Update.Contract.PrepaidBalanceDecrement">
+    <![CDATA[UPDATE Contracts SET PrepaidBalance = PrepaidBalance - @Amt WHERE Id = @Id]]>
+  </update>
+  <select id="Contract.Select.Contract.PrepaidBalance">
+    <![CDATA[SELECT ISNULL(PrepaidBalance,0) FROM Contracts WHERE Id = @Id]]>
+  </select>
   <select id="Receipt.Select.Receipt.WithContractBalance">
     <![CDATA[SELECT r.Amount, r.ContractId, c.OutstandingBalance FROM Receipts r LEFT JOIN Contracts c ON c.Id = r.ContractId WHERE r.Id = @Id]]>
   </select>

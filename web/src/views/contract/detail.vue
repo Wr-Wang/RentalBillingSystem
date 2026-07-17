@@ -65,6 +65,17 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="租客电话" :span="2">{{ contract.tenantPhone || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="欠款余额">
+          <span :style="{ color: (contract.outstandingBalance || 0) > 0 ? '#f56c6c' : '#67c23a', fontWeight: 'bold' }">
+            ¥{{ (contract.outstandingBalance || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+          </span>
+        </el-descriptions-item>
+        <el-descriptions-item label="预存金额">
+          <span :style="{ color: (contract.prepaidBalance || 0) > 0 ? '#409eff' : '#c0c4cc', fontWeight: 'bold' }">
+            ¥{{ (contract.prepaidBalance || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+          </span>
+        </el-descriptions-item>
+        <el-descriptions-item label=" " />
       </el-descriptions>
     </el-card>
 
@@ -841,6 +852,8 @@ const contract = ref({
   startDate: '',
   endDate: '',
   status: '',
+  outstandingBalance: 0,
+  prepaidBalance: 0,
   remark: ''
 })
 /** 主数据加载中 */
@@ -981,6 +994,8 @@ async function fetchContract() {
         status: c.status || '',
         hasRenewalContract: c.hasRenewalContract || false,
         autoRenew: c.autoRenew !== false,
+        outstandingBalance: c.outstandingBalance || 0,
+        prepaidBalance: c.prepaidBalance || 0,
         remark: ''
       }
 

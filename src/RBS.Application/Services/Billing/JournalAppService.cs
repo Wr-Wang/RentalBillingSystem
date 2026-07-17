@@ -375,6 +375,42 @@ public class JournalAppService : IJournalAppService
                         SId = subjects["6001"], SCode = "6001", Dir = "Credit",
                         Amt = jAmt, SrcType = "JournalPost", SrcId = id,
                         Desc = "", CBy = Guid.Empty }, tx);
+
+            // 过账时同步增加合同欠款余额
+            await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
+                new { Id = cId, Amt = jAmt }, tx);
+
+            // 过账时若有预存余额，自动抵扣（预存抵应收，不碰收入科目）
+            var prepaidBalance = await conn.QuerySingleAsync<decimal>(
+                _sql.Get("Contract.Select.Contract.PrepaidBalance"),
+                new { Id = cId }, tx);
+            if (prepaidBalance > 0m)
+            {
+                var applyAmt = Math.Min(prepaidBalance, jAmt);
+                if (applyAmt > 0m && subjects.ContainsKey("2203") && subjects.ContainsKey("1122"))
+                {
+                    // Dr 2203(预收账款)
+                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                        new { Id = Guid.NewGuid(), CoId = coId, CId = cId,
+                            CNo = cNo, Period = period,
+                            SId = subjects["2203"], SCode = "2203", Dir = "Debit",
+                            Amt = applyAmt, SrcType = "JournalPost", SrcId = id,
+                            Desc = "", CBy = Guid.Empty }, tx);
+                    // Cr 1122(应收账款)
+                    await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
+                        new { Id = Guid.NewGuid(), CoId = coId, CId = cId,
+                            CNo = cNo, Period = period,
+                            SId = subjects["1122"], SCode = "1122", Dir = "Credit",
+                            Amt = applyAmt, SrcType = "JournalPost", SrcId = id,
+                            Desc = "", CBy = Guid.Empty }, tx);
+                    // 调整合同余额：欠款减少、预存减少
+                    await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.OutstandingBalanceIncrement"),
+                        new { Id = cId, Amt = -applyAmt }, tx);
+                    await conn.ExecuteAsync(_sql.Get("Contract.Update.Contract.PrepaidBalanceDecrement"),
+                        new { Id = cId, Amt = applyAmt }, tx);
+                }
+            }
+
             count++;
         }
 
