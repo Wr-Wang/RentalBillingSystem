@@ -624,7 +624,7 @@
     <![CDATA[SELECT t.Name FROM Tenants t JOIN ContractTenants ct ON ct.TenantId=t.Id WHERE ct.ContractId=@Id AND ct.IsPrimary=1]]>
   </select>
   <select id="Billing.Select.Journal.OverdueByCompany">
-    <![CDATA[SELECT j.Id, j.CompanyId, j.ContractId, j.Period, j.Amount, j.DueDate,
+    <![CDATA[SELECT j.Id, j.CompanyId, j.ContractId, j.FeeCodeId, j.Period, j.Amount, j.DueDate,
       COALESCE(r.Received, 0) AS Received,
       DATEDIFF(DAY, j.DueDate, CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)) AS DaysOverdue
       FROM Journals j

@@ -2,6 +2,7 @@ using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Application.Common;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Approval;
 using RBS.Core.Common;
@@ -140,22 +141,13 @@ public class ContractFeeConfigsController : ControllerBase
         if (request.ChargeType == "Recurring")
         {
             // 周期费用：按月拆分
-            var segments = _billingDomain.CalculateMonthlySplit(
-                request.Amount,
-                request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"), ChinaTime.Now);
-            var ids = new List<Guid>();
-            foreach (var seg in segments)
-            {
-                var segId = Guid.NewGuid();
-                await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.WithExpiry"),
-                    new { Id = segId, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
-                        BillingMode = request.BillingMode ?? "FixedAmount", Amount = seg.Amount,
-                        Unit = request.Unit, UnitPrice = request.UnitPrice,
-                        IsActive = seg.IsActive, EffectiveDate = seg.EffectiveDate,
-                        ExpiryDate = seg.ExpiryDate,
-                        CreatedBy = _currentUser.UserId, Now = ChinaTime.Now });
-                ids.Add(segId);
-            }
+            var ids = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
+                conn, null, _sql, _billingDomain,
+                request.ContractId, request.FeeCodeId,
+                request.Amount, request.BillingMode ?? "FixedAmount",
+                request.Unit, request.UnitPrice,
+                request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                _currentUser.UserId);
             id = ids.Last(); // 用于 ChangeHistory，用长期配置的 ID
         }
         else

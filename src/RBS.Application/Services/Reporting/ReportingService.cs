@@ -57,7 +57,7 @@ public class ReportingService : IReportingService
             {
                 Id = (Guid)p.Id, ContractId = (Guid)p.ContractId, FeeCodeId = (Guid)p.FeeCodeId,
                 Period = (string)p.Period, Amount = (decimal)p.Amount,
-                DueDate = (DateOnly)p.DueDate, DaysOverdue = (int)p.DaysOverdue
+                DueDate = DateOnly.FromDateTime((DateTime)p.DueDate), DaysOverdue = (int)p.DaysOverdue
             };
         }).OrderByDescending(p => p.DaysOverdue).ToList();
 

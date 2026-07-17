@@ -1,6 +1,7 @@
 using System.Data;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
+using RBS.Application.Common;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
@@ -298,6 +299,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         // ★ Commit 之后再生成补差 Supplementary JE（FeeConfig 已落库，
         //    补差 JE 生成失败不影响 FeeConfig 变更，可手动重试）
         var currentMonth = DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM");
+        var companyId = bizData.CompanyId;
+
         foreach (var item in feeItems)
         {
             var effDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
@@ -308,7 +311,42 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             if (string.Compare(effMonth, currentMonth, StringComparison.Ordinal) <= 0 ||
                 effMonth == DateOnly.FromDateTime(ChinaTime.Now).AddMonths(1).ToString("yyyy-MM"))
             {
-                // TODO: 生成补差 JE — 原 _journalGen.GenerateSupplementaryAsync 已移除
+                var diff = item.NewAmount - item.OldAmount;
+                if (diff == 0) continue;
+
+                // 生效月按天分摊差价
+                var effDateObj = DateOnly.Parse(effDate);
+                var daysInMonth = DateTime.DaysInMonth(effDateObj.Year, effDateObj.Month);
+                var occupiedDays = daysInMonth - effDateObj.Day + 1;
+                var proratedDiff = Math.Round(diff / daysInMonth * occupiedDays, 2);
+                if (proratedDiff == 0) continue;
+
+                try
+                {
+                    using var jeConn = _db.CreateConnection();
+                    jeConn.Open();
+                    await jeConn.ExecuteAsync(
+                        _sql.Get("Billing.Insert.Journal.Unposted"),
+                        new
+                        {
+                            Id = Guid.NewGuid(),
+                            CoId = companyId,
+                            CId = item.ContractId,
+                            FId = item.FeeCodeId,
+                            FConfigId = (Guid?)null,
+                            SubjId = Guid.Empty,
+                            Period = effMonth,
+                            Amt = proratedDiff,
+                            Due = DateOnly.FromDateTime(ChinaTime.Now),
+                            EntryType = "Supplementary",
+                            BilledAt = ChinaTime.Now,
+                            DNId = (Guid?)null,
+                            ParentId = (Guid?)null,
+                            Summary = $"调价补差 {item.FeeName} {effMonth}",
+                            CBy = Guid.Empty
+                        });
+                }
+                catch { /* 补差 JE 失败不影响 FeeConfig 变更，可手动重试 */ }
             }
         }
     }
@@ -357,97 +395,24 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     new { Id = item.FeeCodeId }, tx);
                 var chargeType = (string)(feeCode?.ChargeType ?? "Recurring");
 
-                List<Guid> configIds;
+                List<Guid> configIds = new();
                 if (chargeType == "Recurring")
                 {
-                    // 周期费用：按月拆分（从生效日到当前月逐月生成独立配置）
                     var segments = _billingDomain.CalculateMonthlySplit(
                         item.NewAmount,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                         ChinaTime.Now);
-                    configIds = new List<Guid>();
-
-                    foreach (var seg in segments)
-                    {
-                        var segId = Guid.NewGuid();
-                        await conn.ExecuteAsync(
-                            _sql.Get("Lease.Insert.ContractFeeConfig.WithExpiry"),
-                            new
-                            {
-                                Id = segId,
-                                ContractId = item.ContractId,
-                                FeeCodeId = item.FeeCodeId,
-                                BillingMode = item.BillingMode,
-                                Amount = seg.Amount,
-                                Unit = item.Unit,
-                                UnitPrice = (decimal?)null,
-                                IsActive = seg.IsActive,
-                                EffectiveDate = seg.EffectiveDate,
-                                ExpiryDate = seg.ExpiryDate,
-                                CreatedBy = Guid.Empty,
-                                Now = ChinaTime.Now
-                            }, tx);
-                        configIds.Add(segId);
-                    }                                    // 周期费用：拆分配置后，立即生成当月分摊应收 Journal（GLPosted=0）
-                                    // 后续月份由 BillJob 正常生成
-                                    var firstSeg = segments[0];
-                                    if (firstSeg.ExpiryDate != null)
-                                    {
-                                        // 首段有到期日 → 当月分摊期
-                                        var segEffDate = DateOnly.Parse(firstSeg.EffectiveDate);
-                                        var segExpDate = DateOnly.Parse(firstSeg.ExpiryDate);
-                                        var daysInMonth = DateTime.DaysInMonth(segEffDate.Year, segEffDate.Month);
-                                        var occupiedDays = segExpDate.DayNumber - segEffDate.DayNumber + 1;
-                                        var proratedAmt = _billingDomain.CalculateProratedAmount(
-                                            item.NewAmount, daysInMonth, occupiedDays);
-                
-                                        var period = segEffDate.ToString("yyyy-MM");
-                                        await conn.ExecuteAsync(
-                    _sql.Get("Billing.Insert.Journal.Unposted"),
-                                            new
-                                            {
-                                                Id = Guid.NewGuid(),
-                                                CoId = companyId,
-                                                CId = item.ContractId,
-                                                FId = item.FeeCodeId,
-                                                FConfigId = configIds[0],
-                                                SubjId = Guid.Empty,
-                                                Period = period,
-                                                Amt = firstSeg.Amount,
-                                                Due = DateOnly.FromDateTime(ChinaTime.Now),
-                                                EntryType = "Normal",
-                                                BilledAt = ChinaTime.Now,
-                                                DNId = (Guid?)null,
-                                                ParentId = (Guid?)null,
-                                                Summary = $"应收 {item.FeeName} {period}",
-                                                CBy = Guid.Empty
-                                            }, tx);
-                                    }
-
+                    configIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
+                        conn, tx, _sql, _billingDomain,
+                        item.ContractId, item.FeeCodeId,
+                        item.NewAmount, item.BillingMode, item.Unit, (decimal?)null,
+                        item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                        Guid.Empty);
+                    await RecurringFeeSplitHelper.GenerateFirstMonthJournal(
+                        conn, tx, _sql, segments, configIds,
+                        companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, item.FeeName);
                 }
-                else
-                {
-                    // 一次性费用：单条插入
-                    var configId = Guid.NewGuid();
-                    await conn.ExecuteAsync(
-                        _sql.Get("Lease.Insert.ContractFeeConfig.Default"),
-                        new
-                        {
-                            Id = configId,
-                            ContractId = item.ContractId,
-                            FeeCodeId = item.FeeCodeId,
-                            BillingMode = item.BillingMode,
-                            Amount = item.NewAmount,
-                            Unit = item.Unit,
-                            UnitPrice = (decimal?)null,
-                            EffectiveDate = item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                            CreatedBy = Guid.Empty,
-                            Now = ChinaTime.Now
-                        }, tx);
-                    configIds = new List<Guid> { configId };
-                }
-
-                if (chargeType == "OneTime")
+if (chargeType == "OneTime")
                 {
                     var oneTimeConfigId = configIds[0];
                     // 暂记，等 Commit 后再生成 JE（避免独立连接被事务锁阻塞 → 超时）
@@ -652,24 +617,14 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 		                if (feeChargeType == "Recurring")
 		                {
 		                    var effDate = f.EffectiveDate ?? request.StartDate.ToString("yyyy-MM-dd");
-		                    var segments = _billingDomain.CalculateMonthlySplit((decimal)f.Amount, effDate, ChinaTime.Now);
-		                    foreach (var seg in segments)
-		                    {
-		                        var segId = Guid.NewGuid();
-		                        await conn.ExecuteAsync(
-		                _sql.Get("Lease.Insert.ContractFeeConfig.WithExpiry"),
-		                            new
-		                            {
-		                                Id = segId, ContractId = contractId,
-		                                FeeCodeId = f.FeeCodeId, BillingMode = f.BillingMode,
-		                                Amount = seg.Amount, Unit = f.Unit,
-		                                UnitPrice = f.UnitPrice, IsActive = seg.IsActive,
-		                                EffectiveDate = seg.EffectiveDate,
-		                                ExpiryDate = seg.ExpiryDate,
-		                                CreatedBy = request.CreatedBy, Now = now
-		                            }, tx);
-		                    }
+		                    await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
+		                        conn, tx, _sql, _billingDomain,
+		                        contractId, (Guid)f.FeeCodeId,
+		                        (decimal)f.Amount, (string)f.BillingMode,
+		                        (string?)f.Unit, (decimal?)f.UnitPrice,
+		                        effDate, request.CreatedBy);
 		                }
+
 		                else
 		                {
 		                    await conn.ExecuteAsync(
@@ -874,23 +829,11 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 	            {
 	                var segments = _billingDomain.CalculateMonthlySplit(
 	                    request.Amount, request.EffectiveDate, ChinaTime.Now);
-	                var segIds = new List<Guid>();
-	                foreach (var seg in segments)
-	                {
-	                    var segId = Guid.NewGuid();
-	                    await conn.ExecuteAsync(
-	                            _sql.Get("Lease.Insert.ContractFeeConfig.WithExpiry"),
-	                        new
-	                        {
-	                            Id = segId, ContractId = request.ContractId,
-	                            FeeCodeId = request.FeeCodeId, BillingMode = request.BillingMode,
-	                            Amount = seg.Amount, Unit = (string?)null,
-	                            UnitPrice = (decimal?)null, IsActive = seg.IsActive,
-	                            EffectiveDate = seg.EffectiveDate, ExpiryDate = seg.ExpiryDate,
-	                            CreatedBy = request.CreatedBy, Now = ChinaTime.Now
-	                        }, tx);
-	                    segIds.Add(segId);
-	                }
+	                var segIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
+	                    conn, tx, _sql, _billingDomain,
+	                    request.ContractId, request.FeeCodeId,
+	                    request.Amount, request.BillingMode, (string?)null, (decimal?)null,
+	                    request.EffectiveDate, request.CreatedBy);
 	                configId = segIds.Last();
 	            }
 	            else
