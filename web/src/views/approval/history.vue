@@ -20,8 +20,8 @@
     </div>
 
     <el-table :data="historyList" stripe v-loading="loading">
-      <el-table-column label="申请编号" width="150">
-        <template #default="{ row }">{{ row.id?.slice(0, 8) || '-' }}</template>
+      <el-table-column label="申请编号" width="180">
+        <template #default="{ row }">{{ row.requestNo || '-' }}</template>
       </el-table-column>
       <el-table-column prop="approvalTypeName" label="审批类型" width="120" />
       <el-table-column prop="submitterName" label="申请人" width="100" />

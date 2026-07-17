@@ -235,7 +235,7 @@
             <el-table-column label="日期" width="100">
               <template #default="{ row }">{{ row.date }}</template>
             </el-table-column>
-            <el-table-column label="合同" width="130" prop="contractNo" />
+            <el-table-column label="合同" width="200" prop="contractNo" />
             <el-table-column label="来源" width="80">
               <template #default="{ row }">
                 <el-tag :type="sourceTagType(row.sourceType)" size="small">{{ sourceLabel(row.sourceType) }}</el-tag>

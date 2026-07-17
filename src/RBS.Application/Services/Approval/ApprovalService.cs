@@ -27,6 +27,7 @@ public class ApprovalService : IApprovalService
     private readonly IServiceProvider _serviceProvider;
     private readonly ISqlLoader _sql;
     private readonly IApprovalDomainService _approvalDomain;
+    private readonly IApprovalNumberGenerator _approvalNoGenerator;
 
     /// <summary>
     /// 构造函数
@@ -45,7 +46,8 @@ public class ApprovalService : IApprovalService
         IDbConnectionFactory connectionFactory,
         IServiceProvider serviceProvider,
         ISqlLoader sql,
-        IApprovalDomainService approvalDomain)
+        IApprovalDomainService approvalDomain,
+        IApprovalNumberGenerator approvalNoGenerator)
     {
         _uow = uow;
         _tenantService = tenantService;
@@ -54,6 +56,7 @@ public class ApprovalService : IApprovalService
         _serviceProvider = serviceProvider;
         _sql = sql;
         _approvalDomain = approvalDomain;
+        _approvalNoGenerator = approvalNoGenerator;
     }
 
     // =====================================================================
@@ -90,6 +93,7 @@ public class ApprovalService : IApprovalService
             maxLevel);
 
         entity.SetCreated(_currentUserService.UserId, ChinaTime.Now, null, null);
+        entity.SetRequestNo(await _approvalNoGenerator.GenerateRequestNo());
         entity.AddRecord(_currentUserService.UserId, "Submitted", request.Description);
         await _uow.ApprovalRequests.AddAsync(entity, ct);
 
@@ -766,6 +770,7 @@ public class ApprovalService : IApprovalService
         return new ApprovalRequestDto
         {
             Id = entity.Id,
+            RequestNo = entity.RequestNo,
             ApprovalTypeId = entity.ApprovalTypeId,
             Title = entity.Title,
             Description = entity.Description,

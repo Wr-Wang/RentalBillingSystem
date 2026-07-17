@@ -82,6 +82,11 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     /// </summary>
     public DateTime? CompletedAt { get; private set; }
 
+    /// <summary>
+    /// 申请编号（自动生成，规则：APR{yyyyMMddHHmmssfff}{XX}）
+    /// </summary>
+    public string? RequestNo { get; private set; }
+
     // ===== 审批跟踪 =====
     private readonly List<ApprovalRecord> _records = new();
 
@@ -165,6 +170,12 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     /// </summary>
     /// <param name="contractId">合同标识</param>
     public void SetContractId(Guid contractId) => ContractId = contractId;
+
+    /// <summary>
+    /// 设置申请编号（由生成器在 SubmitAsync 中创建）
+    /// </summary>
+    /// <param name="requestNo">申请编号</param>
+    public void SetRequestNo(string requestNo) => RequestNo = requestNo;
 
     /// <summary>
     /// 记录审批操作

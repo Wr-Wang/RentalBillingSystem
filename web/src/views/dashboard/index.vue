@@ -70,7 +70,7 @@
           <template #header><span>最近收款</span></template>
           <el-table :data="recentReceipts" style="width: 100%" v-loading="receiptLoading">
             <el-table-column prop="receiptNo" label="收据号" width="140" />
-            <el-table-column prop="contractNo" label="合同号" width="120" />
+            <el-table-column prop="contractNo" label="合同号" width="180" />
             <el-table-column prop="amount" label="金额" width="100">
               <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
             </el-table-column>

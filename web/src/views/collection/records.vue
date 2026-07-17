@@ -13,7 +13,7 @@
 
     <el-table :data="records" v-loading="loading" stripe>
       <el-table-column type="index" label="#" width="50" />
-      <el-table-column prop="contractNo" label="合同号" width="120" />
+      <el-table-column prop="contractNo" label="合同号" width="180" />
       <el-table-column prop="contractId" label="合同 ID" width="200" show-overflow-tooltip />
       <el-table-column prop="stageName" label="阶段" width="100" />
       <el-table-column prop="createdAt" label="发送时间" width="160" />

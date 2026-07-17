@@ -59,7 +59,7 @@
         <el-card style="margin-bottom: 16px;">
           <template #header>逾期合同列表</template>
           <el-table :data="overdueContracts" v-loading="loading" stripe size="small">
-            <el-table-column prop="contractNo" label="合同号" width="120" />
+            <el-table-column prop="contractNo" label="合同号" width="180" />
             <el-table-column prop="tenantName" label="租客" width="80" />
             <el-table-column label="欠费金额" width="100">
               <template #default="{ row }">¥{{ (row.overdueAmount || 0).toLocaleString() }}</template>

@@ -38,7 +38,7 @@
       </template>
       <el-empty v-if="!loading && contracts.length === 0" description="暂无合同" />
       <el-table :data="contracts" stripe v-else style="width:100%">
-        <el-table-column prop="contractNo" label="合同号" min-width="140" />
+        <el-table-column prop="contractNo" label="合同号" min-width="220" />
         <el-table-column prop="paymentCycle" label="付款周期" min-width="90">
           <template #default="{ row }">{{ row.paymentCycle === 'Monthly' ? '月付' : row.paymentCycle === 'Quarterly' ? '季付' : row.paymentCycle === 'Yearly' ? '年付' : row.paymentCycle || '-' }}</template>
         </el-table-column>

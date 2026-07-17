@@ -53,7 +53,7 @@
         </div>
       </template>
       <el-table :data="filteredContracts" stripe v-loading="loading" style="width:100%;">
-        <el-table-column prop="contractNo" label="合同编号" width="150" />
+        <el-table-column prop="contractNo" label="合同编号" width="240" />
         <el-table-column label="租客" width="120">
           <template #default="{ row }">{{ row.tenantName || '-' }}</template>
         </el-table-column>

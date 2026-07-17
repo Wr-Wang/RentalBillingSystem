@@ -18,7 +18,7 @@
     <el-card style="margin-bottom: 16px;">
       <template #header>关联合同</template>
       <el-table :data="currentContracts" v-loading="contractsLoading" stripe>
-        <el-table-column prop="contractNo" label="合同号" width="150" />
+        <el-table-column prop="contractNo" label="合同号" width="220" />
         <el-table-column prop="roomFullCode" label="房屋" width="120" />
         <el-table-column prop="startDate" label="起租" width="110" />
         <el-table-column prop="endDate" label="到期" width="110" />

@@ -189,11 +189,15 @@
     <![CDATA[SELECT DISTINCT ApprovalTypeId, LevelNo FROM ApprovalLevelConfigs WHERE ApproverRoleId IN @Ids]]>
   </select>
   <insert id="Approval.Insert.Request.Default">
-    <![CDATA[INSERT INTO ApprovalRequests (Id, ApprovalTypeId, Title, Description, TargetEntityId, TargetEntityType,
+    <![CDATA[INSERT INTO ApprovalRequests (Id, RequestNo, ApprovalTypeId, Title, Description, TargetEntityId, TargetEntityType,
       CurrentLevel, MaxLevel, Status, CompanyId, CreatedBy, CreatedAt)
-      VALUES (@Id, @ApprovalTypeId, @Title, @Description, @TargetEntityId, @TargetEntityType,
+      VALUES (@Id, @RequestNo, @ApprovalTypeId, @Title, @Description, @TargetEntityId, @TargetEntityType,
       @CurrentLevel, @MaxLevel, @Status, @CompanyId, @CreatedBy, @CreatedAt)]]>
   </insert>
+  <select id="Approval.Select.Request.MaxSeqNoByDate">
+    <![CDATA[SELECT ISNULL(MAX(CAST(RIGHT(RequestNo, 6) AS INT)), 0)
+      FROM ApprovalRequests WHERE RequestNo LIKE @Prefix + '%']]>
+  </select>
   <update id="Approval.Update.Request.Default">
     <![CDATA[UPDATE ApprovalRequests SET Status=@Status,CurrentLevel=@CurrentLevel,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
   </update>

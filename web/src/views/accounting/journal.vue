@@ -42,7 +42,7 @@
       <el-table :data="entries" stripe v-loading="loading" style="width:100%;" @row-click="viewVoucherDetail" highlight-current-row>
         <el-table-column type="index" label="#" width="50" fixed />
         <el-table-column prop="voucherNo" label="凭证号" width="150" fixed />
-        <el-table-column prop="contractNo" label="合同号" width="150">
+        <el-table-column prop="contractNo" label="合同号" width="220">
           <template #default="{ row }">
             <span style="font-family:monospace;font-size:13px;">{{ row.contractNo || '-' }}</span>
           </template>

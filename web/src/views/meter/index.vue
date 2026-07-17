@@ -32,7 +32,7 @@
     <el-card>
       <el-table :data="filteredList" v-loading="loading" stripe>
         <el-table-column prop="roomName" label="房屋" width="100" />
-        <el-table-column prop="contractNo" label="合同号" width="130" />
+        <el-table-column prop="contractNo" label="合同号" width="200" />
         <el-table-column prop="feeName" label="项目" width="80" />
         <el-table-column prop="previousReading" label="上期读数" width="100" />
         <el-table-column label="本期读数">

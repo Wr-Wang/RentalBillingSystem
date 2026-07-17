@@ -11,8 +11,8 @@
       <template #header>我的提交记录</template>
       <el-table :data="myRequests" stripe>
         <el-table-column type="index" label="#" width="50" />
-        <el-table-column label="申请编号" width="150">
-          <template #default="{ row }">{{ row.id?.slice(0, 8) || '-' }}</template>
+        <el-table-column label="申请编号" width="180">
+          <template #default="{ row }">{{ row.requestNo || '-' }}</template>
         </el-table-column>
         <el-table-column prop="approvalTypeName" label="审批类型" width="120" />
         <el-table-column prop="title" label="业务摘要" min-width="200" />

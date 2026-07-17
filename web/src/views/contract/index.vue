@@ -25,7 +25,7 @@
 
     <el-table :data="contractList" v-loading="loading" stripe style="flex:1;width:100%;" height="100%" max-height="100%" border>
       <el-table-column type="index" label="#" width="50" />
-      <el-table-column prop="contractNo" label="合同号" min-width="140" />
+      <el-table-column prop="contractNo" label="合同号" min-width="220" />
       <el-table-column prop="roomName" label="房屋" min-width="90" />
       <el-table-column prop="tenantName" label="租客" min-width="90" />
       <el-table-column prop="startDate" label="起租" min-width="90" />

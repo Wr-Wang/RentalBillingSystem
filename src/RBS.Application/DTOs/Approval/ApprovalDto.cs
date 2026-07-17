@@ -7,6 +7,8 @@ public class ApprovalRequestDto
 {
     /// <summary>审批请求 ID</summary>
     public Guid Id { get; set; }
+    /// <summary>申请编号</summary>
+    public string? RequestNo { get; set; }
     /// <summary>审批类型 ID</summary>
     public Guid ApprovalTypeId { get; set; }
     /// <summary>审批标题</summary>

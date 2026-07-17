@@ -51,7 +51,7 @@
       <el-table :data="list" v-loading="loading" stripe style="width:100%;" @row-click="viewDetail" highlight-current-row @selection-change="onSelectionChange">
         <el-table-column type="selection" width="40" :selectable="r => !r.glPosted" />
         <el-table-column type="index" label="#" width="45" fixed />
-        <el-table-column prop="contractNo" label="合同号" width="140" fixed>
+        <el-table-column prop="contractNo" label="合同号" width="210" fixed>
           <template #default="{ row }">
             <span style="font-family:monospace;font-size:13px;">{{ row.contractNo || '-' }}</span>
           </template>

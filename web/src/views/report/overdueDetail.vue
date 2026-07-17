@@ -12,7 +12,7 @@
 
     <el-table :data="filteredList" v-loading="loading" stripe style="width:100%">
       <el-table-column type="index" label="#" width="50" />
-      <el-table-column prop="contractNo" label="合同号" width="130" />
+      <el-table-column prop="contractNo" label="合同号" width="200" />
       <el-table-column prop="roomName" label="房屋" width="100" />
       <el-table-column prop="tenantName" label="租客" width="100" />
       <el-table-column prop="period" label="账期" width="80" />

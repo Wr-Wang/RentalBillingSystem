@@ -99,7 +99,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="contractNo" label="合同号" width="130" />
+        <el-table-column prop="contractNo" label="合同号" width="200" />
         <el-table-column prop="tenantName" label="租客" width="90" />
         <el-table-column prop="roomName" label="房屋" width="120" />
         <el-table-column label="应收金额" width="120">
@@ -149,7 +149,7 @@
       />
 
       <el-table :data="generatedContracts" v-loading="loading" stripe>
-        <el-table-column prop="contractNo" label="合同号" width="130" />
+        <el-table-column prop="contractNo" label="合同号" width="200" />
         <el-table-column prop="tenantName" label="租客" width="90" />
         <el-table-column prop="roomName" label="房屋" width="120" />
         <el-table-column prop="billNo" label="账单编号" width="170" />
@@ -177,7 +177,7 @@
     <!-- ====== Generate Result Dialog ====== -->
     <el-dialog v-model="showResult" title="生成结果" width="600px">
       <el-table :data="generateResults" stripe size="small">
-        <el-table-column prop="contractNo" label="合同号" width="130" />
+        <el-table-column prop="contractNo" label="合同号" width="200" />
         <el-table-column prop="tenantName" label="租客" width="90" />
         <el-table-column label="结果" width="100">
           <template #default="{ row }">
