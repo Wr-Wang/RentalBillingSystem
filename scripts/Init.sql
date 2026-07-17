@@ -5320,3 +5320,68 @@ BEGIN
 END
 GO
 
+-- ===================================================================
+-- 会计科目种子数据（幂等插入）
+-- ===================================================================
+DECLARE @AcctCompanyId uniqueidentifier = (SELECT TOP 1 Id FROM Companies ORDER BY CreatedAt);
+DECLARE @AcctUserId uniqueidentifier = (SELECT TOP 1 Id FROM Users WHERE Username = 'admin');
+IF @AcctUserId IS NULL SELECT TOP 1 @AcctUserId = Id FROM Users ORDER BY CreatedAt;
+DECLARE @AcctNow datetime2 = DATEADD(HOUR, 8, GETUTCDATE());
+
+-- 资产类（1xxx）借方科目
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1001')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1001',N'库存现金',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1002')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1002',N'银行存款',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1122')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1122',N'应收账款',NULL,1,'Debit',0,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '112201')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'112201',N'应收房租','1122',2,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '112202')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'112202',N'应收押金','1122',2,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1131')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1131',N'其他应收款',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+
+-- 负债类（2xxx）贷方科目
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2202')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2202',N'应付款',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2203')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2203',N'预收账款',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2221')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2221',N'应交税费',NULL,1,'Credit',0,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '222101')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'222101',N'应交增值税','2221',2,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2241')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2241',N'其他应付款',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+
+-- 损益类（6xxx）收入贷方/成本借方
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6001')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6001',N'主营业务收入',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6051')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6051',N'其他业务收入',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6401')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6401',N'主营业务成本',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6601')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6601',N'管理费用',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6602')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6602',N'财务费用',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+
+PRINT N'会计科目种子数据已初始化。';
+GO
+

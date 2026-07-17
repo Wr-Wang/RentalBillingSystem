@@ -228,6 +228,7 @@ export function getTrialBalance(params) { return request({ url: '/gl/trialbalanc
 
 // Prepaid（预收明细）
 export function getPrepaids(params) { return request({ url: '/prepaids', method: 'get', params }) }
+export function getGLDetail(params) { return request({ url: '/gl/detail', method: 'get', params }) }
 
 // Receipts
 export function getReceipts(params) { return request({ url: '/receipts', method: 'get', params }) }

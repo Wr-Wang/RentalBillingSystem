@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IDebitNoteService, DebitNoteService>();
         services.AddScoped<IReceiptService, ReceiptService>();
         services.AddScoped<IJournalAppService, JournalAppService>();
+        services.AddScoped<IGLBalanceService, GLBalanceService>();
         services.AddScoped<IBankingService, BankingService>();
         services.AddScoped<IContractTimelineService, ContractTimelineService>();
         services.AddScoped<IReportingService, ReportingService>();

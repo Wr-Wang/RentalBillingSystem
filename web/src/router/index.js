@@ -230,6 +230,14 @@ const routes = [
         meta: { title: '日记账', icon: 'Notebook', roles: ['Admin', 'OpsSupervisor', 'FinanceSupervisor', 'FinanceDirector', 'Accountant'] }
       },
       // =====================================================================
+      // 总账（一级菜单）
+      {
+        path: 'gl',
+        name: 'GLBalance',
+        component: () => import('../views/accounting/gl.vue'),
+        meta: { title: '总账管理', icon: 'DataBoard', roles: ['Admin', 'FinanceSupervisor', 'FinanceDirector', 'Accountant'] }
+      },
+      // =====================================================================
       // 会计管理
       {
         path: 'accounting',
@@ -242,12 +250,6 @@ const routes = [
             name: 'AccountingSubjects',
             component: () => import('../views/accounting/subjects.vue'),
             meta: { title: '科目表', icon: 'List' }
-          },
-          {
-            path: 'gl',
-            name: 'GLBalance',
-            component: () => import('../views/accounting/gl.vue'),
-            meta: { title: '总账', icon: 'DataBoard' }
           },
           {
             path: 'trialbalance',

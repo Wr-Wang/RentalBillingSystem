@@ -88,6 +88,7 @@ public static class DependencyInjection
         services.AddScoped<IRepository<TaxRateConfig>, DapperRepository<TaxRateConfig>>();
         services.AddScoped<IRepository<AccountingSubject>, DapperRepository<AccountingSubject>>();
         services.AddScoped<IRepository<AccountingPeriod>, DapperRepository<AccountingPeriod>>();
+        services.AddScoped<IGLBalanceRepository, DapperGLBalanceRepository>();
 
         // ===== IUnitOfWork（Scoped） =====
         // 工作单元聚合所有仓储，支持变更追踪和事务提交

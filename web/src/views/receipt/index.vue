@@ -321,16 +321,14 @@ async function rejectSingle(row) {
 
 async function reverseSingle(row) {
   try {
-    const { value } = await ElMessageBox.prompt(`退款金额（最多 ¥${(row.amount || 0).toLocaleString()}）：`, '退款', {
-      confirmButtonText: '确定', cancelButtonText: '取消',
-      inputValue: String(row.amount || 0)
-    })
-    const amt = parseFloat(value)
-    if (!amt || amt <= 0 || amt > (row.amount || 0)) { ElMessage.warning('请输入有效金额'); return }
-    await apiRefund(row.id, { amount: amt, reason: '退款' })
-    ElMessage.success('退款成功')
+    await ElMessageBox.confirm(
+      `确认冲销收款单 ${row.receiptNo}，金额 ¥${(row.amount || 0).toLocaleString()}？`,
+      '冲销确认', { type: 'warning' }
+    )
+    await apiReverse(row.id)
+    ElMessage.success('冲销成功')
     await fetchReceipts()
-  } catch (e) { if (e !== 'cancel') ElMessage.error(e?.response?.data?.message || '退款失败') }
+  } catch (e) { if (e !== 'cancel') ElMessage.error(e?.response?.data?.message || '冲销失败') }
 }
 
 // ========== 批量操作 ==========

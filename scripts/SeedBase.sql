@@ -746,11 +746,11 @@ VALUES (@M_Report,N'财务报表','report:view','/reports','TrendCharts',NULL,11
 
 DECLARE @M_Accounting uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting,N'会计核算','accounting:view','/accounting','Files',NULL,12,1,@SysUserId,@Now);
+VALUES (@M_Accounting,N'会计核算','accounting:view','/accounting','Files',NULL,13,1,@SysUserId,@Now);
 
 DECLARE @M_Bank uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Bank,N'银企直连','bank:view','/bank','Link',NULL,13,1,@SysUserId,@Now);
+VALUES (@M_Bank,N'银企直连','bank:view','/bank','Link',NULL,14,1,@SysUserId,@Now);
 
 DECLARE @M_CompanyOverview uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -987,6 +987,11 @@ VALUES (@M_Accounting_Subjects,N'科目表','accounting:subjects','/accounting/s
 DECLARE @M_Journal uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_Journal,N'日记账','journal:view','/journals','Notebook',NULL,11,1,@SysUserId,@Now);
+
+-- 总账（一级菜单）
+DECLARE @M_GL uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_GL,N'总账管理','gl:view','/gl','DataBoard',NULL,12,1,@SysUserId,@Now);
 
 -- 凭证管理菜单已删除（系统不再使用 Voucher）
 
@@ -1426,6 +1431,7 @@ WHERE M.PermissionCode IN (
   --'accounting:vouchers',（已删除）
   'accounting:trialbalance',
   'journal:view',
+  'gl:view',
   'report:view',
   'report:collectionrate',
   'report:overduedetail',
@@ -1456,7 +1462,7 @@ WHERE M.PermissionCode IN (
   'notification:view', 'notification:markallread',
   'receipt:view', 'receipt:list',
   'bill:view', 'bill:list',
-  'journal:view', 'accounting:view', 'accounting:subjects', 'accounting:trialbalance', 'accounting:periods', 'accounting:ledger', 'accounting:balancesheet', 'accounting:incomestatement',
+  'journal:view', 'gl:view', 'accounting:view', 'accounting:subjects', 'accounting:trialbalance', 'accounting:periods', 'accounting:ledger', 'accounting:balancesheet', 'accounting:incomestatement',
   'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
   'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )

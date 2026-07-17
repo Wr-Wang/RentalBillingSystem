@@ -634,7 +634,7 @@
   </select>
   <!-- 逾期状态为派生属性（DueDate < Today 且未结清），不存储，Journal 不可变 -->
   <select id="Accounting.Select.Subject.ByCodes">
-    <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1122','112202','2241','6001','6051')]]>
+    <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1002','1122','112202','2203','2241','6001','6051')]]>
   </select>
   <select id="Accounting.Select.Subject.ByCodeList">
     <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN @Codes]]>
@@ -760,6 +760,67 @@
     <![CDATA[SELECT * FROM GeneralLedgerBalances WHERE CompanyId = @CoId ORDER BY Period DESC, CalculatedAt DESC]]>
   </select>
   <!-- GL 为追加式快照，不支持 UPDATE（去掉了 AddBilled/AddReceived）-->
+
+  <!-- GL 总账：期初余额（期间之前的所有分录汇总）-->
+  <select id="Accounting.Select.GL.OpeningBalances">
+    <![CDATA[SELECT gle.SubjectCode,
+      SUM(CASE WHEN gle.Direction='Debit' THEN gle.Amount ELSE 0 END) AS OpeningDebit,
+      SUM(CASE WHEN gle.Direction='Credit' THEN gle.Amount ELSE 0 END) AS OpeningCredit
+    FROM GeneralLedgerEntries gle
+    WHERE gle.CompanyId = @CompanyId AND gle.Period < @Period
+      AND (@ContractNo IS NULL OR gle.ContractNo LIKE @ContractNo)
+      AND (@SourceType IS NULL OR gle.SourceType = @SourceType)
+    GROUP BY gle.SubjectCode]]>
+  </select>
+
+  <!-- GL 总账：本期发生额 -->
+  <select id="Accounting.Select.GL.PeriodActivity">
+    <![CDATA[SELECT gle.SubjectCode,
+      SUM(CASE WHEN gle.Direction='Debit' THEN gle.Amount ELSE 0 END) AS PeriodDebit,
+      SUM(CASE WHEN gle.Direction='Credit' THEN gle.Amount ELSE 0 END) AS PeriodCredit
+    FROM GeneralLedgerEntries gle
+    WHERE gle.CompanyId = @CompanyId AND gle.Period = @Period
+      AND (@ContractNo IS NULL OR gle.ContractNo LIKE @ContractNo)
+      AND (@SourceType IS NULL OR gle.SourceType = @SourceType)
+    GROUP BY gle.SubjectCode]]>
+  </select>
+
+  <!-- GL 总账：年初至今累计发生额 -->
+  <select id="Accounting.Select.GL.YtdActivity">
+    <![CDATA[SELECT gle.SubjectCode,
+      SUM(CASE WHEN gle.Direction='Debit' THEN gle.Amount ELSE 0 END) AS YtdDebit,
+      SUM(CASE WHEN gle.Direction='Credit' THEN gle.Amount ELSE 0 END) AS YtdCredit
+    FROM GeneralLedgerEntries gle
+    WHERE gle.CompanyId = @CompanyId AND gle.Period >= @YearStart AND gle.Period <= @Period
+      AND (@ContractNo IS NULL OR gle.ContractNo LIKE @ContractNo)
+      AND (@SourceType IS NULL OR gle.SourceType = @SourceType)
+    GROUP BY gle.SubjectCode]]>
+  </select>
+
+  <!-- GL 明细：按科目+期间查分录，按合同号排序 -->
+  <select id="Accounting.Select.GL.DetailBySubject">
+    <![CDATA[SELECT gle.CreatedAt AS Date, gle.ContractNo, gle.SourceType, gle.SourceId,
+      gle.Description, gle.Direction, gle.Amount
+    FROM GeneralLedgerEntries gle
+    WHERE gle.CompanyId = @CompanyId AND gle.Period = @Period
+      AND gle.SubjectCode = @SubjectCode
+      AND (@ContractNo IS NULL OR gle.ContractNo LIKE @ContractNo)
+    ORDER BY gle.ContractNo, gle.CreatedAt]]>
+  </select>
+
+  <!-- GL 科目列表：查询公司所有活跃科目 -->
+  <select id="Accounting.Select.GL.Subjects">
+    <![CDATA[SELECT Code, Name, ParentCode, Direction, Level, IsLeaf
+    FROM AccountingSubjects
+    WHERE CompanyId = @CompanyId AND IsActive = 1
+    ORDER BY Code]]>
+  </select>
+
+  <!-- GL 科目名称：按编码查询 -->
+  <select id="Accounting.Select.GL.SubjectName">
+    <![CDATA[SELECT Name FROM AccountingSubjects WHERE Code = @Code AND CompanyId = @CompanyId]]>
+  </select>
+
   <update id="Contract.Update.Contract.OutstandingBalanceIncrement">
     <![CDATA[UPDATE Contracts SET OutstandingBalance = OutstandingBalance + @Amt WHERE Id = @Id]]>
   </update>
