@@ -43,7 +43,9 @@ public class ReceiptsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateReceiptRequest request, CancellationToken ct)
     {
-        var entity = new Receipt(request.ReceiptNo, request.Amount, request.ReceivedDate, request.CompanyId);
+        var entity = string.IsNullOrWhiteSpace(request.ReceiptNo)
+            ? Receipt.CreateNew(request.Amount, request.ReceivedDate, request.CompanyId)
+            : new Receipt(request.ReceiptNo, request.Amount, request.ReceivedDate, request.CompanyId);
         if (request.ContractId.HasValue) entity.LinkToContract(request.ContractId.Value);
         await _uow.Receipts.AddAsync(entity, ct);
         await _uow.CommitAsync(ct);
@@ -86,10 +88,32 @@ public class ReceiptsController : ControllerBase
         }
     }
 
+    [HttpPut("{id}/reject")]
+    public async Task<IActionResult> Reject(Guid id, [FromBody] ReceiptRejectRequest body, CancellationToken ct)
+    {
+        try
+        {
+            var entity = await _uow.Receipts.GetByIdAsync(id, ct);
+            if (entity == null) return NotFound(new { message = "收款单不存在" });
+            entity.Reject(body.Reason);
+            await _uow.CommitAsync(ct);
+            return Ok(entity);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("batchconfirm")]
     public async Task<IActionResult> BatchConfirm([FromBody] List<Guid> ids, CancellationToken ct)
     {
         var result = await _receiptService.BatchConfirmAsync(ids, ct);
         return Ok(result);
     }
+}
+
+public class ReceiptRejectRequest
+{
+    public string Reason { get; set; } = string.Empty;
 }

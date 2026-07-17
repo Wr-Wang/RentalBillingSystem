@@ -339,7 +339,7 @@ public class JournalAppService : IJournalAppService
         using var tx = conn.BeginTransaction();
         int count = 0;
         var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
-            _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+            _sql.Get("Accounting.Select.Subject.ByCodes"), null, tx)).ToDictionary(r => r.Code, r => r.Id);
 
         foreach (var id in ids)
         {

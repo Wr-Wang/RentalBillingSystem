@@ -30,6 +30,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { createReceipt, getContracts, getPaymentChannels } from '@/api'
 import { ElMessage } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -64,7 +65,7 @@ async function submit() {
     await createReceipt({
       receiptNo: form.receiptNo || undefined,
       amount: form.amount,
-      receivedDate: form.receivedDate || new Date().toISOString().slice(0, 10),
+      receivedDate: form.receivedDate ? (typeof form.receivedDate === 'string' ? form.receivedDate.split('T')[0] : form.receivedDate.toISOString().slice(0, 10)) : chinaTime.today(),
       companyId,
       contractId: form.contractId || undefined,
       paymentChannelId: form.paymentChannelId || undefined

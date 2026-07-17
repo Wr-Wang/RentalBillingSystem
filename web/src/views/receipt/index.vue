@@ -149,6 +149,7 @@ import {
   batchConfirmReceipts, getContracts, getPaymentChannels
 } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { chinaTime } from '@/utils/chinaTime'
 
 const userStore = useUserStore()
 const receiptTableRef = ref(null)
@@ -276,10 +277,11 @@ async function submit() {
 
   submitting.value = true
   try {
+    const fmtDate = (d) => d ? (typeof d === 'string' ? d.split('T')[0] : d.toISOString().slice(0, 10)) : chinaTime.today()
     await createReceipt({
       receiptNo: form.receiptNo || undefined,
       amount: form.amount,
-      receivedDate: form.receivedDate || new Date().toISOString().slice(0, 10),
+      receivedDate: fmtDate(form.receivedDate),
       companyId,
       contractId: form.contractId || undefined,
       paymentChannelId: form.paymentChannelId || undefined

@@ -26,16 +26,11 @@ public class ReceiptService : IReceiptService
         {
             try
             {
-                var entity = await _uow.Receipts.GetByIdAsync(id, ct);
-                if (entity != null && entity.Status == "Pending")
-                {
-                    entity.Confirm(Guid.Empty);
-                    count++;
-                }
+                await ConfirmReceiptAsync(id, ct);
+                count++;
             }
             catch { /* 单个失败不影响其余 */ }
         }
-        await _uow.CommitAsync(ct);
         return new { confirmed = count };
     }
 
@@ -87,9 +82,9 @@ public class ReceiptService : IReceiptService
                 if (receiptFull != null)
                 {
                     var companyId = (Guid)receiptFull.CompanyId;
-                    var period = ((string)receiptFull.ReceivedDate)[..7];
+                    var period = ((DateTime)receiptFull.ReceivedDate).ToString("yyyy-MM");
                     var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
-                        _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+                        _sql.Get("Accounting.Select.Subject.ByCodes"), null, tx)).ToDictionary(r => r.Code, r => r.Id);
 
                     if (subjects.ContainsKey("1002"))
                         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
@@ -139,14 +134,14 @@ public class ReceiptService : IReceiptService
         if (receiptFull == null) throw new KeyNotFoundException("收款信息不存在");
 
         var companyId = (Guid)receiptFull.CompanyId;
-        var period = ((string)receiptFull.ReceivedDate)[..7];
+        var period = ((DateTime)receiptFull.ReceivedDate).ToString("yyyy-MM");
         var cId = (Guid)receiptFull.ContractId;
         var amt = (decimal)receiptFull.Amount;
 
         // 从 GL 分录反查 offset/overflow
         var entries = await conn.QueryAsync<dynamic>(
-            "SELECT Direction, Amount, SubjectCode FROM GeneralLedgerEntries WHERE SourceType='Receipt' AND SourceId=@Id",
-            new { Id = id }, tx);
+            _sql.Get("Receipt.Select.GL.EntriesBySource"),
+            new { SrcType = "Receipt", SrcId = id }, tx);
         decimal offset = 0, overflow = 0;
         foreach (var e in entries)
         {
@@ -157,7 +152,7 @@ public class ReceiptService : IReceiptService
         }
 
         var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
-            _sql.Get("Accounting.Select.Subject.ByCodes"), tx)).ToDictionary(r => r.Code, r => r.Id);
+            _sql.Get("Accounting.Select.Subject.ByCodes"), null, tx)).ToDictionary(r => r.Code, r => r.Id);
 
         // 反向 GL 分录
         if (subjects.ContainsKey("1002"))

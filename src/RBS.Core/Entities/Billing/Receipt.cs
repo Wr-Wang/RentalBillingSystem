@@ -81,10 +81,11 @@ public class Receipt : AggregateRoot, IHasCompany
         return receipt;
     }
 
-    /// <summary>生成收款单号：RCP + yyyyMMdd + 4位随机数</summary>
+    /// <summary>生成收款单号：RCP + yyyyMMddHHmmss + 3位随机数（精确到秒+随机防重）</summary>
     private static string GenerateReceiptNo()
     {
-        return $"RCP{DateTime.UtcNow:yyyyMMdd}{Random.Shared.Next(1000, 9999)}";
+        var now = ChinaTime.Now;
+        return $"RCP{now:yyyyMMddHHmmss}{Random.Shared.Next(100, 999)}";
     }
 
     // ===== 领域行为 =====

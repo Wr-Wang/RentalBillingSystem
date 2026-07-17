@@ -60,7 +60,7 @@ export function handleApiError(e, defaultMsg = '操作失败') {
 // 执行顺序：组件调用 request(config) → 请求拦截器 → 实际 HTTP 请求
 // ===========================================================================
 request.interceptors.request.use(
-  config => {
+  async config => {
     // -----------------------------------------------------------------------
     // 1. 认证令牌：从 localStorage 读取 JWT Token，注入 Authorization 头
     //    token 在 login() 成功后写入，logout() 时清除
@@ -87,10 +87,19 @@ request.interceptors.request.use(
     //      b) 普通用户的所属公司 → companyId
     //      c) 超管查看全部数据 → null（不传参，后端不限公司）
     // -----------------------------------------------------------------------
-    const companyId = getEffectiveCompanyId()
+    let companyId = getEffectiveCompanyId()
     if (companyId) {
       config.params = config.params || {}
       config.params.companyId = companyId
+    } else {
+      try {
+        const { useUserStore } = await import('@/store/user')
+        const store = useUserStore()
+        if (store.effectiveCompanyId) {
+          config.params = config.params || {}
+          config.params.companyId = store.effectiveCompanyId
+        }
+      } catch { /* fallback */ }
     }
 
     return config

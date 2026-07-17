@@ -772,6 +772,10 @@
   <select id="Receipt.Select.Receipt.WithContractInfo">
     <![CDATA[SELECT r.Amount, r.ContractId, r.ReceivedDate, r.CompanyId, r.ReceiptNo, c.ContractNo FROM Receipts r LEFT JOIN Contracts c ON c.Id = r.ContractId WHERE r.Id = @Id]]>
   </select>
+  <select id="Receipt.Select.GL.EntriesBySource">
+    <![CDATA[SELECT Direction, Amount, SubjectCode FROM GeneralLedgerEntries WHERE SourceType=@SrcType AND SourceId=@SrcId]]>
+  </select>
+
   <select id="Billing.Select.Journal.WithContractNo">
     <![CDATA[SELECT j.Id, j.Amount, j.CompanyId, j.ContractId, j.Period, c.ContractNo FROM Journals j LEFT JOIN Contracts c ON c.Id = j.ContractId WHERE j.Id = @Id]]>
   </select>
