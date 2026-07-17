@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../../store/user'
 import { getTenants, createTenant, updateTenant, deleteTenant as deleteTenantApi } from '../../api/index'
@@ -196,6 +196,17 @@ async function deleteTenant(row) {
 }
 
 onMounted(() => {
-  if (getEffectiveCompanyId()) fetchList()
+  fetchList()
 })
+
+// 监听公司视角切换：初始化时或切换公司时自动加载租客列表
+watch(() => userStore.effectiveCompanyId, (newId) => {
+  if (newId) {
+    pagination.page = 1
+    fetchList()
+  } else {
+    tenantList.value = []
+    pagination.total = 0
+  }
+}, { immediate: true })
 </script>

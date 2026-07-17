@@ -48,6 +48,7 @@
           <el-form :model="filter" inline>
             <el-input v-model="filter.keyword" placeholder="收据号/参考号" clearable style="width:160px;" @clear="fetchReceipts" @keyup.enter="fetchReceipts" />
             <el-select v-model="filter.status" placeholder="状态" clearable style="width:110px;" @change="fetchReceipts">
+              <el-option label="全部" value="All" />
               <el-option label="待确认" value="Pending" />
               <el-option label="已确认" value="Confirmed" />
               <el-option label="已驳回" value="Rejected" />
@@ -140,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useUserStore } from '@/store/user'
 import {
   getReceipts, getDeposits, createReceipt,
@@ -351,9 +352,19 @@ async function batchConfirm() {
 
 onMounted(() => {
   fetchContracts()
-  if (getEffectiveCompanyId()) fetchReceipts()
   fetchPaymentChannels()
 })
+
+// 监听公司视角切换：初始化时或切换公司时自动加载收款记录
+watch(() => userStore.effectiveCompanyId, (newId) => {
+  if (newId) {
+    pagination.page = 1
+    fetchReceipts()
+  } else {
+    receiptList.value = []
+    pagination.total = 0
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>

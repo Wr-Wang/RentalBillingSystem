@@ -28,7 +28,7 @@ public class ReceiptsController : ControllerBase
     {
         if (companyId == null) return Ok(new List<object>());
 
-        if (string.IsNullOrEmpty(status) || status == "Pending")
+        if (!string.IsNullOrEmpty(status) && status == "Pending")
         {
             var pending = await _uow.Receipts.GetPendingConfirmAsync(companyId.Value, ct);
             return Ok(pending);
