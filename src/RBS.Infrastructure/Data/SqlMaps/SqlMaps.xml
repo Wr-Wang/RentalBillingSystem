@@ -699,6 +699,14 @@
       @SubjId, @Period, @Amt, @Due, @EntryType, 1, @BilledAt,
       @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
+  <insert id="Billing.Insert.Journal.Unposted">
+    <![CDATA[INSERT INTO Journals (Id, CompanyId, ContractId, FeeCodeId, FeeConfigId,
+      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt,
+      DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
+      VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
+      @SubjId, @Period, @Amt, @Due, @EntryType, 0, @BilledAt,
+      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+  </insert>
   <select id="Billing.Select.Journal.ByCompanyPeriod">
     <![CDATA[SELECT j.*, COALESCE(SUM(ra.Amount), 0) AS ReceivedAmount
       FROM Journals j

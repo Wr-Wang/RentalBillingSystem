@@ -145,58 +145,21 @@
             <el-button type="primary" size="small" @click="openAddOneTimeFee">添加收费</el-button>
             <el-button size="small" @click="fetchFeeConfigs" :loading="feeConfigLoading">刷新</el-button>
           </div>
-          <el-table :data="oneTimeConfigs" stripe style="width:100%;" @expand-change="onOneTimeExpand">
-            <el-table-column type="expand" width="30">
-              <template #default="{ row }">
-                <!-- 一次性费用展开明细 -->
-                <template v-if="row.feeCode === 'DEPOSIT'">
-                  <!-- DEPOSIT 显示押金流水 -->
-                  <el-table v-if="getExpandState(row).depositLogs.length" :data="getExpandState(row).depositLogs" size="small" stripe v-loading="getExpandState(row).loadingLogs" style="margin:8px 0;width:100%;">
-                    <el-table-column label="日期" min-width="90"><template #default="{ row: h }">{{ h.date || '-' }}</template></el-table-column>
-                    <el-table-column label="操作" width="80"><template #default="{ row: h }"><el-tag :type="h.action === '收取' ? 'success' : h.action === '退还' ? 'danger' : 'warning'" size="small">{{ h.action }}</el-tag></template></el-table-column>
-                    <el-table-column label="金额" min-width="90"><template #default="{ row: h }"><span :style="{ color: h.amount > 0 && h.action === '收取' ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }">{{ h.amount > 0 ? '+' : '' }}¥{{ h.amount?.toLocaleString() }}</span></template></el-table-column>
-                    <el-table-column label="余额" min-width="90"><template #default="{ row: h }">¥{{ h.balance?.toLocaleString() }}</template></el-table-column>
-                    <el-table-column label="备注" min-width="120"><template #default="{ row: h }">{{ h.remark || '-' }}</template></el-table-column>
-                  </el-table>
-                  <span v-if="!getExpandState(row).depositLogs.length && !getExpandState(row).loadingLogs" style="color:#909399;font-size:13px;padding:8px;display:block;">暂无押金流水记录</span>
-                </template>
-                <template v-else>
-                  <!-- 其他一次性费用显示应收计划 -->
-                  <el-table :data="getExpandState(row).receivablePlans" size="small" stripe v-loading="getExpandState(row).loadingPlans" style="margin:8px 0;width:100%;">
-                    <el-table-column label="账期" min-width="80"><template #default="{ row: p }">{{ p.period }}</template></el-table-column>
-                    <el-table-column label="金额" min-width="90"><template #default="{ row: p }">¥{{ p.amount.toLocaleString() }}</template></el-table-column>
-                    <el-table-column label="已收" min-width="90"><template #default="{ row: p }">¥{{ p.received.toLocaleString() }}</template></el-table-column>
-                    <el-table-column label="待收" min-width="90"><template #default="{ row: p }"><span :style="{ color: p.balance > 0 ? '#f56c6c' : '#67c23a', fontWeight: 'bold' }">¥{{ p.balance.toLocaleString() }}</span></template></el-table-column>
-                    <el-table-column label="到期日" min-width="90"><template #default="{ row: p }">{{ p.dueDate }}</template></el-table-column>
-                    <el-table-column label="状态" width="80">
-                      <template #default="{ row: p }">
-                        <el-tag :type="p.status === 'Paid' ? 'success' : p.status === 'Overdue' ? 'danger' : p.status === 'Pending' ? 'warning' : 'info'" size="small">{{ p.statusLabel }}</el-tag>
-                      </template>
-                    </el-table-column>
-                  </el-table>
-                  <span v-if="!getExpandState(row).receivablePlans.length && !getExpandState(row).loadingPlans" style="color:#909399;font-size:13px;padding:8px;display:block;">暂无应收记录</span>
-                </template>
-              </template>
-            </el-table-column>
-            <el-table-column label="收费项目" min-width="120">
+          <el-table :data="oneTimeConfigs" stripe style="width:100%;">
+            <el-table-column label="收费项目" min-width="160">
               <template #default="{ row }">
                 <span :style="{ color: row.isActive ? '#303133' : '#c0c4cc' }">{{ row.feeName }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="金额" min-width="120">
+            <el-table-column label="金额" min-width="160">
               <template #default="{ row }">
                 <span v-if="row.isActive" style="font-weight:bold;font-size:14px;">¥{{ (row.amount || 0).toLocaleString() }}</span>
                 <span v-else style="color:#c0c4cc;text-decoration:line-through;">¥{{ (row.amount || 0).toLocaleString() }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="生效期" min-width="200">
+            <el-table-column label="状态" width="80" align="center">
               <template #default="{ row }">
-                <span style="font-size:13px;">{{ row.effectiveDate ? formatDate(row.effectiveDate) : '-' }} ~ {{ row.expiryDate ? formatDate(row.expiryDate) : '至今' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="65" align="center">
-              <template #default="{ row }">
-                <span :style="{ color: row.isActive ? '#67c23a' : '#909399', fontSize: '12px' }">{{ row.isActive ? '已启用' : '已停用' }}</span>
+                <el-tag :type="row.isActive ? 'success' : 'info'" size="small">{{ row.isActive ? '已启用' : '已停用' }}</el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -805,27 +768,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { toGuidId } from '@/utils'
 import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel,
   getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract,
-  feeAdjust, getJournals, getJournalsByContract, generateJournals as apiGenerateReceivables, getDeposits,
+  feeAdjust, getJournals, generateJournals as apiGenerateReceivables, getDeposits,
   getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig,
   getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal,
   getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges,
   handleApiError, previewJournals, generateJournalRequest } from '@/api/index.js'
-
-// ---------------------------------------------------------------------------
-// ★ 一次性收费展开行状态管理
-// 使用 reactive Map 独立管理，避免 computed 元素属性修改不触发重新渲染
-// ---------------------------------------------------------------------------
-const oneTimeExpandState = reactive(new Map())
-function getExpandState(row) {
-  const key = row.id || row.feeCodeId
-  if (!oneTimeExpandState.has(key)) {
-    oneTimeExpandState.set(key, reactive({
-      depositLogs: [], loadingLogs: false,
-      receivablePlans: [], loadingPlans: false
-    }))
-  }
-  return oneTimeExpandState.get(key)
-}
 
 // ---------------------------------------------------------------------------
 // 路由 & 路由
@@ -837,6 +784,7 @@ const router = useRouter()
 const activeTab = ref('recurring')
 watch(activeTab, (tab) => {
   if (tab === 'tenants') fetchContractTenants()
+  if (tab === 'onetime') fetchFeeConfigs()
 })
 
 // =========================================================================
@@ -952,18 +900,8 @@ const recurringConfigs = computed(() => {
   return [...map.values()]
 })
 const oneTimeConfigs = computed(() => {
-  const map = new Map()
-  for (const f of feeConfigs.value) {
-    if (f.chargeType === 'OneTime' && f.isActive && !f.expiryDate && f.feeCodeId) {
-      map.set(f.feeCodeId, { ...f, history: [] })
-    }
-  }
-  for (const f of feeConfigs.value) {
-    if (f.chargeType === 'OneTime' && !map.has(f.feeCodeId) && f.feeCodeId) {
-      map.set(f.feeCodeId, { ...f, history: [] })
-    }
-  }
-  return [...map.values()]
+  // 一次性收费支持同项目多次添加，不过滤不去重
+  return feeConfigs.value.filter(f => f.chargeType === 'OneTime' && f.feeCodeId)
 })
 const monthlyTotal = computed(() => {
   return recurringConfigs.value.filter(f => f.isActive && f.billingMode === 'FixedAmount').reduce((s, f) => s + (f.amount || 0), 0)
@@ -1167,62 +1105,6 @@ async function updateAvailableFeeCodes() {
     : new Set(feeConfigs.value.filter(f => f.isActive).map(f => f.feeCodeId))
   const chargeTypeFilter = addFeeDialogMode.value === 'OneTime' ? 'OneTime' : 'Recurring'
   availableFeeCodes.value = feeCodeList.value.filter(f => !usedIds.has(f.id) && f.chargeType === chargeTypeFilter)
-}
-
-// 展开一次性收费行时加载明细（DEPOSIT 显示押金流水，其他显示应收计划）
-async function onOneTimeExpand(row) {
-  const cid = contract.value?.id || route.params.id
-  const st = getExpandState(row)
-
-  if (row.feeCode === 'DEPOSIT') {
-    if (st.depositLogs.length || st.loadingLogs) return
-    st.loadingLogs = true
-    try {
-      const depRes = await getDeposits({ contractId: cid })
-      const depItems = depRes.items || depRes.data || depRes || []
-      st.depositLogs = depItems.map(d => ({
-        date: d.createdAt?.split('T')[0] || '',
-        action: d.action === 'Create' ? '收取'
-          : d.action === 'Return' || d.action === 'Refund' ? '退还'
-          : d.action === 'Deduct' ? '扣款'
-          : d.action === 'TransferOut' ? '押金转出'
-          : d.action === 'TransferIn' ? '押金转入'
-          : d.action || '收取',
-        amount: d.amount || 0,
-        balance: d.balance || 0,
-        remark: d.remark || ''
-      }))
-    } catch { /* 静默 */ }
-    st.loadingLogs = false
-    return
-  }
-
-  // 非 DEPOSIT 一次性费用：加载应收计划
-  if (st.receivablePlans.length || st.loadingPlans) return
-  await loadOneTimeReceivablePlans(st, cid, row.feeCodeId)
-}
-
-async function loadOneTimeReceivablePlans(st, contractId, feeCodeId) {
-  st.loadingPlans = true
-  try {
-    const plans = await getJournalsByContract(contractId)
-    st.receivablePlans = (plans || []).map(p => {
-      const received = p.received || 0
-      const balance = p.balance || p.amount - received
-      const isPaid = balance <= 0
-      const isOverdue = !isPaid && p.dueDate && new Date(p.dueDate) < new Date()
-      return {
-        period: p.period || '',
-        amount: p.amount || 0,
-        dueDate: p.dueDate || '-',
-        status: isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending',
-        statusLabel: isPaid ? '已收款' : isOverdue ? '逾期' : '待收',
-        received,
-        balance
-      }
-    })
-  } catch { /* 静默 */ }
-  st.loadingPlans = false
 }
 
 function onFeeCodeChange(feeCodeId) {

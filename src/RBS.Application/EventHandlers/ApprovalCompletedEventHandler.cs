@@ -329,6 +329,20 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
         using var conn = _db.CreateConnection();
         conn.Open();
+
+        // 获取公司 ID（优先从 bizData，无则查合同）
+        var companyId = bizData?.CompanyId;
+        if (companyId == null || companyId == Guid.Empty)
+        {
+            var firstItem = feeItems.FirstOrDefault();
+            if (firstItem != null)
+            {
+                var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                    "SELECT CompanyId FROM Contracts WHERE Id = @Id", new { Id = firstItem.ContractId });
+                companyId = contract?.CompanyId is Guid cid ? cid : Guid.Empty;
+            }
+        }
+
         using var tx = conn.BeginTransaction();
         try
         {
@@ -364,18 +378,26 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     oneTimeJobs.Add((item.ContractId, configId));
 
                     // 插入 ReceivablePlan（一次性费用应收计划，关联到 FeeConfig 实例以支持同费用多次添加）
+                    // 使用 Unposted SQL，GLPosted=0，待收款确认后再过账
                     var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
                     await conn.ExecuteAsync(
-                        _sql.Get("Billing.Insert.Journal.Default"),
+                        _sql.Get("Billing.Insert.Journal.Unposted"),
                         new
                         {
                             Id = Guid.NewGuid(),
+                            CoId = companyId,
                             CId = item.ContractId,
                             FId = item.FeeCodeId,
                             FConfigId = configId,
-                            P = period,
+                            SubjId = Guid.Empty,
+                            Period = period,
                             Amt = item.NewAmount,
                             Due = DateOnly.FromDateTime(ChinaTime.Now),
+                            EntryType = "Normal",
+                            BilledAt = ChinaTime.Now,
+                            DNId = (Guid?)null,
+                            ParentId = (Guid?)null,
+                            Summary = $"一次性 {item.FeeName}",
                             CBy = Guid.Empty
                         }, tx);
                 }
