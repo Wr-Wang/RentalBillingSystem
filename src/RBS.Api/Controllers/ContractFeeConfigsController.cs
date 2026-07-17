@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Approval;
 using RBS.Core.Common;
+using RBS.Core.DomainServices;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -21,14 +22,16 @@ public class ContractFeeConfigsController : ControllerBase
     private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _uow;
     private readonly IApprovalService _approvalService;
+    private readonly IBillingDomainService _billingDomain;
 
-    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser, IUnitOfWork uow, IApprovalService approvalService)
+    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser, IUnitOfWork uow, IApprovalService approvalService, IBillingDomainService billingDomain)
     {
         _db = db;
         _sql = sql;
         _currentUser = currentUser;
         _uow = uow;
         _approvalService = approvalService;
+        _billingDomain = billingDomain;
     }
 
     [HttpGet]
@@ -133,13 +136,37 @@ public class ContractFeeConfigsController : ControllerBase
         if (overlap > 0)
             return Conflict(new { code = "FEE_CONFIG_OVERLAP", message = "该费用项目在生效日期范围内已存在配置" });
 
-        var id = Guid.NewGuid();
-        await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
-            new { Id = id, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
-                BillingMode = request.BillingMode ?? "FixedAmount", Amount = request.Amount,
-                Unit = request.Unit, UnitPrice = request.UnitPrice,
-                EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                CreatedBy = _currentUser.UserId, Now = ChinaTime.Now });
+        Guid id;
+        if (request.ChargeType == "Recurring")
+        {
+            // 周期费用：按月拆分
+            var segments = _billingDomain.CalculateMonthlySplit(
+                request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"), ChinaTime.Now);
+            var ids = new List<Guid>();
+            foreach (var seg in segments)
+            {
+                var segId = Guid.NewGuid();
+                await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.WithExpiry"),
+                    new { Id = segId, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                        BillingMode = request.BillingMode ?? "FixedAmount", Amount = request.Amount,
+                        Unit = request.Unit, UnitPrice = request.UnitPrice,
+                        IsActive = seg.IsActive, EffectiveDate = seg.EffectiveDate,
+                        ExpiryDate = seg.ExpiryDate,
+                        CreatedBy = _currentUser.UserId, Now = ChinaTime.Now });
+                ids.Add(segId);
+            }
+            id = ids.Last(); // 用于 ChangeHistory，用长期配置的 ID
+        }
+        else
+        {
+            id = Guid.NewGuid();
+            await conn.ExecuteAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
+                new { Id = id, ContractId = request.ContractId, FeeCodeId = request.FeeCodeId,
+                    BillingMode = request.BillingMode ?? "FixedAmount", Amount = request.Amount,
+                    Unit = request.Unit, UnitPrice = request.UnitPrice,
+                    EffectiveDate = request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                    CreatedBy = _currentUser.UserId, Now = ChinaTime.Now });
+        }
         await InsertChangeHistoryAsync(conn, null, request.ContractId, "FEE_ADD",
             "添加费用", "添加 " + (request.BillingMode ?? "FixedAmount") + " ¥" + request.Amount.ToString("F2") + ", 生效 " + (request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")),
             null, request.Amount, request.EffectiveDate, _currentUser.UserId);

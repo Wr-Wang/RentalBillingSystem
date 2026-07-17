@@ -133,4 +133,63 @@ public class BillingDomainService : IBillingDomainService
         }
         return journals;
     }
+
+    /// <summary>
+    /// 计算周期收费的月份拆分方案。
+    /// 从 effectiveDate 到当前月份逐月生成独立分段，每个分段覆盖一个自然月。
+    /// 纯计算逻辑，不涉及任何持久化。
+    /// </summary>
+    /// <param name="effectiveDate">费用生效日（yyyy-MM-dd）</param>
+    /// <param name="now">当前时间</param>
+    /// <returns>拆分后的分段列表</returns>
+    /// <example>
+    /// 输入：effectiveDate="2026-05-20", now=2026-07-17
+    /// 输出：4 个分段：5/20~5/31, 6/1~6/30, 7/1~7/31, 8/1~NULL
+    /// </example>
+    public List<FeeMonthSegment> CalculateMonthlySplit(string effectiveDate, DateTime now)
+    {
+        var effDate = DateOnly.Parse(effectiveDate);
+        var effMonth = new DateOnly(effDate.Year, effDate.Month, 1);
+        var currentMonth = new DateOnly(now.Year, now.Month, 1);
+        var nextMonth = currentMonth.AddMonths(1);
+        var segments = new List<FeeMonthSegment>();
+
+        // 生效日在当前月之后 → 单条，不拆分
+        if (effMonth > currentMonth)
+        {
+            segments.Add(new FeeMonthSegment
+            {
+                EffectiveDate = effectiveDate,
+                ExpiryDate = null,
+                IsActive = true
+            });
+            return segments;
+        }
+
+        // 逐月拆分：从生效月循环到当前月
+        var cursor = effMonth;
+        while (cursor <= currentMonth)
+        {
+            var monthEnd = cursor.AddMonths(1).AddDays(-1);
+            segments.Add(new FeeMonthSegment
+            {
+                EffectiveDate = cursor == effMonth
+                    ? effectiveDate
+                    : cursor.ToString("yyyy-MM-dd"),
+                ExpiryDate = monthEnd.ToString("yyyy-MM-dd"),
+                IsActive = false
+            });
+            cursor = cursor.AddMonths(1);
+        }
+
+        // 未来长期配置：下月1日起，无到期日，启用
+        segments.Add(new FeeMonthSegment
+        {
+            EffectiveDate = nextMonth.ToString("yyyy-MM-dd"),
+            ExpiryDate = null,
+            IsActive = true
+        });
+
+        return segments;
+    }
 }

@@ -4288,6 +4288,7 @@ CREATE TABLE [JobSchedules] (
     [Description] NVARCHAR(500) , -- 描述,
     [LastRunAt] DATETIME2 , -- 上次执行时间,
     [LastRunStatus] NVARCHAR(20) , -- 上次执行结果,
+    [TargetDate] DATETIME2 , -- 最近一次执行成功的时间（来自 JobScheduleExecutions.TargetDate）,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,

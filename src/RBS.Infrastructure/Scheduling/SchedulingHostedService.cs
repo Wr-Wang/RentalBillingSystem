@@ -264,6 +264,11 @@ public class SchedulingHostedService : BackgroundService
                 Sql.Get("Scheduling.Update.Execution.Complete"),
                 new { Id = execution.Id });
 
+            // 更新排期最后执行时间
+            await Dapper.SqlMapper.ExecuteAsync(conn,
+                "UPDATE JobSchedules SET TargetDate = @TargetDate WHERE Id = @Id",
+                new { TargetDate = execution.TargetDate, Id = schedule.Id });
+
             // 更新任务日志
             await UpdateTaskLogAsync(innerDb, schedule.JobName,
                 execution.CompanyId, execution.Month, "Completed", null, ct);

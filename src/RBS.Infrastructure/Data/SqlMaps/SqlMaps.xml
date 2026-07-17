@@ -1178,9 +1178,16 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt, CompanyId)
             VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, 1, @EffectiveDate, NULL, @CreatedBy, @Now, (SELECT CompanyId FROM Contracts WHERE Id = @ContractId))]]>
   </insert>
+  <insert id="Lease.Insert.ContractFeeConfig.WithExpiry">
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, BillingMode, Amount, Unit, UnitPrice, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt, CompanyId)
+            VALUES (@Id, @ContractId, @FeeCodeId, @BillingMode, @Amount, @Unit, @UnitPrice, @IsActive, @EffectiveDate, @ExpiryDate, @CreatedBy, @Now, (SELECT CompanyId FROM Contracts WHERE Id = @ContractId))]]>
+  </insert>
   <update id="Lease.Update.ContractFeeConfig.Default">
     <![CDATA[UPDATE ContractFeeConfigs SET Amount=@Amount, BillingMode=@BillingMode, Unit=@Unit, UnitPrice=@UnitPrice, IsActive=@IsActive
             WHERE Id=@Id]]>
+  </update>
+  <update id="Lease.Update.ContractFeeConfig.ExpireById">
+    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @ExpiryDate, IsActive = 0 WHERE Id = @Id]]>
   </update>
   <select id="Lease.Select.ContractFeeConfig.CurrentByContractAndFee">
     <![CDATA[SELECT Id, EffectiveDate FROM ContractFeeConfigs

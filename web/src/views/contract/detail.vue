@@ -886,6 +886,8 @@ const oneTimeSubtotal = computed(() =>
   oneTimePreviewItems.value.reduce((s, i) => s + (i.amount || 0), 0)
 )
 const recurringConfigs = computed(() => {
+  // 只显示当前生效中的周期收费（无到期日、已启用），每条费用项目最多一条
+  // 历史版本在展开行中通过 onFeeConfigExpand 加载
   const map = new Map()
   for (const f of feeConfigs.value) {
     if (f.chargeType === 'Recurring' && f.isActive && !f.expiryDate && f.feeCodeId) {

@@ -27,4 +27,7 @@ public interface IBillingDomainService
         List<(Guid FeeCodeId, decimal Amount, string? EffectiveDate, string? ExpiryDate, string FeeName)> feeConfigs,
         Guid contractId, string period, DateOnly dueDate,
         Guid companyId, Guid defaultSubjectId, DateTime billedAt);
+
+    /// <summary>计算周期收费的月份拆分方案。</summary>
+    List<FeeMonthSegment> CalculateMonthlySplit(string effectiveDate, DateTime now);
 }

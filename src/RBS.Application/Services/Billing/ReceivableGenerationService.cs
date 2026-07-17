@@ -98,8 +98,12 @@ public class ReceivableGenerationService : IReceivableGenerationService
         {
             var dueDate = CalculateDueDate(period, contract);
 
-            var journals = _billingDomain.GenerateJournals(feeConfigs, contract.Id,
-                contract.CompanyId, period, dueDate, Guid.Empty, ChinaTime.Now);
+            // 使用按天分摊生成 Journal，兼容拆分后的多条月度配置
+            var feeConfigsWithName = feeConfigs.Select(f => (
+                f.FeeCodeId, f.Amount, f.EffectiveDate, f.ExpiryDate,
+                FeeName: (string?)null ?? "")).ToList();
+            var journals = _billingDomain.GenerateProratedJournals(feeConfigsWithName,
+                contract.Id, period, dueDate, contract.CompanyId, Guid.Empty, ChinaTime.Now);
 
             foreach (var journal in journals)
             {
