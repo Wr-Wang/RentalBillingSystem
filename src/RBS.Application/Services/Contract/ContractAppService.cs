@@ -344,6 +344,14 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
         if (contract == null) throw new KeyNotFoundException("合同不存在");
 
+        // 校验所有调价项的生效日期在合同起止日期范围内
+        foreach (var item in request.Items)
+        {
+            var effDate = item.EffectiveDate ?? "";
+            if (!string.IsNullOrEmpty(effDate))
+                ContractEntity.ValidateFeeEffectiveDate(DateOnly.Parse(effDate), contract.StartDate, contract.EndDate, item.FeeName);
+        }
+
         // 找审批类型
         var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_FEE_CHANGE", ct);
 

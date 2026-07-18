@@ -7,6 +7,7 @@ using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Approval;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
+using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -52,6 +53,10 @@ public class ContractFeeConfigsController : ControllerBase
         // 校验合同状态：Active 合同必须走审批
         var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
         if (contract == null) return NotFound(new { message = "合同不存在" });
+
+        // 校验生效日期在合同起止日期范围内
+        var effDate = DateOnly.Parse(request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"));
+        Contract.ValidateFeeEffectiveDate(effDate, contract.StartDate, contract.EndDate);
 
         if (contract.Status == "Active")
         {
@@ -147,7 +152,8 @@ public class ContractFeeConfigsController : ControllerBase
                 request.Amount, request.BillingMode ?? "FixedAmount",
                 request.Unit, request.UnitPrice,
                 request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                _currentUser.UserId);
+                _currentUser.UserId,
+                contract.StartDate, contract.EndDate);
             id = ids.Last(); // 用于 ChangeHistory，用长期配置的 ID
         }
         else
@@ -204,6 +210,10 @@ public class ContractFeeConfigsController : ControllerBase
             return BadRequest(new { code = "ACTIVE_CONTRACT_REQUIRES_APPROVAL",
                 message = "生效中的合同请使用「费用调价」功能提交审批，不可直接调价" });
         }
+        if (contract == null) return NotFound(new { message = "合同不存在" });
+
+        // 校验生效日期在合同起止日期范围内
+        Contract.ValidateFeeEffectiveDate(DateOnly.Parse(request.EffectiveDate), contract.StartDate, contract.EndDate);
 
         // Draft 合同直接执行
         using var conn = _db.CreateConnection(); conn.Open();

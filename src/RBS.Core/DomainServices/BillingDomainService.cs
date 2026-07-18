@@ -139,18 +139,31 @@ public class BillingDomainService : IBillingDomainService
     /// 从 effectiveDate 到当前月份逐月生成独立分段，每个分段覆盖一个自然月。
     /// 首段（分摊期）的 Amount 按天折算，中间月/未来月使用全额。
     /// 纯计算逻辑，不涉及任何持久化。
+    /// contractStartDate/contractEndDate 用于兜底裁剪生效日期至合同期内（防御性校验）。
     /// </summary>
     /// <param name="monthlyAmount">月度全额</param>
     /// <param name="effectiveDate">费用生效日（yyyy-MM-dd）</param>
     /// <param name="now">当前时间</param>
+    /// <param name="contractStartDate">合同起租日期</param>
+    /// <param name="contractEndDate">合同到期日期，null 表示长期</param>
     /// <returns>拆分后的分段列表</returns>
     /// <example>
     /// 输入：monthlyAmount=4500, effectiveDate="2026-05-20", now=2026-07-17
     /// 输出：4 个分段：5/20~5/31(1741.94), 6/1~6/30(4500), 7/1~7/31(4500), 8/1~NULL(4500)
     /// </example>
-    public List<FeeMonthSegment> CalculateMonthlySplit(decimal monthlyAmount, string effectiveDate, DateTime now)
+    public List<FeeMonthSegment> CalculateMonthlySplit(decimal monthlyAmount, string effectiveDate, DateTime now,
+        DateOnly contractStartDate, DateOnly? contractEndDate)
     {
         var effDate = DateOnly.Parse(effectiveDate);
+
+        // 兜底裁剪：生效日期不能早于合同起租日
+        if (effDate < contractStartDate)
+            effDate = contractStartDate;
+
+        // 兜底裁剪：生效日期不能晚于合同到期日
+        if (contractEndDate.HasValue && effDate > contractEndDate.Value)
+            return new List<FeeMonthSegment>();
+
         var effMonth = new DateOnly(effDate.Year, effDate.Month, 1);
         var currentMonth = new DateOnly(now.Year, now.Month, 1);
         var nextMonth = currentMonth.AddMonths(1);
@@ -159,9 +172,13 @@ public class BillingDomainService : IBillingDomainService
         // 生效日在当前月之后 → 单条，不拆分
         if (effMonth > currentMonth)
         {
+            // 裁剪后检查是否超出合同到期日
+            if (contractEndDate.HasValue && effDate > contractEndDate.Value)
+                return segments;
+
             segments.Add(new FeeMonthSegment
             {
-                EffectiveDate = effectiveDate,
+                EffectiveDate = effDate.ToString("yyyy-MM-dd"),
                 ExpiryDate = null,
                 IsActive = true,
                 Amount = monthlyAmount
@@ -174,41 +191,64 @@ public class BillingDomainService : IBillingDomainService
         while (cursor <= currentMonth)
         {
             var monthEnd = cursor.AddMonths(1).AddDays(-1);
-            var segEffDate = cursor == effMonth ? effectiveDate : cursor.ToString("yyyy-MM-dd");
+
+            // 如果 cursor 月已超出合同到期日，停止拆分
+            if (contractEndDate.HasValue && cursor > contractEndDate.Value)
+                break;
+
+            var segEffDate = cursor == effMonth ? effDate.ToString("yyyy-MM-dd") : cursor.ToString("yyyy-MM-dd");
+            // segEffDate 不应超过合同到期日
+            if (contractEndDate.HasValue)
+            {
+                var segEffParsed = DateOnly.Parse(segEffDate);
+                if (segEffParsed > contractEndDate.Value)
+                    break;
+            }
+
             var daysInMonth = DateTime.DaysInMonth(cursor.Year, cursor.Month);
+            var actMonthEnd = contractEndDate.HasValue && monthEnd > contractEndDate.Value
+                ? contractEndDate.Value
+                : monthEnd;
 
             // 首段按天分摊，中间月全额
             decimal segAmount;
             if (cursor == effMonth)
             {
                 var segEff = DateOnly.Parse(segEffDate);
-                var segExp = DateOnly.Parse(monthEnd.ToString("yyyy-MM-dd"));
-                var occupiedDays = segExp.DayNumber - segEff.DayNumber + 1;
-                segAmount = Math.Round(monthlyAmount / daysInMonth * occupiedDays, 2);
+                var occupiedDays = actMonthEnd.DayNumber - segEff.DayNumber + 1;
+                segAmount = occupiedDays > 0
+                    ? Math.Round(monthlyAmount / daysInMonth * occupiedDays, 2)
+                    : 0;
             }
             else
             {
                 segAmount = monthlyAmount;
             }
 
-            segments.Add(new FeeMonthSegment
+            if (segAmount > 0)
             {
-                EffectiveDate = segEffDate,
-                ExpiryDate = monthEnd.ToString("yyyy-MM-dd"),
-                IsActive = false,
-                Amount = segAmount
-            });
+                segments.Add(new FeeMonthSegment
+                {
+                    EffectiveDate = segEffDate,
+                    ExpiryDate = actMonthEnd.ToString("yyyy-MM-dd"),
+                    IsActive = false,
+                    Amount = segAmount
+                });
+            }
             cursor = cursor.AddMonths(1);
         }
 
-        // 未来长期配置：下月1日起，无到期日，启用
-        segments.Add(new FeeMonthSegment
+        // 未来长期配置：下月1日起，无到期日，启用（但不超过合同到期日）
+        if (!contractEndDate.HasValue || nextMonth <= DateOnly.FromDateTime(new DateTime(contractEndDate.Value.Year, contractEndDate.Value.Month, 1)))
         {
-            EffectiveDate = nextMonth.ToString("yyyy-MM-dd"),
-            ExpiryDate = null,
-            IsActive = true,
-            Amount = monthlyAmount
-        });
+            segments.Add(new FeeMonthSegment
+            {
+                EffectiveDate = nextMonth.ToString("yyyy-MM-dd"),
+                ExpiryDate = null,
+                IsActive = true,
+                Amount = monthlyAmount
+            });
+        }
 
         return segments;
     }

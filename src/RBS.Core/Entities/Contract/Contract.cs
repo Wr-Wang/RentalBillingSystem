@@ -398,6 +398,25 @@ public class Contract : AggregateRoot, IHasCompany
         return EndDate.Value.DayNumber - today.DayNumber;
     }
 
+    // ===== 静态校验方法 =====
+
+    /// <summary>
+    /// 校验费用生效日期是否在合同起止日期范围内
+    /// </summary>
+    /// <param name="effectiveDate">费用生效日期</param>
+    /// <param name="contractStartDate">合同起租日期</param>
+    /// <param name="contractEndDate">合同到期日期，null 表示长期</param>
+    /// <param name="feeDescription">费用描述（可选，用于错误信息）</param>
+    /// <exception cref="InvalidOperationException">当生效日期不在合同日期范围内时抛出</exception>
+    public static void ValidateFeeEffectiveDate(DateOnly effectiveDate, DateOnly contractStartDate, DateOnly? contractEndDate, string? feeDescription = null)
+    {
+        var prefix = feeDescription != null ? $"「{feeDescription}」" : "";
+        if (effectiveDate < contractStartDate)
+            throw new InvalidOperationException($"{prefix}生效日期({effectiveDate:yyyy-MM-dd})不能早于合同起租日期({contractStartDate:yyyy-MM-dd})");
+        if (contractEndDate.HasValue && effectiveDate > contractEndDate.Value)
+            throw new InvalidOperationException($"{prefix}生效日期({effectiveDate:yyyy-MM-dd})不能晚于合同到期日期({contractEndDate:yyyy-MM-dd})");
+    }
+
     // ===== 私有校验 =====
 
     /// <summary>

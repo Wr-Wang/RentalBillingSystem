@@ -26,18 +26,18 @@
     <el-table :data="contractList" v-loading="loading" stripe style="flex:1;width:100%;" height="100%" max-height="100%" border>
       <el-table-column type="index" label="#" width="50" />
       <el-table-column prop="contractNo" label="合同号" min-width="220" />
-      <el-table-column prop="roomName" label="房屋" min-width="90" />
+      <el-table-column prop="roomName" label="房屋" min-width="110" />
       <el-table-column prop="tenantName" label="租客" min-width="90" />
-      <el-table-column prop="startDate" label="起租" min-width="90" />
-      <el-table-column prop="endDate" label="到期" min-width="90" />
+      <el-table-column prop="startDate" label="起租" min-width="110" />
+      <el-table-column prop="endDate" label="到期" min-width="110" />
       <el-table-column prop="status" label="状态" min-width="80">
         <template #default="{ row }">
           <el-tag :type="statusTypeMap[row.status] || 'info'" size="small">{{ statusLabelMap[row.status] || row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="自动续签" min-width="70" align="center">
+      <el-table-column label="自动续签" min-width="90" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.autoRenew ? 'success' : 'info'" size="small" effect="plain">{{ row.autoRenew ? '开' : '关' }}</el-tag>
+          {{ row.autoRenew ? '开' : '关' }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="270" fixed="right">

@@ -242,6 +242,18 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         var approvalReq = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
         var userId = approvalReq?.CreatedBy ?? Guid.Empty;
 
+        // 校验所有调价项的生效日期在合同起止日期范围内
+        var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
+        if (contract != null)
+        {
+            foreach (var item in feeItems)
+            {
+                var effDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
+                if (!string.IsNullOrEmpty(effDate))
+                    Contract.ValidateFeeEffectiveDate(DateOnly.Parse(effDate), contract.StartDate, contract.EndDate, item.FeeName);
+            }
+        }
+
         foreach (var item in feeItems)
         {
             var effectiveDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
@@ -349,6 +361,21 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         var bizData = await _uow.ApprovalBizData.GetByApprovalRequestIdAsync(@event.ApprovalRequestId, ct);
         if (bizData != null && bizData.IsProcessed) return;
 
+        // 校验生效日期在合同起止日期范围内，并缓存合同日期供后续使用
+        var contractCache = new Dictionary<Guid, (DateOnly StartDate, DateOnly? EndDate)>();
+        var contractIds = feeItems.Select(f => f.ContractId).Distinct().ToList();
+        foreach (var cid in contractIds)
+        {
+            var c = await _uow.Contracts.GetByIdAsync(cid, ct);
+            if (c == null) continue;
+            contractCache[cid] = (c.StartDate, c.EndDate);
+            foreach (var item in feeItems.Where(f => f.ContractId == cid))
+            {
+                var effDate = item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd");
+                Contract.ValidateFeeEffectiveDate(DateOnly.Parse(effDate), c.StartDate, c.EndDate, item.FeeName);
+            }
+        }
+
         // 事务外收集：审批后需要生成 JE 的一次性费用项（等 FeeConfig 落库后执行）
         var oneTimeJobs = new List<(Guid ContractId, Guid ConfigId)>();
 
@@ -382,16 +409,20 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 List<Guid> configIds = new();
                 if (chargeType == "Recurring")
                 {
+                    var (cStart, cEnd) = contractCache.TryGetValue(item.ContractId, out var cd)
+                        ? cd : (DateOnly.FromDateTime(ChinaTime.Now), (DateOnly?)null);
                     var segments = _billingDomain.CalculateMonthlySplit(
                         item.NewAmount,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                        ChinaTime.Now);
+                        ChinaTime.Now,
+                        cStart, cEnd);
                     configIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
                         conn, tx, _sql, _billingDomain,
                         item.ContractId, item.FeeCodeId,
                         item.NewAmount, item.BillingMode, item.Unit, (decimal?)null,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                        Guid.Empty);
+                        Guid.Empty,
+                        cStart, cEnd);
                     await RecurringFeeSplitHelper.GenerateFirstMonthJournal(
                         conn, tx, _sql, segments, configIds,
                         companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, item.FeeName);
@@ -592,7 +623,8 @@ if (chargeType == "OneTime")
 		                        contractId, (Guid)f.FeeCodeId,
 		                        (decimal)f.Amount, (string)f.BillingMode,
 		                        (string?)f.Unit, (decimal?)f.UnitPrice,
-		                        effDate, request.CreatedBy);
+		                        effDate, request.CreatedBy,
+		                        request.StartDate, request.EndDate);
 		                }
 
 		                else
@@ -762,6 +794,11 @@ if (chargeType == "OneTime")
 	            new { Id = request.Id, Now = ChinaTime.Now }, ct);
 	        if (locked == 0) return;
 
+	        // 校验生效日期在合同起止日期范围内
+	        var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
+	        if (contract != null && !string.IsNullOrEmpty(request.EffectiveDate))
+	            Contract.ValidateFeeEffectiveDate(DateOnly.Parse(request.EffectiveDate), contract.StartDate, contract.EndDate);
+
 	        List<dynamic> items;
         using (var conn3 = _db.CreateConnection()) { conn3.Open();
             items = (await conn3.QueryAsync<dynamic>(
@@ -791,12 +828,14 @@ if (chargeType == "OneTime")
 	            if (feeChargeType == "Recurring")
 	            {
 	                var segments = _billingDomain.CalculateMonthlySplit(
-	                    request.Amount, request.EffectiveDate, ChinaTime.Now);
+	                    request.Amount, request.EffectiveDate, ChinaTime.Now,
+	                    contract.StartDate, contract.EndDate);
 	                var segIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
 	                    conn, tx, _sql, _billingDomain,
 	                    request.ContractId, request.FeeCodeId,
 	                    request.Amount, request.BillingMode, (string?)null, (decimal?)null,
-	                    request.EffectiveDate, request.CreatedBy);
+	                    request.EffectiveDate, request.CreatedBy,
+	                    contract.StartDate, contract.EndDate);
 	                configId = segIds.Last();
 	            }
 	            else
