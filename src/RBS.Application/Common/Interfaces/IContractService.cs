@@ -75,22 +75,6 @@ public interface IContractService
     Task TerminateAsync(Guid id, string reason, CancellationToken ct = default);
 
     /// <summary>
-    /// 暂停合同（将状态设为 Suspended）
-    /// </summary>
-    /// <param name="id">合同 ID</param>
-    /// <param name="ct">取消令牌</param>
-    Task SuspendAsync(Guid id, CancellationToken ct = default);
-
-    /// <summary>
-    /// 恢复合同（将状态从 Suspended 恢复为 Active）
-    /// </summary>
-    /// <param name="id">合同 ID</param>
-    /// <param name="ct">取消令牌</param>
-    Task ResumeAsync(Guid id, CancellationToken ct = default);
-
-    /// <summary>
-    /// 检查合同是否有待审批的调价申请，有则抛出 InvalidOperationException
-    /// </summary>
     Task EnsureNoPendingForContractAsync(Guid contractId, CancellationToken ct = default);
 
     /// <summary>
@@ -123,4 +107,5 @@ public interface IContractService
     /// <param name="ct">取消令牌</param>
     /// <returns>{ status, requestId?, approvalRequestId?, message }</returns>
     Task<object> ModifySubmitAsync(Guid contractId, ContractModifySubmitRequest request, Guid userId, CancellationToken ct = default);
+
 }

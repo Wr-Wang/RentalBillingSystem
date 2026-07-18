@@ -668,8 +668,7 @@ public class ApprovalService : IApprovalService
 			return dto.Fields.Count > 0 ? dto : null;
 		}
 
-        // Contract 类型：正则解析（需要 Description）
-        if (!string.IsNullOrEmpty(desc) && approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == false)
+		if (!string.IsNullOrEmpty(desc) && approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == false)
         {
             var match = System.Text.RegularExpressions.Regex.Match(desc, @"→\s*¥([\d,]+)");
             if (match.Success)

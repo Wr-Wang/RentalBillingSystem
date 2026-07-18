@@ -27,19 +27,6 @@ public interface IContractDomainService
     /// <summary>
     /// 暂停合同：暂停期间不生成应收计划。
     /// </summary>
-    Task SuspendContractAsync(Contract contract, CancellationToken ct = default);
-
-    /// <summary>
-    /// 恢复已暂停的合同。
-    /// </summary>
-    Task ResumeContractAsync(Contract contract, CancellationToken ct = default);
-
-    /// <summary>
-    /// 续签合同：创建新合同，关联旧合同。
-    /// 注意：合同编号应通过 IContractNumberGenerator 生成后传入，
-    /// 此方法已废弃，请使用 RenewalService 的续签流程。
-    /// </summary>
-    [Obsolete("Use RenewalService with IContractNumberGenerator instead")]
     Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateOnly newEndDate, CancellationToken ct = default);
 
     /// <summary>

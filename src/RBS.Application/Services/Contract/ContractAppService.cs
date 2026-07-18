@@ -250,39 +250,6 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         await _uow.CommitAsync(ct);
     }
 
-    /// <summary>
-    /// 暂停合同 — 通过领域服务校验状态机并记录暂停时间
-    /// </summary>
-    public async Task SuspendAsync(Guid id, CancellationToken ct = default)
-    {
-        var contract = await _uow.Contracts.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("合同不存在");
-        await _contractDomain.SuspendContractAsync(contract, ct);
-        await _uow.Contracts.UpdateAsync(contract, ct);
-        await _uow.CommitAsync(ct);
-    }
-
-    /// <summary>
-    /// 恢复合同 — 通过领域服务校验状态机并记录恢复时间
-    /// </summary>
-    public async Task ResumeAsync(Guid id, CancellationToken ct = default)
-    {
-        var contract = await _uow.Contracts.GetByIdAsync(id, ct) ?? throw new KeyNotFoundException("合同不存在");
-        await _contractDomain.ResumeContractAsync(contract, ct);
-        await _uow.Contracts.UpdateAsync(contract, ct);
-        await _uow.CommitAsync(ct);
-    }
-
-    public async Task SubmitContractCreateRequestStatusAsync(Guid requestId, CancellationToken ct = default)
-    {
-        await _uow.ExecuteSqlRawAsync(_sql.Get("ContractCreate.Update.Request.Submit"),
-            new { Id = requestId }, ct);
-    }
-
-    public async Task SetApprovalRequestContractIdAsync(Guid approvalRequestId, Guid contractId, CancellationToken ct = default)
-    {
-        await _uow.ExecuteSqlRawAsync(_sql.Get("Approval.Update.Request.SetContractId"),
-            new { Id = approvalRequestId, ContractId = contractId }, ct);
-    }
 
     /// <summary>
     /// 检查合同是否有待审批的调价申请，有则抛出 InvalidOperationException
@@ -337,6 +304,18 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         if (contract != null) { contract.Activate(); await _uow.CommitAsync(ct); }
         try { await _receivableGen.GenerateForActivationAsync(contractId, ct); } catch { }
         return contractId;
+    }
+
+    public async Task SubmitContractCreateRequestStatusAsync(Guid requestId, CancellationToken ct = default)
+    {
+        await _uow.ExecuteSqlRawAsync(_sql.Get("ContractCreate.Update.Request.Submit"),
+            new { Id = requestId }, ct);
+    }
+
+    public async Task SetApprovalRequestContractIdAsync(Guid approvalRequestId, Guid contractId, CancellationToken ct = default)
+    {
+        await _uow.ExecuteSqlRawAsync(_sql.Get("Approval.Update.Request.SetContractId"),
+            new { Id = approvalRequestId, ContractId = contractId }, ct);
     }
 
     /// <summary>

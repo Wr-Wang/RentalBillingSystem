@@ -20,7 +20,7 @@ namespace RBS.Application.EventHandlers;
 /// 支持的业务类型包括：Import（导入）、ContractFeeAdjust（费用调价）、
 /// ContractFeeAdd（费用添加）、ContractTerminate（终止）、ContractRenewal（续签）、
 /// ContractActivation（合同创建）、ReceivableGeneration（应收生成）、
-/// ContractSuspend（暂停）、ContractModify（修改）、ContractTenantChange（换租）、
+/// ContractModify（修改）、ContractTenantChange（换租）、
 /// SupplementaryFee（补充收费）等
 /// </summary>
 public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEvent>
@@ -140,9 +140,6 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 break;
             case "ReceivableGeneration":
                 await HandleReceivableGenerationAsync(@event, ct);
-                break;
-            case "ContractSuspend":
-                await HandleContractSuspendAsync(@event, ct);
                 break;
             case "ContractModify":
                 await HandleContractModifyAsync(@event, ct);
@@ -718,21 +715,6 @@ if (chargeType == "OneTime")
 	    }
 
 	    // ===== 暂停审批通过 =====
-	    private async Task HandleContractSuspendAsync(ApprovalCompletedEvent @event, CancellationToken ct)
-	    {
-	        if (@event.Action != "Approved") return;
-
-	        var bizData = await _uow.ApprovalBizData.GetByApprovalRequestIdAsync(@event.ApprovalRequestId, ct);
-	        if (bizData == null || bizData.IsProcessed) return;
-
-	        var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
-	        if (contract == null || contract.Status != "Active") return;
-
-	        contract.Suspend();
-	        await _uow.CommitAsync(ct); // 触发 ContractSuspendedEvent → 冻结应收
-	    }
-
-	    // ===== 修改信息审批通过 =====
 	    private async Task HandleContractModifyAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         if (@event.Action != "Approved") return;

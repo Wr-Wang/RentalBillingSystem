@@ -47,8 +47,8 @@
             <el-button v-if="row.status === 'Active' || row.status === 'Suspended'" text size="small" type="warning" @click="showModifyFee(row)" style="padding:4px 6px;">调价</el-button>
             <el-button v-if="(row.status === 'Active' || row.status === 'Expired') && !row.hasRenewalContract" text size="small" type="primary" @click="handleRenew(row)" style="padding:4px 6px;">续签</el-button>
             <el-button v-if="row.status === 'Active'" text size="small" type="danger" @click="handleTerminate(row)" style="padding:4px 6px;">终止</el-button>
-            <el-button v-if="row.status === 'Active'" text size="small" type="warning" @click="handleSuspend(row)" style="padding:4px 6px;">暂停</el-button>
-            <el-button v-if="row.status === 'Suspended'" text size="small" type="success" @click="handleResume(row)" style="padding:4px 6px;">恢复</el-button>
+            <el-button v-if="row.status === 'Active'" text size="small" type="warning"  style="padding:4px 6px;">暂停</el-button>
+            <el-button v-if="row.status === 'Suspended'" text size="small" type="success"  style="padding:4px 6px;">恢复</el-button>
           </div>
         </template>
       </el-table-column>
@@ -190,7 +190,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, suspendContract, resumeContract, previewRenewal, submitRenewal, getLastRejectedRenewal, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory, handleApiError } from '@/api/index.js'
+import { getApprovalTypes, getRoles, createApprovalType, createApprovalLevel, getContracts, renewContract, terminateContract, previewRenewal, submitRenewal, getLastRejectedRenewal, feeAdjust, getContractFeeConfigs, getContractFeeConfigHistory, handleApiError } from '@/api/index.js'
 import { useUserStore } from '@/store/user'
 import { toGuidId } from '@/utils'
 
@@ -303,28 +303,8 @@ async function submitTerminate() {
   }
 }
 
-function handleSuspend(row) {
-  ElMessageBox.confirm(`确定暂停合同 ${row.contractNo} 吗？`, '提示').then(async () => {
-    try {
-      await suspendContract(toGuidId(row.id))
-      row.status = 'Suspended'
-      ElMessage.success('合同已暂停')
-    } catch (e) {
-      ElMessage.error(e?.response?.data?.message || '暂停失败')
-    }
-  }).catch(() => {})
-}
-function handleResume(row) {
-  ElMessageBox.confirm(`确定恢复合同 ${row.contractNo} 吗？`, '提示').then(async () => {
-    try {
-      await resumeContract(toGuidId(row.id))
-      row.status = 'Active'
-      ElMessage.success('合同已恢复')
-    } catch (e) {
-      ElMessage.error(e?.response?.data?.message || '恢复失败')
-    }
-  }).catch(() => {})
-}
+
+
 
 // === Modify Fee ===
 const feeConfigLoading = ref(false)

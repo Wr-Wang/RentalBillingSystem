@@ -981,10 +981,6 @@
     <![CDATA[INSERT INTO ApprovalBizData (Id, ApprovalRequestId, ContractId, ContractNo, CompanyId, ChangeType, ActualEndDate, Reason, TerminateType, DepositReturn, IsProcessed, CreatedBy, CreatedAt)
       VALUES (@Id, NULL, @ContractId, @ContractNo, @CompanyId, 'TERMINATE', @ActualEndDate, @Reason, @TerminateType, @DepositReturn, 0, @CreatedBy, @CreatedAt)]]>
   </insert>
-  <insert id="Contract.Insert.ApprovalBizData.Suspend">
-    <![CDATA[INSERT INTO ApprovalBizData (Id, ApprovalRequestId, ContractId, ContractNo, CompanyId, ChangeType, Reason, IsProcessed, CreatedBy, CreatedAt)
-      VALUES (@Id, NULL, @ContractId, @ContractNo, @CompanyId, 'SUSPEND', @Reason, 1, @CreatedBy, @CreatedAt)]]>
-  </insert>
   <insert id="Contract.Insert.ApprovalFeeItem.ForFeeAdjust">
     <![CDATA[INSERT INTO ApprovalFeeItems (Id, ApprovalRequestId, ContractId, FeeCodeId, FeeName, OldAmount, NewAmount, BillingMode, Unit, EffectiveDate, CreatedBy, CreatedAt)
       VALUES (@Id, @ApprovalRequestId, @ContractId, @FeeCodeId, @FeeName, @OldAmount, @NewAmount, @BillingMode, @Unit, @EffectiveDate, @CreatedBy, @CreatedAt)]]>

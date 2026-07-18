@@ -4,7 +4,7 @@
 
   页面结构：
     ┌─ 操作按钮栏 ─────────────────────────────────────────────────┐
-    │  费用调价 ｜ 续签 ｜ 终止 ｜ 暂停 ｜ 修改信息 ｜ 返回           │
+    │  费用调价 ｜ 续签 ｜ 终止 ｜  修改信息 ｜ 返回           │
     └────────────────────────────────────────────────────────────────┘
     ┌─ 基本信息卡片 ───────────────────────────────────────────────┐
     │  合同号 / 房屋 / 租客 / 起租 / 到期 / 付款周期 / 自动续签     │
@@ -35,8 +35,6 @@
         <el-button v-if="isActive || contract.status === 'Suspended'" type="warning" @click="openFeeAdjust">费用调价</el-button>
         <el-button v-if="isActive && !contract.hasRenewalContract" type="primary" @click="openRenewDialog">续签</el-button>
         <el-button v-if="isActive" type="danger" @click="showTerminate = true">终止合同</el-button>
-        <el-button v-if="isActive" type="warning" @click="showSuspend = true">暂停</el-button>
-        <el-button v-if="contract.status === 'Suspended'" type="success" @click="handleResume">恢复</el-button>
         <el-button v-if="isActive || contract.status === 'Suspended'" type="primary" @click="showOtherModify = true">修改信息</el-button>
         <el-button @click="$router.back()">返回</el-button>
       </div>
@@ -196,7 +194,6 @@
           <el-empty v-if="!tenantLoading && contractTenants.length===0" description="暂无租户，点击「添加租户」创建" :image-size="60" />
         </el-tab-pane>
 
-
       
 
         <!-------- 2d. Tenants ------>
@@ -293,8 +290,6 @@
       </el-table>
     </el-card>
       <el-empty v-if="!receivableLoading && receivableTimeline.length === 0" description="暂无应收数据，点击「生成应收」创建" :image-size="60" style="padding:20px 0;" />
-
-
 
     <!--===============================================================-->
     <!-- MODAL: Fee Price Adjustment                                   -->
@@ -502,7 +497,6 @@
           <el-form-item label=" ">
             <div v-if="renewForm.depositHandling === 'NEW'" style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
 
-
             </div>
             <div v-else style="padding:6px 10px;background:#f5f7fa;border-radius:4px;font-size:13px;line-height:1.8;">
               <div>押金：原押金延续至新合同</div>
@@ -555,31 +549,6 @@
       <template #footer>
         <el-button @click="showTerminate = false">取消</el-button>
         <el-button type="primary" @click="submitTerminate">提交审批</el-button>
-      </template>
-    </el-dialog>
-
-
-
-    <!-- Suspend Confirm -->
-    <el-dialog v-model="showSuspend" title="暂停合同" width="450px">
-      <el-alert title="暂停期间将不生成新的应收计划。审批通过后执行暂停操作。" type="info" show-icon :closable="false" style="margin-bottom:16px;" />
-      <el-form style="margin-top: 12px;">
-        <el-form-item label="暂停原因">
-          <el-input v-model="suspendReason" type="textarea" :rows="2" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showSuspend = false">取消</el-button>
-        <el-button type="primary" @click="previewSuspend" :loading="suspendPreviewLoading">预览变更</el-button>
-      </template>
-    </el-dialog>
-    <el-dialog v-model="showSuspendPreview" title="暂停合同 — 预览" width="450px">
-      <p>暂停原因: {{ suspendReason }}</p>
-      <p style="margin-top:8px;">将冻结 <strong>{{ suspendPreviewData?.frozenPeriods?.length || 0 }}</strong> 个月应收计划</p>
-      <el-checkbox v-model="suspendConfirmed" style="margin-top:12px;">我已确认以上信息</el-checkbox>
-      <template #footer>
-        <el-button @click="showSuspendPreview = false">返回修改</el-button>
-        <el-button type="warning" @click="submitSuspendApproval" :disabled="!suspendConfirmed" :loading="suspendSubmitting">提交审批</el-button>
       </template>
     </el-dialog>
 
@@ -767,8 +736,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { toGuidId } from '@/utils'
 import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel,
-  getContract, updateContract, terminateContract, renewContract, suspendContract, resumeContract,
-  feeAdjust, getJournals, generateJournals as apiGenerateReceivables, getDeposits,
+  getContract, updateContract, terminateContract, renewContract, feeAdjust, getJournals, generateJournals as apiGenerateReceivables, getDeposits,
   getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig,
   getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal,
   getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges,
@@ -1257,9 +1225,8 @@ async function toggleFeeConfig(row) {
 }
 
 /* ================================================================
- * Suspend / Resume (API connected)
- * ================================================================ */
 
+ * ================================================================ */
 
 // toGuidId 从 @/utils 导入，见文件顶部
 
@@ -1549,13 +1516,6 @@ async function submitRenew() {
 /* ================================================================
  * Terminate (CONTRACT_TERMINATE — AmountBased 1~3级)
  * ================================================================ */
-const showSuspend = ref(false)
-const suspendReason = ref('')
-const showSuspendPreview = ref(false)
-const suspendPreviewLoading = ref(false)
-const suspendSubmitting = ref(false)
-const suspendPreviewData = ref(null)
-const suspendConfirmed = ref(false)
 const showTerminate = ref(false)
 const terminateForm = reactive({
   type: 'EARLY',
@@ -1601,40 +1561,6 @@ async function submitTerminate() {
   } catch (e) {
     handleApiError(e, '终止失败')
   }
-}
-
-async function previewSuspend() {
-  if (!suspendReason.value) { ElMessage.warning('请填写暂停原因'); return }
-  suspendPreviewLoading.value = true
-  try {
-    const res = await fetch('/api/contracts/' + route.params.id + '/suspendpreview', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }
-    }).then(r => r.json())
-    suspendPreviewData.value = res
-    showSuspend.value = false
-    showSuspendPreview.value = true
-  } catch (e) {
-    ElMessage.error('预览失败')
-  }
-  suspendPreviewLoading.value = false
-}
-
-async function submitSuspendApproval() {
-  suspendSubmitting.value = true
-  try {
-    const res = await fetch('/api/contracts/' + route.params.id + '/suspendsubmit', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: suspendReason.value })
-    }).then(r => r.json())
-    if (res.status === 'PendingApproval') {
-      ElMessage.success('暂停申请已提交审批')
-    } else {
-      contract.value.status = 'Suspended'
-      ElMessage.success('合同已暂停')
-    }
-    showSuspendPreview.value = false
-  } catch (e) { ElMessage.error('提交失败') }
-  suspendSubmitting.value = false
 }
 
 async function toggleAutoRenew() {
@@ -1687,7 +1613,6 @@ async function submitSupplementaryFee() {
   } catch (e) { ElMessage.error('提交失败') }
   suppSubmitting.value = false
 }
-
 
 // === 租户Tab函数 ===
 async function fetchContractTenants() {

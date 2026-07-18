@@ -35,27 +35,6 @@ public class ContractDomainService : IContractDomainService
     /// <summary>
     /// 暂停合同。
     /// </summary>
-    public async Task SuspendContractAsync(Contract contract, CancellationToken ct = default)
-    {
-        contract.Suspend();
-        await Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 恢复已暂停的合同。
-    /// </summary>
-    public async Task ResumeContractAsync(Contract contract, CancellationToken ct = default)
-    {
-        contract.Resume();
-        await Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 续签合同：校验旧合同状态、标记已续签、创建新合同。
-    /// 注意：合同编号应通过 IContractNumberGenerator 生成后传入。
-    /// 此方法已废弃，请使用 RenewalService 的续签流程。
-    /// </summary>
-    [Obsolete("Use RenewalService with IContractNumberGenerator instead")]
     public async Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateOnly newEndDate, CancellationToken ct = default)
     {
         if (oldContract.Status != "Active" && oldContract.Status != "Expired")

@@ -59,11 +59,6 @@ public class Contract : AggregateRoot, IHasCompany
     public DateTime? TerminatedAt { get; private set; }
     /// <summary>合同终止原因，如违约退租、协商解除等</summary>
     public string? TerminationReason { get; private set; }
-    /// <summary>合同暂停时间，仅当 Status 为 Suspended 时有值</summary>
-    public DateTime? SuspendedAt { get; private set; }
-    /// <summary>合同恢复时间，从暂停状态恢复为 Active 时记录</summary>
-    public DateTime? ResumedAt { get; private set; }
-
     // ===== 内部集合 =====
     private readonly List<ContractTenant> _contractTenants = new();
     private readonly List<ContractFeeConfig> _feeConfigs = new();
@@ -283,30 +278,6 @@ public class Contract : AggregateRoot, IHasCompany
         AssertValidTransition("Active");
         Status = "Active";
         AddDomainEvent(new ContractActivatedEvent(Id, RoomId, CompanyId));
-    }
-
-    /// <summary>
-    /// 暂停合同，记录暂停时间并触发暂停领域事件
-    /// </summary>
-    public void Suspend()
-    {
-        AssertValidTransition("Suspended");
-        Status = "Suspended";
-        SuspendedAt = ChinaTime.Now;
-        AddDomainEvent(new ContractSuspendedEvent(Id));
-    }
-
-    /// <summary>
-    /// 恢复已暂停的合同至生效状态，记录恢复时间并触发恢复领域事件
-    /// </summary>
-    /// <exception cref="InvalidOperationException">当合同不是暂停状态时抛出</exception>
-    public void Resume()
-    {
-        if (Status != "Suspended")
-            throw new InvalidOperationException("只有已暂停的合同可以恢复");
-        Status = "Active";
-        ResumedAt = ChinaTime.Now;
-        AddDomainEvent(new ContractResumedEvent(Id, ResumedAt.Value));
     }
 
     /// <summary>

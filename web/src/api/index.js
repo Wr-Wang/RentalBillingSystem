@@ -185,8 +185,6 @@ export function submitRenewal(id, data) { return request({ url: `/contracts/${id
 export function getRenewalHistory(id) { return request({ url: `/contracts/${id}/renewal/history`, method: 'get' }) }
 export function getRenewalChain(id) { return request({ url: `/contracts/${id}/renewal/chain`, method: 'get' }) }
 export function getAllowedOperations(id) { return request({ url: `/contracts/${id}/allowedoperations`, method: 'get' }) }
-export function suspendContract(id, data) { return request({ url: `/contracts/${id}/suspend`, method: 'post', data }) }
-export function resumeContract(id) { return request({ url: `/contracts/${id}/resume`, method: 'post' }) }
 export function getContractTimeline(id) { return request({ url: `/contracts/${id}/timeline`, method: 'get' }) }
 export function getContractChanges(id) { return request({ url: `/contracts/${id}/changes`, method: 'get' }) }
 export function submitContractModify(id, data) { return request({ url: `/contracts/${id}/modifysubmit`, method: 'post', data }) }
