@@ -136,8 +136,8 @@ IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[HolidayCalenda
     DELETE FROM [HolidayCalendars_Audit]
 GO
 
-IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[LateFeeConfigs_Audit]'))
-    DELETE FROM [LateFeeConfigs_Audit]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[InterestConfigs_Audit]'))
+    DELETE FROM [InterestConfigs_Audit]
 GO
 
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ImportBatches_Audit]'))
@@ -354,8 +354,8 @@ IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[HolidayCalenda
     DELETE FROM [HolidayCalendars]
 GO
 
-IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[LateFeeConfigs]'))
-    DELETE FROM [LateFeeConfigs]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[InterestConfigs]'))
+    DELETE FROM [InterestConfigs]
 GO
 
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Notifications]'))

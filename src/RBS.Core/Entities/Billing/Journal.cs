@@ -44,7 +44,7 @@ public class Journal : AuditableEntity, IHasCompany
 
     /// <summary>
     /// 条目类型
-    /// Normal（周期费用）/ Deposit（押金）/ Supplementary（补差）/ LateFee（利息）/ Adjustment（手工调整）
+    /// Normal（周期费用）/ Deposit（押金）/ Supplementary（补差）/ Interest（利息）/ Adjustment（手工调整）
     /// </summary>
     public string EntryType { get; private set; } = "Normal";
 

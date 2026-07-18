@@ -7,34 +7,34 @@ using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.SystemConfig;
 
-public class LateFeeConfigService : ILateFeeConfigService
+public class InterestConfigService : IInterestConfigService
 {
     private readonly IUnitOfWork _uow;
     private readonly ITenantService _tenant;
-    public LateFeeConfigService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
+    public InterestConfigService(IUnitOfWork uow, ITenantService tenant) { _uow = uow; _tenant = tenant; }
     private Guid CompanyId => _tenant.DefaultCompanyId;
 
-    public async Task<List<LateFeeConfigDto>> GetListAsync(CancellationToken ct = default)
-        => (await _uow.LateFeeConfigs.GetAllAsync(ct))
+    public async Task<List<InterestConfigDto>> GetListAsync(CancellationToken ct = default)
+        => (await _uow.InterestConfigs.GetAllAsync(ct))
             .OrderByDescending(x => x.EffectiveDate)
             .Select(Map).ToList();
 
-    public async Task<LateFeeConfigDto> GetActiveAsync(CancellationToken ct = default)
+    public async Task<InterestConfigDto> GetActiveAsync(CancellationToken ct = default)
     {
-        var list = await _uow.LateFeeConfigs.GetAllAsync(ct);
+        var list = await _uow.InterestConfigs.GetAllAsync(ct);
         var active = list.FirstOrDefault(x => x.IsActive && x.CompanyId == CompanyId);
         if (active == null && list.Count > 0)
             active = list.OrderByDescending(x => x.EffectiveDate).FirstOrDefault(x => x.CompanyId == CompanyId);
-        return active != null ? Map(active) : new LateFeeConfigDto
+        return active != null ? Map(active) : new InterestConfigDto
         {
             DailyRate = 0.0005m, GraceDays = 3, MaxRate = 100, MinAmount = 1,
             EffectiveDate = DateOnly.FromDateTime(ChinaTime.Now), IsActive = true
         };
     }
 
-    public async Task<LateFeeConfigDto> SaveAsync(SaveLateFeeConfigRequest request, CancellationToken ct = default)
+    public async Task<InterestConfigDto> SaveAsync(SaveInterestConfigRequest request, CancellationToken ct = default)
     {
-        var list = await _uow.LateFeeConfigs.GetAllAsync(ct);
+        var list = await _uow.InterestConfigs.GetAllAsync(ct);
         var existing = list.FirstOrDefault(x => x.IsActive && x.CompanyId == CompanyId);
 
         if (existing != null)
@@ -44,22 +44,22 @@ public class LateFeeConfigService : ILateFeeConfigService
             return Map(existing);
         }
 
-        var entity = new LateFeeConfig(request.DailyRate, request.GraceDays, CompanyId, request.EffectiveDate);
+        var entity = new InterestConfig(request.DailyRate, request.GraceDays, CompanyId, request.EffectiveDate);
         entity.Update(request.DailyRate, request.GraceDays, request.MaxRate, request.MinAmount, request.EffectiveDate);
-        await _uow.LateFeeConfigs.AddAsync(entity, ct);
+        await _uow.InterestConfigs.AddAsync(entity, ct);
         await _uow.CommitAsync(ct);
         return Map(entity);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _uow.LateFeeConfigs.GetByIdAsync(id, ct)
-            ?? throw new KeyNotFoundException("滞纳金配置不存在");
-        await _uow.LateFeeConfigs.DeleteAsync(entity, ct);
+        var entity = await _uow.InterestConfigs.GetByIdAsync(id, ct)
+            ?? throw new KeyNotFoundException("利息配置不存在");
+        await _uow.InterestConfigs.DeleteAsync(entity, ct);
         await _uow.CommitAsync(ct);
     }
 
-    private static LateFeeConfigDto Map(LateFeeConfig c) => new()
+    private static InterestConfigDto Map(InterestConfig c) => new()
     {
         Id = c.Id, DailyRate = c.DailyRate, GraceDays = c.GraceDays,
         MaxRate = c.MaxRate, MinAmount = c.MinAmount,

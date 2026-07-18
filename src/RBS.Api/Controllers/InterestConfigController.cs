@@ -8,10 +8,10 @@ namespace RBS.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class LateFeeConfigController : ControllerBase
+public class InterestConfigController : ControllerBase
 {
-    private readonly ILateFeeConfigService _service;
-    public LateFeeConfigController(ILateFeeConfigService service) => _service = service;
+    private readonly IInterestConfigService _service;
+    public InterestConfigController(IInterestConfigService service) => _service = service;
 
     [HttpGet]
     public async Task<IActionResult> GetList(CancellationToken ct)
@@ -22,7 +22,7 @@ public class LateFeeConfigController : ControllerBase
         => Ok(await _service.GetActiveAsync(ct));
 
     [HttpPost]
-    public async Task<IActionResult> Save([FromBody] SaveLateFeeConfigRequest request, CancellationToken ct)
+    public async Task<IActionResult> Save([FromBody] SaveInterestConfigRequest request, CancellationToken ct)
         => Ok(await _service.SaveAsync(request, ct));
 
     [HttpDelete("{id}")]

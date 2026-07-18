@@ -202,7 +202,7 @@ public sealed record PaymentRejectedEvent : IDomainEvent
 /// 触发时机：系统定时任务检测到应收计划超过付款截止日仍未结清时发出。
 /// 预期响应：
 /// - 将应收计划状态从 Pending 更新为 Overdue
-/// - 开始计算滞纳金（如合同约定有滞纳金条款）
+/// - 开始计算利息（如合同约定有利息条款）
 /// - 触发催收通知（短信、邮件、系统消息）
 /// - 更新合同的逾期统计信息
 /// </summary>
@@ -252,7 +252,7 @@ public sealed record ReceivableOverdueEvent : IDomainEvent
 /// 预期响应：
 /// - 将应收计划状态更新为 Paid
 /// - 更新合同的整体回收率统计
-/// - 如有滞纳金，停止滞纳金计算
+/// - 如有利息，停止利息计算
 /// - 通知租户该月费用已结清
 /// </summary>
 public sealed record ReceivableSettledEvent : IDomainEvent

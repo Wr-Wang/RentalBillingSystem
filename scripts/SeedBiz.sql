@@ -14,9 +14,9 @@ IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'MonthlyFeeBill')
     INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultScheduleType],[DefaultHour],[DefaultMinute],[DefaultDayOfMonth],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),'MonthlyFeeBill',N'月度应收生成',N'月度应收','Monthly',20,0,25,N'每月25日 20:00 生成月度应收账单','Calendar','Billing',1,1,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'LateFeeCalc')
+IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'InterestCalc')
     INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultScheduleType],[DefaultHour],[DefaultMinute],[DefaultDayOfMonth],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'LateFeeCalc',N'月度结算',N'结算','Monthly',22,0,1,N'每月1日 22:00 执行月度结算：预收冲抵应收 → 计算滞纳金并生成凭证 → 标记逾期状态','Money','Billing',2,1,@SysUserId,@Now);
+    VALUES (NEWID(),'InterestCalc',N'月度结算',N'结算','Monthly',22,0,1,N'每月1日 22:00 执行月度结算：预收冲抵应收 → 计算利息并生成凭证 → 标记逾期状态','Money','Billing',2,1,@SysUserId,@Now);
 
 IF NOT EXISTS (SELECT 1 FROM [JobTemplates] WHERE [Code] = 'AutoRenew')
     INSERT INTO [JobTemplates] ([Id],[Code],[DisplayName],[ShortName],[DefaultScheduleType],[DefaultHour],[DefaultMinute],[Description],[Icon],[Category],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -61,7 +61,7 @@ IF NOT EXISTS (SELECT 1 FROM [JobSchedules] WHERE [JobName]=N'RenewalReminderJob
 
 IF NOT EXISTS (SELECT 1 FROM [JobSchedules] WHERE [JobName]=N'SettleJob' AND [CompanyId]=@Cid)
     INSERT INTO [JobSchedules] ([Id],[JobName],[ScheduleType],[Hour],[Minute],[DayOfMonth],[Description],[IsActive],[CompanyId],[TemplateCode],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'SettleJob','Monthly',22,0,1,N'每月1日 22:00 执行月度结算：①预收账款冲抵应收账款 ②按日利率0.05%、上限90天计算逾期滞纳金并生成会计凭证(借:1122/贷:6051) ③标记逾期应收计划状态',1,@Cid,'LateFeeCalc',@SysUserId,@Now);
+    VALUES (NEWID(),'SettleJob','Monthly',22,0,1,N'每月1日 22:00 执行月度结算：①预收账款冲抵应收账款 ②按日利率0.05%、上限90天计算逾期利息并生成会计凭证(借:1122/贷:6051) ③标记逾期应收计划状态',1,@Cid,'InterestCalc',@SysUserId,@Now);
 
 PRINT N'调度任务初始化完成！';
 GO
@@ -175,16 +175,16 @@ PRINT N'催缴阶段种子数据初始化完成！';
 GO
 
 -- ===================================================================
--- 17. 滞纳金配置
+-- 17. 利息配置
 -- ===================================================================
 DECLARE @Now datetime2 = GETUTCDATE(); DECLARE @SysUserId uniqueidentifier = '00000000-0000-0000-0000-000000000000';
 DECLARE @Cid uniqueidentifier; SELECT @Cid = [Id] FROM [Companies] WHERE [Code] = 'GS001';
 
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('LateFeeConfigs') AND name='LandlordId')
-    EXEC sp_rename 'LateFeeConfigs.LandlordId', 'CompanyId', 'COLUMN';
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('InterestConfigs') AND name='LandlordId')
+    EXEC sp_rename 'InterestConfigs.LandlordId', 'CompanyId', 'COLUMN';
 
-IF NOT EXISTS (SELECT 1 FROM [LateFeeConfigs] WHERE [CompanyId]=@Cid AND [IsActive]=1)
-INSERT INTO [LateFeeConfigs] ([Id],[DailyRate],[GracePeriodDays],[MaxPercentOfPrincipal],[MinLateFeeAmount],[EffectiveDate],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+IF NOT EXISTS (SELECT 1 FROM [InterestConfigs] WHERE [CompanyId]=@Cid AND [IsActive]=1)
+INSERT INTO [InterestConfigs] ([Id],[DailyRate],[GracePeriodDays],[MaxPercentOfPrincipal],[MinInterestAmount],[EffectiveDate],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
 VALUES (NEWID(),0.0005,3,100.00,1.00,'2026-01-01',1,@Cid,@SysUserId,@Now);
 GO
 

@@ -296,9 +296,9 @@ IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'PARKING')
     INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),'PARKING',N'停车费','FixedAmount',12,'Other','Recurring',1,0,@Cid,@SysUserId,@Now);
 
-IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'LATE_FEE')
+IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'INTEREST')
     INSERT INTO [FeeCodes] ([Id],[Code],[Name],[BillingMode],[SortOrder],[Category],[ChargeType],[IsActive],[IsRequired],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),'LATE_FEE',N'滞纳金','FixedAmount',99,'Other','Recurring',1,0,@Cid,@SysUserId,@Now);
+    VALUES (NEWID(),'INTEREST',N'利息','FixedAmount',99,'Other','Recurring',1,0,@Cid,@SysUserId,@Now);
 
 -- ===== 一次性收费 (OneTime) =====
 IF NOT EXISTS (SELECT 1 FROM [FeeCodes] WHERE [Code] = 'DEPOSIT')
@@ -1094,9 +1094,9 @@ DECLARE @M_System_Holiday uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_Holiday,N'节假日管理','system:holiday','/system/holidays','Calendar',@M_System,14,1,@SysUserId,@Now);
 
-DECLARE @M_System_LateFee uniqueidentifier = NEWID();
+DECLARE @M_System_Interest uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_System_LateFee,N'滞纳金配置','system:latefee','/system/latefee','WarningFilled',@M_System,15,1,@SysUserId,@Now);
+VALUES (@M_System_Interest,N'利息配置','system:interest','/system/interest','WarningFilled',@M_System,15,1,@SysUserId,@Now);
 
 DECLARE @M_System_Scheduler uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1262,9 +1262,9 @@ DECLARE @M_System_HolidayDelete uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_HolidayDelete,N'删除节假日','system:holidaydelete',@M_System_Holiday,13,1,@SysUserId,@Now);
 
-DECLARE @M_System_LateFeeSave uniqueidentifier = NEWID();
+DECLARE @M_System_InterestSave uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_System_LateFeeSave,N'保存配置','system:latefeesave',@M_System_LateFee,10,1,@SysUserId,@Now);
+VALUES (@M_System_InterestSave,N'保存配置','system:interestsave',@M_System_Interest,10,1,@SysUserId,@Now);
 
 DECLARE @M_System_SchedulerConfig uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])

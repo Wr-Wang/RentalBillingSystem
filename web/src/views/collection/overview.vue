@@ -92,7 +92,7 @@ const stageStats = ref([])
 
 const manualForm = reactive({
   contractId: '', channel: 'SMS',
-  content: '您好，您的房租已逾期，请尽快缴纳以免产生滞纳金。'
+  content: '您好，您的房租已逾期，请尽快缴纳以免产生利息。'
 })
 
 const stageColors = ['#909399', '#e6a23c', '#f56c6c', '#c03636']

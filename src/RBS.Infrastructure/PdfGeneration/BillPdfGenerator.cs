@@ -125,7 +125,7 @@ public class BillPdfGenerator : IBillPdfGenerator
             col.Item().PaddingTop(20).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
             col.Item().PaddingTop(10).Text("备注：").FontSize(9).FontColor(Colors.Grey.Darken1);
             col.Item().Text("1. 请在收到本通知后 7 日内完成付款。").FontSize(9).FontColor(Colors.Grey.Darken1);
-            col.Item().Text("2. 逾期未付将按合同约定收取滞纳金。").FontSize(9).FontColor(Colors.Grey.Darken1);
+            col.Item().Text("2. 逾期未付将按合同约定收取利息。").FontSize(9).FontColor(Colors.Grey.Darken1);
             col.Item().Text("3. 如有疑问请联系运营人员。").FontSize(9).FontColor(Colors.Grey.Darken1);
         });
     }

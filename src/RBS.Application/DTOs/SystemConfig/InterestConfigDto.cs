@@ -1,6 +1,6 @@
 namespace RBS.Application.DTOs.SystemConfig;
 
-public class LateFeeConfigDto
+public class InterestConfigDto
 {
     public Guid Id { get; set; }
     public decimal DailyRate { get; set; }
@@ -11,7 +11,7 @@ public class LateFeeConfigDto
     public bool IsActive { get; set; }
 }
 
-public class SaveLateFeeConfigRequest
+public class SaveInterestConfigRequest
 {
     public decimal DailyRate { get; set; } = 0.0005m;
     public int GraceDays { get; set; } = 0;

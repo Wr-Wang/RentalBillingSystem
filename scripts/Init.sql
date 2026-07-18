@@ -3054,7 +3054,7 @@ CREATE TABLE [Journals] (
     [Period] VARCHAR(7) NOT NULL , -- 归属账期(格式: yyyy-MM),
     [Amount] DECIMAL(18,2) NOT NULL , -- 金额（允许负数，用于冲销错误记录）,
     [DueDate] DATE NOT NULL , -- 到期日,
-    [EntryType] VARCHAR(20) NOT NULL DEFAULT ('Normal') , -- 条目类型(Normal/Deposit/Supplementary/LateFee/Adjustment),
+    [EntryType] VARCHAR(20) NOT NULL DEFAULT ('Normal') , -- 条目类型(Normal/Deposit/Supplementary/Interest/Adjustment),
     [GLPosted] BIT NOT NULL DEFAULT (0) , -- 是否已写入总账(0=未入账,1=已入账),
     [PostedAt] DATETIME2 NULL , -- 总账写入时间,
     [BilledAt] DATETIME2 NOT NULL , -- 出账时间,
@@ -3086,7 +3086,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'会计科�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'归属账期(格式: yyyy-MM)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'Period'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'金额（允许负数，用于冲销错误记录）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'Amount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'DueDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'条目类型(Normal/Deposit/Supplementary/LateFee/Adjustment)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'EntryType'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'条目类型(Normal/Deposit/Supplementary/Interest/Adjustment)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'EntryType'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否已写入总账(0=未入账,1=已入账)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'GLPosted'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'总账写入时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'PostedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'出账时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Journals', @level2type = N'COLUMN', @level2name = N'BilledAt'
@@ -4912,15 +4912,15 @@ CREATE UNIQUE INDEX [IX_HolidayCalendars_Audit_Id_Version] ON [HolidayCalendars_
 
 
 -- ===================================================================
--- 59. LateFeeConfigs 表：滞纳金配置表
+-- 59. InterestConfigs 表：利息配置表
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[LateFeeConfigs]'))
-CREATE TABLE [LateFeeConfigs] (
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[InterestConfigs]'))
+CREATE TABLE [InterestConfigs] (
     [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
     [DailyRate] DECIMAL(5,4) NOT NULL DEFAULT (0) , -- 日利率,
     [GracePeriodDays] INT NOT NULL DEFAULT (3) , -- 宽限期天数,
     [MaxPercentOfPrincipal] DECIMAL(5,2) , -- 上限百分比,
-    [MinLateFeeAmount] DECIMAL(18,2) , -- 最低金额,
+    [MinInterestAmount] DECIMAL(18,2) , -- 最低金额,
     [EffectiveDate] DATE , -- 生效日期,
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
@@ -4935,34 +4935,34 @@ CREATE TABLE [LateFeeConfigs] (
 )
 GO
 
--- 表说明：滞纳金配置表
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'滞纳金配置表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs'
+-- 表说明：利息配置表
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'利息配置表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs'
 GO
 
--- LateFeeConfigs 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日利率', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'DailyRate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'宽限期天数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'GracePeriodDays'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上限百分比', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'MaxPercentOfPrincipal'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'最低金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'MinLateFeeAmount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'生效日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'EffectiveDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否启用', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'IsActive'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'CompanyId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+-- InterestConfigs 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日利率', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'DailyRate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'宽限期天数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'GracePeriodDays'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上限百分比', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'MaxPercentOfPrincipal'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'最低金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'MinInterestAmount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'生效日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'EffectiveDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否启用', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'IsActive'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'CreatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
 
 -- ===================================================================
--- LateFeeConfigs_Audit 表：滞纳金配置表审计
+-- InterestConfigs_Audit 表：利息配置表审计
 -- ===================================================================
-IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[LateFeeConfigs_Audit]'))
-CREATE TABLE [LateFeeConfigs_Audit] (
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[InterestConfigs_Audit]'))
+CREATE TABLE [InterestConfigs_Audit] (
     [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY , -- 审计自增主键,
     [AuditAction] VARCHAR(20) NOT NULL , -- 审计操作类型,
     [AuditVersionNo] INT NOT NULL , -- 版本号,
@@ -4973,7 +4973,7 @@ CREATE TABLE [LateFeeConfigs_Audit] (
     [DailyRate] DECIMAL(5,4) , -- 日利率,
     [GracePeriodDays] INT , -- 宽限期天数,
     [MaxPercentOfPrincipal] DECIMAL(5,2) , -- 上限百分比,
-    [MinLateFeeAmount] DECIMAL(18,2) , -- 最低金额,
+    [MinInterestAmount] DECIMAL(18,2) , -- 最低金额,
     [EffectiveDate] DATE , -- 生效日期,
     [IsActive] BIT , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER , -- 所属公司ID,
@@ -4988,38 +4988,38 @@ CREATE TABLE [LateFeeConfigs_Audit] (
 )
 GO
 
--- LateFeeConfigs_Audit 表说明：滞纳金配置表审计
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'滞纳金配置表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit'
+-- InterestConfigs_Audit 表说明：利息配置表审计
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'利息配置表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit'
 GO
 
--- LateFeeConfigs_Audit 字段说明
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'Id'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日利率', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'DailyRate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'宽限期天数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'GracePeriodDays'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上限百分比', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'MaxPercentOfPrincipal'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'最低金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'MinLateFeeAmount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'生效日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'EffectiveDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否启用', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'IsActive'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CompanyId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'LateFeeConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+-- InterestConfigs_Audit 字段说明
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计自增主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'审计操作类型', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditAction'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'版本号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditVersionNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'操作人主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'AuditChangedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'日利率', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'DailyRate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'宽限期天数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'GracePeriodDays'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上限百分比', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'MaxPercentOfPrincipal'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'最低金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'MinInterestAmount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'生效日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'EffectiveDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否启用', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'IsActive'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CompanyId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'InterestConfigs_Audit', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
 GO
 
 -- 按记录ID+版本号唯一索引
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[LateFeeConfigs_Audit]') AND name=N'IX_LateFeeConfigs_Audit_Id_Version')
-CREATE UNIQUE INDEX [IX_LateFeeConfigs_Audit_Id_Version] ON [LateFeeConfigs_Audit]([Id], [AuditVersionNo])
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[InterestConfigs_Audit]') AND name=N'IX_InterestConfigs_Audit_Id_Version')
+CREATE UNIQUE INDEX [IX_InterestConfigs_Audit_Id_Version] ON [InterestConfigs_Audit]([Id], [AuditVersionNo])
 
 
 -- ===================================================================

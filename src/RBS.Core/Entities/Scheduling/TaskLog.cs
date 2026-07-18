@@ -11,7 +11,7 @@ using RBS.Core.Entities.Base;
 public class TaskLog : AuditableEntity
 {
     /// <summary>
-    /// 任务名称，如 "租金计算"、"滞纳金计算"，标识具体执行的任务
+    /// 任务名称，如 "租金计算"、"利息计算"，标识具体执行的任务
     /// </summary>
     public string TaskName { get; private set; } = string.Empty;
 

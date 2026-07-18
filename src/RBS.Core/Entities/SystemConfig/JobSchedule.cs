@@ -10,7 +10,7 @@ using RBS.Core.Entities.Base;
 public class JobSchedule : AuditableEntity, IHasCompany
 {
     /// <summary>
-    /// 任务名称，标识要执行的具体任务，如 "租金计算"、"滞纳金计算"
+    /// 任务名称，标识要执行的具体任务，如 "租金计算"、"利息计算"
     /// </summary>
     public string JobName { get; private set; } = string.Empty;
 

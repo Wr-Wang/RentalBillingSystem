@@ -167,8 +167,8 @@ public interface IUnitOfWork : IDisposable
     IHolidayCalendarRepository HolidayCalendars { get; }
     /// <summary>税率配置仓储</summary>
     IRepository<TaxRateConfig> TaxRateConfigs { get; }
-    /// <summary>滞纳金配置仓储</summary>
-    IRepository<LateFeeConfig> LateFeeConfigs { get; }
+    /// <summary>利息配置仓储</summary>
+    IRepository<InterestConfig> InterestConfigs { get; }
     /// <summary>会计科目仓储</summary>
     IRepository<AccountingSubject> AccountingSubjects { get; }
     /// <summary>定时任务调度配置仓储</summary>

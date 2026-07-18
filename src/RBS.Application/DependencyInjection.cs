@@ -48,7 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IPricingStandardService, PricingStandardService>();
         services.AddScoped<IPaymentChannelService, PaymentChannelService>();
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
-        services.AddScoped<ILateFeeConfigService, LateFeeConfigService>();
+        services.AddScoped<IInterestConfigService, InterestConfigService>();
         services.AddScoped<IAutoRenewConfigService, AutoRenewConfigService>();
         services.AddScoped<IHousingUnitService, HousingUnitService>();
         services.AddScoped<ITenantAppService, TenantAppService>();

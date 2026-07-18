@@ -56,10 +56,10 @@ public class BillingDomainService : IBillingDomainService
     }
 
     /// <summary>
-    /// 计算利息（滞纳金）。基于 Journal 余额和配置计算逾期费用。
+    /// 计算利息（利息）。基于 Journal 余额和配置计算逾期费用。
     /// </summary>
-    public decimal CalculateLateFee(decimal amount, decimal received, DateOnly dueDate,
-        string status, LateFeeConfig config, DateOnly asOfDate)
+    public decimal CalculateInterest(decimal amount, decimal received, DateOnly dueDate,
+        string status, InterestConfig config, DateOnly asOfDate)
     {
         if (status == "Paid" || status == "Cancelled")
             return 0;

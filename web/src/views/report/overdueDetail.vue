@@ -20,8 +20,8 @@
         <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
       </el-table-column>
       <el-table-column prop="overdueDays" label="逾期天数" width="90" />
-      <el-table-column label="滞纳金" min-width="100">
-        <template #default="{ row }">¥{{ (row.lateFee || 0).toLocaleString() }}</template>
+      <el-table-column label="利息" min-width="100">
+        <template #default="{ row }">¥{{ (row.interest || 0).toLocaleString() }}</template>
       </el-table-column>
     </el-table>
 
@@ -79,7 +79,7 @@ async function loadData() {
       amount: item.amount || 0,
       overdueAmount: (item.amount || 0) - (item.received || 0),
       overdueDays: item.daysOverdue || 0,
-      lateFee: item.lateFee || 0
+      interest: item.interest || 0
     }))
     total.value = overdueList.value.length
   } catch {

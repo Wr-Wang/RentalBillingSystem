@@ -478,7 +478,7 @@ public sealed class ReceivableStatus : ValueObject
     public static readonly ReceivableStatus Partial = new("Partial", "部分收款");
     /// <summary>已结清 — 应收金额已全部收齐</summary>
     public static readonly ReceivableStatus Paid = new("Paid", "已结清");
-    /// <summary>已逾期 — 超过付款日仍未结清，需进行催收或滞纳金计算</summary>
+    /// <summary>已逾期 — 超过付款日仍未结清，需进行催收或利息计算</summary>
     public static readonly ReceivableStatus Overdue = new("Overdue", "已逾期");
     /// <summary>已取消 — 该笔应收计划已作废（合同终止或费用调整）</summary>
     public static readonly ReceivableStatus Cancelled = new("Cancelled", "已取消");

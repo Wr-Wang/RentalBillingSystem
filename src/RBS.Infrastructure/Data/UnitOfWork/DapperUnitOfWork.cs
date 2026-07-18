@@ -80,7 +80,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     public IRepository<ApprovalLevelConfig> ApprovalLevelConfigs => _approvalLevelConfigs ??= new DapperRepository<ApprovalLevelConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<FloorLevelBand> FloorLevelBands => _floorLevelBands ??= new DapperRepository<FloorLevelBand>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<TaxRateConfig> TaxRateConfigs => _taxRateConfigs ??= new DapperRepository<TaxRateConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
-    public IRepository<LateFeeConfig> LateFeeConfigs => _lateFeeConfigs ??= new DapperRepository<LateFeeConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
+    public IRepository<InterestConfig> InterestConfigs => _interestConfigs ??= new DapperRepository<InterestConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AutoRenewConfig> AutoRenewConfigs => _autoRenewConfigs ??= new DapperRepository<AutoRenewConfig>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AccountingSubject> AccountingSubjects => _accountingSubjects ??= new DapperRepository<AccountingSubject>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IRepository<AccountingPeriod> AccountingPeriods => _accountingPeriods ??= new DapperRepository<AccountingPeriod>(_db, _auditWriter, tracker: this, tenant: _tenant);
@@ -132,7 +132,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private IRepository<ApprovalLevelConfig>? _approvalLevelConfigs;
     private IRepository<FloorLevelBand>? _floorLevelBands;
     private IRepository<TaxRateConfig>? _taxRateConfigs;
-    private IRepository<LateFeeConfig>? _lateFeeConfigs;
+    private IRepository<InterestConfig>? _interestConfigs;
     private IRepository<AutoRenewConfig>? _autoRenewConfigs;
     private IRepository<AccountingSubject>? _accountingSubjects;
     private IRepository<AccountingPeriod>? _accountingPeriods;

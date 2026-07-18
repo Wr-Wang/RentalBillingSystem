@@ -11,17 +11,17 @@ public class JobTemplate : AuditableEntity
 {
     /// <summary>
     /// 模板编码（唯一），用于程序识别和关联 JobSchedule.TemplateCode，
-    /// 如 "RentCalculation"、"LateFeeCalculation"
+    /// 如 "RentCalculation"、"InterestCalculation"
     /// </summary>
     public string Code { get; private set; } = string.Empty;
 
     /// <summary>
-    /// 模板显示名称，如 "租金计算"、"滞纳金计算"，用于界面列表展示
+    /// 模板显示名称，如 "租金计算"、"利息计算"，用于界面列表展示
     /// </summary>
     public string DisplayName { get; private set; } = string.Empty;
 
     /// <summary>
-    /// 模板短名称，如 "计算租金"、"计算滞纳金"，用于紧凑界面展示
+    /// 模板短名称，如 "计算租金"、"计算利息"，用于紧凑界面展示
     /// </summary>
     public string ShortName { get; private set; } = string.Empty;
 

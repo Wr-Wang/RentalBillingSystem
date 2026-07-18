@@ -408,7 +408,7 @@ const routes = [
       { path: 'accountingsubjects', redirect: '/system/accountingsubjects', meta: { hidden: true } },
       { path: 'scheduler', redirect: '/system/scheduler', meta: { hidden: true } },
       { path: 'holidays', redirect: '/system/holidays', meta: { hidden: true } },
-      { path: 'latefee', redirect: '/system/latefee', meta: { hidden: true } },
+      { path: 'interest', redirect: '/system/interest', meta: { hidden: true } },
       // Report shortcuts
       { path: 'collectionrate', redirect: '/reports/collectionrate', meta: { hidden: true } },
       { path: 'overduedetail', redirect: '/reports/overduedetail', meta: { hidden: true } },
@@ -541,10 +541,10 @@ const routes = [
             meta: { title: '节假日管理', icon: 'Calendar' }
           },
           {
-            path: 'latefee',
-            name: 'SystemLateFee',
-            component: () => import('../views/system/lateFeeConfig.vue'),
-            meta: { title: '滞纳金配置', icon: 'WarningFilled' }
+            path: 'interest',
+            name: 'SystemInterest',
+            component: () => import('../views/system/interestConfig.vue'),
+            meta: { title: '利息配置', icon: 'WarningFilled' }
           },
           {
             path: 'autorenew',

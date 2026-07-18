@@ -409,10 +409,10 @@ export function updateFloorLevelBand(id, data) { return request({ url: '/floorle
 export function deleteFloorLevelBand(id) { return request({ url: '/floorlevelbands/' + id, method: 'delete' }) }
 
 // Late Fee Config
-export function getLateFeeConfigs() { return request({ url: '/latefeeconfig', method: 'get' }) }
-export function getActiveLateFeeConfig() { return request({ url: '/latefeeconfig/active', method: 'get' }) }
-export function saveLateFeeConfig(data) { return request({ url: '/latefeeconfig', method: 'post', data }) }
-export function deleteLateFeeConfig(id) { return request({ url: `/latefeeconfig/${id}`, method: 'delete' }) }
+export function getInterestConfigs() { return request({ url: '/interestconfig', method: 'get' }) }
+export function getActiveInterestConfig() { return request({ url: '/interestconfig/active', method: 'get' }) }
+export function saveInterestConfig(data) { return request({ url: '/interestconfig', method: 'post', data }) }
+export function deleteInterestConfig(id) { return request({ url: `/interestconfig/${id}`, method: 'delete' }) }
 
 // AutoRenew Config
 export function getAutoRenewConfig(companyId) { return request({ url: '/autorenewconfig', method: 'get', params: { companyId } }) }

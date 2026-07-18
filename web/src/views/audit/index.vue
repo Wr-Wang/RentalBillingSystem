@@ -29,7 +29,7 @@
         <el-option label="调度执行" value="JobScheduleExecutions" />
         <el-option label="任务模板" value="JobTemplates" />
         <el-option label="凭证分录" value="JournalEntries" />
-        <el-option label="滞纳金配置" value="LateFeeConfigs" />
+        <el-option label="利息配置" value="InterestConfigs" />
         <el-option label="菜单" value="Menus" />
         <el-option label="抄表估读" value="MeterEstimationConfigs" />
         <el-option label="抄表记录" value="MeterReadings" />

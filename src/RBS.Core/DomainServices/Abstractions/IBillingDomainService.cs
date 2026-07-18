@@ -15,9 +15,9 @@ public interface IBillingDomainService
         Guid contractId, Guid companyId, string period, DateOnly dueDate,
         Guid defaultSubjectId, DateTime billedAt);
 
-    /// <summary>计算利息（滞纳金）。</summary>
-    decimal CalculateLateFee(decimal amount, decimal received, DateOnly dueDate,
-        string status, LateFeeConfig config, DateOnly asOfDate);
+    /// <summary>计算利息（利息）。</summary>
+    decimal CalculateInterest(decimal amount, decimal received, DateOnly dueDate,
+        string status, InterestConfig config, DateOnly asOfDate);
 
     /// <summary>按天分摊金额。</summary>
     decimal CalculateProratedAmount(decimal monthlyAmount, int daysInPeriod, int occupiedDays);

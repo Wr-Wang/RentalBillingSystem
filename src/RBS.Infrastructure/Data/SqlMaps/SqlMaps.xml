@@ -1287,7 +1287,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT * FROM ReceivablePlans WHERE ContractId=@Id AND Period=@P AND FeeCodeId=@F]]>
   </select>
   <select id="Receivable.Select.Plan.ByContractAndFee">
-    <![CDATA[SELECT Id, Period, Amount, DueDate, Status, Received, LateFee, IsBilled
+    <![CDATA[SELECT Id, Period, Amount, DueDate, Status, Received, Interest, IsBilled
              FROM ReceivablePlans
              WHERE ContractId=@ContractId AND FeeCodeId=@FeeCodeId
              ORDER BY Period]]>

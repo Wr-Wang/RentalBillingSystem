@@ -140,7 +140,7 @@ IUnitOfWork
 SchedulingHostedService (BackgroundService, 60s 轮询)
   ├── JobScheduleGenerator (每小时生成待执行实例)
   ├── BillJob          每月25日 20:00  生成应收账单
-  ├── SettleJob        每月1日 22:00   结算（含滞纳金）
+  ├── SettleJob        每月1日 22:00   结算（含利息）
   ├── TerminateJob     每日 02:00     到期合同终止
   ├── ReceiptJob       每日 03:00     收款处理
   ├── AutoRenewJob     每日 00:00     自动续签
@@ -202,7 +202,7 @@ SchedulingHostedService (BackgroundService, 60s 轮询)
 
 - **多阶段**：短信→电话→上门→法务，阶段可配置
 - **自动触发**：逾期自动进入催缴流程
-- **滞纳金**：日利率/宽限期/上限可配置
+- **利息**：日利率/宽限期/上限可配置
 
 ### 银行对账
 
@@ -321,7 +321,7 @@ RentalBillingSystem/
 │   │   │   ├── Scheduling/           # 定时任务 (BillJob, SettleJob 等)
 │   │   │   ├── Organization/         # 用户/角色/菜单/公司/认证
 │   │   │   ├── Property/             # 房屋/房型/楼层/定价
-│   │   │   └── SystemConfig/         # 调度/节假日/滞纳金/税率/通知等
+│   │   │   └── SystemConfig/         # 调度/节假日/利息/税率/通知等
 │   │   ├── DTOs/                     # 数据传输对象
 │   │   ├── Common/Interfaces/        # 应用服务接口
 │   │   └── EventHandlers/            # 领域事件处理器
@@ -470,7 +470,7 @@ API 遵循 RESTful 风格，基础路径 `/api`。
 | 财务报表 | `/api/financialstatements` | balanceSheet, incomeStatement |
 | 明细账 | `/api/ledger` | query |
 | 催缴 | `/api/collectionstages`, `/api/collectionrecords` | CRUD, auto |
-| 滞纳金 | `/api/latefeeconfig` | CRUD |
+| 利息 | `/api/interestconfig` | CRUD |
 | 税率 | `/api/taxrateconfigs` | CRUD |
 | 支付通道 | `/api/paymentchannels` | CRUD |
 | 自动续签 | `/api/autorenewconfig` | CRUD |

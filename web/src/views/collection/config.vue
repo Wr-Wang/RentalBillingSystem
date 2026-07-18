@@ -32,21 +32,21 @@
     </el-card>
 
     <el-card>
-      <template #header>滞纳金配置</template>
-      <el-form :model="lateFeeConfig" label-width="140px" style="max-width: 500px;">
+      <template #header>利息配置</template>
+      <el-form :model="interestConfig" label-width="140px" style="max-width: 500px;">
         <el-form-item label="日利率">
-          <el-input-number v-model="lateFeeConfig.dailyRate" :precision="4" :step="0.0001" :min="0" style="width: 180px;" />
+          <el-input-number v-model="interestConfig.dailyRate" :precision="4" :step="0.0001" :min="0" style="width: 180px;" />
           <span style="margin-left: 8px;">%</span>
         </el-form-item>
         <el-form-item label="宽限期（天）">
-          <el-input-number v-model="lateFeeConfig.graceDays" :min="0" style="width: 180px;" />
+          <el-input-number v-model="interestConfig.graceDays" :min="0" style="width: 180px;" />
         </el-form-item>
-        <el-form-item label="滞纳金上限">
-          <el-input-number v-model="lateFeeConfig.maxRate" :precision="2" :min="0" style="width: 180px;" />
+        <el-form-item label="利息上限">
+          <el-input-number v-model="interestConfig.maxRate" :precision="2" :min="0" style="width: 180px;" />
           <span style="margin-left: 8px;">% 本金</span>
         </el-form-item>
-        <el-form-item label="最低滞纳金">
-          <el-input-number v-model="lateFeeConfig.minAmount" :precision="2" :min="0" style="width: 180px;" />
+        <el-form-item label="最低利息">
+          <el-input-number v-model="interestConfig.minAmount" :precision="2" :min="0" style="width: 180px;" />
           <span style="margin-left: 8px;">元</span>
         </el-form-item>
         <el-form-item>
@@ -82,7 +82,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import {
   getCollectionStages, createCollectionStage, updateCollectionStage, deleteCollectionStage,
-  getActiveLateFeeConfig, saveLateFeeConfig
+  getActiveInterestConfig, saveInterestConfig
 } from '@/api'
 
 const userStore = useUserStore()
@@ -92,7 +92,7 @@ const configSaving = ref(false)
 const stageSaving = ref(false)
 const showAddStage = ref(false)
 
-const lateFeeConfig = reactive({
+const interestConfig = reactive({
   dailyRate: 0.05, graceDays: 3, maxRate: 100, minAmount: 1, effectiveDate: ''
 })
 
@@ -111,15 +111,15 @@ async function loadStages() {
   finally { stagesLoading.value = false }
 }
 
-async function loadLateFeeConfig() {
+async function loadInterestConfig() {
   try {
-    const cfg = await getActiveLateFeeConfig()
+    const cfg = await getActiveInterestConfig()
     if (cfg && cfg.id) {
-      lateFeeConfig.dailyRate = (cfg.dailyRate || 0) * 100  // 转为百分比显示
-      lateFeeConfig.graceDays = cfg.graceDays || 0
-      lateFeeConfig.maxRate = cfg.maxRate || 100
-      lateFeeConfig.minAmount = cfg.minAmount || 1
-      lateFeeConfig.effectiveDate = cfg.effectiveDate || ''
+      interestConfig.dailyRate = (cfg.dailyRate || 0) * 100  // 转为百分比显示
+      interestConfig.graceDays = cfg.graceDays || 0
+      interestConfig.maxRate = cfg.maxRate || 100
+      interestConfig.minAmount = cfg.minAmount || 1
+      interestConfig.effectiveDate = cfg.effectiveDate || ''
     }
   } catch { /* 静默 */ }
 }
@@ -171,11 +171,11 @@ async function deleteStage(row) {
 async function saveConfig() {
   configSaving.value = true
   try {
-    await saveLateFeeConfig({
-      dailyRate: lateFeeConfig.dailyRate / 100,  // 转为小数
-      graceDays: lateFeeConfig.graceDays,
-      maxRate: lateFeeConfig.maxRate,
-      minAmount: lateFeeConfig.minAmount,
+    await saveInterestConfig({
+      dailyRate: interestConfig.dailyRate / 100,  // 转为小数
+      graceDays: interestConfig.graceDays,
+      maxRate: interestConfig.maxRate,
+      minAmount: interestConfig.minAmount,
       effectiveDate: new Date().toISOString().slice(0, 10)
     })
     ElMessage.success('保存成功')
@@ -185,6 +185,6 @@ async function saveConfig() {
 
 onMounted(() => {
   loadStages()
-  loadLateFeeConfig()
+  loadInterestConfig()
 })
 </script>
