@@ -744,11 +744,17 @@
     <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND GLPosted = 0]]>
   </update>
   <select id="Billing.Select.Journal.UnbilledByContract">
-    <![CDATA[SELECT Id, Amount, GLPosted, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND DebitNoteId IS NULL]]>
+    <![CDATA[SELECT Id, Amount, GLPosted, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND IsBilled = 0]]>
   </select>
   <update id="Billing.Update.Journal.SetDebitNoteId">
-    <![CDATA[UPDATE Journals SET DebitNoteId = @DNId WHERE Id = @Id AND DebitNoteId IS NULL]]>
+    <![CDATA[UPDATE Journals SET IsBilled = 1, DebitNoteId = @DNId WHERE Id = @Id AND IsBilled = 0]]>
   </update>
+  <select id="Billing.Select.Journal.UnpostedByContract">
+    <![CDATA[SELECT Id, Amount, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND IsBilled = 1 AND GLPosted = 0]]>
+  </select>
+  <select id="Billing.Select.Journal.UnpostedByPeriod">
+    <![CDATA[SELECT Id, Amount, CompanyId, ContractId, Period FROM Journals WHERE GLPosted = 0 AND Period = @Period AND IsBilled = 1]]>
+  </select>
 
 
   <!-- ===== GL（总账）===== -->

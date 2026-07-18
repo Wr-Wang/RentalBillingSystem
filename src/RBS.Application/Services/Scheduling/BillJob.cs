@@ -71,10 +71,12 @@ public class BillJob : ScheduledJobBase
 
                 var step02 = await _stepLogger.StartStepAsync(taskLogId, "BillStep02",
                     $"加载费用-{contract.ContractNo}", null, null, token);
-                var today = ChinaTime.Now;
-                var lastDay = DateTime.DaysInMonth(today.Year, today.Month);
+                var periodParts = targetMonth.Split('-');
+                var pYear = int.Parse(periodParts[0]);
+                var pMonth = int.Parse(periodParts[1]);
+                var lastDay = DateTime.DaysInMonth(pYear, pMonth);
                 var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
-                var dueDate = new DateOnly(today.Year, today.Month, dueDay);
+                var dueDate = new DateOnly(pYear, pMonth, dueDay);
 
                 var feeConfigs = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
                     _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
@@ -244,12 +246,16 @@ public class BillJob : ScheduledJobBase
         using var conn = _db.CreateConnection(); conn.Open();
         var contracts = await _uow.Contracts.GetActiveContractsAsync(companyId, ct);
         var matched = contracts.Where(c => c.ShouldGenerateReceivableFor(targetMonth)).ToList();
+        var periodParts = targetMonth.Split('-');
+        var pYear = int.Parse(periodParts[0]);
+        var pMonth = int.Parse(periodParts[1]);
+        var pLastDay = DateTime.DaysInMonth(pYear, pMonth);
         int totalFees = 0;
         var warnings = new List<string>();
         foreach (var c in matched)
         {
             var fees = (await conn.QueryAsync(_sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
-                new { ContractId = c.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{DateTime.DaysInMonth(ChinaTime.Now.Year, ChinaTime.Now.Month)}" })).ToList();
+                new { ContractId = c.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{pLastDay}" })).ToList();
             totalFees += fees.Count;
             if (fees.Count == 0) warnings.Add($"合同 {c.ContractNo} 无生效费用配置");
         }

@@ -10,7 +10,8 @@ using RBS.Core.Entities.Base;
 /// 不记录已收金额、不记录余额、没有状态流转。
 ///
 /// 设计要点：
-/// - GLPosted 标记是否已写入总账，正常创建时在同事务中置 true
+/// - IsBilled 标记是否已写入 DebitNote（入账单）
+/// - GLPosted 标记是否已写入总账
 /// - Amount 允许负数，用于红字冲销错误记录
 /// - ParentJournalId 指向被冲销/被调整的源日记账
 /// - 无 RowVersion（从不 UPDATE）
@@ -53,6 +54,9 @@ public class Journal : AuditableEntity, IHasCompany
 
     /// <summary>总账写入时间</summary>
     public DateTime? PostedAt { get; private set; }
+
+    /// <summary>是否已写入 DebitNote（0=未入账单，1=已入账）</summary>
+    public bool IsBilled { get; private set; }
 
     /// <summary>出账时间</summary>
     public DateTime BilledAt { get; private set; }
@@ -111,5 +115,14 @@ public class Journal : AuditableEntity, IHasCompany
     {
         GLPosted = true;
         PostedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// 标记为已入账单
+    /// </summary>
+    public void MarkAsBilled(Guid debitNoteId)
+    {
+        IsBilled = true;
+        DebitNoteId = debitNoteId;
     }
 }
