@@ -325,26 +325,10 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 {
                     using var jeConn = _db.CreateConnection();
                     jeConn.Open();
-                    await jeConn.ExecuteAsync(
-                        _sql.Get("Billing.Insert.Journal.Unposted"),
-                        new
-                        {
-                            Id = Guid.NewGuid(),
-                            CoId = companyId,
-                            CId = item.ContractId,
-                            FId = item.FeeCodeId,
-                            FConfigId = (Guid?)null,
-                            SubjId = Guid.Empty,
-                            Period = effMonth,
-                            Amt = proratedDiff,
-                            Due = DateOnly.FromDateTime(ChinaTime.Now),
-                            EntryType = "Supplementary",
-                            BilledAt = ChinaTime.Now,
-                            DNId = (Guid?)null,
-                            ParentId = (Guid?)null,
-                            Summary = $"调价补差 {item.FeeName} {effMonth}",
-                            CBy = Guid.Empty
-                        });
+                    await InsertJournalAsync(jeConn, null,
+                        companyId, item.ContractId, item.FeeCodeId, null,
+                        effMonth, proratedDiff, DateOnly.FromDateTime(ChinaTime.Now),
+                        "Supplementary", $"调价补差 {item.FeeName} {effMonth}");
                 }
                 catch { /* 补差 JE 失败不影响 FeeConfig 变更，可手动重试 */ }
             }
@@ -420,27 +404,13 @@ if (chargeType == "OneTime")
 
                     // 插入 ReceivablePlan（一次性费用应收计划，关联到 FeeConfig 实例以支持同费用多次添加）
                     // 使用 Unposted SQL，GLPosted=0，待收款确认后再过账
+                    var feeContract = await conn.QuerySingleOrDefaultAsync("SELECT StartDate FROM Contracts WHERE Id = @Id", new { Id = item.ContractId }, tx);
+                    var contractStart = feeContract != null ? (DateOnly)feeContract.StartDate : DateOnly.FromDateTime(ChinaTime.Now);
                     var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
-                    await conn.ExecuteAsync(
-                        _sql.Get("Billing.Insert.Journal.Unposted"),
-                        new
-                        {
-                            Id = Guid.NewGuid(),
-                            CoId = companyId,
-                            CId = item.ContractId,
-                            FId = item.FeeCodeId,
-                            FConfigId = oneTimeConfigId,
-                            SubjId = Guid.Empty,
-                            Period = period,
-                            Amt = item.NewAmount,
-                            Due = DateOnly.FromDateTime(ChinaTime.Now),
-                            EntryType = "Normal",
-                            BilledAt = ChinaTime.Now,
-                            DNId = (Guid?)null,
-                            ParentId = (Guid?)null,
-                            Summary = $"一次性 {item.FeeName}",
-                            CBy = Guid.Empty
-                        }, tx);
+                    await InsertJournalAsync(conn, tx,
+                        companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, oneTimeConfigId,
+                        period, item.NewAmount, contractStart.AddDays(30),
+                        "Normal", $"一次性 {item.FeeName}");
                 }
 
                 // 写入变更历史（审计追踪）
@@ -694,19 +664,12 @@ if (chargeType == "OneTime")
 	                    new { C = request.ContractId, F = (Guid)item.FeeCodeId, P = (string)item.Period }, tx);
 	                if (exists > 0) continue;
 
-	                var jId = Guid.NewGuid();
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Billing.Insert.Journal.Default"),
-	                    new
-		                        {
-		                            Id = jId, CoId = request.CompanyId, CId = request.ContractId,
-		                            FId = (Guid)item.FeeCodeId, FConfigId = (Guid?)null,
-		                            SubjId = Guid.Empty, Period = (string)item.Period,
-		                            Amt = (decimal)item.Amount, Due = DateOnly.FromDateTime((DateTime)item.DueDate),
-		                            EntryType = "Normal", BilledAt = ChinaTime.Now,
-		                            DNId = (Guid?)null, ParentId = (Guid?)null,
-		                            Summary = $"生成应收 {item.Period}", CBy = Guid.Empty
-		                        }, tx);
+		                var jId = Guid.NewGuid();
+		                await InsertJournalAsync(conn, tx,
+		                    request.CompanyId, request.ContractId, (Guid)item.FeeCodeId, null,
+		                    (string)item.Period, (decimal)item.Amount,
+		                    DateOnly.FromDateTime((DateTime)item.DueDate),
+		                    "Normal", $"生成应收 {item.Period}");
 
 	               
 	                await conn.ExecuteAsync(
@@ -859,19 +822,12 @@ if (chargeType == "OneTime")
 	                    new { C = request.ContractId, F = request.FeeCodeId, P = (string)item.Period }, tx);
 	                if (exists > 0) continue;
 
-	                var jId = Guid.NewGuid();
-	                await conn.ExecuteAsync(
-	                    _sql.Get("Billing.Insert.Journal.Default"),
-	                    new
-		                        {
-		                            Id = jId, CoId = request.CompanyId, CId = request.ContractId,
-		                            FId = request.FeeCodeId, FConfigId = configId,
-		                            SubjId = Guid.Empty, Period = (string)item.Period,
-		                            Amt = (decimal)item.ProratedAmount, Due = DateOnly.FromDateTime(ChinaTime.Now),
-		                            EntryType = "Normal", BilledAt = ChinaTime.Now,
-		                            DNId = (Guid?)null, ParentId = (Guid?)null,
-		                            Summary = $"补充收费 {item.Period}", CBy = Guid.Empty
-		                        }, tx);
+		                var jId = Guid.NewGuid();
+		                await InsertJournalAsync(conn, tx,
+		                    request.CompanyId, request.ContractId, request.FeeCodeId, configId,
+		                    (string)item.Period, (decimal)item.ProratedAmount,
+		                    DateOnly.FromDateTime(ChinaTime.Now),
+		                    "Normal", $"补充收费 {item.Period}");
 
 	               
 	                await conn.ExecuteAsync(
@@ -937,6 +893,34 @@ if (chargeType == "OneTime")
             new { Id = Guid.NewGuid(), ContractId = contractId, ChangeType = changeType,
                 Title = title, Detail = detail, OldValue = oldValue, NewValue = newValue,
                 EffectiveDate = effectiveDate, OperatorId = operatorId, OperatorName = operatorName ?? "" }, tx);
+    }
+
+    /// <summary>
+    /// 插入未过账 Journal（GLPosted=0），统一入口，消除重复
+    /// </summary>
+    private async Task InsertJournalAsync(IDbConnection conn, IDbTransaction? tx,
+        Guid companyId, Guid contractId, Guid feeCodeId, Guid? feeConfigId,
+        string period, decimal amount, DateOnly dueDate, string entryType, string summary)
+    {
+        await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Unposted"),
+            new
+            {
+                Id = Guid.NewGuid(),
+                CoId = companyId,
+                CId = contractId,
+                FId = feeCodeId,
+                FConfigId = feeConfigId,
+                SubjId = Guid.Empty,
+                Period = period,
+                Amt = amount,
+                Due = dueDate,
+                EntryType = entryType,
+                BilledAt = ChinaTime.Now,
+                DNId = (Guid?)null,
+                ParentId = (Guid?)null,
+                Summary = summary,
+                CBy = Guid.Empty
+            }, tx);
     }
 
 }

@@ -167,7 +167,7 @@ public class ReceivableGenerationService : IReceivableGenerationService
             {
                 // 一次性费用：INSERT Journal(EntryType='Deposit') + Update GL
                 var jId = Guid.NewGuid();
-                var dueDate = DateOnly.FromDateTime(today.AddDays(30));
+                var dueDate = contract.StartDate.AddDays(30);
                 var depositSubjectId = subjects.GetValueOrDefault("1122", receivableId);
                 await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
                     new { Id = jId, CoId = contract.CompanyId, CId = contractId, FId = (Guid)fc.FeeCodeId,
