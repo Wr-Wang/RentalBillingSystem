@@ -734,27 +734,65 @@ if (chargeType == "OneTime")
 
 	    // ===== 修改信息审批通过 =====
 	    private async Task HandleContractModifyAsync(ApprovalCompletedEvent @event, CancellationToken ct)
-	    {
-	        if (@event.Action != "Approved") return;
+    {
+        if (@event.Action != "Approved") return;
 
-	        var request = await _uow.ContractModifyRequests.GetByIdAsync(@event.TargetEntityId, ct);
-	        if (request == null || request.Status != "PendingApproval") return;
+        var request = await _uow.ContractModifyRequests.GetByIdAsync(@event.TargetEntityId, ct);
+        if (request == null || request.Status != "PendingApproval") return;
 
-	        var locked = await _uow.ExecuteSqlRawAsync(
-	            _sql.Get("ContractModify.Update.Request.LockExecuting"),
-	            new { Id = request.Id, Now = ChinaTime.Now }, ct);
-	        if (locked == 0) return;
+        var locked = await _uow.ExecuteSqlRawAsync(
+            _sql.Get("ContractModify.Update.Request.LockExecuting"),
+            new { Id = request.Id, Now = ChinaTime.Now }, ct);
+        if (locked == 0) return;
 
-	        await _uow.ExecuteSqlRawAsync(
-	            _sql.Get("ContractModify.Update.Contract.ApplyChanges"), request, ct);
-	        await _uow.ExecuteSqlRawAsync(
-	            _sql.Get("ContractModify.Update.Request.Complete"),
-	            new { Id = request.Id }, ct);
-	        await _uow.CommitAsync(ct);
-	    }
+        await _uow.ExecuteSqlRawAsync(
+            _sql.Get("ContractModify.Update.Contract.ApplyChanges"), request, ct);
+        await _uow.ExecuteSqlRawAsync(
+            _sql.Get("ContractModify.Update.Request.Complete"),
+            new { Id = request.Id }, ct);
 
-	    // ===== 补充收费审批通过 =====
-	    private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
+        // 写入变更历史（独立连接，失败不阻断主流程）
+        try
+        {
+            using var histConn = _db.CreateConnection();
+            histConn.Open();
+            var detail = BuildModifyChangeDetail(request);
+            await histConn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    ContractId = request.ContractId,
+                    ChangeType = "CONTRACT_MODIFY",
+                    Title = "修改合同信息",
+                    Detail = detail,
+                    OldValue = (decimal?)null,
+                    NewValue = (decimal?)null,
+                    EffectiveDate = (string?)null,
+                    OperatorId = Guid.Empty,
+                    OperatorName = ""
+                });
+        }
+        catch { /* 变更历史写入失败不影响主流程 */ }
+
+        await _uow.CommitAsync(ct);
+    }
+
+    /// <summary>构建合同修改变更详情文本</summary>
+    private static string BuildModifyChangeDetail(ContractModifyRequest req)
+    {
+        var parts = new List<string>();
+        if (req.StartDate.HasValue) parts.Add($"起租日: {req.StartDate:yyyy-MM-dd}");
+        if (req.EndDate.HasValue) parts.Add($"到期日: {req.EndDate:yyyy-MM-dd}");
+        if (!string.IsNullOrEmpty(req.PaymentCycle)) parts.Add($"付款周期: {req.PaymentCycle}");
+        if (req.PaymentDueDay.HasValue) parts.Add($"付款到期日: {req.PaymentDueDay}日");
+        if (req.AllowDepositAsLastRent.HasValue) parts.Add($"押金抵租金: {(req.AllowDepositAsLastRent.Value ? "是" : "否")}");
+        if (!string.IsNullOrEmpty(req.TenantPhone)) parts.Add($"电话: {req.TenantPhone}");
+        if (!string.IsNullOrEmpty(req.Remark)) parts.Add($"备注: {req.Remark}");
+        return string.Join("; ", parts);
+    }
+
+    
+private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
 	    {
 	        if (@event.Action != "Approved" || bizData == null) return;
 	        if (bizData.IsProcessed) return;

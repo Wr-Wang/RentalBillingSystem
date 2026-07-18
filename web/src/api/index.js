@@ -189,6 +189,7 @@ export function suspendContract(id, data) { return request({ url: `/contracts/${
 export function resumeContract(id) { return request({ url: `/contracts/${id}/resume`, method: 'post' }) }
 export function getContractTimeline(id) { return request({ url: `/contracts/${id}/timeline`, method: 'get' }) }
 export function getContractChanges(id) { return request({ url: `/contracts/${id}/changes`, method: 'get' }) }
+export function submitContractModify(id, data) { return request({ url: `/contracts/${id}/modifysubmit`, method: 'post', data }) }
 export function addSupplementaryFee(id, data) { return request({ url: `/contracts/${id}/supplementaryfee`, method: 'post', data }) }
 
 // Fee Codes

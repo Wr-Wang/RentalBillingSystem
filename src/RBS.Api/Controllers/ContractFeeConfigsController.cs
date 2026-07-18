@@ -50,6 +50,8 @@ public class ContractFeeConfigsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateFeeConfigRequest request, CancellationToken ct)
     {
+        try
+        {
         // 校验合同状态：Active 合同必须走审批
         var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
         if (contract == null) return NotFound(new { message = "合同不存在" });
@@ -176,6 +178,14 @@ public class ContractFeeConfigsController : ControllerBase
         }
 
         return Ok(new { id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            var code = ex.Message.Contains("不能早于") ? "EFFECTIVE_DATE_BEFORE_START"
+                    : ex.Message.Contains("不能晚于") ? "EFFECTIVE_DATE_AFTER_END"
+                    : "VALIDATION_ERROR";
+            return BadRequest(new { code, message = ex.Message });
+        }
     }
 
     [HttpPut("{id}")]

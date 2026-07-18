@@ -1,5 +1,6 @@
 using Dapper;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Approval;
 using RBS.Application.DTOs.Contract;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
@@ -25,16 +26,18 @@ public class ContractAppService : IContractService
     private readonly IUnitOfWork _uow;
     private readonly IContractDomainService _contractDomain;
     private readonly IReceivableGenerationService _receivableGen;
+    private readonly IApprovalService _approvalService;
 
     /// <summary>
     /// 构造函数
     /// </summary>
     public ContractAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql,
         IContractDomainService contractDomain,
-        IReceivableGenerationService receivableGen)
+        IReceivableGenerationService receivableGen,
+        IApprovalService approvalService)
     {
         _uow = uow; _db = db; _sql = sql; _contractDomain = contractDomain;
-        _receivableGen = receivableGen;
+        _receivableGen = receivableGen; _approvalService = approvalService;
     }
 
     /// <summary>
@@ -465,5 +468,104 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         }
 
         return new { contractId };
+    }
+
+    /// <summary>
+    /// 提交合同修改 — 创建暂存请求，判断是否需要审批
+    /// 无审批配置时直接执行变更 + 写入变更历史
+    /// 有审批配置时提交审批 + 关联 ApprovalRequestId
+    /// </summary>
+    public async Task<object> ModifySubmitAsync(Guid contractId, ContractModifySubmitRequest request, Guid userId, CancellationToken ct = default)
+    {
+        var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
+        if (contract == null) throw new KeyNotFoundException("合同不存在");
+        if (contract.Status != "Active" && contract.Status != "Suspended")
+            throw new InvalidOperationException("当前合同状态不允许修改信息");
+
+        var now = ChinaTime.Now;
+
+        // 1. 创建修改请求暂存
+        var modifyReq = new ContractModifyRequest(contractId);
+        modifyReq.SetField(
+            request.StartDate, request.EndDate, request.PaymentCycle,
+            request.AutoRenew, request.AllowDepositAsLastRent,
+            request.PaymentDueDay, request.TenantPhone, request.Remark);
+        modifyReq.SetCreated(userId, now, null, null);
+        await _uow.ContractModifyRequests.AddAsync(modifyReq, ct);
+        await _uow.CommitAsync(ct);
+
+        // 2. 判断是否需要审批
+        var approvalType = await _uow.FindApprovalTypeByCodeAsync("CONTRACT_MODIFY_OTHER", ct);
+        if (approvalType == null)
+        {
+            // 无审批 → 直接执行
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("ContractModify.Update.Contract.ApplyChanges"), modifyReq, ct);
+
+            modifyReq.Complete();
+            await _uow.ContractModifyRequests.UpdateAsync(modifyReq, ct);
+
+            // 写入变更历史（独立连接，失败不影响主流程）
+            try
+            {
+                using var conn = _db.CreateConnection();
+                conn.Open();
+                var detail = BuildModifyDetail(request);
+                var operatorName = await conn.QuerySingleOrDefaultAsync<string>(
+                    _sql.Get("Contract.Select.User.DisplayNameById"), new { Id = userId });
+                await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
+                    new
+                    {
+                        Id = Guid.NewGuid(), ContractId = contractId,
+                        ChangeType = "CONTRACT_MODIFY", Title = "修改合同信息",
+                        Detail = detail,
+                        OldValue = (decimal?)null, NewValue = (decimal?)null,
+                        EffectiveDate = (string?)null, OperatorId = userId,
+                        OperatorName = operatorName ?? ""
+                    });
+            }
+            catch { }
+
+            await _uow.CommitAsync(ct);
+            return new { status = "Completed", message = "合同信息已更新" };
+        }
+
+        // 3. 有审批 → 提审批
+        modifyReq.Submit();
+        await _uow.ContractModifyRequests.UpdateAsync(modifyReq, ct);
+
+        var approvalResult = await _approvalService.SubmitAsync(new SubmitApprovalRequest
+        {
+            ApprovalTypeId = approvalType.Id,
+            Title = $"[合同修改] {contract.ContractNo}",
+            Description = BuildModifyDetail(request),
+            TargetEntityId = modifyReq.Id,
+            TargetEntityType = "ContractModify"
+        }, ct);
+
+        modifyReq.SetApprovalRequestId(approvalResult.Id);
+        await _uow.ContractModifyRequests.UpdateAsync(modifyReq, ct);
+        await _uow.CommitAsync(ct);
+
+        return new
+        {
+            status = "PendingApproval",
+            requestId = modifyReq.Id,
+            approvalRequestId = approvalResult.Id
+        };
+    }
+
+    /// <summary>构建合同修改变更详情文本</summary>
+    private static string BuildModifyDetail(ContractModifySubmitRequest req)
+    {
+        var parts = new List<string>();
+        if (req.StartDate.HasValue) parts.Add($"起租日: {req.StartDate:yyyy-MM-dd}");
+        if (req.EndDate.HasValue) parts.Add($"到期日: {req.EndDate:yyyy-MM-dd}");
+        if (!string.IsNullOrEmpty(req.PaymentCycle)) parts.Add($"付款周期: {req.PaymentCycle}");
+        if (req.PaymentDueDay.HasValue) parts.Add($"付款到期日: {req.PaymentDueDay}日");
+        if (req.AllowDepositAsLastRent.HasValue) parts.Add($"押金抵租金: {(req.AllowDepositAsLastRent.Value ? "是" : "否")}");
+        if (!string.IsNullOrEmpty(req.TenantPhone)) parts.Add($"电话: {req.TenantPhone}");
+        if (!string.IsNullOrEmpty(req.Remark)) parts.Add($"备注: {req.Remark}");
+        return string.Join("; ", parts);
     }
 }

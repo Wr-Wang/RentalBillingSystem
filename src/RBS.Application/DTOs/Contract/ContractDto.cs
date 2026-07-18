@@ -164,3 +164,27 @@ public class FeeAdjustItem
     /// <summary>计费方式：FixedAmount / MeterBased</summary>
     public string? BillingMode { get; set; }
 }
+
+/// <summary>
+/// 合同修改信息请求体 — 修改合同信息时提交的字段
+/// 可空字段表示该属性不变更，仅非空字段参与更新
+/// </summary>
+public class ContractModifySubmitRequest
+{
+    /// <summary>新的起租日期，null 表示不变更</summary>
+    public DateOnly? StartDate { get; set; }
+    /// <summary>新的到期日期，null 表示不变更</summary>
+    public DateOnly? EndDate { get; set; }
+    /// <summary>新的付款周期，null 表示不变更</summary>
+    public string? PaymentCycle { get; set; }
+    /// <summary>新的自动续签标志，null 表示不变更</summary>
+    public bool? AutoRenew { get; set; }
+    /// <summary>新的押金抵最后租金标志，null 表示不变更</summary>
+    public bool? AllowDepositAsLastRent { get; set; }
+    /// <summary>新的付款到期日，null 表示不变更</summary>
+    public int? PaymentDueDay { get; set; }
+    /// <summary>新的租客联系电话，null 表示不变更</summary>
+    public string? TenantPhone { get; set; }
+    /// <summary>备注</summary>
+    public string? Remark { get; set; }
+}

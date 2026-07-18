@@ -5,6 +5,7 @@ using RBS.Application.DTOs.Approval;
 using RBS.Core.Common;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.Base;
+using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
@@ -631,6 +632,41 @@ public class ApprovalService : IApprovalService
             }
             return dto.Fields.Count > 0 ? dto : null;
         }
+
+		// ContractModify 类型：加载合同修改请求，展示新旧字段对比
+		if (approval.TargetEntityType == "ContractModify" && approval.TargetEntityId != Guid.Empty)
+		{
+			var req = _uow.ContractModifyRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
+			if (req != null)
+			{
+				using var conn = _connectionFactory.CreateConnection(); conn.Open();
+				var contract = conn.QuerySingleOrDefault<dynamic>(
+					_sql.Get("Lease.Select.Contract.Default"), new { Id = req.ContractId });
+				var tenant = conn.QuerySingleOrDefault<dynamic>(
+					_sql.Get("Lease.Select.ContractTenant.PrimaryByContract"), new { Id = req.ContractId });
+				var oldPhone = tenant?.TenantPhone as string ?? "";
+
+				dto.BizType = "ContractModify";
+				if (req.StartDate.HasValue)
+					dto.Fields.Add(new BizFieldDto { Label = "起租日期", OldValue = contract?.StartDate is DateTime sd ? sd.ToString("yyyy-MM-dd") : "", NewValue = req.StartDate.Value.ToString("yyyy-MM-dd"), IsChanged = true });
+				if (req.EndDate.HasValue)
+					dto.Fields.Add(new BizFieldDto { Label = "到期日期", OldValue = contract?.EndDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : "不限", NewValue = req.EndDate.Value.ToString("yyyy-MM-dd"), IsChanged = true });
+				if (!string.IsNullOrEmpty(req.PaymentCycle))
+					dto.Fields.Add(new BizFieldDto { Label = "付款周期", OldValue = contract?.PaymentCycle, NewValue = req.PaymentCycle, IsChanged = true });
+				if (req.PaymentDueDay.HasValue)
+					dto.Fields.Add(new BizFieldDto { Label = "付款到期日", OldValue = (contract?.PaymentDueDay?.ToString() ?? "5") + "日", NewValue = req.PaymentDueDay + "日", IsChanged = true });
+				if (req.AllowDepositAsLastRent.HasValue)
+				{
+					var oldVal = contract?.AllowDepositAsLastRent is bool b ? (b ? "是" : "否") : "否";
+					dto.Fields.Add(new BizFieldDto { Label = "押金抵最后月租", OldValue = oldVal, NewValue = req.AllowDepositAsLastRent.Value ? "是" : "否", IsChanged = true });
+				}
+				if (!string.IsNullOrEmpty(req.TenantPhone))
+					dto.Fields.Add(new BizFieldDto { Label = "租客电话", OldValue = oldPhone, NewValue = req.TenantPhone, IsChanged = true });
+				if (!string.IsNullOrEmpty(req.Remark))
+					dto.Fields.Add(new BizFieldDto { Label = "备注", OldValue = null, NewValue = req.Remark, IsChanged = true });
+			}
+			return dto.Fields.Count > 0 ? dto : null;
+		}
 
         // Contract 类型：正则解析（需要 Description）
         if (!string.IsNullOrEmpty(desc) && approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == false)

@@ -439,7 +439,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showOtherModify = false">取消</el-button>
-        <el-button type="primary" @click="submitOtherModify">保存修改</el-button>
+        <el-button type="primary" @click="submitOtherModify">提交审批</el-button>
       </template>
     </el-dialog>
 
@@ -772,7 +772,8 @@ import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createA
   getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig,
   getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal,
   getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges,
-  handleApiError, previewJournals, generateJournalRequest } from '@/api/index.js'
+  handleApiError, previewJournals, generateJournalRequest,
+  submitContractModify } from '@/api/index.js'
 
 // ---------------------------------------------------------------------------
 // 路由 & 路由
@@ -1431,25 +1432,36 @@ const otherForm = reactive({
   startDate: '',
   endDate: '',
   paymentCycle: 'Monthly',
-  tenantPhone: '13800138001',
+  tenantPhone: '',
   paymentDueDay: 5,
   allowDepositAsLastRent: false,
   remark: ''
 })
 
+/** 打开修改信息弹窗时，用当前合同数据初始化表单 */
+watch(showOtherModify, (val) => {
+  if (val && contract.value?.id) {
+    otherForm.startDate = contract.value.startDate || ''
+    otherForm.endDate = contract.value.endDate || ''
+    otherForm.paymentCycle = contract.value.paymentCycle || 'Monthly'
+    otherForm.tenantPhone = contract.value.tenantPhone || ''
+    otherForm.paymentDueDay = contract.value.paymentDueDay || 5
+    otherForm.allowDepositAsLastRent = contract.value.allowDepositAsLastRent || false
+    otherForm.remark = contract.value.remark || ''
+  }
+})
+
 async function submitOtherModify() {
   try {
-    const res = await fetch('/api/contracts/' + route.params.id + '/modifysubmit', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        startDate: otherForm.startDate || null,
-        endDate: otherForm.endDate || null,
-        paymentCycle: otherForm.paymentCycle,
-        tenantPhone: otherForm.tenantPhone,
-        paymentDueDay: otherForm.paymentDueDay,
-        allowDepositAsLastRent: otherForm.allowDepositAsLastRent
-      })
-    }).then(r => r.json())
+    const res = await submitContractModify(route.params.id, {
+      startDate: otherForm.startDate || null,
+      endDate: otherForm.endDate || null,
+      paymentCycle: otherForm.paymentCycle,
+      tenantPhone: otherForm.tenantPhone,
+      paymentDueDay: otherForm.paymentDueDay,
+      allowDepositAsLastRent: otherForm.allowDepositAsLastRent,
+      remark: otherForm.remark
+    })
     if (res.status === 'PendingApproval') {
       ElMessage.success('修改申请已提交审批')
     } else {
@@ -1458,7 +1470,7 @@ async function submitOtherModify() {
     showOtherModify.value = false
     await fetchContract()
   } catch (e) {
-    ElMessage.error('提交失败')
+    handleApiError(e, '提交失败')
   }
 }
 

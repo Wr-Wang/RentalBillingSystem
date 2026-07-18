@@ -112,4 +112,15 @@ public interface IContractService
     /// 执行费用调价
     /// </summary>
     Task<object> FeeAdjustAsync(Guid contractId, FeeAdjustRequest request, Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 提交合同修改 — 创建暂存请求，判断是否需要审批
+    /// 无审批配置时直接执行变更，有审批配置时提交审批
+    /// </summary>
+    /// <param name="contractId">合同 ID</param>
+    /// <param name="request">修改请求体</param>
+    /// <param name="userId">操作人</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>{ status, requestId?, approvalRequestId?, message }</returns>
+    Task<object> ModifySubmitAsync(Guid contractId, ContractModifySubmitRequest request, Guid userId, CancellationToken ct = default);
 }

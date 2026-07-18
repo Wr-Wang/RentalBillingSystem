@@ -555,6 +555,11 @@ IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_MODIFY')
     VALUES (NEWID(),N'修改合同租金','CONTRACT_MODIFY',N'修改合同租金需要审批，金额越大审批级别越高。',1,@Cid,@SysUserId,@Now);
 SELECT @AT_ContractModify = [Id] FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_MODIFY';
 
+IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_MODIFY_OTHER')
+    INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),N'修改合同信息','CONTRACT_MODIFY_OTHER',N'修改合同起止日期、付款周期等信息需要审批',1,@Cid,@SysUserId,@Now);
+SELECT @AT_ContractModifyOther = [Id] FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_MODIFY_OTHER';
+
 IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'CONTRACT_RENEW')
     INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),N'合同续签','CONTRACT_RENEW',N'合同续签需要审批，根据月租金额自动路由审批级别',1,@Cid,@SysUserId,@Now);
@@ -659,6 +664,10 @@ IF @AT_ContractModify IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELE
 IF @AT_ContractModify IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModify AND [LevelNo] = 2)
     INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
     VALUES (NEWID(),@AT_ContractModify,2,@R_DeptMgr,5000,99999999,@Cid,@SysUserId,@Now);
+
+IF @AT_ContractModifyOther IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModifyOther AND [LevelNo] = 1)
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractModifyOther,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ChangeRequest IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ChangeRequest AND [LevelNo] = 1)
     INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])

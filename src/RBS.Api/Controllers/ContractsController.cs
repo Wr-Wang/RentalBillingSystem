@@ -260,6 +260,23 @@ public class ContractsController : ControllerBase
         }
     }
 
+    // =====================================================================
+    // POST /api/contracts/{id}/modifysubmit — 修改合同信息
+    // 由 Application Service 统一编排（审批驱动/直接执行）
+    // =====================================================================
+    [HttpPost("{id}/modifysubmit")]
+    public async Task<IActionResult> ModifySubmit(Guid id, [FromBody] ContractModifySubmitRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var result = await _contractService.ModifySubmitAsync(id, request, userId, ct);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException) { return NotFound(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     /// <summary>从 JWT Claims 获取当前用户 ID</summary>
     private Guid GetCurrentUserId()
     {

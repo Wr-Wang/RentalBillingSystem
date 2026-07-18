@@ -42,6 +42,18 @@ public class Contract : AggregateRoot, IHasCompany
     /// <summary>是否启用自动续签，默认启用；到期前系统根据此标志判断是否需要触发续签流程</summary>
     public bool AutoRenew { get; private set; } = true;
 
+    // ===== 付款信息 =====
+    /// <summary>付款到期日，默认每月5日</summary>
+    public int PaymentDueDay { get; private set; } = 5;
+    /// <summary>是否允许押金抵最后月租，默认不允许</summary>
+    public bool AllowDepositAsLastRent { get; private set; }
+
+    // ===== 联系方式与备注 =====
+    /// <summary>租客电话（合同级联系方式，区别于租客个人电话）</summary>
+    public string? TenantPhone { get; private set; }
+    /// <summary>合同备注</summary>
+    public string? Remark { get; private set; }
+
     // ===== 终止信息 =====
     /// <summary>合同终止时间，仅当 Status 为 Terminated 时有值</summary>
     public DateTime? TerminatedAt { get; private set; }

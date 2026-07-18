@@ -69,4 +69,6 @@ public class ContractModifyRequest : AuditableEntity
     public void Complete() => Status = "Completed";
     /// <summary>驳回请求，状态变更为 Rejected</summary>
     public void Reject() => Status = "Rejected";
+    /// <summary>关联审批请求</summary>
+    public void SetApprovalRequestId(Guid approvalRequestId) => ApprovalRequestId = approvalRequestId;
 }

@@ -1045,6 +1045,9 @@
       FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
       WHERE cf.ContractId = @Id AND cf.IsActive = 1]]>
   </select>
+  <select id="Lease.Select.Contract.Default">
+    <![CDATA[SELECT * FROM Contracts WHERE Id = @Id]]>
+  </select>
   <select id="Lease.Select.Contract.DetailMulti">
     <![CDATA[SELECT c.*, r.FullCode AS RoomFullCode FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
 SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id;
@@ -1136,7 +1139,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId IN @Ids AND ct.IsPrimary = 1]]>
   </select>
   <select id="Lease.Select.ContractTenant.PrimaryByContract">
-    <![CDATA[SELECT TenantId, IsPrimary FROM ContractTenants WHERE ContractId = @Id]]>
+    <![CDATA[SELECT ct.TenantId, ct.IsPrimary, t.Name AS TenantName, t.Phone AS TenantPhone FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id AND ct.IsPrimary = 1]]>
   </select>
   <insert id="Lease.Insert.ContractTenant.Default">
     <![CDATA[INSERT INTO ContractTenants (ContractId, TenantId, IsPrimary, CreatedBy, CreatedAt)
@@ -1703,6 +1706,9 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <update id="ContractModify.Update.Request.Reject">
     <![CDATA[UPDATE ContractModifyRequests SET Status='Rejected', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
+  <update id="ContractModify.Update.Request.Submit">
+    <![CDATA[UPDATE ContractModifyRequests SET Status='PendingApproval', ApprovalRequestId=@ApprovalRequestId, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Draft']]>
+  </update>
   <update id="ContractModify.Update.Request.LockExecuting">
     <![CDATA[UPDATE ContractModifyRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
@@ -1714,6 +1720,8 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
         AutoRenew = ISNULL(@AutoRenew, AutoRenew),
         AllowDepositAsLastRent = ISNULL(@AllowDepositAsLastRent, AllowDepositAsLastRent),
         PaymentDueDay = ISNULL(@PaymentDueDay, PaymentDueDay),
+        TenantPhone = ISNULL(@TenantPhone, TenantPhone),
+        Remark = ISNULL(@Remark, Remark),
         UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE())
       WHERE Id = @ContractId]]>
   </update>

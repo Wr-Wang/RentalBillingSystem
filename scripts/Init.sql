@@ -1825,6 +1825,8 @@ CREATE TABLE [Contracts] (
     [PaymentDueDay] INT NOT NULL DEFAULT (5) , -- 每月到期日,
     [AllowDepositAsLastRent] BIT NOT NULL DEFAULT (0) , -- 押金抵扣最后租金,
     [AutoRenew] BIT NOT NULL DEFAULT (1) , -- 是否自动续签,
+    [TenantPhone] NVARCHAR(32) NULL , -- 租客电话,
+    [Remark] NVARCHAR(MAX) NULL , -- 备注,
     [ActualEndDate] DATE , -- 实际搬离日,
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Draft') , -- 合同状态,
     [PreviousContractId] UNIQUEIDENTIFIER , -- 上一份合同ID,
@@ -1864,6 +1866,8 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付周�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'每月到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'PaymentDueDay'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'押金抵扣最后租金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'AllowDepositAsLastRent'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否自动续签', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'AutoRenew'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'租客电话', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'TenantPhone'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'备注', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'Remark'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'实际搬离日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'ActualEndDate'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'Status'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上一份合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'PreviousContractId'
@@ -1916,6 +1920,8 @@ CREATE TABLE [Contracts_Audit] (
     [PaymentDueDay] INT , -- 每月到期日,
     [AllowDepositAsLastRent] BIT , -- 押金抵扣最后租金,
     [AutoRenew] BIT , -- 是否自动续签,
+    [TenantPhone] NVARCHAR(32) , -- 租客电话,
+    [Remark] NVARCHAR(MAX) , -- 备注,
     [ActualEndDate] DATE , -- 实际搬离日,
     [Status] VARCHAR(20) , -- 合同状态,
     [PreviousContractId] UNIQUEIDENTIFIER , -- 上一份合同ID,
@@ -1958,6 +1964,8 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付周�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'每月到期日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'PaymentDueDay'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'押金抵扣最后租金', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'AllowDepositAsLastRent'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否自动续签', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'AutoRenew'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'租客电话', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'TenantPhone'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'备注', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'Remark'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'实际搬离日', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'ActualEndDate'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'Status'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上一份合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts_Audit', @level2type = N'COLUMN', @level2name = N'PreviousContractId'
