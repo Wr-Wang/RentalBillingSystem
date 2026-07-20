@@ -110,7 +110,8 @@ import { Bell, Check, Loading } from '@element-plus/icons-vue'
 import { useNotificationStore } from '../../store/notification'
 
 
-import { formatTime } from '@/utils/chinaTime'const router = useRouter()
+import { formatTime } from '@/utils/chinaTime'
+const router = useRouter()
 const store = useNotificationStore()
 const activeTab = ref('all')
 
