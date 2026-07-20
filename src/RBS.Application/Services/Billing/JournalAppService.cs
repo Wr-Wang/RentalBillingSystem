@@ -126,6 +126,11 @@ public class JournalAppService : IJournalAppService
 
         var activeFees = allFees.Where(f => f.IsActive || (!f.IsActive && f.ExpiryDate != null)).ToList();
 
+        // 获取 BillJob 已执行到的最后月份（周期收费只生成到该月为止）
+        var maxBilledMonth = await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Scheduling.Select.Execution.MaxBilledMonthByCompany"),
+            new { CompanyId = contract.CompanyId, CurrentMonth = ChinaTime.Now.ToString("yyyy-MM") });
+
         var items = new List<PreviewItem>();
         var oneTimeShown = new HashSet<Guid>();
 
@@ -139,7 +144,10 @@ public class JournalAppService : IJournalAppService
             var dueDay = contract.EndDate.HasValue ? Math.Min(contract.EndDate.Value.Day, daysInMonth) : daysInMonth;
             var dueDate = new DateOnly(year, month, dueDay);
 
-            // 1) Recurring 费用 — 按天分摊
+            // 1) Recurring 费用 — 按天分摊（仅限 BillJob 已执行到的月份为止）
+            if (string.Compare(period, maxBilledMonth, StringComparison.Ordinal) > 0)
+                break;
+
             var recurring = activeFees.Where(f => f.ChargeType == "Recurring").ToList();
             foreach (var group in recurring.GroupBy(f => f.FeeCodeId))
             {
@@ -292,9 +300,8 @@ public class JournalAppService : IJournalAppService
 
             // 6. 写入审批业务数据（供审批详情页展示）
             var bizDataId = Guid.NewGuid();
-            var periodEndDate = contract.EndDate.HasValue
-                ? contract.EndDate.Value.ToString("yyyy-MM-dd")
-                : $"{allPeriods.Last()}-{DateTime.DaysInMonth(int.Parse(allPeriods.Last()[..4]), int.Parse(allPeriods.Last()[5..7])):D2}";
+            var lastPeriod = previewItems.Last().Period;
+            var periodEndDate = $"{lastPeriod}-{DateTime.DaysInMonth(int.Parse(lastPeriod[..4]), int.Parse(lastPeriod[5..7])):D2}";
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("ReceivableGenerate.Insert.ApprovalBizData.Default"),
                 new

@@ -89,19 +89,39 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             return; // 已处理过，跳过
         }
 
-        // 1. 业务回调
-        await ExecuteBusinessCallbacksAsync(@event, bizData, ct);
-
-        // 2. ★ 幂等标记：直接用 SQL 更新（回调内部可能已调 CommitAsync 清空了 ChangeTracker）
-        if (bizData != null)
+        try
         {
-            await _uow.ExecuteSqlRawAsync(
-                _sql.Get("Approval.Update.ApprovalBizData.MarkProcessed"),
-                new { Id = bizData.Id });  // 用匿名类型匹配 @Id
-        }
+            // 1. 业务回调
+            await ExecuteBusinessCallbacksAsync(@event, bizData, ct);
 
-        // 3. 通知相关人员
-        await SendNotificationsAsync(@event, ct);
+            // 2. ★ 幂等标记：直接用 SQL 更新（回调内部可能已调 CommitAsync 清空了 ChangeTracker）
+            if (bizData != null)
+            {
+                await _uow.ExecuteSqlRawAsync(
+                    _sql.Get("Approval.Update.ApprovalBizData.MarkProcessed"),
+                    new { Id = bizData.Id });  // 用匿名类型匹配 @Id
+            }
+
+            // 3. 通知相关人员
+            await SendNotificationsAsync(@event, ct);
+        }
+        catch
+        {
+            // 业务处理失败 → 审批退回待审批状态 + 删除本次流转记录，允许用户修复后重新审批
+            try
+            {
+                using var rollbackConn = _db.CreateConnection();
+                rollbackConn.Open();
+                await rollbackConn.ExecuteAsync(
+                    _sql.Get("Approval.Update.Request.RollbackToPending"),
+                    new { Id = @event.ApprovalRequestId, UpdatedBy = Guid.Empty });
+                await rollbackConn.ExecuteAsync(
+                    _sql.Get("Approval.Delete.Record.LastByRequest"),
+                    new { RequestId = @event.ApprovalRequestId });
+            }
+            catch { /* 回滚失败不影响原始异常 */ }
+            throw;
+        }
     }
 
     private async Task ExecuteBusinessCallbacksAsync(ApprovalCompletedEvent @event, ApprovalBizData? bizData, CancellationToken ct)
@@ -420,20 +440,50 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                         Guid.Empty,
                         cStart, cEnd);
-                    await RecurringFeeSplitHelper.GenerateFirstMonthJournal(
-                        conn, tx, _sql, segments, configIds,
-                        companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, item.FeeName);
-                }
+                        // 生成所有历史月份的日记账（首月及后续各月），不包含未来段
+                        for (int i = 0; i < segments.Count; i++)
+                        {
+                            var seg = segments[i];
+                            if (seg.ExpiryDate == null) continue;
+
+                            var period = DateOnly.Parse(seg.EffectiveDate).ToString("yyyy-MM");
+                            var exists = await conn.QuerySingleAsync<int>(
+                                _sql.Get("Billing.Select.Journal.ExistsByKey"),
+                                new { C = item.ContractId, F = item.FeeCodeId, P = period }, tx);
+                            if (exists > 0) continue;
+
+                            await InsertJournalAsync(conn, tx,
+                                companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, configIds[i],
+                                period, seg.Amount,
+                                DateOnly.FromDateTime(ChinaTime.Now),
+                                "Normal", $"应收 {item.FeeName} {period}");
+                        }
+}
 if (chargeType == "OneTime")
                 {
-                    var oneTimeConfigId = configIds[0];
+                    var oneTimeConfigId = Guid.NewGuid();
+                    await conn.ExecuteAsync(
+                        _sql.Get("Lease.Insert.ContractFeeConfig.Default"),
+                        new
+                        {
+                            Id = oneTimeConfigId,
+                            ContractId = item.ContractId,
+                            FeeCodeId = item.FeeCodeId,
+                            BillingMode = item.BillingMode ?? "FixedAmount",
+                            Amount = item.NewAmount,
+                            Unit = (string?)null,
+                            UnitPrice = (decimal?)null,
+                            EffectiveDate = item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
+                            CreatedBy = Guid.Empty,
+                            Now = ChinaTime.Now
+                        }, tx);
                     // 暂记，等 Commit 后再生成 JE（避免独立连接被事务锁阻塞 → 超时）
                     oneTimeJobs.Add((item.ContractId, oneTimeConfigId));
 
                     // 插入 ReceivablePlan（一次性费用应收计划，关联到 FeeConfig 实例以支持同费用多次添加）
                     // 使用 Unposted SQL，GLPosted=0，待收款确认后再过账
                     var feeContract = await conn.QuerySingleOrDefaultAsync("SELECT StartDate FROM Contracts WHERE Id = @Id", new { Id = item.ContractId }, tx);
-                    var contractStart = feeContract != null ? (DateOnly)feeContract.StartDate : DateOnly.FromDateTime(ChinaTime.Now);
+                    var contractStart = feeContract != null ? DateOnly.FromDateTime((DateTime)feeContract.StartDate) : DateOnly.FromDateTime(ChinaTime.Now);
                     var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
                     await InsertJournalAsync(conn, tx,
                         companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, oneTimeConfigId,
@@ -659,6 +709,16 @@ if (chargeType == "OneTime")
 		    }// ===== 生成应收审批通过 =====
 	    private async Task HandleReceivableGenerationAsync(ApprovalCompletedEvent @event, CancellationToken ct)
 	    {
+	        if (@event.Action == "Rejected")
+	        {
+	            using var rejectConn = _db.CreateConnection();
+	            rejectConn.Open();
+	            await rejectConn.ExecuteAsync(
+	                _sql.Get("ReceivableGenerate.Update.Request.Reject"),
+	                new { Id = @event.TargetEntityId });
+	            return;
+	        }
+
 	        if (@event.Action != "Approved") return;
 
 	        var request = await _uow.ReceivableGenerateRequests.GetByIdAsync(@event.TargetEntityId, ct);
@@ -670,48 +730,131 @@ if (chargeType == "OneTime")
 	            new { Id = request.Id, Now = ChinaTime.Now });
 	        if (locked == 0) return;
 
-	        List<dynamic> items;
-        using (var conn2 = _db.CreateConnection()) { conn2.Open();
+        List<dynamic> items;
+        using (var conn2 = _db.CreateConnection())
+        {
+            conn2.Open();
             items = (await conn2.QueryAsync<dynamic>(
                 _sql.Get("ReceivableGenerate.Select.Items.ByRequestId"), new { RequestId = request.Id })).ToList();
         }
 
-	        using var conn = _db.CreateConnection(); conn.Open();
-	        using var tx = conn.BeginTransaction();
-	        try
-	        {
-	            var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
-	                _sql.Get("Accounting.Select.Subject.ByCodes"), null, tx)).ToDictionary(r => r.Code, r => r.Id);
-	            var receivableId = subjects.GetValueOrDefault("1122", Guid.Empty);
-	            var revenueId = subjects.GetValueOrDefault("6001", subjects.GetValueOrDefault("6051", Guid.Empty));
-	            var now = ChinaTime.Now;
+        using var conn = _db.CreateConnection(); conn.Open();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            // 补充 FeeConfig：按现有 Recurring 费用的生效日和全额月租展开月度分段
+            var contractRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                "SELECT StartDate, EndDate FROM Contracts WHERE Id=@Id",
+                new { Id = request.ContractId }, tx);
+            if (contractRow != null)
+            {
+                var cStart = DateOnly.FromDateTime((DateTime)contractRow.StartDate);
+                var cEnd = contractRow.EndDate != null
+                    ? DateOnly.FromDateTime((DateTime)contractRow.EndDate) : (DateOnly?)null;
 
-	            foreach (var item in items)
-	            {
-	                var exists = await conn.QuerySingleAsync<int>(
-	                    _sql.Get("Billing.Select.Journal.ExistsByKey"),
-	                    new { C = request.ContractId, F = (Guid)item.FeeCodeId, P = (string)item.Period }, tx);
-	                if (exists > 0) continue;
+                var allConfigs = (await conn.QueryAsync<dynamic>(
+                    _sql.Get("Lease.Select.ContractFeeConfig.WithFeeCodeByContract"),
+                    new { ContractId = request.ContractId }, tx)).ToList();
 
-		                var jId = Guid.NewGuid();
-		                await InsertJournalAsync(conn, tx,
-		                    request.CompanyId, request.ContractId, (Guid)item.FeeCodeId, null,
-		                    (string)item.Period, (decimal)item.Amount,
-		                    DateOnly.FromDateTime((DateTime)item.DueDate),
-		                    "Normal", $"生成应收 {item.Period}");
+                foreach (var feeGroup in allConfigs.GroupBy(x => (Guid)x.FeeCodeId))
+                {
+                    var feeCodeId = feeGroup.Key;
+                    var feeCodeInfo = await conn.QuerySingleOrDefaultAsync<dynamic>(
+                        _sql.Get("FeeCode.Select.FeeCode.ChargeTypeById"), new { Id = feeCodeId }, tx);
+                    var chargeType = (string)(feeCodeInfo?.ChargeType ?? "Recurring");
+                    if (chargeType != "Recurring") continue;
 
-	               
-	                await conn.ExecuteAsync(
-	                    _sql.Get("ReceivableGenerate.Update.Item.SetPlanIds"),
-	                    new { Id = (Guid)item.Id, ReceivablePlanId = jId, VoucherId = (Guid?)null }, tx);
-	            }
+                    // 1. 删除旧的懒汉式未来段（IsActive=1, ExpiryDate=null）
+                    foreach (var cfg in feeGroup)
+                    {
+                        if (!(bool)cfg.IsActive) continue;
+                        if (cfg.ExpiryDate != null) continue;
+                        await conn.ExecuteAsync(
+                            _sql.Get("Lease.Delete.ContractFeeConfig.ById"),
+                            new { Id = (Guid)cfg.Id }, tx);
+                        break;
+                    }
 
-	            await conn.ExecuteAsync(
-	                _sql.Get("ReceivableGenerate.Update.Request.Complete"),
-	                new { Id = request.Id }, tx);
-	            tx.Commit();
-	        }
-	        catch { tx.Rollback(); throw; }
+                    // 2. 取原始生效日和全额月租
+                    var cfgList = feeGroup.ToList();
+                    var origEff = cfgList.Min(x => (DateTime)x.EffectiveDate).ToString("yyyy-MM-dd");
+                    var fullAmt = cfgList.Max(x => (decimal)x.Amount);
+
+                    // 3. 算出当前应有的完整月度分段
+                    var expected = _billingDomain.CalculateMonthlySplit(
+                        fullAmt, origEff, ChinaTime.Now, cStart, cEnd);
+                    if (expected.Count == 0) continue;
+
+                    // 4. 已有分段集合 (Eff, Exp)
+                    var existing = new HashSet<(string Eff, string Exp)>();
+                    foreach (var cfg in feeGroup)
+                    {
+                        var eff = ((DateTime)cfg.EffectiveDate).ToString("yyyy-MM-dd");
+                        var exp = cfg.ExpiryDate != null
+                            ? ((DateTime)cfg.ExpiryDate).ToString("yyyy-MM-dd") : "null";
+                        existing.Add((eff, exp));
+                    }
+
+                    // 5. 创建缺失的分段
+                    foreach (var seg in expected)
+                    {
+                        var key = (seg.EffectiveDate, seg.ExpiryDate ?? "null");
+                        if (existing.Contains(key)) continue;
+
+                        await conn.ExecuteAsync(
+                            _sql.Get("Lease.Insert.ContractFeeConfig.WithExpiry"),
+                            new
+                            {
+                                Id = Guid.NewGuid(),
+                                ContractId = request.ContractId,
+                                FeeCodeId = feeCodeId,
+                                BillingMode = "FixedAmount",
+                                Amount = seg.Amount,
+                                Unit = (string?)null,
+                                UnitPrice = (decimal?)null,
+                                IsActive = seg.IsActive,
+                                EffectiveDate = seg.EffectiveDate,
+                                ExpiryDate = seg.ExpiryDate,
+                                CreatedBy = Guid.Empty,
+                                Now = ChinaTime.Now
+                            }, tx);
+                    }
+                }
+            }
+
+            // 读取会计科目
+            var subjects = (await conn.QueryAsync<(string Code, Guid Id)>(
+                _sql.Get("Accounting.Select.Subject.ByCodes"), null, tx)).ToDictionary(r => r.Code, r => r.Id);
+            var receivableId = subjects.GetValueOrDefault("1122", Guid.Empty);
+            var revenueId = subjects.GetValueOrDefault("6001", subjects.GetValueOrDefault("6051", Guid.Empty));
+            var now = ChinaTime.Now;
+
+            // 生成日记账
+            foreach (var item in items)
+            {
+                var exists = await conn.QuerySingleAsync<int>(
+                    _sql.Get("Billing.Select.Journal.ExistsByKey"),
+                    new { C = request.ContractId, F = (Guid)item.FeeCodeId, P = (string)item.Period }, tx);
+                if (exists > 0) continue;
+
+                var jId = Guid.NewGuid();
+                await InsertJournalAsync(conn, tx,
+                    request.CompanyId, request.ContractId, (Guid)item.FeeCodeId, null,
+                    (string)item.Period, (decimal)item.Amount,
+                    DateOnly.FromDateTime((DateTime)item.DueDate),
+                    "Normal", $"生成应收 {item.Period}");
+
+                await conn.ExecuteAsync(
+                    _sql.Get("ReceivableGenerate.Update.Item.SetPlanIds"),
+                    new { Id = (Guid)item.Id, ReceivablePlanId = jId, VoucherId = (Guid?)null }, tx);
+            }
+
+            await conn.ExecuteAsync(
+                _sql.Get("ReceivableGenerate.Update.Request.Complete"),
+                new { Id = request.Id }, tx);
+            tx.Commit();
+        }
+        catch { tx.Rollback(); throw; }
 	    }
 
 	    // ===== 暂停审批通过 =====
@@ -779,26 +922,62 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	        if (@event.Action != "Approved" || bizData == null) return;
 	        if (bizData.IsProcessed) return;
 
-	        var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
-	        if (contract == null) return;
+	        var tenantId = Guid.Parse(bizData.Reason ?? "");
 
-	        if (bizData.ChangeType == "TENANT_ADD")
+	        using var conn = _db.CreateConnection(); conn.Open();
+	        using var tx = conn.BeginTransaction();
+	        try
 	        {
-	            var tenantId = Guid.Parse(bizData.Reason ?? "");
-	            contract.AddTenant(tenantId, isPrimary: false);
-	            await _uow.CommitAsync(ct);
-	        }
-	        else if (bizData.ChangeType == "TENANT_REMOVE")
-	        {
-	            var tenantId = Guid.Parse(bizData.Reason ?? "");
-	            contract.RemoveTenant(tenantId);
-	            await _uow.CommitAsync(ct);
-	        }
+	            // 验证合同存在
+	            var contractExists = await conn.QuerySingleAsync<int>(
+	                "SELECT COUNT(1) FROM Contracts WHERE Id=@Id", new { Id = bizData.ContractId }, tx);
+	            if (contractExists == 0) return;
 
-	        if (bizData != null)
+	            if (bizData.ChangeType == "TENANT_ADD")
+	            {
+	                // 验证租客未关联
+	                var exists = await conn.QuerySingleAsync<int>(
+	                    _sql.Get("Lease.Select.ContractTenant.ExistsByContractAndTenant"),
+	                    new { ContractId = bizData.ContractId, TenantId = tenantId }, tx);
+	                if (exists > 0)
+	                    throw new InvalidOperationException("该租客已关联到此合同");
+
+	                await conn.ExecuteAsync(
+	                    _sql.Get("Lease.Insert.ContractTenant.Default"),
+	                    new { ContractId = bizData.ContractId, TenantId = tenantId,
+	                        IsPrimary = false, CreatedBy = Guid.Empty,
+	                        CreatedAt = ChinaTime.Now }, tx);
+	            }
+	            else if (bizData.ChangeType == "TENANT_REMOVE")
+	            {
+	                // 验证租客已关联
+	                var exists = await conn.QuerySingleAsync<int>(
+	                    _sql.Get("Lease.Select.ContractTenant.ExistsByContractAndTenant"),
+	                    new { ContractId = bizData.ContractId, TenantId = tenantId }, tx);
+	                if (exists == 0)
+	                    throw new InvalidOperationException("该租客未关联到此合同");
+
+	                // 验证至少还有一个租客
+	                var total = await conn.QuerySingleAsync<int>(
+	                    _sql.Get("Lease.Select.ContractTenant.CountByContract"),
+	                    new { ContractId = bizData.ContractId }, tx);
+	                if (total <= 1)
+	                    throw new InvalidOperationException("合同必须至少有一个租客");
+
+	                await conn.ExecuteAsync(
+	                    _sql.Get("Lease.Delete.ContractTenant.ByContractAndTenant"),
+	                    new { ContractId = bizData.ContractId, TenantId = tenantId }, tx);
+	            }
+
+	            await conn.ExecuteAsync(
+	                _sql.Get("Approval.Update.ApprovalBizData.MarkProcessed"),
+	                new { Id = bizData.Id }, tx);
+	            tx.Commit();
+	        }
+	        catch
 	        {
-	            bizData.MarkAsProcessed();
-	            await _uow.CommitAsync(ct);
+	            tx.Rollback();
+	            throw;
 	        }
 	    }
 

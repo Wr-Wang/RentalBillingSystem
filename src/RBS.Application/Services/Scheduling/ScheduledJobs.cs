@@ -142,7 +142,7 @@ public class CollectionJob : IScheduledJob
 
         foreach (var journal in overdueJournals)
         {
-            var daysOverdue = today.DayNumber - ((DateOnly)journal.DueDate).DayNumber;
+            var daysOverdue = today.DayNumber - (DateOnly.FromDateTime((DateTime)journal.DueDate)).DayNumber;
 
             var stage = stages
                 .Where(s => s.IsAuto && daysOverdue >= s.OverdueDaysFrom && daysOverdue <= s.OverdueDaysTo)

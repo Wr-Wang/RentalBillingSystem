@@ -21,10 +21,10 @@ public class DapperDateOnlyHandler : SqlMapper.TypeHandler<DateOnly>
         return DateOnly.FromDateTime(Convert.ToDateTime(value));
     }
 
-    /// <summary>将 DateOnly 写入数据库参数（转为 DateTime，DbType=Date）</summary>
+    /// <summary>将 DateOnly 写入数据库参数（转为 DateTime，DbType=DateTime）</summary>
     public override void SetValue(IDbDataParameter parameter, DateOnly value)
     {
-        parameter.DbType = DbType.Date;
+        parameter.DbType = DbType.DateTime;
         parameter.Value = value.ToDateTime(TimeOnly.MinValue);
     }
 }

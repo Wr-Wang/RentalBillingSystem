@@ -76,11 +76,22 @@ public class ReceivableGenerationService : IReceivableGenerationService
         if (matched.Count == 0)
             throw new InvalidOperationException($"账期范围 {from}~{to} 不在合同有效期内");
 
-        // 3. 逐月生成（去重：同一合同+账期+费用类型只生成一次）
-        int totalCreated = 0;
-
+        // 3. 截断到 BillJob 已执行到的最后月份（周期收费只生成到该月为止）
         using var conn = _db.CreateConnection();
         conn.Open();
+
+        var maxBilledMonth = await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Scheduling.Select.Execution.MaxBilledMonthByCompany"),
+            new { CompanyId = contract.CompanyId, CurrentMonth = ChinaTime.Now.ToString("yyyy-MM") });
+        if (maxBilledMonth == null)
+            return 0; // BillJob 从未执行，无周期应收可生成
+        matched = matched.Where(p => string.Compare(p, maxBilledMonth, StringComparison.Ordinal) <= 0).ToList();
+
+        if (matched.Count == 0)
+            return 0;
+
+        // 4. 逐月生成（去重：同一合同+账期+费用类型只生成一次）
+        int totalCreated = 0;
 
         // 读取费用配置（Dapper 泛型 GetByIdAsync 不含 FeeConfigs 导航属性）
         var feeConfigRows = (await conn.QueryAsync(

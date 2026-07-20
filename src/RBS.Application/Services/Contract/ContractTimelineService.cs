@@ -68,7 +68,7 @@ public class ContractTimelineService : IContractTimelineService
         {
             events.Add(new TimelineEvent { Time = DateTime.Parse($"{j.Period}-01"), Type = "Payment",
                 Title = $"应收：{j.Period}", Description = $"¥{(decimal)j.Amount}" });
-            var dueDate = (DateOnly)j.DueDate;
+            var dueDate = DateOnly.FromDateTime((DateTime)j.DueDate);
             if (dueDate < DateOnly.FromDateTime(ChinaTime.Now))
                 events.Add(new TimelineEvent { Time = dueDate.ToDateTime(TimeOnly.MinValue), Type = "Overdue",
                     Title = $"逾期：{j.Period}", Description = $"到期日 {dueDate}" });

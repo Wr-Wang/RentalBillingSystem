@@ -117,7 +117,7 @@ public class SettleJob : ScheduledJobBase
                 int interestCount = 0;
                 foreach (var journal in overdueJournals)
                 {
-                    var daysOverdue = today.DayNumber - ((DateOnly)journal.DueDate).DayNumber;
+                    var daysOverdue = today.DayNumber - (DateOnly.FromDateTime((DateTime)journal.DueDate)).DayNumber;
                     if (daysOverdue <= 0) continue;
                     var balance = (decimal)journal.Amount;
                     if (balance <= 0) continue;
@@ -135,8 +135,15 @@ public class SettleJob : ScheduledJobBase
                     }
 
                 await _stepLogger.CompleteStepAsync(step03, interestCount, null, token);
+
+                tx.Commit();
+                Interlocked.Increment(ref success);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Interlocked.Increment(ref fail);
+                errors.Add((contract.Id, ex.Message));
+            }
         });
 
         var result = new JobResult(success, fail, errors,

@@ -58,7 +58,7 @@ public class LedgerController : ControllerBase
             VoucherId = (Guid)e.VoucherId,
             EntryNo = (int)e.EntryNo,
             VoucherNo = (string)e.VoucherNo,
-            VoucherDate = ((DateOnly)e.VoucherDate).ToString("yyyy-MM-dd"),
+            VoucherDate = (DateOnly.FromDateTime((DateTime)e.VoucherDate)).ToString("yyyy-MM-dd"),
             Period = (string)e.Period,
             Direction = (string)e.Direction,
             Amount = (decimal)e.Amount,

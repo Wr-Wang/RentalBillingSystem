@@ -24,7 +24,7 @@ public class DapperNullableDateOnlyHandler : SqlMapper.TypeHandler<DateOnly?>
     {
         if (value.HasValue)
         {
-            parameter.DbType = DbType.Date;
+            parameter.DbType = DbType.DateTime;
             parameter.Value = value.Value.ToDateTime(TimeOnly.MinValue);
         }
         else

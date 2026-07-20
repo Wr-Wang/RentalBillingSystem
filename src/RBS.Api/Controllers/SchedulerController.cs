@@ -416,6 +416,62 @@ public class SchedulerController : ControllerBase
             new { Id = id, Take = take });
         return Ok(beats);
     }
+
+    // ===== 日记账历史数据清理 =====
+
+    private bool IsSuperAdmin => User.FindFirst("IsSuperAdmin")?.Value == "True";
+    private IActionResult? RequireSuperAdmin() => IsSuperAdmin ? null : Forbid();
+
+    /// <summary>清理日记账历史数据（仅超级管理员）</summary>
+    [HttpDelete("cleanup-journal-history")]
+    public async Task<IActionResult> CleanupJournalHistory(CancellationToken ct = default)
+    {
+        var auth = RequireSuperAdmin();
+        if (auth != null) return auth;
+
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            var result = new
+            {
+                DeletedAuditRecords = await conn.ExecuteAsync(
+                    _sql.Get("Accounting.Delete.JournalAudit.Expired"), transaction: tx),
+                DeletedRedundantBalances = await conn.ExecuteAsync(
+                    _sql.Get("Accounting.Delete.GLBalance.Redundant"), transaction: tx),
+                DeletedOrphanGLEntries = await conn.ExecuteAsync(
+                    _sql.Get("Accounting.Delete.GLEntry.OrphanJournalPost"), transaction: tx),
+            };
+
+            tx.Commit();
+
+            // 记录清理日志（直接写 SystemLogs）
+            try
+            {
+                await conn.ExecuteAsync(
+                    @"INSERT INTO SystemLogs (Id, Level, Category, Message, MachineName, CreatedAt)
+                      VALUES (@Id, 'Info', 'DataCleanup', @Msg, @Machine, DATEADD(HOUR, 8, GETUTCDATE()))",
+                    new
+                    {
+                        Id = Guid.NewGuid(),
+                        Msg = $"日记账历史数据清理完成: Journals_Audit={result.DeletedAuditRecords}, "
+                            + $"GLBalances={result.DeletedRedundantBalances}, "
+                            + $"OrphanGLEntries={result.DeletedOrphanGLEntries}",
+                        Machine = Environment.MachineName
+                    });
+            }
+            catch { /* 日志记录失败不影响主流程 */ }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            tx.Rollback();
+            return StatusCode(500, new { error = $"清理失败: {ex.Message}" });
+        }
+    }
 }
 
 public class ReverseRequest
