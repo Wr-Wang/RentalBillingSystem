@@ -97,7 +97,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSystemLogs, getSystemLog, deleteSystemLog, clearSystemLogs } from '../../../api/index'
 
-const loading = ref(false)
+
+import { formatTime } from '@/utils/chinaTime'const loading = ref(false)
 const list = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -159,11 +160,6 @@ async function copyText(text) {
   }
 }
 
-function formatTime(d) {
-  if (!d) return ''
-  const dt = new Date(d)
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
-}
 
 onMounted(() => fetchList())
 </script>

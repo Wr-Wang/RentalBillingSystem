@@ -80,7 +80,8 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getHousingUnit, getContracts } from '../../api/index'
 
-const route = useRoute()
+
+import { formatDate } from '@/utils/chinaTime'const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const unit = ref(null)
@@ -94,11 +95,7 @@ function statusLabel(status) {
   const map = { Rented: '已租', Vacant: '空置', Maintenance: '维修' }
   return map[status] || status || '-'
 }
-function formatDate(dt) {
-  if (!dt) return '-'
-  const d = new Date(dt)
-  return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
+
 function goEdit() {
   router.push({ path: '/buildings', query: { editId: unit.value?.id } })
 }

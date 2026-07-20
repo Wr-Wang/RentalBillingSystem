@@ -295,7 +295,7 @@
                   <template #header>
                     <span style="font-weight: 600;">变更摘要</span>
                     <el-tag v-if="bizDetail.effectiveDate" size="small" type="warning" effect="plain" style="float: right;">
-                      生效日: {{ formatBizDate(bizDetail.effectiveDate) }}
+                      生效日: {{ formatDate(bizDetail.effectiveDate) }}
                     </el-tag>
                   </template>
 
@@ -549,6 +549,7 @@
 
 <script setup>
 import { approvalStatusText, approvalStatusTagType, stepStatusText } from '@/utils/statusHelper'
+import { formatTime, formatDate } from '@/utils/chinaTime'
 /**
  * =========================================================================
  * 审批详情抽屉组件
@@ -785,49 +786,7 @@ async function loadImportBatch(batchId) {
   loadingBatch.value = false
 }
 
-function formatTime(t) {
-  if (!t) return ''
-  const d = new Date(t)
-  if (isNaN(d.getTime())) return String(t).slice(0, 16)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
-function formatBizDate(d) {
-  if (!d) return ''
-  // 已是 yyyy-MM-dd 格式的字符串，直接返回
-  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) {
-    return d.slice(0, 10)
-  }
-  // 尝试标准 Date 解析
-  const dt = new Date(d)
-  if (!isNaN(dt.getTime())) {
-    const pad = n => String(n).padStart(2, '0')
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
-  }
-  // 兜底：从形如 "Mon Jul 06 2026 ..." 的字符串中提取 yyyy-MM-dd
-  if (typeof d === 'string') {
-    // 尝试匹配 "Mon DD YYYY" 或 "DD Mon YYYY" 模式
-    const m = d.match(/\b(\d{4})\b.*\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b.*\b(\d{1,2})\b/i)
-      || d.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b.*\b(\d{1,2})\b.*\b(\d{4})\b/i)
-    if (m) {
-      const monthMap = { Jan:'01', Feb:'02', Mar:'03', Apr:'04', May:'05', Jun:'06',
-        Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12' }
-      const year = m[1].length === 4 ? m[1] : m[3]
-      const month = monthMap[(m[1].length === 4 ? m[2] : m[1]).toLowerCase()]
-      const day = String(m[1].length === 4 ? m[3] : m[2]).padStart(2, '0')
-      if (year && month) return `${year}-${month}-${day}`
-    }
-    // 最后的保底：从字符串中提取任意四位数年份 + 月份 + 日期
-    const fallback = d.match(/(\d{4})[^\d](\d{1,2})[^\d](\d{1,2})/)
-    if (fallback) {
-      const [, y, m2, d2] = fallback
-      return `${y}-${String(m2).padStart(2, '0')}-${String(d2).padStart(2, '0')}`
-    }
-    return d.slice(0, 10) // 完全无法解析时截断
-  }
-  return ''
-}
 
 /** 费用明细行样式：有变价的行加高亮标记 */
 function avatarStyle(action) {

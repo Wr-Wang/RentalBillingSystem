@@ -109,7 +109,8 @@ import { ElMessage } from 'element-plus'
 import { Bell, Check, Loading } from '@element-plus/icons-vue'
 import { useNotificationStore } from '../../store/notification'
 
-const router = useRouter()
+
+import { formatTime } from '@/utils/chinaTime'const router = useRouter()
 const store = useNotificationStore()
 const activeTab = ref('all')
 
@@ -200,12 +201,6 @@ function categoryTag(cat) {
   return map[cat?.toLowerCase()] || 'info'
 }
 
-function formatTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 onMounted(() => {
   loadNotifications()

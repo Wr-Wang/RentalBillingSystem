@@ -647,6 +647,12 @@
       WHERE j.CompanyId = @CompanyId AND j.DueDate < CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
         AND j.Amount > COALESCE(r.Received, 0)]]>
   </select>
+  <select id="Billing.Select.Journal.OverdueByContract">
+    <![CDATA[SELECT j.Id, j.ContractId, j.FeeCodeId, j.Period, j.Amount, j.DueDate, j.BillMonth
+      FROM Journals j
+      WHERE j.ContractId = @CId AND j.DueDate < @Today
+        AND j.Amount > 0]]>
+  </select>
   <!-- 逾期状态为派生属性（DueDate < Today 且未结清），不存储，Journal 不可变 -->
   <select id="Accounting.Select.Subject.ByCodes">
     <![CDATA[SELECT Code, Id FROM AccountingSubjects WHERE Code IN ('1001','1002','1122','112202','2203','2241','6001','6051')]]>
@@ -697,6 +703,7 @@
   </select>
   <select id="Billing.Select.Journal.ByContractWithPayment">
     <![CDATA[SELECT j.Id, j.ContractId, j.FeeCodeId, j.Period, j.Amount, j.DueDate, j.EntryType,
+      j.BillMonth, j.BilledAt,
       c.ContractNo, fc.Name AS FeeName, fc.ChargeType,
       COALESCE(ra.Received, 0) AS Received,
       j.Amount - COALESCE(ra.Received, 0) AS Balance
@@ -708,18 +715,30 @@
   </select>
   <insert id="Billing.Insert.Journal.Default">
     <![CDATA[INSERT INTO Journals (Id, CompanyId, ContractId, FeeCodeId, FeeConfigId,
-      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt,
+      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt, BillMonth,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, @Due, @EntryType, 1, @BilledAt,
+      @SubjId, @Period, @Amt, DATEADD(DAY, -1, DATEADD(MONTH, 1, DATEADD(MONTH,
+        CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN 2 ELSE 1 END,
+        DATEFROMPARTS(YEAR(@BilledAt), MONTH(@BilledAt), 1)))), @EntryType, 1, @BilledAt,
+      CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN CONCAT(DATEPART(YEAR, DATEADD(MONTH, 2, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 2, @BilledAt)) AS VARCHAR(2)), 2))
+        ELSE CONCAT(DATEPART(YEAR, DATEADD(MONTH, 1, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 1, @BilledAt)) AS VARCHAR(2)), 2)) END,
       @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
   <insert id="Billing.Insert.Journal.Unposted">
     <![CDATA[INSERT INTO Journals (Id, CompanyId, ContractId, FeeCodeId, FeeConfigId,
-      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt,
+      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt, BillMonth,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, @Due, @EntryType, 0, @BilledAt,
+      @SubjId, @Period, @Amt, DATEADD(DAY, -1, DATEADD(MONTH, 1, DATEADD(MONTH,
+        CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN 2 ELSE 1 END,
+        DATEFROMPARTS(YEAR(@BilledAt), MONTH(@BilledAt), 1)))), @EntryType, 0, @BilledAt,
+      CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN CONCAT(DATEPART(YEAR, DATEADD(MONTH, 2, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 2, @BilledAt)) AS VARCHAR(2)), 2))
+        ELSE CONCAT(DATEPART(YEAR, DATEADD(MONTH, 1, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 1, @BilledAt)) AS VARCHAR(2)), 2)) END,
       @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
   <select id="Billing.Select.Journal.ByCompanyPeriod">
@@ -729,7 +748,7 @@
       WHERE j.CompanyId = @CoId AND j.Period = @Period
       GROUP BY j.Id, j.CompanyId, j.ContractId, j.FeeCodeId, j.FeeConfigId,
         j.AccountingSubjectId, j.Period, j.Amount, j.DueDate, j.EntryType,
-        j.GLPosted, j.PostedAt, j.BilledAt, j.DebitNoteId, j.ParentJournalId, j.Summary,
+        j.GLPosted, j.PostedAt, j.BilledAt, j.BillMonth, j.DebitNoteId, j.ParentJournalId, j.Summary,
         j.CreatedBy, j.CreatedAt, j.CreatedIp, j.CreatedHostname,
         j.UpdatedBy, j.UpdatedAt, j.UpdatedIp, j.UpdatedHostname
       ORDER BY j.BilledAt DESC]]>
@@ -776,10 +795,16 @@
   </insert>
   <insert id="Billing.Insert.Journal.Interest">
     <![CDATA[INSERT INTO Journals (Id, CompanyId, ContractId, FeeCodeId, FeeConfigId,
-      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt,
+      AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt, BillMonth,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, @Due, 'Interest', 0, @BilledAt,
+      @SubjId, @Period, @Amt, DATEADD(DAY, -1, DATEADD(MONTH, 1, DATEADD(MONTH,
+        CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN 2 ELSE 1 END,
+        DATEFROMPARTS(YEAR(@BilledAt), MONTH(@BilledAt), 1)))), 'Interest', 0, @BilledAt,
+      CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN CONCAT(DATEPART(YEAR, DATEADD(MONTH, 2, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 2, @BilledAt)) AS VARCHAR(2)), 2))
+        ELSE CONCAT(DATEPART(YEAR, DATEADD(MONTH, 1, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 1, @BilledAt)) AS VARCHAR(2)), 2)) END,
       @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
 

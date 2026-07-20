@@ -108,7 +108,7 @@
             <el-table :data="executions" stripe size="small" v-loading="execLoading" @selection-change="onSelectionChange">
               <el-table-column type="selection" width="40" />
               <el-table-column prop="month" label="月份" width="90" />
-              <el-table-column label="计划时间" width="200"><template #default="{row}">{{ formatDate(row.targetDate) }}<el-tag v-if="row.isAdjusted" type="warning" size="small" style="margin-left:4px;">调整</el-tag><el-tag v-if="row.isCustom" type="info" size="small" style="margin-left:4px;">自定义</el-tag></template></el-table-column>
+              <el-table-column label="计划时间" width="200"><template #default="{row}">{{ chinaTime.formatDate(row.targetDate) }}<el-tag v-if="row.isAdjusted" type="warning" size="small" style="margin-left:4px;">调整</el-tag><el-tag v-if="row.isCustom" type="info" size="small" style="margin-left:4px;">自定义</el-tag></template></el-table-column>
               <el-table-column label="状态" width="80"><template #default="{row}"><el-tag :color="statusColor(row.status)" style="color:#fff;border:0" size="small">{{ statusLabel(row.status) }}</el-tag></template></el-table-column>
               <el-table-column prop="reason" label="说明" min-width="160" />
               <el-table-column label="操作" width="220" fixed="right"><template #default="{row}">
@@ -379,10 +379,6 @@ async function handleGenerate(){
 
 function statusColor(s){return {Completed:'#67c23a',Success:'#67c23a',Failed:'#f56c6c',Processing:'#409eff',Running:'#409eff',Pending:'#909399',Skipped:'#e6a23c',Paused:'#d4a017',Cancelled:'#b0b0b0',Stale:'#e6a23c',Reversed:'#9e9e9e'}[s]||'#909399'}
 function statusLabel(s){return {Pending:'待执行',Processing:'处理中',Running:'执行中',Completed:'已完成',Success:'成功',Failed:'失败',Skipped:'已跳过',Paused:'已暂停',Cancelled:'已取消',Stale:'僵死',Reversed:'已撤销'}[s]||s}
-function formatDate(d){
-  if(!d)return '';const dt=new Date(d)
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
-}
 
 onMounted(fetchJobs)
 </script>

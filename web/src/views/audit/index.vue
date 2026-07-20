@@ -76,7 +76,7 @@
         <el-timeline-item
           v-for="(log, index) in auditLogs"
           :key="index"
-          :timestamp="formatTime(log.auditChangedAt)"
+          :timestamp="formatDateTime(log.auditChangedAt)"
           :type="log.auditAction === 'Update' ? 'primary' : log.auditAction === 'Insert' ? 'success' : 'danger'"
         >
           <h4>
@@ -134,7 +134,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAuditHistory, getAuditStats, compareAuditVersions } from '../../api/index'
 
-const search = reactive({
+
+import { formatDateTime } from '@/utils/chinaTime'const search = reactive({
   tableName: 'Companies',
   recordId: '',
   dateRange: null
@@ -203,12 +204,6 @@ function resetSearch() {
   fetchHistory()
 }
 
-function formatTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
 
 async function compareVersion(log) {
   try {

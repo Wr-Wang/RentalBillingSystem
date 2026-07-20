@@ -68,6 +68,7 @@
 
 <script setup>
 import { approvalStatusText, approvalStatusTagType } from '@/utils/statusHelper'
+import { formatTime } from '@/utils/chinaTime'
 import { ref, reactive, onMounted } from 'vue'
 import { getApprovalHistoryList } from '../../api/index'
 import ApprovalDetailDialog from './ApprovalDetailDialog.vue'
@@ -79,12 +80,6 @@ const search = reactive({ keyword: '', status: '' })
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 const historyList = ref([])
 
-function formatTime(t) {
-  if (!t) return ''
-  const d = new Date(t)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 function statusLabel(status) {
   const map = { Pending: '待审批', Approved: '已通过', Rejected: '已驳回', Cancelled: '已撤回' }

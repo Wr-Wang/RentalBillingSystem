@@ -124,7 +124,8 @@
 import { computed } from 'vue'
 import { Top, Bottom, Right } from '@element-plus/icons-vue'
 
-const props = defineProps({
+
+import { formatDate } from '@/utils/chinaTime'const props = defineProps({
   item: { type: Object, required: true }
 })
 
@@ -150,11 +151,7 @@ function billingLabel(mode) {
   return mode || '-'
 }
 
-function formatDate(d) {
-  if (!d) return ''
-  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10)
-  return String(d).slice(0, 10)
-}
+
 </script>
 
 <style scoped>

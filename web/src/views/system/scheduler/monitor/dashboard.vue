@@ -57,7 +57,7 @@
               <template #default="{row}">{{ row.taskName }}</template>
             </el-table-column>
             <el-table-column label="时间" width="140">
-              <template #default="{row}">{{ formatDate(row.startedAt) }}</template>
+              <template #default="{row}">{{ chinaTime.formatDate(row.startedAt) }}</template>
             </el-table-column>
             <el-table-column label="状态" width="70">
               <template #default="{row}">
@@ -258,11 +258,6 @@ async function openStepDrawer(row) {
   }
 }
 
-function formatDate(d) {
-  if (!d) return ''
-  const dt = new Date(d)
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
-}
 
 function formatDuration(ms) {
   if (!ms) return '-'

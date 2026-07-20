@@ -51,7 +51,7 @@
       <el-table :data="list" v-loading="loading" stripe style="width:100%;" @row-click="viewDetail" highlight-current-row @selection-change="onSelectionChange">
         <el-table-column type="selection" width="40" :selectable="r => !r.glPosted" />
         <el-table-column type="index" label="#" width="45" fixed />
-        <el-table-column prop="contractNo" label="合同号" width="210" fixed>
+        <el-table-column prop="contractNo" label="合同号" width="180" fixed>
           <template #default="{ row }">
             <span style="font-family:monospace;font-size:13px;">{{ row.contractNo || '-' }}</span>
           </template>
@@ -64,12 +64,19 @@
           </template>
         </el-table-column>
         <el-table-column prop="period" label="账期" width="85" align="center" />
-        <el-table-column label="金额" width="140" align="right" sortable>
+        <el-table-column prop="billMonth" label="账单月" width="85" align="center">
+          <template #default="{ row }">
+            <span>{{ row.billMonth || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" width="120" align="right" sortable>
           <template #default="{ row }">
             <span style="font-weight:500;">¥{{ (row.amount || 0).toLocaleString() }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="dueDate" label="到期日" width="100" align="center" />
+        <el-table-column label="到期日" width="120" align="center">
+          <template #default="{ row }">{{ formatDate(row.dueDate) }}</template>
+        </el-table-column>
         <el-table-column label="GL状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.glPosted ? 'success' : 'warning'" size="small" effect="dark">
@@ -101,6 +108,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { formatDate } from '@/utils/chinaTime'
 import { getJournals, generateJournals, getFeeCodes, postJournals } from '@/api'
 import { Refresh } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
@@ -141,6 +149,8 @@ const fetchData = async () => {
       amount: r.amount || 0,
       dueDate: r.dueDate || '',
       glPosted: r.glPosted || false,
+      isBilled: r.isBilled || r.glPosted || false,
+      billMonth: r.billMonth || '',
       billedAt: r.billedAt ? (r.billedAt.slice ? r.billedAt.slice(0, 16).replace('T', ' ') : r.billedAt) : ''
     }))
     total.value = res.total || 0

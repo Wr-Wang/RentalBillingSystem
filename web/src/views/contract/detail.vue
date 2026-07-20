@@ -235,61 +235,89 @@
     </el-card>
 
     <!--===============================================================-->
-    <!-- 3. Receivable Timeline                                         -->
+    <!-- 3. Receivable Timeline (按账期分组的卡片式设计)                  -->
     <!--===============================================================-->
-    <el-card>
+    <el-card v-loading="receivableLoading" :body-style="{ paddingBottom: groupedTimeline.length === 0 ? '20px' : '0' }">
       <template #header>
-        <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="timeline-header">
           <span>应收时间线</span>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <span v-if="receivableStats.totalAmount > 0" style="font-size:13px;color:#909399;">
-              应收合计: <strong style="color:#e6a23c;">¥{{ receivableStats.totalAmount.toLocaleString() }}</strong>
-              | 未收: <strong style="color:#f56c6c;">¥{{ receivableStats.totalDue.toLocaleString() }}</strong>
+          <div class="timeline-actions">
+            <span class="timeline-stats" v-if="receivableStats.totalAmount > 0">
+              应收合计: <strong class="stat-amount">¥{{ receivableStats.totalAmount.toLocaleString() }}</strong>
+              <span class="stat-sep">|</span>
+              已入账: <strong class="stat-posted">¥{{ receivableStats.totalPosted.toLocaleString() }}</strong>
             </span>
             <el-button type="primary" size="small" @click="generateReceivables()">生成应收</el-button>
             <el-button size="small" @click="showSupplementaryFee = true">补充收费</el-button>
           </div>
         </div>
       </template>
-      <el-table :data="receivableTimeline" stripe default-expand-all row-key="id" v-loading="receivableLoading" style="width:100%;">
-        <el-table-column prop="period" label="账期" width="85" />
-        <el-table-column prop="dueDate" label="到期日" width="95" />
-        <el-table-column label="应收" min-width="110" align="right">
-          <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column label="已收" min-width="110" align="right">
-          <template #default="{ row }">
-            <span :style="{ color: row.received > 0 ? '#67c23a' : '#c0c4cc' }">¥{{ (row.received || 0).toLocaleString() }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="欠费" min-width="120" align="right">
-          <template #default="{ row }">
-            <span v-if="(row.amount || 0) - (row.received || 0) > 0" style="color:#f56c6c;font-weight:bold;">
-              ¥{{ ((row.amount || 0) - (row.received || 0)).toLocaleString() }}
-            </span>
-            <span v-else style="color:#67c23a;">已结清</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="85" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'Paid' ? 'success' : row.status === 'Partial' ? 'warning' : row.status === 'Cancelled' ? 'info' : 'danger'" size="small">
-              {{ row.status === 'Paid' ? '已付清' : row.status === 'Partial' ? '部分' : row.status === 'Cancelled' ? '已取消' : '待收款' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column type="expand" width="50">
-          <template #default="{ row }">
-            <el-table :data="row.details" size="small">
-              <el-table-column prop="feeName" label="费用项目" width="110" />
-              <el-table-column prop="amount" label="金额" width="90"><template #default="{ row: d }">¥{{ d.amount?.toLocaleString() }}</template></el-table-column>
-              <el-table-column prop="received" label="已收" width="90"><template #default="{ row: d }">¥{{ d.received?.toLocaleString() }}</template></el-table-column>
-              <el-table-column prop="description" label="计算说明 / 调价说明" min-width="220" />
+
+      <!-- 空状态 -->
+      <el-empty v-if="!receivableLoading && groupedTimeline.length === 0"
+        description="暂无应收数据，点击「生成应收」创建" :image-size="60" />
+
+      <!-- 分组时间线 -->
+      <div v-else-if="!receivableLoading" class="timeline-container">
+        <div v-for="(group, gi) in groupedTimeline" :key="group.period" class="period-group">
+          <!-- 时间线连接器 -->
+          <div class="period-connector">
+            <div class="period-dot" :class="group.statusClass"></div>
+            <div v-if="gi < groupedTimeline.length - 1" class="period-line"></div>
+          </div>
+
+          <!-- 账期卡片 -->
+          <div class="period-card" :class="'card-' + group.statusClass">
+            <div class="period-card-header">
+              <div class="period-card-title">
+                <span class="period-label">{{ group.period }}</span>
+                <el-tag :type="group.statusTagType" size="small" effect="dark" class="period-status-badge">
+                  {{ group.statusText }}
+                </el-tag>
+                <span v-if="group.billMonth" class="period-billmonth-label">账单月 {{ group.billMonth }}</span>
+                <span class="period-due-label">到期日 {{ formatDate(group.dueDate) }}</span>
+                <el-tag v-if="group.allPosted" size="small" type="success" effect="plain" style="margin-left:4px;">GL已入账</el-tag>
+                <el-tag v-else-if="group.somePosted" size="small" type="warning" effect="plain" style="margin-left:4px;">GL部分入账</el-tag>
+              </div>
+              <div class="period-card-amounts">
+                <span class="period-total">¥{{ group.totalAmount.toLocaleString() }}</span>
+              </div>
+            </div>
+
+            <!-- 费用明细表 -->
+            <el-table :data="group.items" size="small" stripe class="period-detail-table"
+              :show-header="group.items.length > 1">
+              <el-table-column label="费用项目" min-width="120">
+                <template #default="{ row }">
+                  <span>{{ row.feeName || row.entryType || '-' }}</span>
+                  <el-tag v-if="row.chargeType === 'OneTime'" size="small" type="warning" effect="plain" style="margin-left:4px;">一次性</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="金额" width="130" align="right">
+                <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+              </el-table-column>
+              <el-table-column label="GL" width="70" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.glPosted ? 'success' : 'warning'" size="small" effect="plain">
+                    {{ row.glPosted ? '已入账' : '未入账' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="账单月" width="75" align="center">
+                <template #default="{ row }">
+                  <span>{{ row.billMonth || '-' }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="出账时间" min-width="140" show-overflow-tooltip>
+                <template #default="{ row }">
+                  {{ row.billedAt ? formatTime(row.billedAt) : '-' }}
+                </template>
+              </el-table-column>
             </el-table>
-          </template>
-        </el-table-column>
-      </el-table>
+          </div>
+        </div>
+      </div>
     </el-card>
-      <el-empty v-if="!receivableLoading && receivableTimeline.length === 0" description="暂无应收数据，点击「生成应收」创建" :image-size="60" style="padding:20px 0;" />
 
     <!--===============================================================-->
     <!-- MODAL: Fee Price Adjustment                                   -->
@@ -735,6 +763,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { toGuidId } from '@/utils'
+import { formatDate, formatTime } from '@/utils/chinaTime'
 import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createApprovalLevel,
   getContract, updateContract, terminateContract, renewContract, feeAdjust, getJournals, generateJournals as apiGenerateReceivables, getDeposits,
   getContractFeeConfigs, createContractFeeConfig, updateContractFeeConfig, adjustContractFeeConfig,
@@ -825,8 +854,39 @@ const receivablePreviewItems = ref([])
 const receivablePreviewTotal = ref(0)
 const receivableStats = computed(() => {
   const totalAmount = receivableTimeline.value.reduce((s, r) => s + (r.amount || 0), 0)
-  const totalReceived = receivableTimeline.value.reduce((s, r) => s + (r.received || 0), 0)
-  return { totalAmount, totalDue: totalAmount - totalReceived }
+  const totalPosted = receivableTimeline.value.filter(r => r.glPosted).reduce((s, r) => s + (r.amount || 0), 0)
+  return { totalAmount, totalPosted }
+})
+
+/** 按账期分组的应收时间线 */
+const groupedTimeline = computed(() => {
+  const map = new Map()
+  for (const r of receivableTimeline.value) {
+    const key = r.period || '未知'
+    if (!map.has(key)) {
+      map.set(key, { period: key, dueDate: r.dueDate, billMonth: r.billMonth, items: [], totalAmount: 0 })
+    }
+    const g = map.get(key)
+    g.items.push(r)
+    g.totalAmount += r.amount || 0
+    // 取最早的到期日作为该账期的到期日
+    if (r.dueDate && r.dueDate < g.dueDate) g.dueDate = r.dueDate
+    // 取第一条非空账单月作为该组的账单月
+    if (!g.billMonth && r.billMonth) g.billMonth = r.billMonth
+  }
+  // 按账期降序排列（最近的在最上面）
+  const groups = [...map.values()].sort((a, b) => b.period.localeCompare(a.period))
+  return groups.map(g => {
+    const overdue = g.dueDate && new Date(g.dueDate) < new Date()
+    return {
+      ...g,
+      statusText: overdue ? '已逾期' : '待收款',
+      statusTagType: overdue ? 'danger' : 'warning',
+      statusClass: overdue ? 'status-overdue' : 'status-pending',
+      allPosted: g.items.length > 0 && g.items.every(i => i.glPosted),
+      somePosted: g.items.some(i => i.glPosted)
+    }
+  })
 })
 /** 按收费类型拆分预览项 */
 const recurringPreviewItems = computed(() =>
@@ -937,23 +997,23 @@ async function fetchContract() {
       }))
     } catch { /* 押金接口暂不可用，保留空列表 */ }
 
-    // 应收时间线（基于 Journal）
+    // 应收时间线（基于 Journal — 按账期分组展示）
     try {
-      const recRes = await getJournals({ contractId: route.params.id, pageSize: 12 })
+      const recRes = await getJournals({ contractId: route.params.id, pageSize: 120 })
       const recItems = recRes.items || recRes.data || recRes || []
       receivableTimeline.value = recItems.map(r => {
-        const received = r.receivedAmount || r.received || 0
-        const balance = r.amount - received
-        const isPaid = balance <= 0
-        const isOver = !isPaid && r.dueDate && new Date(r.dueDate) < new Date()
         return {
           id: r.id,
           period: r.period || '',
           dueDate: r.dueDate || '',
           amount: r.amount || 0,
-          received,
-          status: isPaid ? 'Paid' : isOver ? 'Overdue' : 'Pending',
-          details: []
+          feeName: r.feeName || r.entryType || '',
+          chargeType: r.chargeType || '',
+          entryType: r.entryType || '',
+          glPosted: r.glPosted || false,
+          billedAt: r.billedAt || '',
+          billMonth: r.billMonth || '',
+          contractNo: r.contractNo || ''
         }
       })
     } catch { /* 应收接口暂不可用，保留空列表 */ }
@@ -1721,35 +1781,147 @@ async function submitReceivableGenerate() {
 // Change Requests removed
 
 /** 格式化日期（仅日期）为 yyyy-MM-dd，兼容 Date 对象/时间戳/各种字符串 */
-function formatDate(d) {
-  if (!d) return ''
-  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10)
-  const dt = new Date(d)
-  if (!isNaN(dt.getTime())) {
-    const pad = n => String(n).padStart(2, '0')
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
-  }
-  // 兜底：英文月份格式提取
-  if (typeof d === 'string') {
-    const m = d.match(/\b(\d{4})\b.*\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b.*\b(\d{1,2})\b/i)
-      || d.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b.*\b(\d{1,2})\b.*\b(\d{4})\b/i)
-    if (m) {
-      const monthMap = { Jan:'01', Feb:'02', Mar:'03', Apr:'04', May:'05', Jun:'06',
-        Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12' }
-      const year = m[1].length === 4 ? m[1] : m[3]
-      const month = monthMap[(m[1].length === 4 ? m[2] : m[1]).toLowerCase()]
-      const day = String(m[1].length === 4 ? m[3] : m[2]).padStart(2, '0')
-      if (year && month) return `${year}-${month}-${day}`
-    }
-    const fallback = d.match(/(\d{4})[^\d](\d{1,2})[^\d](\d{1,2})/)
-    if (fallback) return `${fallback[1]}-${String(fallback[2]).padStart(2,'0')}-${String(fallback[3]).padStart(2,'0')}`
-    return d.slice(0, 10)
-  }
-  return ''
-}
+
 </script>
 <style scoped>
 .el-timeline h4 {
   margin: 0 0 4px;
 }
+
+/* ================================================================
+   应收时间线样式
+   ================================================================ */
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.timeline-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.timeline-stats {
+  font-size: 13px;
+  color: #909399;
+}
+.stat-amount { color: #e6a23c; }
+.stat-posted { color: #67c23a; }
+.stat-sep { margin: 0 6px; color: #dcdfe6; }
+
+.timeline-container {
+  padding: 8px 0;
+}
+
+/* 账期分组：时间线连接器 + 卡片 */
+.period-group {
+  display: flex;
+  gap: 0;
+  position: relative;
+}
+
+/* 左侧时间线 */
+.period-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 28px;
+  flex-shrink: 0;
+  padding-top: 18px;
+}
+.period-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #c0c4cc;
+  background: #fff;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.period-dot.status-overdue {
+  border-color: #f56c6c;
+  background: #f56c6c;
+}
+.period-dot.status-pending {
+  border-color: #e6a23c;
+  background: #e6a23c;
+}
+.period-line {
+  width: 2px;
+  flex: 1;
+  background: #e4e7ed;
+  min-height: 24px;
+}
+
+/* 账期卡片 */
+.period-card {
+  flex: 1;
+  margin: 8px 0 8px 8px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+.period-card:hover {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.period-card.card-status-overdue { border-left: 3px solid #f56c6c; }
+.period-card.card-status-pending { border-left: 3px solid #e6a23c; }
+
+.period-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.period-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.period-label {
+  font-weight: 600;
+  font-size: 15px;
+  color: #303133;
+}
+.period-status-badge { font-weight: 600; }
+.period-due-label {
+  font-size: 12px;
+  color: #909399;
+}
+.period-billmonth-label {
+  font-size: 12px;
+  color: #409eff;
+  background: #ecf5ff;
+  padding: 0 6px;
+  border-radius: 3px;
+  line-height: 20px;
+}
+.period-card-amounts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.period-total {
+  font-weight: 700;
+  font-size: 16px;
+  color: #303133;
+}
+
+.period-detail-table {
+  margin: 0;
+}
+.period-detail-table :deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
 </style>

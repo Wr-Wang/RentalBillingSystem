@@ -59,7 +59,7 @@
         <el-table-column prop="userDisplayName" label="用户" width="100" show-overflow-tooltip />
         <el-table-column prop="ipAddress" label="IP" width="130" />
         <el-table-column prop="createdAt" label="时间" width="160">
-          <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+          <template #default="{ row }">{{ chinaTime.formatTime(row.createdAt) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
@@ -87,7 +87,7 @@
           <el-descriptions-item label="方法">
             <el-tag :type="detail.httpMethod === 'GET' ? '' : 'success'" size="small">{{ detail.httpMethod }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="时间">{{ formatTime(detail.createdAt) }}</el-descriptions-item>
+          <el-descriptions-item label="时间">{{ chinaTime.formatTime(detail.createdAt) }}</el-descriptions-item>
           <el-descriptions-item label="路径" :span="2">{{ detail.path }}</el-descriptions-item>
           <el-descriptions-item label="状态码">
             <el-tag :type="detail.statusCode < 300 ? 'success' : 'danger'" size="small">{{ detail.statusCode }}</el-tag>
@@ -267,11 +267,6 @@ function formatJson(str) {
   }
 }
 
-function formatTime(d) {
-  if (!d) return ''
-  const dt = new Date(d)
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
-}
 
 onMounted(() => { initDefaultDateRange(); fetchList() })
 </script>

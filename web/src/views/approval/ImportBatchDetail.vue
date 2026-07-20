@@ -79,7 +79,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getImportBatch } from '../../api/index'
 
-const route = useRoute()
+
+import { formatTime } from '@/utils/chinaTime'const route = useRoute()
 const loading = ref(false)
 const batch = ref(null)
 const filterStatus = ref('all')
@@ -97,12 +98,6 @@ function batchStatusType(status) {
   return map[status] || 'info'
 }
 
-function formatTime(t) {
-  if (!t) return ''
-  const d = new Date(t)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 function applyFilter() { /* computed handles this */ }
 

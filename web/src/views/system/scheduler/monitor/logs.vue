@@ -81,7 +81,7 @@
         </template>
       </el-table-column>
       <el-table-column label="执行时间" width="160">
-        <template #default="{row}">{{ formatDate(row.startedAt) }}</template>
+        <template #default="{row}">{{ chinaTime.formatDate(row.startedAt) }}</template>
       </el-table-column>
       <el-table-column label="状态" width="80">
         <template #default="{row}">
@@ -308,11 +308,7 @@ function statusLabel(s) {
 function triggerLabel(t) {
   return { Scheduled: '自动', Manual: '手动', Event: '事件' }[t] || t
 }
-function formatDate(d) {
-  if (!d) return ''
-  const dt = new Date(d)
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
-}
+
 function formatDuration(ms) {
   if (!ms) return '-'
   return (ms / 1000).toFixed(3) + 's'

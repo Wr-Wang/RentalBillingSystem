@@ -69,18 +69,13 @@ import { ElMessage } from 'element-plus'
 import { getPendingApprovals } from '../../api/index'
 import ApprovalDetailDialog from './ApprovalDetailDialog.vue'
 
-const loading = ref(false)
+
+import { formatTime } from '@/utils/chinaTime'const loading = ref(false)
 const pendingList = ref([])
 const approvedThisMonth = ref(0)
 const showDetail = ref(false)
 const currentId = ref('')
 
-function formatTime(t) {
-  if (!t) return ''
-  const d = new Date(t)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 async function fetchPending() {
   loading.value = true

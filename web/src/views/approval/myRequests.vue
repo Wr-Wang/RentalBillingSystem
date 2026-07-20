@@ -61,6 +61,7 @@
 
 <script setup>
 import { approvalStatusText, approvalStatusTagType } from '@/utils/statusHelper'
+import { formatTime } from '@/utils/chinaTime'
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getMyApprovalRequests, cancelApproval } from '../../api/index'
@@ -70,13 +71,6 @@ const loading = ref(false)
 const myRequests = ref([])
 const showDetail = ref(false)
 const currentId = ref('')
-
-function formatTime(t) {
-  if (!t) return ''
-  const d = new Date(t)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 async function fetchMyRequests() {
   loading.value = true
