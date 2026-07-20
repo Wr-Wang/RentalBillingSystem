@@ -72,6 +72,14 @@ public class ApprovalsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>重新提交已撤回的审批（仅提交人可操作）</summary>
+    [HttpPost("{id}/resubmit")]
+    public async Task<IActionResult> Resubmit(Guid id, CancellationToken ct)
+    {
+        var result = await _approvalService.ResubmitAsync(id, ct);
+        return Ok(result);
+    }
+
     /// <summary>获取审批历史（分页）</summary>
     [HttpGet("history")]
     public async Task<IActionResult> GetHistory([FromQuery] ApprovalHistoryQuery query, CancellationToken ct)

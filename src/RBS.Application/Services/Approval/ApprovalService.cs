@@ -130,6 +130,57 @@ public class ApprovalService : IApprovalService
         return await MapToDtoAsync(entity, ct);
     }
 
+    /// <summary>
+    /// 重新提交已撤回的审批 — 将状态从 Cancelled 改为 Pending，重置级别并添加提交记录
+    /// </summary>
+    public async Task<ApprovalRequestDto> ResubmitAsync(Guid id, CancellationToken ct = default)
+    {
+        var entity = await _uow.ApprovalRequests.GetByIdWithRecordsAsync(id, ct)
+            ?? throw new KeyNotFoundException("审批请求不存在");
+
+        if (entity.Status != "Cancelled")
+            throw new InvalidOperationException("仅已撤回的审批可以重新提交");
+
+        var submitRecord = entity.Records.FirstOrDefault(r => r.Action == "Submitted");
+        if (submitRecord == null || submitRecord.ApproverId != _currentUserService.UserId)
+            throw new InvalidOperationException("仅提交人可以重新提交");
+
+        var now = ChinaTime.Now;
+        var userId = _currentUserService.UserId;
+
+        using var tx = await _uow.BeginTransactionAsync(ct);
+        try
+        {
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Approval.Update.Request.Resubmit"),
+                new object[] { userId, now, id }, ct);
+
+            var recordId = Guid.NewGuid();
+            await _uow.ExecuteSqlRawAsync(
+                _sql.Get("Approval.Insert.Record.Raw"),
+                new object[] { recordId, id, 0, userId, "Submitted", "重新提交", userId, now }, ct);
+
+            await tx.CommitAsync(ct);
+        }
+        catch (InvalidOperationException) { throw; }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+
+        // 触发提交事件，通知下一级审批人
+        using var scope = _serviceProvider.CreateScope();
+        var handler = scope.ServiceProvider
+            .GetRequiredService<IEventHandler<ApprovalSubmittedEvent>>();
+        await handler.HandleAsync(
+            new ApprovalSubmittedEvent(entity.Id, entity.ApprovalTypeId,
+                entity.TargetEntityId, entity.TargetEntityType, entity.Title),
+            ct);
+
+        return await MapToDtoAsync(entity, ct);
+    }
+
     // =====================================================================
     // 写操作：ApproveAsync / RejectAsync / CancelAsync 使用原始 SQL
     // =====================================================================
@@ -776,7 +827,12 @@ public class ApprovalService : IApprovalService
 
             string status;
             if (approvedRecord != null)
-                status = approvedRecord.Action == "Rejected" ? "rejected" : "completed";
+                status = approvedRecord.Action switch
+                {
+                    "Rejected" => "rejected",
+                    "Cancelled" => "cancelled",
+                    _ => "completed"
+                };
             else if (lc.LevelNo == entity.CurrentLevel && entity.Status == "Pending")
                 status = "current";
             else if (entity.Status is "Approved" or "Rejected" || lc.LevelNo < entity.CurrentLevel)

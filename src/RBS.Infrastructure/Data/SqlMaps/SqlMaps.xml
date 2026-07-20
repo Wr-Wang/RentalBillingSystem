@@ -927,6 +927,9 @@
   <update id="Approval.Update.Request.RollbackToPending">
     <![CDATA[UPDATE ApprovalRequests SET Status = 'Pending', UpdatedBy = @UpdatedBy, UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND Status = 'Approved']]>
   </update>
+  <update id="Approval.Update.Request.Resubmit">
+    <![CDATA[UPDATE ApprovalRequests SET Status = 'Pending', CurrentLevel = 1, UpdatedBy = @UpdatedBy, UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND Status = 'Cancelled']]>
+  </update>
   <update id="Approval.Update.ContractFeeConfig.ExpireById">
     <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0, UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @p1 AND IsActive = 1]]>
   </update>

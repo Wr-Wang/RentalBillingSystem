@@ -67,6 +67,7 @@
 </template>
 
 <script setup>
+import { approvalStatusText, approvalStatusTagType } from '@/utils/statusHelper'
 import { ref, reactive, onMounted } from 'vue'
 import { getApprovalHistoryList } from '../../api/index'
 import ApprovalDetailDialog from './ApprovalDetailDialog.vue'
@@ -91,8 +92,7 @@ function statusLabel(status) {
 }
 
 function statusTagType(status) {
-  const map = { Pending: 'warning', Approved: 'success', Rejected: 'danger', Cancelled: 'info' }
-  return map[status] || 'info'
+  return approvalStatusTagType(status)
 }
 
 async function fetchHistory() {

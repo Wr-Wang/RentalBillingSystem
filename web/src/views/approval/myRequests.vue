@@ -21,8 +21,8 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'Approved' ? 'success' : row.status === 'Rejected' ? 'danger' : 'warning'" size="small">
-              {{ row.status === 'Pending' ? '审批中' : row.status === 'Approved' ? '已通过' : '已驳回' }}
+            <el-tag :type="approvalStatusTagType(row.status)" size="small">
+              {{ approvalStatusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -42,6 +42,7 @@
               @click="withdraw(row)"
             >撤回</el-button>
             <el-tag v-else-if="row.status === 'Rejected'" size="small" type="danger" effect="plain">已驳回</el-tag>
+            <el-tag v-else-if="row.status === 'Cancelled'" size="small" type="info" effect="plain">已撤回</el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -59,6 +60,7 @@
 </template>
 
 <script setup>
+import { approvalStatusText, approvalStatusTagType } from '@/utils/statusHelper'
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getMyApprovalRequests, cancelApproval } from '../../api/index'

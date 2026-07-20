@@ -107,7 +107,7 @@
               <template #header>
                 <span style="font-weight: 600;">流转步骤</span>
                 <el-tag size="small" style="float: right;" :type="data.status === 'Approved' ? 'success' : data.status === 'Rejected' ? 'danger' : 'warning'" effect="plain">
-                  {{ data.status === 'Pending' ? '审批中' : data.status === 'Approved' ? '已完成' : data.status === 'Rejected' ? '已驳回' : data.status === 'Cancelled' ? '已撤回' : data.status }}
+                  {{ approvalStatusText(data.status) }}
                 </el-tag>
               </template>
 
@@ -147,6 +147,12 @@
                         type="danger"
                         effect="plain"
                       >已驳回</el-tag>
+                      <el-tag
+                        v-else-if="level.status === 'cancelled'"
+                        size="small"
+                        type="info"
+                        effect="plain"
+                      >已撤回</el-tag>
                       <el-tag
                         v-else-if="level.status === 'current'"
                         size="small"
@@ -522,6 +528,9 @@
             <el-button v-if="canCancel" type="warning" @click="handleCancel" :loading="cancelling" :disabled="cancelling || approving || rejecting" :icon="RefreshLeft">
               撤回
             </el-button>
+            <el-button v-if="canResubmit" type="primary" @click="handleResubmit" :icon="RefreshRight">
+              重新提交
+            </el-button>
           </div>
           <div class="footer-right">
             <el-button @click="close">关闭</el-button>
@@ -539,6 +548,7 @@
 </template>
 
 <script setup>
+import { approvalStatusText, approvalStatusTagType, stepStatusText } from '@/utils/statusHelper'
 /**
  * =========================================================================
  * 审批详情抽屉组件
@@ -603,22 +613,21 @@ const currentUserId = ref(localStorage.getItem('userId') || '')
 /** 状态标签类型 */
 const statusTagType = computed(() => {
   if (!data.value) return 'info'
-  const map = { Pending: 'warning', Approved: 'success', Rejected: 'danger', Cancelled: 'info' }
-  return map[data.value.status] || 'info'
+  return approvalStatusTagType(data.value.status)
 })
 
 /** 状态中文 */
 const statusText = computed(() => {
   if (!data.value) return ''
-  const map = { Pending: '审批中', Approved: '已通过', Rejected: '已驳回', Cancelled: '已撤回' }
-  return map[data.value.status] || data.value.status
+  return approvalStatusText(data.value.status)
 })
 
 /** 审批步骤增强数据（合并 record 中的审批人、时间、备注） */
 const levelDetails = computed(() => {
   if (!data.value?.levelChain) return []
   return data.value.levelChain.map(level => {
-    const record = data.value.records?.find(r => r.level === level.level)
+      const recordsForLevel = data.value.records?.filter(r => r.level === level.level) || []
+      const record = recordsForLevel[recordsForLevel.length - 1] || null
     return {
       ...level,
       timestamp: record?.createdAt || null,
@@ -631,6 +640,12 @@ const levelDetails = computed(() => {
 /** 是否可以撤回（当前用户是提交人且状态为 Pending） */
 const canCancel = computed(() => {
   if (!data.value || data.value.status !== 'Pending') return false
+  const submitRecord = data.value.records?.find(r => r.action === 'Submitted')
+  return submitRecord && submitRecord.approverId === currentUserId.value
+})
+
+const canResubmit = computed(() => {
+  if (!data.value || data.value.status !== 'Cancelled') return false
   const submitRecord = data.value.records?.find(r => r.action === 'Submitted')
   return submitRecord && submitRecord.approverId === currentUserId.value
 })
@@ -855,6 +870,22 @@ async function handleReject() {
     ElMessage.error(e?.response?.data?.title || '操作失败')
   }
   rejecting.value = false
+}
+
+async function handleResubmit() {
+  try {
+    await ElMessageBox.confirm('确定要重新提交该审批申请吗？', '重新提交', {
+      confirmButtonText: '确定', cancelButtonText: '取消', type: 'info'
+    })
+  } catch { return }
+  try {
+    await axios.post(`/api/approvals/${props.approvalId}/resubmit`)
+    ElMessage.success('已重新提交')
+    emit('cancelled')
+    close()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '重新提交失败')
+  }
 }
 
 async function handleCancel() {
