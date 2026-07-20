@@ -1,10 +1,15 @@
 namespace RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Billing;
 
 /// <summary>
 /// 收款应用服务 — 提供批量确认和冲销等收款编排操作
 /// </summary>
 public interface IReceiptService
 {
+    /// <summary>
+    /// 获取收款列表（按公司、状态、合同筛选）
+    /// </summary>
+    Task<List<ReceiptDto>> GetAllAsync(Guid? companyId, string? status, Guid? contractId, CancellationToken ct);
     /// <summary>
     /// 批量确认收款记录
     /// </summary>

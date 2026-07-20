@@ -76,12 +76,12 @@
           @selection-change="onReceiptSelectionChange"
         >
           <el-table-column type="selection" width="40" />
-          <el-table-column prop="receiptNo" label="收据号" min-width="160" />
+          <el-table-column prop="receiptNo" label="收据号" min-width="110" />
           <el-table-column label="金额" width="130" align="right">
             <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
           </el-table-column>
-          <el-table-column label="关联合同" width="140">
-            <template #default="{ row }">{{ row.contractNo || row.contractId || '-' }}</template>
+          <el-table-column label="关联合同" width="220">
+            <template #default="{ row }">{{ row.contractNo || '-' }}</template>
           </el-table-column>
           <el-table-column prop="receivedDate" label="收款日期" width="110" />
           <el-table-column label="状态" width="100">
@@ -91,7 +91,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="220" fixed="right">
+          <el-table-column label="操作" width="160" fixed="right">
             <template #default="{ row }">
               <el-button text size="small" type="success" v-if="row.status === 'Pending'" @click="confirmSingle(row)">确认</el-button>
               <el-button text size="small" type="warning" v-if="row.status === 'Pending'" @click="rejectSingle(row)">驳回</el-button>

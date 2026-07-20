@@ -8,6 +8,7 @@ public class ReceiptDto
     public Guid Id { get; set; }
     public string ReceiptNo { get; set; } = string.Empty;
     public Guid? ContractId { get; set; }
+    public string? ContractNo { get; set; }
     public decimal Amount { get; set; }
     public DateOnly ReceivedDate { get; set; }
     public Guid? PaymentChannelId { get; set; }

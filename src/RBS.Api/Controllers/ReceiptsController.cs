@@ -24,20 +24,11 @@ public class ReceiptsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, [FromQuery] string? status, CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId, [FromQuery] string? status,
+        [FromQuery] Guid? contractId, CancellationToken ct)
     {
-        if (companyId == null) return Ok(new List<object>());
-
-        if (!string.IsNullOrEmpty(status) && status == "Pending")
-        {
-            var pending = await _uow.Receipts.GetPendingConfirmAsync(companyId.Value, ct);
-            return Ok(pending);
-        }
-
-        var list = await _uow.Receipts.GetAllByCompanyAsync(companyId.Value, ct);
-        if (!string.IsNullOrEmpty(status) && status != "All")
-            list = list.Where(r => r.Status == status).ToList();
-        return Ok(list);
+        var result = await _receiptService.GetAllAsync(companyId, status, contractId, ct);
+        return Ok(result);
     }
 
     [HttpPost]

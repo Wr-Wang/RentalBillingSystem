@@ -1,5 +1,6 @@
 using Dapper;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Billing;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -17,6 +18,17 @@ public class ReceiptService : IReceiptService
         _uow = uow;
         _db = db;
         _sql = sql;
+    }
+
+    public async Task<List<ReceiptDto>> GetAllAsync(Guid? companyId, string? status, Guid? contractId, CancellationToken ct)
+    {
+        if (companyId == null) return new List<ReceiptDto>();
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var rows = await conn.QueryAsync<ReceiptDto>(
+            _sql.Get("Receipt.Select.Receipt.ListByCompany"),
+            new { CoId = companyId.Value, CId = contractId, Status = status });
+        return rows.AsList();
     }
 
     public async Task<object> BatchConfirmAsync(List<Guid> ids, CancellationToken ct)

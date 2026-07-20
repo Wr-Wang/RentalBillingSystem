@@ -280,40 +280,91 @@
                 <el-tag v-else-if="group.somePosted" size="small" type="warning" effect="plain" style="margin-left:4px;">GL部分入账</el-tag>
               </div>
               <div class="period-card-amounts">
-                <span class="period-total">¥{{ group.totalAmount.toLocaleString() }}</span>
+                <span class="period-total">应收 ¥{{ group.totalAmount.toLocaleString() }}</span>
+                <span v-if="group.receiptTotal > 0" class="period-received">已收 ¥{{ group.receiptTotal.toLocaleString() }}</span>
+                <span v-if="group.unpaid > 0" class="period-unpaid">待收 ¥{{ group.unpaid.toLocaleString() }}</span>
+                <span v-else-if="group.receiptTotal > 0" class="period-settled">已结清</span>
               </div>
             </div>
 
-            <!-- 费用明细表 -->
-            <el-table :data="group.items" size="small" stripe class="period-detail-table"
-              :show-header="group.items.length > 1">
-              <el-table-column label="费用项目" min-width="120">
-                <template #default="{ row }">
-                  <span>{{ row.feeName || row.entryType || '-' }}</span>
-                  <el-tag v-if="row.chargeType === 'OneTime'" size="small" type="warning" effect="plain" style="margin-left:4px;">一次性</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="金额" width="130" align="right">
-                <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
-              </el-table-column>
-              <el-table-column label="GL" width="70" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="row.glPosted ? 'success' : 'warning'" size="small" effect="plain">
-                    {{ row.glPosted ? '已入账' : '未入账' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="账单月" width="75" align="center">
-                <template #default="{ row }">
-                  <span>{{ row.billMonth || '-' }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="出账时间" min-width="140" show-overflow-tooltip>
-                <template #default="{ row }">
-                  {{ row.billedAt ? formatTime(row.billedAt) : '-' }}
-                </template>
-              </el-table-column>
-            </el-table>
+            <!-- 已入账明细 -->
+            <div v-if="group.postedItems.length > 0" class="period-gl-section">
+              <div class="period-gl-header posted-header">
+                <span>已入账</span>
+                <span class="period-gl-amt">¥{{ group.postedItems.reduce((s, i) => s + (i.amount || 0), 0).toLocaleString() }}</span>
+              </div>
+              <el-table :data="group.postedItems" size="small" stripe class="period-detail-table" :show-header="group.postedItems.length > 1">
+                <el-table-column label="费用项目" min-width="120">
+                  <template #default="{ row }">
+                    <span>{{ row.feeName || row.entryType || '-' }}</span>
+                    <el-tag v-if="row.chargeType === 'OneTime'" size="small" type="warning" effect="plain" style="margin-left:4px;">一次性</el-tag>
+                    <el-tag v-else-if="row.chargeType === 'Recurring'" size="small" type="primary" effect="plain" style="margin-left:4px;">周期</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="金额" width="130" align="right">
+                  <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+                </el-table-column>
+                <el-table-column label="账单月" width="75" align="center">
+                  <template #default="{ row }"><span>{{ row.billMonth || '-' }}</span></template>
+                </el-table-column>
+                <el-table-column label="出账时间" min-width="140" show-overflow-tooltip>
+                  <template #default="{ row }">{{ row.billedAt ? formatTime(row.billedAt) : '-' }}</template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <!-- 未入账明细 -->
+            <div v-if="group.unpostedItems.length > 0" class="period-gl-section">
+              <div class="period-gl-header unposted-header">
+                <span>未入账</span>
+                <span class="period-gl-amt">¥{{ group.unpostedItems.reduce((s, i) => s + (i.amount || 0), 0).toLocaleString() }}</span>
+              </div>
+              <el-table :data="group.unpostedItems" size="small" stripe class="period-detail-table" :show-header="group.unpostedItems.length > 1">
+                <el-table-column label="费用项目" min-width="120">
+                  <template #default="{ row }">
+                    <span>{{ row.feeName || row.entryType || '-' }}</span>
+                    <el-tag v-if="row.chargeType === 'OneTime'" size="small" type="warning" effect="plain" style="margin-left:4px;">一次性</el-tag>
+                    <el-tag v-else-if="row.chargeType === 'Recurring'" size="small" type="primary" effect="plain" style="margin-left:4px;">周期</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="金额" width="130" align="right">
+                  <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+                </el-table-column>
+                <el-table-column label="账单月" width="75" align="center">
+                  <template #default="{ row }"><span>{{ row.billMonth || '-' }}</span></template>
+                </el-table-column>
+                <el-table-column label="出账时间" min-width="140" show-overflow-tooltip>
+                  <template #default="{ row }">{{ row.billedAt ? formatTime(row.billedAt) : '-' }}</template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <!-- 收款记录 -->
+            <div v-if="group.receiptItems.length > 0" class="period-receipt-section">
+              <div class="period-receipt-header">
+                <span class="period-receipt-icon">📥</span>
+                <span>收款</span>
+                <span class="period-receipt-total">
+                  已收 ¥{{ (group.receiptTotal || 0).toLocaleString() }}
+                </span>
+              </div>
+              <el-table :data="group.receiptItems" size="small" stripe class="period-detail-table">
+                <el-table-column label="收据号" min-width="140">
+                  <template #default="{ row }">{{ row.receiptNo }}</template>
+                </el-table-column>
+                <el-table-column label="金额" width="130" align="right">
+                  <template #default="{ row }">¥{{ (row.amount || 0).toLocaleString() }}</template>
+                </el-table-column>
+                <el-table-column label="收款日期" width="100" align="center">
+                  <template #default="{ row }">{{ formatDate(row.receivedDate) }}</template>
+                </el-table-column>
+                <el-table-column label="状态" width="70" align="center">
+                  <template #default="{ row }">
+                    <el-tag size="small" type="success">{{ row.status === 'Confirmed' ? '已确认' : row.status }}</el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
           </div>
         </div>
       </div>
@@ -770,7 +821,7 @@ import { submitApproval, getApprovalTypes, getRoles, createApprovalType, createA
   getContractFeeConfigHistory, getFeeCodes, previewRenewal, submitRenewal,
   getRenewalHistory, getRenewalChain, getAllowedOperations, getContractChanges,
   handleApiError, previewJournals, generateJournalRequest,
-  submitContractModify } from '@/api/index.js'
+  submitContractModify, getReceipts } from '@/api/index.js'
 
 // ---------------------------------------------------------------------------
 // 路由 & 路由
@@ -838,6 +889,8 @@ const feeConfigs = ref([])
 const depositLogs = ref([])
 /** 应收时间线 */
 const receivableTimeline = ref([])
+/** 收款记录 */
+const receipts = ref([])
 
 // =========================================================================
 // 补充收费弹窗
@@ -864,25 +917,58 @@ const groupedTimeline = computed(() => {
   for (const r of receivableTimeline.value) {
     const key = r.period || '未知'
     if (!map.has(key)) {
-      map.set(key, { period: key, dueDate: r.dueDate, billMonth: r.billMonth, items: [], totalAmount: 0 })
+      map.set(key, { period: key, dueDate: r.dueDate, billMonth: r.billMonth, items: [], totalAmount: 0, receiptItems: [] })
     }
     const g = map.get(key)
     g.items.push(r)
     g.totalAmount += r.amount || 0
-    // 取最早的到期日作为该账期的到期日
     if (r.dueDate && r.dueDate < g.dueDate) g.dueDate = r.dueDate
-    // 取第一条非空账单月作为该组的账单月
     if (!g.billMonth && r.billMonth) g.billMonth = r.billMonth
+  }
+  // 将收款记录匹配到对应账期（按 receiptMonth 匹配 billMonth）
+  for (const rc of receipts.value) {
+    let matched = [...map.values()].find(g => g.billMonth === rc.receiptMonth || g.period === rc.receiptMonth)
+    if (!matched) {
+      const key = rc.receiptMonth
+      if (!map.has(key)) {
+        map.set(key, { period: key, dueDate: '', billMonth: key, items: [], totalAmount: 0, receiptItems: [], receiptTotal: 0 })
+      }
+      matched = map.get(key)
+    }
+    matched.receiptItems.push(rc)
+    matched.receiptTotal = (matched.receiptTotal || 0) + (rc.amount || 0)
   }
   // 按账期降序排列（最近的在最上面）
   const groups = [...map.values()].sort((a, b) => b.period.localeCompare(a.period))
   return groups.map(g => {
+    const receiptTotal = g.receiptTotal || 0
+    const unpaid = g.totalAmount - receiptTotal
     const overdue = g.dueDate && new Date(g.dueDate) < new Date()
+    let statusText, statusTagType, statusClass
+    if (g.items.length > 0 && unpaid <= 0) {
+      statusText = '已付清'
+      statusTagType = 'success'
+      statusClass = 'status-paid'
+    } else if (overdue) {
+      statusText = '已逾期'
+      statusTagType = 'danger'
+      statusClass = 'status-overdue'
+    } else {
+      statusText = '待收款'
+      statusTagType = 'warning'
+      statusClass = 'status-pending'
+    }
+    const postedItems = g.items.filter(i => i.glPosted)
+    const unpostedItems = g.items.filter(i => !i.glPosted)
     return {
       ...g,
-      statusText: overdue ? '已逾期' : '待收款',
-      statusTagType: overdue ? 'danger' : 'warning',
-      statusClass: overdue ? 'status-overdue' : 'status-pending',
+      postedItems,
+      unpostedItems,
+      receiptTotal,
+      unpaid: Math.max(0, unpaid),
+      statusText,
+      statusTagType,
+      statusClass,
       allPosted: g.items.length > 0 && g.items.every(i => i.glPosted),
       somePosted: g.items.some(i => i.glPosted)
     }
@@ -965,6 +1051,7 @@ async function fetchContract() {
         autoRenew: c.autoRenew !== false,
         outstandingBalance: c.outstandingBalance || 0,
         prepaidBalance: c.prepaidBalance || 0,
+        companyId: c.companyId || '',
         remark: ''
       }
 
@@ -1017,6 +1104,26 @@ async function fetchContract() {
         }
       })
     } catch { /* 应收接口暂不可用，保留空列表 */ }
+
+    // 收款记录（按 ReceivedDate 排序，FIFO 匹配到账期）
+    try {
+      const contractId = route.params.id
+      const recRes = await getReceipts({ companyId: contract.value.companyId, contractId })
+      const recList = Array.isArray(recRes) ? recRes : recRes.items || recRes.data || []
+      receipts.value = recList
+        .filter(r => r.status === 'Confirmed')
+        .sort((a, b) => new Date(a.receivedDate) - new Date(b.receivedDate))
+        .map(r => ({
+          id: r.id,
+          receiptNo: r.receiptNo || '',
+          amount: r.amount || 0,
+          receivedDate: r.receivedDate || '',
+          status: r.status || 'Confirmed',
+          referenceNo: r.referenceNo || '',
+          contractId: r.contractId || '',
+          receiptMonth: r.receivedDate ? r.receivedDate.slice(0, 7) : ''
+        }))
+    } catch { receipts.value = [] }
 
     // 加载费用配置
     await fetchFeeConfigs()
@@ -1841,6 +1948,10 @@ async function submitReceivableGenerate() {
   z-index: 1;
   flex-shrink: 0;
 }
+.period-dot.status-paid {
+  border-color: #67c23a;
+  background: #67c23a;
+}
 .period-dot.status-overdue {
   border-color: #f56c6c;
   background: #f56c6c;
@@ -1868,6 +1979,7 @@ async function submitReceivableGenerate() {
 .period-card:hover {
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
+.period-card.card-status-paid { border-left: 3px solid #67c23a; }
 .period-card.card-status-overdue { border-left: 3px solid #f56c6c; }
 .period-card.card-status-pending { border-left: 3px solid #e6a23c; }
 
@@ -1916,12 +2028,74 @@ async function submitReceivableGenerate() {
   font-size: 16px;
   color: #303133;
 }
+.period-received {
+  font-size: 13px;
+  color: #67c23a;
+  font-weight: 600;
+}
+.period-unpaid {
+  font-size: 13px;
+  color: #f56c6c;
+  font-weight: 600;
+}
+.period-settled {
+  font-size: 13px;
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.period-gl-section {
+  margin: 0 16px;
+}
+.period-gl-section + .period-gl-section {
+  border-top: 1px dashed #e4e7ed;
+  padding-top: 6px;
+  margin-top: 6px;
+}
+.period-gl-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 0 4px;
+}
+.period-gl-header.posted-header { color: #67c23a; }
+.period-gl-header.unposted-header { color: #e6a23c; }
+.period-gl-amt {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 14px;
+}
 
 .period-detail-table {
   margin: 0;
 }
 .period-detail-table :deep(.el-table__body-wrapper) {
   overflow-x: auto;
+}
+
+.period-receipt-section {
+  border-top: 1px dashed #e4e7ed;
+  margin: 8px 16px 4px;
+  padding-top: 8px;
+}
+.period-receipt-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 6px;
+}
+.period-receipt-icon {
+  font-size: 14px;
+}
+.period-receipt-total {
+  margin-left: auto;
+  color: #67c23a;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 </style>
