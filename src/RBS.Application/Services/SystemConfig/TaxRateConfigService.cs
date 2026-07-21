@@ -14,7 +14,11 @@ public class TaxRateConfigService : ITaxRateConfigService
     private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<TaxRateConfigDto>> GetListAsync(CancellationToken ct = default)
-        => (await _uow.TaxRateConfigs.GetAllAsync(ct)).Select(MapToDto).ToList();
+    {
+        var items = await _uow.TaxRateConfigs.GetAllAsync(ct);
+        var cid = _tenant.EffectiveCompanyId;
+        return items.Where(x => !cid.HasValue || x.CompanyId == cid.Value).Select(MapToDto).ToList();
+    }
 
     public async Task<TaxRateConfigDto> CreateAsync(CreateTaxRateConfigRequest request, CancellationToken ct = default)
     {

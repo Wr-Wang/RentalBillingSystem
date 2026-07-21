@@ -15,9 +15,13 @@ public class InterestConfigService : IInterestConfigService
     private Guid CompanyId => _tenant.DefaultCompanyId;
 
     public async Task<List<InterestConfigDto>> GetListAsync(CancellationToken ct = default)
-        => (await _uow.InterestConfigs.GetAllAsync(ct))
+    {
+        var items = await _uow.InterestConfigs.GetAllAsync(ct);
+        var cid = _tenant.EffectiveCompanyId;
+        return items.Where(x => !cid.HasValue || x.CompanyId == cid.Value)
             .OrderByDescending(x => x.EffectiveDate)
             .Select(Map).ToList();
+    }
 
     public async Task<InterestConfigDto> GetActiveAsync(CancellationToken ct = default)
     {

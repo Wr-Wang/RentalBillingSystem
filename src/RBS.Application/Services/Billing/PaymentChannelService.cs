@@ -15,7 +15,11 @@ public class PaymentChannelService : IPaymentChannelService
     private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<PaymentChannelDto>> GetListAsync(CancellationToken ct = default)
-        => (await _uow.PaymentChannels.GetAllAsync(ct)).Select(MapToDto).ToList();
+    {
+        var items = await _uow.PaymentChannels.GetAllAsync(ct);
+        var cid = _tenant.EffectiveCompanyId;
+        return items.Where(x => !cid.HasValue || x.CompanyId == cid.Value).Select(MapToDto).ToList();
+    }
 
     public async Task<PaymentChannelDto> CreateAsync(CreatePaymentChannelRequest request, CancellationToken ct = default)
     {

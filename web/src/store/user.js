@@ -59,9 +59,11 @@ export const useUserStore = defineStore('user', () => {
 
   // 计算属性：当前生效的 companyId（用于 API 请求拦截器注入）
   const effectiveCompanyId = computed(() => {
-    if (isSuperAdmin.value && currentCompanyId.value) {
+    if (isSuperAdmin.value) {
+      // 超管：有选中公司则过滤，null 表示查看全部
       return currentCompanyId.value
     }
+    // 普通用户：固定自己的公司
     return companyId.value
   })
 

@@ -376,7 +376,7 @@
     <![CDATA[SELECT hu.BuildingName, hu.Id AS BuildingId, COUNT(hu.Id) AS TotalRooms,
       SUM(CASE WHEN hu.Status='Rented' THEN 1 ELSE 0 END) AS RentedRooms,
       ROUND(CAST(SUM(CASE WHEN hu.Status='Rented' THEN 1 ELSE 0 END) AS FLOAT)/NULLIF(COUNT(hu.Id),0)*100,1) AS OccupancyRate
-      FROM HousingUnits hu WHERE hu.BuildingName IS NOT NULL GROUP BY hu.BuildingName, hu.Id ORDER BY hu.BuildingName]]>
+      FROM HousingUnits hu WHERE hu.BuildingName IS NOT NULL AND (@CompanyId IS NULL OR hu.CompanyId = @CompanyId) GROUP BY hu.CompanyId, hu.BuildingName, hu.Id ORDER BY hu.BuildingName]]>
   </select>
 
   <!-- 多公司总览 — 聚合各公司资产、财务、合同指标 -->

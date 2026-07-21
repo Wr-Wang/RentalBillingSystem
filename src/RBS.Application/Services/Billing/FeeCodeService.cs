@@ -17,7 +17,8 @@ public class FeeCodeService : IFeeCodeService
     public async Task<List<FeeCodeDto>> GetListAsync(CancellationToken ct = default)
     {
         var items = await _uow.FeeCodes.GetAllAsync(ct);
-        return items.Select(MapToDto).ToList();
+        var cid = _tenant.EffectiveCompanyId;
+        return items.Where(x => !cid.HasValue || x.CompanyId == cid.Value).Select(MapToDto).ToList();
     }
 
     public async Task<FeeCodeDto?> GetByIdAsync(Guid id, CancellationToken ct = default)

@@ -2,6 +2,7 @@ using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Reporting;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
@@ -13,12 +14,15 @@ public class ReportingService : IReportingService
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
+    private readonly ITenantService _tenant;
 
-    public ReportingService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
+    public ReportingService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql,
+        ITenantService tenant)
     {
         _uow = uow;
         _db = db;
         _sql = sql;
+        _tenant = tenant;
     }
 
     public async Task<object> GetCollectionRateAsync(Guid? companyId, string? period, CancellationToken ct)
@@ -111,7 +115,7 @@ public class ReportingService : IReportingService
         using var conn = _db.CreateConnection(); conn.Open();
         var result = await conn.QueryAsync(
             _sql.Get("Billing.Select.FeeRevenue.All"),
-            new { Period = period, CompanyId = (Guid?)null });
+            new { Period = period, CompanyId = _tenant.EffectiveCompanyId });
         return result;
     }
 
@@ -119,7 +123,8 @@ public class ReportingService : IReportingService
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var result = await conn.QueryAsync(
-            _sql.Get("Billing.Select.HousingUnit.OccupancyRate"));
+            _sql.Get("Billing.Select.HousingUnit.OccupancyRate"),
+            new { CompanyId = _tenant.EffectiveCompanyId });
         return result;
     }
 

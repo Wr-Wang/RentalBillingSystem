@@ -16,7 +16,11 @@ public class FloorLevelBandService : IFloorLevelBandService
     private Guid CompanyId => _tenant.EffectiveCompanyId ?? _tenant.CompanyId ?? Guid.Empty;
 
     public async Task<List<FloorLevelBandDto>> GetListAsync(CancellationToken ct = default)
-        => (await _uow.FloorLevelBands.GetAllAsync(ct)).Select(MapToDto).ToList();
+    {
+        var items = await _uow.FloorLevelBands.GetAllAsync(ct);
+        var cid = _tenant.EffectiveCompanyId;
+        return items.Where(x => !cid.HasValue || x.CompanyId == cid.Value).Select(MapToDto).ToList();
+    }
 
     public async Task<FloorLevelBandDto> CreateAsync(CreateFloorLevelBandRequest request, CancellationToken ct = default)
     {

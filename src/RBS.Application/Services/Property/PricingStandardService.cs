@@ -17,8 +17,9 @@ public class PricingStandardService : IPricingStandardService
     public async Task<List<PricingStandardDto>> GetListAsync(CancellationToken ct = default)
     {
         var items = await _uow.RoomPricingStandards.GetAllAsync(ct);
+        var cid = _tenant.EffectiveCompanyId;
         var dtos = new List<PricingStandardDto>();
-        foreach (var item in items)
+        foreach (var item in items.Where(x => !cid.HasValue || x.CompanyId == cid.Value))
             dtos.Add(await MapToDtoAsync(item, ct));
         return dtos;
     }
