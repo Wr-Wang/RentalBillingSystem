@@ -135,7 +135,8 @@ import { ElMessage } from 'element-plus'
 import { getAuditHistory, getAuditStats, compareAuditVersions } from '../../api/index'
 
 
-import { formatDateTime } from '@/utils/chinaTime'const search = reactive({
+import { formatDateTime } from '@/utils/chinaTime'
+const search = reactive({
   tableName: 'Companies',
   recordId: '',
   dateRange: null

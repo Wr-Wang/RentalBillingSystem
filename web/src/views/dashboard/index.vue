@@ -69,8 +69,9 @@
         <el-card>
           <template #header><span>最近收款</span></template>
           <el-table :data="recentReceipts" style="width: 100%" v-loading="receiptLoading">
-            <el-table-column prop="receiptNo" label="收据号" width="140" />
-            <el-table-column prop="contractNo" label="合同号" width="180" />
+            <el-table-column prop="receiptNo" label="收据号" width="220" />
+            <el-table-column prop="contractNo" label="合同号" width="220" />
+            <el-table-column prop="paymentChannelName" label="支付通道" width="100" />
             <el-table-column prop="amount" label="金额" width="100">
               <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
             </el-table-column>
@@ -89,17 +90,21 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { chinaTime } from '@/utils/chinaTime'
+import { useUserStore } from '@/store/user'
 import { CanvasRenderer } from 'echarts/renderers'
 import { PieChart, BarChart, LineChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
-import { getReceipts, getContracts, getCollectionRate, getDailyReceipt, getMonthlyReceipt, getOverdueDetail } from '@/api'
+import { getReceipts, getContracts, getCollectionRate, getDailyReceipt, getMonthlyReceipt, getOverdueDetail, getPendingApprovals, getUnreadCounts } from '@/api'
 
 use([CanvasRenderer, PieChart, BarChart, LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
 const currentDate = ref(new Date())
+const userStore = useUserStore()
+const router = useRouter()
 const todayStats = ref({ received: 0, count: 0 })
 const monthStats = ref({ receivable: 0, received: 0, overdue: 0, collectionRate: 0 })
 const overdueContracts = ref(0)
@@ -116,28 +121,43 @@ async function loadData() {
   const today = chinaTime.today()
 
   // 今日收款
-  try { const dr = await getDailyReceipt({ date: today }); const details = dr.details || dr || []; const totalReceived = details.reduce((s, r) => s + (r.total || 0), 0); const totalCount = details.reduce((s, r) => s + (r.cnt || 0), 0); todayStats.value = { received: totalReceived, count: totalCount } } catch {}
+  try { const dr = await getDailyReceipt({ date: today, companyId: userStore.companyId }); const details = dr.details || dr || []; const totalReceived = details.reduce((s, r) => s + (r.total || 0), 0); const totalCount = details.reduce((s, r) => s + (r.cnt || 0), 0); todayStats.value = { received: totalReceived, count: totalCount } } catch {}
   // 本月报
-  try { const mr = await getMonthlyReceipt({ period: p }); const d = mr.plans || mr; const ta = d.totalAmount || 0; const tr = d.totalReceived || 0; monthStats.value = { receivable: ta, received: tr, overdue: ta - tr, collectionRate: ta > 0 ? ((tr / ta) * 100).toFixed(1) : 0 } } catch {}
+  try { const mr = await getMonthlyReceipt({ period: p, companyId: userStore.companyId }); const d = mr.plans || mr; const ta = d.totalAmount || 0; const tr = d.totalReceived || 0; monthStats.value = { receivable: ta, received: tr, overdue: ta - tr, collectionRate: ta > 0 ? ((tr / ta) * 100).toFixed(1) : 0 } } catch {}
   // 逾期明细 → 逾期合同数
-  try { const od = await getOverdueDetail(); overdueContracts.value = od.length; pendingCollection.value = od.filter(p => p.daysOverdue > 7).length } catch {}
+  try { const od = await getOverdueDetail({ companyId: userStore.companyId }); overdueContracts.value = od.length; pendingCollection.value = od.filter(p => p.daysOverdue > 7).length } catch {}
   // 最近收款
   receiptLoading.value = true
-  try { const r = await getReceipts({}); recentReceipts.value = (r || []).slice(0, 5) } catch {}
+  try { const r = await getReceipts({ companyId: userStore.companyId }); recentReceipts.value = (r || []).slice(0, 5) } catch {}
   finally { receiptLoading.value = false }
   // 待办事项
   todoLoading.value = true
   try {
     const items = []
-    const pendingReceipts = await getReceipts({ status: 'Pending' })
+
+    // 并行加载各待办数据源
+    const [pendingReceipts, allContractsRes, overduePlans, pendingApprovals, unreadCounts] = await Promise.all([
+      getReceipts({ status: 'Pending', companyId: userStore.companyId }),
+      getContracts({ pageSize: 100 }),
+      getOverdueDetail({ companyId: userStore.companyId }),
+      getPendingApprovals().catch(() => null),
+      getUnreadCounts().catch(() => null)
+    ])
+
+    // 收款确认
     if (pendingReceipts?.length > 0) items.push({ type: '收款确认', tagType: 'warning', content: `${pendingReceipts.length} 笔收款待确认`, date: today })
-    const expiring = await getContracts({ pageSize: 1 })
-    const allContracts = await getContracts({ pageSize: 100 })
-    const actives = allContracts.items?.filter(c => c.status === 'Active') || []
+    // 待审批
+    if (pendingApprovals?.length > 0) items.push({ type: '待审批', tagType: 'primary', content: `${pendingApprovals.length} 个审批请求待处理`, date: today })
+    // 续签
+    const actives = allContractsRes?.items?.filter(c => c.status === 'Active') || []
     const expiringSoon = actives.filter(c => c.endDate && new Date(c.endDate) < new Date(Date.now() + 14 * 86400000))
     if (expiringSoon.length > 0) items.push({ type: '续签', tagType: 'primary', content: `${expiringSoon.length} 份合同即将到期`, date: today })
-    const overduePlans = await getOverdueDetail()
-    if (overduePlans.length > 0) items.push({ type: '催缴', tagType: 'danger', content: `${overduePlans.length} 户逾期欠费`, date: today })
+    // 催缴
+    if (overduePlans?.length > 0) items.push({ type: '催缴', tagType: 'danger', content: `${overduePlans.length} 户逾期欠费`, date: today })
+    // 未读通知
+    const unreadTotal = unreadCounts?.Total || 0
+    if (unreadTotal > 0) items.push({ type: '通知', tagType: 'info', content: `${unreadTotal} 条未读通知`, date: today })
+
     todoList.value = items.length > 0 ? items : [{ type: '提示', tagType: 'info', content: '暂无待办事项', date: today }]
   } catch {}
   finally { todoLoading.value = false }
@@ -150,9 +170,9 @@ async function loadDailyTrend() {
   for (let i = 6; i >= 0; i--) {
     const dt = chinaTime.now()
     dt.setDate(dt.getDate() - i)
-    const dateStr = chinaTime.today()
+    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
     try {
-      const dr = await getDailyReceipt({ date: dateStr })
+      const dr = await getDailyReceipt({ date: dateStr, companyId: userStore.companyId })
       const details = dr.details || dr || []
       const total = details.reduce((s, r) => s + (r.total || 0), 0)
       data.push(total)
@@ -164,15 +184,15 @@ async function loadDailyTrend() {
 }
 
 function handleAction(row) {
-  if (row.type === '收款确认') window.location.hash = '#/receipts/confirm'
-  else if (row.type === '续签') window.location.hash = '#/renewaldashboard'
-  else if (row.type === '催缴') window.location.hash = '#/collection/overview'
+  const routes = { '收款确认': '/receipts/confirm', '待审批': '/approvals', '续签': '/renewaldashboard', '催缴': '/collection', '通知': '/notifications' }
+  const path = routes[row.type]
+  if (path) router.push(path)
 }
 
 const collectionRateOption = computed(() => ({
   tooltip: { trigger: 'item' },
   legend: { bottom: '0%' },
-  series: [{ type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'], avoidLabelOverlap: false, itemStyle: { borderRadius: 10 }, label: { show: true, formatter: '{b}: {d}%' }, data: [{ value: monthStats.value.received, name: '已收款', itemStyle: { color: '#67c23a' } }, { value: Math.max(monthStats.value.overdue, 1), name: '欠费', itemStyle: { color: '#e6a23c' } }] }]
+  series: [{ type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'], avoidLabelOverlap: false, itemStyle: { borderRadius: 10 }, label: { show: true, formatter: '{b}: {d}%' }, data: [{ value: monthStats.value.received, name: '已收款', itemStyle: { color: '#67c23a' } }, { value: monthStats.value.overdue || 0, name: '欠费', itemStyle: { color: '#e6a23c' } }] }]
 }))
 
 const trendOption = computed(() => ({

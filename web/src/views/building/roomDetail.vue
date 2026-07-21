@@ -81,7 +81,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { getHousingUnit, getContracts } from '../../api/index'
 
 
-import { formatDate } from '@/utils/chinaTime'const route = useRoute()
+import { formatDate } from '@/utils/chinaTime'
+const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const unit = ref(null)

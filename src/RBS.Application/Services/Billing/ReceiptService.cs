@@ -22,12 +22,11 @@ public class ReceiptService : IReceiptService
 
     public async Task<List<ReceiptDto>> GetAllAsync(Guid? companyId, string? status, Guid? contractId, CancellationToken ct)
     {
-        if (companyId == null) return new List<ReceiptDto>();
         using var conn = _db.CreateConnection();
         conn.Open();
         var rows = await conn.QueryAsync<ReceiptDto>(
             _sql.Get("Receipt.Select.Receipt.ListByCompany"),
-            new { CoId = companyId.Value, CId = contractId, Status = status });
+            new { CoId = companyId, CId = contractId, Status = status });
         return rows.AsList();
     }
 

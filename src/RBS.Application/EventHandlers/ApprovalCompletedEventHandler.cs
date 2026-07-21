@@ -436,7 +436,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     configIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
                         conn, tx, _sql, _billingDomain,
                         item.ContractId, item.FeeCodeId,
-                        item.NewAmount, item.BillingMode, item.Unit, (decimal?)null,
+                        item.NewAmount, item.BillingMode!, item.Unit, (decimal?)null,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                         Guid.Empty,
                         cStart, cEnd);
@@ -996,7 +996,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	        // 校验生效日期在合同起止日期范围内
 	        var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
 	        if (contract != null && !string.IsNullOrEmpty(request.EffectiveDate))
-	            Contract.ValidateFeeEffectiveDate(DateOnly.Parse(request.EffectiveDate), contract.StartDate, contract.EndDate);
+	            Contract.ValidateFeeEffectiveDate(DateOnly.Parse(request.EffectiveDate), contract!.StartDate, contract!.EndDate);
 
 	        List<dynamic> items;
         using (var conn3 = _db.CreateConnection()) { conn3.Open();
@@ -1028,13 +1028,13 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	            {
 	                var segments = _billingDomain.CalculateMonthlySplit(
 	                    request.Amount, request.EffectiveDate, ChinaTime.Now,
-	                    contract.StartDate, contract.EndDate);
+	                    contract!.StartDate, contract!.EndDate);
 	                var segIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
 	                    conn, tx, _sql, _billingDomain,
 	                    request.ContractId, request.FeeCodeId,
 	                    request.Amount, request.BillingMode, (string?)null, (decimal?)null,
 	                    request.EffectiveDate, request.CreatedBy,
-	                    contract.StartDate, contract.EndDate);
+	                    contract!.StartDate, contract!.EndDate);
 	                configId = segIds.Last();
 	            }
 	            else

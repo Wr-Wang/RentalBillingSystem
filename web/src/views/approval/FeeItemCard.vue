@@ -125,7 +125,8 @@ import { computed } from 'vue'
 import { Top, Bottom, Right } from '@element-plus/icons-vue'
 
 
-import { formatDate } from '@/utils/chinaTime'const props = defineProps({
+import { formatDate } from '@/utils/chinaTime'
+const props = defineProps({
   item: { type: Object, required: true }
 })
 

@@ -12,6 +12,7 @@ public class ReceiptDto
     public decimal Amount { get; set; }
     public DateOnly ReceivedDate { get; set; }
     public Guid? PaymentChannelId { get; set; }
+    public string? PaymentChannelName { get; set; }
     public string? ReferenceNo { get; set; }
     public string Status { get; set; } = "Pending";
     public Guid CompanyId { get; set; }

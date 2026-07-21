@@ -20,12 +20,12 @@ public class ReportingService : IReportingService
         _sql = sql;
     }
 
-    public async Task<object> GetCollectionRateAsync(string? period, CancellationToken ct)
+    public async Task<object> GetCollectionRateAsync(Guid? companyId, string? period, CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         return await conn.QueryAsync(
             _sql.Get("Billing.Select.Journal.CollectionRate"),
-            new { Period = period });
+            new { CompanyId = companyId, Period = period });
     }
 
     public async Task<object> GetOverdueDetailAsync(Guid? companyId, string? period, CancellationToken ct)
@@ -64,17 +64,17 @@ public class ReportingService : IReportingService
         return enriched;
     }
 
-    public async Task<object> GetDailyReceiptAsync(DateOnly? date, CancellationToken ct)
+    public async Task<object> GetDailyReceiptAsync(Guid? companyId, DateOnly? date, CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var d = date ?? DateOnly.FromDateTime(ChinaTime.Now);
         var result = await conn.QueryAsync(
             _sql.Get("Billing.Select.Receipt.DailyReceipt"),
-            new { D = d });
+            new { D = d, CompanyId = companyId });
         return new { date = d, details = result };
     }
 
-    public async Task<object> GetMonthlyReceiptAsync(string? period, CancellationToken ct)
+    public async Task<object> GetMonthlyReceiptAsync(Guid? companyId, string? period, CancellationToken ct)
     {
         var now = ChinaTime.Now;
         var p = period ?? $"{now.Year}-{now.Month:D2}";
@@ -83,12 +83,12 @@ public class ReportingService : IReportingService
         // 月度汇总
         var plans = await conn.QueryAsync(
             _sql.Get("Billing.Select.Journal.CollectionRate"),
-            new { Period = p });
+            new { CompanyId = companyId, Period = p });
 
         // 每日收款明细（用于趋势图）
         var daily = await conn.QueryAsync(
             _sql.Get("Billing.Select.Receipt.DailyByMonth"),
-            new { P = p });
+            new { P = p, CompanyId = companyId });
 
         // 填充每日数据（无收款的日期补 0）
         var daysInMonth = DateTime.DaysInMonth(int.Parse(p.Split('-')[0]), int.Parse(p.Split('-')[1]));

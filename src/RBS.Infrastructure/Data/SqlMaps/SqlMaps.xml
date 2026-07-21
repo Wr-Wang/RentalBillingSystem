@@ -331,18 +331,18 @@
 
   <!-- 收款报表查询 -->
   <select id="Billing.Select.Receipt.DailyReceipt">
-    <![CDATA[SELECT Status, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE ReceivedDate=@D GROUP BY Status]]>
+    <![CDATA[SELECT Status, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE ReceivedDate=@D AND (@CompanyId IS NULL OR CompanyId = @CompanyId) GROUP BY Status]]>
   </select>
   <select id="Billing.Select.Receipt.DailyByMonth">
-    <![CDATA[SELECT DAY(ReceivedDate) AS D, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE FORMAT(ReceivedDate, 'yyyy-MM')=@P GROUP BY DAY(ReceivedDate) ORDER BY D]]>
+    <![CDATA[SELECT DAY(ReceivedDate) AS D, COUNT(1) AS Cnt, SUM(Amount) AS Total FROM Receipts WHERE FORMAT(ReceivedDate, 'yyyy-MM')=@P AND (@CompanyId IS NULL OR CompanyId = @CompanyId) GROUP BY DAY(ReceivedDate) ORDER BY D]]>
   </select>
   
 
-  <!-- 应收报表查询 -->
+  <!-- 应收报表查询：统计各月应收总额与实际已收总额 -->
   <select id="Billing.Select.Journal.CollectionRate">
     <![CDATA[SELECT j.Period, COUNT(1) AS TotalPlans, SUM(j.Amount) AS TotalAmount,
-      0 AS TotalReceived
-      FROM Journals j WHERE (@Period IS NULL OR j.Period = @Period) GROUP BY j.Period ORDER BY j.Period DESC]]>
+      ISNULL((SELECT SUM(r.Amount) FROM Receipts r WHERE FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period AND r.Status = 'Confirmed' AND (@CompanyId IS NULL OR r.CompanyId = @CompanyId)), 0) AS TotalReceived
+      FROM Journals j WHERE (@Period IS NULL OR j.Period = @Period) AND (@CompanyId IS NULL OR j.CompanyId = @CompanyId) GROUP BY j.Period ORDER BY j.Period DESC]]>
   </select>
   <select id="Billing.Select.Contract.OverdueData">
     <![CDATA[SELECT c.Id, c.ContractNo, t.Name AS TenantName, h.FullCode AS RoomFullCode
@@ -899,11 +899,12 @@
 
   <select id="Receipt.Select.Receipt.ListByCompany">
     <![CDATA[SELECT r.Id, r.ReceiptNo, r.ContractId, c.ContractNo, r.Amount, r.ReceivedDate,
-      r.PaymentChannelId, r.ReferenceNo, r.Status, r.CompanyId, r.RejectReason,
+      r.PaymentChannelId, p.Name AS PaymentChannelName, r.ReferenceNo, r.Status, r.CompanyId, r.RejectReason,
       r.ConfirmedAt, r.ConfirmedBy, r.CreatedAt
       FROM Receipts r
       LEFT JOIN Contracts c ON c.Id = r.ContractId
-      WHERE r.CompanyId = @CoId
+      LEFT JOIN PaymentChannels p ON p.Id = r.PaymentChannelId
+      WHERE (@CoId IS NULL OR r.CompanyId = @CoId)
       AND (@CId IS NULL OR r.ContractId = @CId)
       AND (@Status IS NULL OR @Status = 'All' OR r.Status = @Status)
       ORDER BY r.CreatedAt DESC]]>

@@ -3582,11 +3582,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收据编�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付通道ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'PaymentChannelId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'Amount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'ReceivedDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'付款人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'RemitterName'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'付款人账号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'RemitterAccount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'交易参考号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'TransactionRef'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'被退款收据ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'RefundedReceiptId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'乐观锁', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'RowVersion'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'CompanyId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'CreatedBy'
@@ -3601,10 +3597,6 @@ GO
 -- 收据编号唯一
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Receipts]') AND name=N'IX_Receipts_ReceiptNo')
 CREATE UNIQUE INDEX [IX_Receipts_ReceiptNo] ON [Receipts]([ReceiptNo])
--- 交易参考号索引
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Receipts]') AND name=N'IX_Receipts_TransactionRef')
-CREATE INDEX [IX_Receipts_TransactionRef] ON [Receipts]([TransactionRef])
-
 -- ===================================================================
 -- Receipts_Audit 表：收据表审计
 -- ===================================================================
@@ -3621,11 +3613,7 @@ CREATE TABLE [Receipts_Audit] (
     [PaymentChannelId] UNIQUEIDENTIFIER , -- 支付通道ID,
     [Amount] DECIMAL(18,2) , -- 收款金额,
     [ReceivedDate] DATETIME2 , -- 收款时间,
-    [RemitterName] NVARCHAR(100) , -- 付款人,
-    [RemitterAccount] VARCHAR(100) , -- 付款人账号,
-    [TransactionRef] VARCHAR(200) , -- 交易参考号,
     [Status] VARCHAR(20) , -- 状态,
-    [RefundedReceiptId] UNIQUEIDENTIFIER , -- 被退款收据ID,
     [CompanyId] UNIQUEIDENTIFIER , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER , -- 创建人,
     [CreatedAt] DATETIME2 , -- 创建时间,
@@ -3654,11 +3642,7 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收据编�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付通道ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'PaymentChannelId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'Amount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'ReceivedDate'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'付款人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'RemitterName'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'付款人账号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'RemitterAccount'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'交易参考号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'TransactionRef'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'被退款收据ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'RefundedReceiptId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'CompanyId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts_Audit', @level2type = N'COLUMN', @level2name = N'CreatedAt'

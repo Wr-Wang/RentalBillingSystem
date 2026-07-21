@@ -70,7 +70,8 @@ import { getPendingApprovals } from '../../api/index'
 import ApprovalDetailDialog from './ApprovalDetailDialog.vue'
 
 
-import { formatTime } from '@/utils/chinaTime'const loading = ref(false)
+import { formatTime } from '@/utils/chinaTime'
+const loading = ref(false)
 const pendingList = ref([])
 const approvedThisMonth = ref(0)
 const showDetail = ref(false)

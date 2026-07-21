@@ -35,9 +35,11 @@ public class ReceiptsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateReceiptRequest request, CancellationToken ct)
     {
         var entity = string.IsNullOrWhiteSpace(request.ReceiptNo)
-            ? Receipt.CreateNew(request.Amount, request.ReceivedDate, request.CompanyId)
+            ? Receipt.CreateNew(request.Amount, request.ReceivedDate, request.CompanyId, request.PaymentChannelId)
             : new Receipt(request.ReceiptNo, request.Amount, request.ReceivedDate, request.CompanyId);
         if (request.ContractId.HasValue) entity.LinkToContract(request.ContractId.Value);
+        if (request.PaymentChannelId.HasValue && !string.IsNullOrWhiteSpace(request.ReceiptNo))
+            entity.SetPaymentChannel(request.PaymentChannelId.Value);
         await _uow.Receipts.AddAsync(entity, ct);
         await _uow.CommitAsync(ct);
         return Ok(entity);

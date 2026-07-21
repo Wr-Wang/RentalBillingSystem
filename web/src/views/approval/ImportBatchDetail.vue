@@ -80,7 +80,8 @@ import { useRoute } from 'vue-router'
 import { getImportBatch } from '../../api/index'
 
 
-import { formatTime } from '@/utils/chinaTime'const route = useRoute()
+import { formatTime } from '@/utils/chinaTime'
+const route = useRoute()
 const loading = ref(false)
 const batch = ref(null)
 const filterStatus = ref('all')

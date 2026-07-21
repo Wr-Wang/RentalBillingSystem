@@ -98,7 +98,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSystemLogs, getSystemLog, deleteSystemLog, clearSystemLogs } from '../../../api/index'
 
 
-import { formatTime } from '@/utils/chinaTime'const loading = ref(false)
+import { formatTime } from '@/utils/chinaTime'
+const loading = ref(false)
 const list = ref([])
 const total = ref(0)
 const page = ref(1)

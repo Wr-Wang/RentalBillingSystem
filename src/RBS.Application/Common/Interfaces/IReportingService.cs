@@ -6,10 +6,11 @@ public interface IReportingService
     /// <summary>
     /// 获取收款率统计
     /// </summary>
+    /// <param name="companyId">公司 ID，null 表示全部公司</param>
     /// <param name="period">账期 (yyyy-MM)，null 表示当前月</param>
     /// <param name="ct">取消令牌</param>
     /// <returns>收款率统计数据</returns>
-    Task<object> GetCollectionRateAsync(string? period, CancellationToken ct);
+    Task<object> GetCollectionRateAsync(Guid? companyId, string? period, CancellationToken ct);
 
     /// <summary>
     /// 获取逾期明细
@@ -23,18 +24,20 @@ public interface IReportingService
     /// <summary>
     /// 获取每日收款汇总
     /// </summary>
+    /// <param name="companyId">公司 ID，null 表示全部公司</param>
     /// <param name="date">日期，null 表示今日</param>
     /// <param name="ct">取消令牌</param>
     /// <returns>每日收款数据</returns>
-    Task<object> GetDailyReceiptAsync(DateOnly? date, CancellationToken ct);
+    Task<object> GetDailyReceiptAsync(Guid? companyId, DateOnly? date, CancellationToken ct);
 
     /// <summary>
     /// 获取月度收款汇总
     /// </summary>
+    /// <param name="companyId">公司 ID，null 表示全部公司</param>
     /// <param name="period">账期 (yyyy-MM)，null 表示当前月</param>
     /// <param name="ct">取消令牌</param>
     /// <returns>月度收款数据</returns>
-    Task<object> GetMonthlyReceiptAsync(string? period, CancellationToken ct);
+    Task<object> GetMonthlyReceiptAsync(Guid? companyId, string? period, CancellationToken ct);
 
     /// <summary>
     /// 获取费用收入统计
