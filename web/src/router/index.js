@@ -532,7 +532,7 @@ const routes = [
             path: 'scheduler/monitor/logs',
             name: 'SystemSchedulerLogs',
             component: () => import('../views/system/scheduler/monitor/logs.vue'),
-            meta: { title: '执行日志', icon: 'Document', hidden: true }
+            meta: { title: '执行日志', icon: 'Document' }
           },
           {
             path: 'holidays',

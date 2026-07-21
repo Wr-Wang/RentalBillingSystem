@@ -4803,6 +4803,41 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[TaskStepLogs]') AND name=N'IX_TaskStepLogs_TaskLogId')
 CREATE INDEX [IX_TaskStepLogs_TaskLogId] ON [TaskStepLogs]([TaskLogId])
 
+
+-- ===================================================================
+-- 57b. BillJobFailedContracts 表：BillJob 失败合同记录表
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[BillJobFailedContracts]'))
+CREATE TABLE [BillJobFailedContracts] (
+    [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY ,
+    [TaskLogId] UNIQUEIDENTIFIER NOT NULL , -- 关联任务日志ID,
+    [ContractId] UNIQUEIDENTIFIER NOT NULL , -- 失败合同ID,
+    [ContractNo] VARCHAR(50) NOT NULL , -- 合同编号,
+    [StepName] VARCHAR(50) NOT NULL , -- 失败步骤,
+    [ErrorMessage] NVARCHAR(2000) NOT NULL , -- 错误消息,
+    [FailedAt] DATETIME2 NOT NULL , -- 失败时间,
+    [IsRetried] BIT NOT NULL DEFAULT 0 , -- 是否已重试,
+    [RetriedAt] DATETIME2 NULL -- 重试时间
+)
+GO
+
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'BillJob 失败合同记录表', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts'
+GO
+
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'关联任务日志ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'TaskLogId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'失败合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'ContractId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同编号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'ContractNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'失败步骤', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'StepName'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'错误消息', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'ErrorMessage'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'失败时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'FailedAt'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'是否已重试', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'IsRetried'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'重试时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'BillJobFailedContracts', @level2type = N'COLUMN', @level2name = N'RetriedAt'
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[BillJobFailedContracts]') AND name=N'IX_BillJobFailedContracts_TaskLogId')
+CREATE INDEX [IX_BillJobFailedContracts_TaskLogId] ON [BillJobFailedContracts]([TaskLogId])
+GO
+
 -- ===================================================================
 -- 57. SystemLogs 表：系统日志表
 -- ===================================================================

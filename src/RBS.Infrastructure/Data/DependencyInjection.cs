@@ -98,6 +98,7 @@ public static class DependencyInjection
         // 用于调度系统的任务日志和步骤日志管理
         services.AddScoped<ITaskLogRepository, DapperTaskLogRepository>();
         services.AddScoped<ITaskStepLogRepository, DapperTaskStepLogRepository>();
+        services.AddScoped<IBillJobFailedContractRepository, DapperBillJobFailedContractRepository>();
 
         // ===== 多租户（Scoped） =====
         // 基于 HttpContext 的 CompanyId 解析，每个请求一个实例

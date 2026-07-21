@@ -369,6 +369,7 @@ export function getMonitorFailures(days) { return request({ url: '/monitor/dashb
 export function queryMonitorLogs(params) { return request({ url: '/monitor/logs', method: 'get', params }) }
 export function getMonitorLogDetail(id) { return request({ url: `/monitor/logs/${id}`, method: 'get' }) }
 export function previewReverse(id) { return request({ url: `/monitor/logs/${id}/previewreverse`, method: 'post' }) }
+export function getMonitorFailedContracts(id) { return request({ url: `/monitor/logs/${id}/failedContracts`, method: 'get' }) }
 
 // Audit
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }

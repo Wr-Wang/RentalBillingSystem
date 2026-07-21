@@ -16,17 +16,20 @@ public class TaskMonitorService : ITaskMonitorService
     private readonly ISqlLoader _sql;
     private readonly ITaskLogRepository _taskLogRepo;
     private readonly ITaskStepLogRepository _stepLogRepo;
+    private readonly IBillJobFailedContractRepository _failedContractRepo;
 
     public TaskMonitorService(
         IDbConnectionFactory db,
         ISqlLoader sql,
         ITaskLogRepository taskLogRepo,
-        ITaskStepLogRepository stepLogRepo)
+        ITaskStepLogRepository stepLogRepo,
+        IBillJobFailedContractRepository failedContractRepo)
     {
         _db = db;
         _sql = sql;
         _taskLogRepo = taskLogRepo;
         _stepLogRepo = stepLogRepo;
+        _failedContractRepo = failedContractRepo;
     }
 
     public async Task<DashboardStatsDto> GetDashboardStatsAsync(CancellationToken ct = default)
@@ -187,6 +190,23 @@ public class TaskMonitorService : ITaskMonitorService
             DebitNoteCount = debitNoteCount,
             JournalCount = journalCount
         };
+    }
+
+    public async Task<List<FailedContractDto>> GetFailedContractsAsync(Guid taskLogId, CancellationToken ct = default)
+    {
+        var contracts = await _failedContractRepo.GetByTaskLogIdAsync(taskLogId, ct);
+        return contracts.Select(c => new FailedContractDto
+        {
+            Id = c.Id,
+            TaskLogId = c.TaskLogId,
+            ContractId = c.ContractId,
+            ContractNo = c.ContractNo,
+            StepName = c.StepName,
+            ErrorMessage = c.ErrorMessage,
+            FailedAt = c.FailedAt,
+            IsRetried = c.IsRetried,
+            RetriedAt = c.RetriedAt
+        }).ToList();
     }
 
     private class FailureRow

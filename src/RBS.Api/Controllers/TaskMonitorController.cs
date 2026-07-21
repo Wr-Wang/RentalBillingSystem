@@ -65,6 +65,14 @@ public class TaskMonitorController : ControllerBase
         }
     }
 
+    /// <summary>获取失败合同明细（BillJob）</summary>
+    [HttpGet("logs/{id}/failedContracts")]
+    public async Task<IActionResult> GetFailedContracts(Guid id, CancellationToken ct)
+    {
+        var contracts = await _monitorService.GetFailedContractsAsync(id, ct);
+        return Ok(contracts);
+    }
+
     /// <summary>反转预览</summary>
     [HttpPost("logs/{id}/previewreverse")]
     public async Task<IActionResult> PreviewReverse(Guid id, CancellationToken ct)

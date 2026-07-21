@@ -738,6 +738,21 @@
   <select id="Scheduling.Select.TaskStepLog.ByTaskLogId">
     <![CDATA[SELECT * FROM TaskStepLogs WHERE TaskLogId=@Id ORDER BY SortOrder, StartedAt]]>
   </select>
+  <!-- ===== BillJob 失败合同记录 ===== -->
+  <insert id="Scheduling.Insert.BillJobFailedContract.Batch">
+    <![CDATA[INSERT INTO BillJobFailedContracts (TaskLogId, ContractId, ContractNo, StepName, ErrorMessage, FailedAt, IsRetried)
+      VALUES (@TaskLogId, @ContractId, @ContractNo, @StepName, @ErrorMessage, @FailedAt, 0)]]>
+  </insert>
+  <select id="Scheduling.Select.BillJobFailedContract.ByTaskLogId">
+    <![CDATA[SELECT * FROM BillJobFailedContracts WHERE TaskLogId = @TaskLogId ORDER BY FailedAt]]>
+  </select>
+  <update id="Scheduling.Update.BillJobFailedContract.MarkRetried">
+    <![CDATA[UPDATE BillJobFailedContracts SET IsRetried = 1, RetriedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id]]>
+  </update>
+  <update id="Scheduling.Update.BillJobFailedContract.MarkRetriedBatch">
+    <![CDATA[UPDATE BillJobFailedContracts SET IsRetried = 1, RetriedAt = DATEADD(HOUR, 8, GETUTCDATE())
+      WHERE TaskLogId = @TaskLogId AND ContractId IN @ContractIds]]>
+  </update>
 
   <!-- ================================================================
        模块：Notification（通知）
@@ -796,6 +811,9 @@
   </select>
   <select id="Billing.Select.Journal.ExistsByKey">
     <![CDATA[SELECT COUNT(1) FROM Journals WHERE ContractId=@C AND FeeCodeId=@F AND Period=@P]]>
+  </select>
+  <select id="Billing.Select.Journal.ExistingFeeCodesByContractPeriod">
+    <![CDATA[SELECT FeeCodeId FROM Journals WHERE ContractId = @ContractId AND Period = @Period]]>
   </select>
   <select id="Billing.Select.Journal.PeriodFeePairsByContract">
     <![CDATA[SELECT Period, FeeCodeId FROM Journals WHERE ContractId=@CId]]>

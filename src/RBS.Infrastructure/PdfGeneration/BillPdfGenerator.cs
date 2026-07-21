@@ -44,7 +44,7 @@ public class BillPdfGenerator : IBillPdfGenerator
     public byte[] Generate(DebitNote note, IReadOnlyList<(string FeeName, decimal Amount)> items,
         string contractNo, string tenantName, string? companyName,
         string? buildingAddress = null, string? generatedAt = null,
-        decimal previousBalance = 0, IReadOnlyList<(decimal Amount, string Date, string ReceiptNo)>? receipts = null)
+        decimal previousBalance = 0, IReadOnlyList<(decimal Amount, string Date, string Channel)>? receipts = null)
     {
         var title = "通知单";
         var genDate = generatedAt ?? note.CreatedAt.ToString("yyyy-MM-dd");
@@ -85,7 +85,7 @@ public class BillPdfGenerator : IBillPdfGenerator
         IReadOnlyList<(string FeeName, decimal Amount)> items,
         string contractNo, string tenantName, string? buildingAddress = null,
         string? genDate = null, decimal previousBalance = 0,
-        IReadOnlyList<(decimal Amount, string Date, string ReceiptNo)>? receipts = null, decimal totalDue = 0)
+        IReadOnlyList<(decimal Amount, string Date, string Channel)>? receipts = null, decimal totalDue = 0)
     {
         container.Column(col =>
         {
@@ -145,7 +145,7 @@ public class BillPdfGenerator : IBillPdfGenerator
                     foreach (var r in receipts)
                     {
                         table.Cell().Border(1).BorderColor(borderColor2).PaddingVertical(10).PaddingHorizontal(12).AlignCenter().Text((idx++).ToString());
-                        var label = string.IsNullOrEmpty(r.ReceiptNo) ? "收款" : $"收款({r.ReceiptNo})";
+                        var label = $"收款({r.Channel})";
                         table.Cell().Border(1).BorderColor(borderColor2).PaddingVertical(10).PaddingHorizontal(12).Text(label);
                         table.Cell().Border(1).BorderColor(borderColor2).PaddingVertical(10).PaddingHorizontal(12).AlignCenter().Text(r.Date);
                         table.Cell().Border(1).BorderColor(borderColor2).PaddingVertical(10).PaddingHorizontal(12).AlignRight().Text($"-{r.Amount:N2}");

@@ -124,4 +124,28 @@ public class ReversePreviewDto
     public int JournalCount { get; set; }
 }
 
+// ===== 失败合同 =====
+
+public class FailedContractDto
+{
+    public long Id { get; set; }
+    public Guid TaskLogId { get; set; }
+    public Guid ContractId { get; set; }
+    public string ContractNo { get; set; } = "";
+    public string StepName { get; set; } = "";
+    public string ErrorMessage { get; set; } = "";
+    public DateTime FailedAt { get; set; }
+    public bool IsRetried { get; set; }
+    public DateTime? RetriedAt { get; set; }
+
+    /// <summary>步骤中文名（前端展示用）</summary>
+    public string StepDisplayName => StepName switch
+    {
+        "BillStep02" => "加载费用配置",
+        "BillStep03" => "生成应收/GL",
+        "BillStep04" => "生成账单快照",
+        _ => StepName
+    };
+}
+
 // 分页结果复用 RBS.Core.Interfaces.Repositories.PagedResult<T>

@@ -28,4 +28,7 @@ public interface ITaskMonitorService
 
     /// <summary>反转预览 — 估算反转影响范围</summary>
     Task<ReversePreviewDto> PreviewReverseAsync(Guid taskLogId, CancellationToken ct = default);
+
+    /// <summary>获取失败合同明细（BillJob）</summary>
+    Task<List<FailedContractDto>> GetFailedContractsAsync(Guid taskLogId, CancellationToken ct = default);
 }

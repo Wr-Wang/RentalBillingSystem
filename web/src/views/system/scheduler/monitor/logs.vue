@@ -136,8 +136,31 @@
     </div>
 
     <!-- 步骤详情 Drawer -->
-    <el-drawer v-model="stepDrawerVisible" title="步骤详情" :size="700" destroy-on-close>
-      <StepWaterfall :log-detail="currentDetail" :steps="currentSteps" />
+    <el-drawer v-model="stepDrawerVisible" title="步骤详情" :size="750" destroy-on-close>
+      <el-tabs v-if="currentDetail" type="border-card">
+        <el-tab-pane label="步骤瀑布图">
+          <StepWaterfall :log-detail="currentDetail" :steps="currentSteps" />
+        </el-tab-pane>
+        <el-tab-pane v-if="currentDetail.taskName === 'BillJob'" label="失败合同">
+          <el-table v-if="failedContracts.length > 0" :data="failedContracts" stripe size="small">
+            <el-table-column prop="contractNo" label="合同编号" width="180" />
+            <el-table-column label="失败步骤" width="140">
+              <template #default="{ row }">{{ row.stepDisplayName }}</template>
+            </el-table-column>
+            <el-table-column prop="errorMessage" label="错误信息" min-width="200" />
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag v-if="row.isRetried" type="success" size="small">已修复</el-tag>
+                <el-tag v-else type="danger" size="small">待修复</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="时间" width="160">
+              <template #default="{ row }">{{ chinaTime.formatDate(row.failedAt) }}</template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="无失败合同记录" />
+        </el-tab-pane>
+      </el-tabs>
     </el-drawer>
   </div>
 </template>
@@ -147,7 +170,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { chinaTime } from '@/utils/chinaTime'
 import {
-  queryMonitorLogs, getMonitorLogDetail,
+  queryMonitorLogs, getMonitorLogDetail, getMonitorFailedContracts,
   previewReverse
 } from '../../../../api/index'
 import { executeJob, reverseTask } from '../../../../api/index'
@@ -223,6 +246,8 @@ function onSelectionChange(rows) {
 const stepDrawerVisible = ref(false)
 const currentDetail = ref(null)
 const currentSteps = ref([])
+const failedContracts = ref([])
+const failedLoading = ref(false)
 
 async function openStepDrawer(row) {
   try {
@@ -230,6 +255,14 @@ async function openStepDrawer(row) {
     currentDetail.value = detail
     currentSteps.value = detail.steps || []
     stepDrawerVisible.value = true
+    // 加载失败合同（仅 BillJob）
+    if (row.taskName === 'BillJob') {
+      failedLoading.value = true
+      try {
+        failedContracts.value = await getMonitorFailedContracts(row.id) || []
+      } catch { failedContracts.value = [] }
+      failedLoading.value = false
+    }
   } catch {
     ElMessage.error('获取步骤详情失败')
   }
