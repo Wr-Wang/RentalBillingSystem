@@ -36,4 +36,13 @@ public class ReportsController : ControllerBase
     [HttpGet("occupancyrate")]
     public async Task<IActionResult> GetOccupancyRate([FromQuery] string? period, CancellationToken ct)
         => Ok(await _reporting.GetOccupancyRateAsync(period, ct));
+
+    /// <summary>
+    /// 多公司总览 — 聚合所有公司的资产、财务、合同指标
+    /// </summary>
+    /// <param name="period">账期 (yyyy-MM)，null 表示当前月</param>
+    /// <param name="ct">取消令牌</param>
+    [HttpGet("companyoverview")]
+    public async Task<IActionResult> GetMultiCompanyOverview([FromQuery] string? period, CancellationToken ct)
+        => Ok(await _reporting.GetMultiCompanyOverviewAsync(period, ct));
 }

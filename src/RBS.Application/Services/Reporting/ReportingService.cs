@@ -1,5 +1,6 @@
 using Dapper;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.Reporting;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
@@ -120,5 +121,112 @@ public class ReportingService : IReportingService
         var result = await conn.QueryAsync(
             _sql.Get("Billing.Select.HousingUnit.OccupancyRate"));
         return result;
+    }
+
+    public async Task<MultiCompanyOverviewDto> GetMultiCompanyOverviewAsync(string? period, CancellationToken ct)
+    {
+        var now = ChinaTime.Now;
+        var p = period ?? $"{now.Year}-{now.Month:D2}";
+
+        // 计算上月账期
+        var prevMonth = now.AddMonths(-1);
+        var prevPeriod = $"{prevMonth.Year}-{prevMonth.Month:D2}";
+
+        using var conn = _db.CreateConnection(); conn.Open();
+
+        var rows = await conn.QueryAsync<MultiCompanyOverviewRow>(
+            _sql.Get("Billing.Select.Report.MultiCompanyOverview"),
+            new { Period = p, PrevPeriod = prevPeriod });
+
+        var items = rows.Select(r => new CompanyOverviewItem
+        {
+            Id = r.Id,
+            Name = r.Name,
+            IsActive = r.IsActive,
+            BuildingCount = r.BuildingCount,
+            RoomCount = r.RoomCount,
+            RentedCount = r.RentedCount,
+            OccupancyRate = r.OccupancyRate,
+            MonthlyReceivable = r.MonthlyReceivable,
+            MonthlyReceived = r.MonthlyReceived,
+            CollectionRate = r.CollectionRate,
+            OverdueAmount = r.OverdueAmount,
+            OverdueCount = r.OverdueCount,
+            ActiveContractCount = r.ActiveContractCount,
+            TotalContractCount = r.TotalContractCount,
+            PrevMonthCollectionRate = r.PrevMonthCollectionRate > 0 ? r.PrevMonthCollectionRate : null
+        }).ToList();
+
+        var activeItems = items.Where(i => i.IsActive).ToList();
+
+        var totalBuilding = activeItems.Sum(i => i.BuildingCount);
+        var totalRoom = activeItems.Sum(i => i.RoomCount);
+        var totalRented = activeItems.Sum(i => i.RentedCount);
+        var totalReceivable = activeItems.Sum(i => i.MonthlyReceivable);
+        var totalReceived = activeItems.Sum(i => i.MonthlyReceived);
+        var totalOverdue = activeItems.Sum(i => i.OverdueAmount);
+        var totalOverdueCount = activeItems.Sum(i => i.OverdueCount);
+        var totalActiveContracts = activeItems.Sum(i => i.ActiveContractCount);
+
+        var avgOccupancy = activeItems.Count > 0
+            ? Math.Round(activeItems.Average(i => i.OccupancyRate), 2)
+            : 0m;
+        var avgCollection = totalReceivable > 0
+            ? Math.Round(totalReceived / totalReceivable * 100, 2)
+            : 0m;
+
+        // 环比
+        decimal? prevCollectionRate = null;
+        if (activeItems.Any(i => i.PrevMonthCollectionRate.HasValue))
+        {
+            var prevCollectionRates = activeItems
+                .Where(i => i.PrevMonthCollectionRate.HasValue && i.MonthlyReceivable > 0)
+                .Select(i => i.PrevMonthCollectionRate!.Value);
+            if (prevCollectionRates.Any())
+                prevCollectionRate = Math.Round(prevCollectionRates.Average(), 2);
+        }
+
+        return new MultiCompanyOverviewDto
+        {
+            Period = p,
+            TotalCompanies = items.Count,
+            ActiveCompanies = activeItems.Count,
+            TotalBuildings = totalBuilding,
+            TotalRooms = totalRoom,
+            TotalRented = totalRented,
+            AvgOccupancyRate = avgOccupancy,
+            TotalMonthlyReceivable = totalReceivable,
+            TotalMonthlyReceived = totalReceived,
+            AvgCollectionRate = avgCollection,
+            TotalOverdueAmount = totalOverdue,
+            TotalOverdueCount = totalOverdueCount,
+            TotalActiveContracts = totalActiveContracts,
+            CollectionRateChange = null,      // 同比需要去年数据
+            CollectionRateMomChange = prevCollectionRate.HasValue && prevCollectionRate > 0
+                ? Math.Round(avgCollection - prevCollectionRate.Value, 2)
+                : null,
+            OccupancyRateChange = null,
+            Companies = items
+        };
+    }
+
+    /// <summary>多公司总览查询中间行（Dapper 映射用）</summary>
+    private class MultiCompanyOverviewRow
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public int BuildingCount { get; set; }
+        public int RoomCount { get; set; }
+        public int RentedCount { get; set; }
+        public decimal OccupancyRate { get; set; }
+        public decimal MonthlyReceivable { get; set; }
+        public decimal MonthlyReceived { get; set; }
+        public decimal CollectionRate { get; set; }
+        public decimal OverdueAmount { get; set; }
+        public int OverdueCount { get; set; }
+        public int ActiveContractCount { get; set; }
+        public int TotalContractCount { get; set; }
+        public decimal PrevMonthCollectionRate { get; set; }
     }
 }

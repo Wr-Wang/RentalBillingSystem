@@ -304,6 +304,9 @@ export function getMonthlyReceipt(params) { return request({ url: '/reports/mont
 export function getFeeRevenue(params) { return request({ url: '/reports/feerevenue', method: 'get', params }) }
 export function getOccupancyRate(params) { return request({ url: '/reports/occupancyrate', method: 'get', params }) }
 
+/** 多公司总览 — 聚合资产、财务、合同指标（超管专用） */
+export function getMultiCompanyOverview(params) { return request({ url: '/reports/companyoverview', method: 'get', params }) }
+
 // Debit Notes (Bills)
 export function getDebitNotes(params) { return request({ url: '/debitnotes', method: 'get', params }) }
 export function getDebitNote(id) { return request({ url: `/debitnotes/${id}`, method: 'get' }) }

@@ -1,3 +1,5 @@
+using RBS.Application.DTOs.Reporting;
+
 namespace RBS.Application.Common.Interfaces;
 
 /// <summary>报表服务 — 将所有报表查询逻辑从控制器抽取到此服务</summary>
@@ -54,4 +56,12 @@ public interface IReportingService
     /// <param name="ct">取消令牌</param>
     /// <returns>出租率数据</returns>
     Task<object> GetOccupancyRateAsync(string? period, CancellationToken ct);
+
+    /// <summary>
+    /// 多公司总览 — 聚合所有公司的资产、财务、合同指标
+    /// </summary>
+    /// <param name="period">账期 (yyyy-MM)，null 表示当前月</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>多公司总览聚合数据</returns>
+    Task<MultiCompanyOverviewDto> GetMultiCompanyOverviewAsync(string? period, CancellationToken ct);
 }

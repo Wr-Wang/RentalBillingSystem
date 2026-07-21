@@ -363,6 +363,72 @@
       FROM HousingUnits hu WHERE hu.BuildingName IS NOT NULL GROUP BY hu.BuildingName, hu.Id ORDER BY hu.BuildingName]]>
   </select>
 
+  <!-- 多公司总览 — 聚合各公司资产、财务、合同指标 -->
+  <select id="Billing.Select.Report.MultiCompanyOverview">
+    <![CDATA[SELECT
+      c.Id, c.Name, c.IsActive,
+      COALESCE(h.BuildingCount, 0) AS BuildingCount,
+      COALESCE(h.RoomCount, 0) AS RoomCount,
+      COALESCE(h.RentedCount, 0) AS RentedCount,
+      COALESCE(h.OccupancyRate, 0) AS OccupancyRate,
+      COALESCE(j.MonthlyReceivable, 0) AS MonthlyReceivable,
+      COALESCE(j.MonthlyReceived, 0) AS MonthlyReceived,
+      CASE WHEN COALESCE(j.MonthlyReceivable, 0) > 0
+        THEN ROUND(COALESCE(j.MonthlyReceived, 0) / j.MonthlyReceivable * 100, 2)
+        ELSE 0 END AS CollectionRate,
+      COALESCE(o.OverdueAmount, 0) AS OverdueAmount,
+      COALESCE(o.OverdueCount, 0) AS OverdueCount,
+      COALESCE(ct.ActiveContractCount, 0) AS ActiveContractCount,
+      COALESCE(ct.TotalContractCount, 0) AS TotalContractCount,
+      COALESCE(pc.PrevMonthCollectionRate, 0) AS PrevMonthCollectionRate
+    FROM Companies c
+    LEFT JOIN (
+      SELECT CompanyId,
+        COUNT(DISTINCT BuildingName) AS BuildingCount,
+        COUNT(1) AS RoomCount,
+        SUM(CASE WHEN Status = 'Rented' THEN 1 ELSE 0 END) AS RentedCount,
+        ROUND(CAST(SUM(CASE WHEN Status = 'Rented' THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(1), 0) * 100, 2) AS OccupancyRate
+      FROM HousingUnits GROUP BY CompanyId
+    ) h ON h.CompanyId = c.Id
+    LEFT JOIN (
+      SELECT CompanyId,
+        SUM(Amount) AS MonthlyReceivable,
+        ISNULL((SELECT SUM(r.Amount) FROM Receipts r
+          WHERE r.CompanyId = j.CompanyId AND FORMAT(r.ReceivedDate, 'yyyy-MM') = @Period AND r.Status = 'Confirmed'), 0) AS MonthlyReceived
+      FROM Journals j
+      WHERE j.Period = @Period
+      GROUP BY j.CompanyId
+    ) j ON j.CompanyId = c.Id
+    LEFT JOIN (
+      SELECT CompanyId,
+        SUM(OutstandingBalance) AS OverdueAmount,
+        COUNT(1) AS OverdueCount
+      FROM Contracts
+      WHERE OutstandingBalance > 0
+      GROUP BY CompanyId
+    ) o ON o.CompanyId = c.Id
+    LEFT JOIN (
+      SELECT CompanyId,
+        SUM(CASE WHEN Status IN ('Active', 'InEffect') THEN 1 ELSE 0 END) AS ActiveContractCount,
+        COUNT(1) AS TotalContractCount
+      FROM Contracts GROUP BY CompanyId
+    ) ct ON ct.CompanyId = c.Id
+    LEFT JOIN (
+      SELECT j2.CompanyId,
+        ROUND(ISNULL(r2.MonthlyReceived, 0) / NULLIF(j2.MonthlyReceivable, 0) * 100, 2) AS PrevMonthCollectionRate
+      FROM (
+        SELECT CompanyId, SUM(Amount) AS MonthlyReceivable
+        FROM Journals WHERE Period = @PrevPeriod GROUP BY CompanyId
+      ) j2
+      LEFT JOIN (
+        SELECT CompanyId, SUM(Amount) AS MonthlyReceived
+        FROM Receipts WHERE FORMAT(ReceivedDate, 'yyyy-MM') = @PrevPeriod AND Status = 'Confirmed'
+        GROUP BY CompanyId
+      ) r2 ON r2.CompanyId = j2.CompanyId
+    ) pc ON pc.CompanyId = c.Id
+    ORDER BY c.Name]]>
+  </select>
+
   <!-- ================================================================
        模块：MeterReading（抄表）
        ================================================================ -->
