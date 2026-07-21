@@ -309,17 +309,22 @@
        模块：DebitNote（账单）
        ================================================================ -->
   <select id="Billing.Select.DebitNote.ByCompany">
-    <![CDATA[SELECT dn.*, c.ContractNo
+    <![CDATA[SELECT dn.Id, dn.ContractId, dn.BillNo, dn.PeriodYear, dn.PeriodMonth, dn.DueDate,
+      dn.TotalAmount, dn.TotalReceived, dn.Status, dn.GeneratedAt, dn.IsHistorical, dn.CompanyId, dn.CreatedAt,
+      c.ContractNo,
+      t.Name AS TenantName,
+      h.FullCode AS RoomName
       FROM DebitNotes dn
       JOIN Contracts c ON c.Id = dn.ContractId
-      WHERE c.CompanyId = @CompanyId
-      ORDER BY dn.CreatedAt DESC]]>
-  </select>
-  <select id="Billing.Select.DebitNote.ByPeriodCompany">
-    <![CDATA[SELECT dn.*, c.ContractNo
-      FROM DebitNotes dn
-      JOIN Contracts c ON c.Id = dn.ContractId
-      WHERE c.CompanyId = @CompanyId AND dn.Period = @Period
+      LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
+      LEFT JOIN Tenants t ON t.Id = ct.TenantId
+      LEFT JOIN HousingUnits h ON h.Id = c.RoomId
+      WHERE (@CompanyId IS NULL OR c.CompanyId = @CompanyId)
+        AND (@PeriodYear IS NULL OR dn.PeriodYear = @PeriodYear)
+        AND (@PeriodMonth IS NULL OR dn.PeriodMonth = @PeriodMonth)
+        AND (@ContractId IS NULL OR dn.ContractId = @ContractId)
+        AND (@Keyword IS NULL OR c.ContractNo LIKE @Keyword)
+        AND (@Status IS NULL OR dn.Status = @Status)
       ORDER BY dn.CreatedAt DESC]]>
   </select>
   <select id="Billing.Select.DebitNote.ByTenantId">
@@ -331,12 +336,96 @@
       ORDER BY dn.CreatedAt DESC]]>
   </select>
   <insert id="Billing.Insert.DebitNoteItem.Default">
-    <![CDATA[INSERT INTO DebitNoteItems (Id, DebitNoteId, FeeCodeId, Amount, CreatedBy, CreatedAt)
-      VALUES (@p0, @p1, @p2, @p3, @p4, @p5)]]>
+    <![CDATA[INSERT INTO DebitNoteItems (Id, DebitNoteId, FeeCodeId, FeeName, Amount, CreatedBy, CreatedAt)
+      VALUES (@Id, @DebitNoteId, @FeeCodeId, @FeeName, @Amount, @CreatedBy, @CreatedAt)]]>
   </insert>
   <select id="Billing.Select.DebitNoteItem.ByDebitNoteId">
     <![CDATA[SELECT * FROM DebitNoteItems WHERE DebitNoteId=@Id ORDER BY CreatedAt]]>
   </select>
+  <!-- 作废账单 -->
+  <update id="DebitNote.Update.DebitNote.Cancel">
+    <![CDATA[UPDATE DebitNotes SET Status='Cancelled',
+      UpdatedBy=@CancelledBy, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE())
+      WHERE Id=@Id AND Status IN ('Published', 'Draft')]]>
+  </update>
+  <!-- 收款回写账单：递增已收、更新状态 -->
+  <update id="DebitNote.Update.DebitNote.AddPayment">
+    <![CDATA[UPDATE DebitNotes SET
+      TotalReceived = TotalReceived + @Amount,
+      Status = CASE
+        WHEN TotalAmount - (TotalReceived + @Amount) <= 0 THEN 'Paid'
+        WHEN TotalReceived + @Amount > 0 THEN 'Partial'
+        ELSE Status END
+      WHERE ContractId = @ContractId AND PeriodYear = @PeriodYear AND PeriodMonth = @PeriodMonth
+        AND Status IN ('Published', 'Partial')]]>
+  </update>
+  <!-- 冲销回滚账单：扣减已收、还原状态 -->
+  <update id="DebitNote.Update.DebitNote.ReversePayment">
+    <![CDATA[UPDATE DebitNotes SET
+      TotalReceived = TotalReceived - @Amount,
+      Status = CASE
+        WHEN TotalAmount - (TotalReceived - @Amount) <= 0 THEN 'Paid'
+        WHEN TotalReceived - @Amount > 0 THEN 'Partial'
+        ELSE 'Published' END
+      WHERE ContractId = @ContractId AND PeriodYear = @PeriodYear AND PeriodMonth = @PeriodMonth
+        AND Status IN ('Published', 'Partial', 'Paid')]]>
+  </update>
+  <!-- 手动生成账单 INSERT -->
+  <insert id="DebitNote.Insert.DebitNote.ManualGenerate">
+    <![CDATA[INSERT INTO DebitNotes (Id, ContractId, PeriodYear, PeriodMonth, BillNo, DueDate,
+      TotalAmount, TotalReceived, Status, GeneratedAt, GeneratedBy, IsHistorical, CompanyId, CreatedBy, CreatedAt)
+      VALUES (@Id, @ContractId, @PeriodYear, @PeriodMonth, @BillNo, @DueDate,
+      @TotalAmount, 0, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @GeneratedBy, 0, @CompanyId, @CreatedBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+  </insert>
+  <!-- 账单详情（含合同号+公司名） -->
+  <select id="DebitNote.Select.DebitNote.DetailById">
+    <![CDATA[SELECT dn.Id, dn.ContractId, dn.BillNo, dn.PeriodYear, dn.PeriodMonth, dn.DueDate,
+      dn.TotalAmount, dn.TotalReceived, dn.Status, dn.GeneratedAt, dn.IsHistorical, dn.CompanyId, dn.CreatedAt,
+      c.ContractNo,
+      t.Name AS TenantName,
+      h.FullCode AS RoomName,
+      h.BuildingAddress AS BuildingAddress,
+      co.Name AS CompanyName
+      FROM DebitNotes dn
+      JOIN Contracts c ON c.Id = dn.ContractId
+      LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
+      LEFT JOIN Tenants t ON t.Id = ct.TenantId
+      LEFT JOIN HousingUnits h ON h.Id = c.RoomId
+      LEFT JOIN Companies co ON co.Id = dn.CompanyId
+      WHERE dn.Id = @Id]]>
+  </select>
+  <!-- 账单前后期结余：合同在指定账期之前的未结清总额 -->
+  <select id="Billing.Select.Journal.PreviousBalance">
+    <![CDATA[SELECT ISNULL(SUM(j.Amount), 0) - ISNULL((
+      SELECT SUM(r.Amount) FROM Receipts r
+      LEFT JOIN PaymentChannels p ON p.Id = r.PaymentChannelId
+      WHERE r.ContractId = @ContractId
+        AND (r.ReceivedDate < DATEFROMPARTS(@Year, @Month, 1))
+        AND r.Status = 'Confirmed'
+    ), 0) FROM Journals j
+    WHERE j.ContractId = @ContractId
+      AND (j.Period < CONCAT(@Year, '-', RIGHT('0' + CAST(@Month AS VARCHAR), 2)))]]>
+  </select>
+  <!-- 账单当期收款记录 -->
+  <select id="Billing.Select.Receipt.ByContractAndPeriod">
+    <![CDATA[SELECT r.Amount, r.ReceivedDate, r.ReceiptNo, p.Name AS PaymentChannel
+      FROM Receipts r
+      LEFT JOIN PaymentChannels p ON p.Id = r.PaymentChannelId
+      WHERE r.ContractId = @ContractId
+        AND YEAR(r.ReceivedDate) = @Year AND MONTH(r.ReceivedDate) = @Month
+        AND r.Status = 'Confirmed'
+      ORDER BY r.ReceivedDate]]>
+  </select>
+  <!-- 删除账单（硬删，用于重新生成）：删明细 → 重置 Journals → 删主表 -->
+  <delete id="DebitNote.Delete.DebitNoteItems.ByDebitNoteId">
+    <![CDATA[DELETE FROM DebitNoteItems WHERE DebitNoteId = @Id]]>
+  </delete>
+  <update id="DebitNote.Update.Journal.ResetBilledByDebitNoteId">
+    <![CDATA[UPDATE Journals SET IsBilled = 0, DebitNoteId = NULL WHERE DebitNoteId = @Id]]>
+  </update>
+  <delete id="DebitNote.Delete.DebitNote.ById">
+    <![CDATA[DELETE FROM DebitNotes WHERE Id = @Id]]>
+  </delete>
 
   <!-- 收款报表查询 -->
   <select id="Billing.Select.Receipt.DailyReceipt">
@@ -711,6 +800,7 @@
         UNION
         SELECT v.Id FROM Vouchers v
         INNER JOIN Receipts r ON r.Id = v.SourceEntityId
+      LEFT JOIN PaymentChannels p ON p.Id = r.PaymentChannelId
         WHERE r.ContractId=@ContractId
       )]]>
   </select>
@@ -745,12 +835,10 @@
   <!-- Voucher 和旧 JournalEntry SQL 已删除（系统不再使用）-->
   <!-- ReceivablePlan SQL 已删除（由 Journals 替代）-->
   <insert id="Lease.Insert.DebitNote.FromBillJob">
-    <![CDATA[INSERT INTO DebitNotes (Id, NoteNo, ContractId, ContractNo, Period, CompanyId,
-      RoomFullCode, TenantName, TotalAmount, TotalReceived, TotalPrepaid, BalanceDue,
-      IsHistorical, DueDate, Status, GeneratedAt, BillJobTaskLogId, CreatedBy, CreatedAt)
-      VALUES (@Id, @NoteNo, @CId, @CNo, @Period, @CoId,
-      @Room, @Tenant, @Amt, 0, @Prepaid, @Amt - @Prepaid,
-      @IsHist, @Due, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @TaskLogId, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+    <![CDATA[INSERT INTO DebitNotes (Id, BillNo, ContractId, PeriodYear, PeriodMonth, CompanyId,
+      TotalAmount, TotalReceived, IsHistorical, DueDate, Status, GeneratedAt, GeneratedBy, CreatedBy, CreatedAt)
+      VALUES (@Id, @NoteNo, @CId, @PeriodYear, @PeriodMonth, @CoId,
+      @Amt, 0, @IsHist, @Due, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @CBy, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
 
   <!-- ===== Journal（日记账）===== -->
@@ -970,7 +1058,7 @@
     <![CDATA[SELECT ISNULL(PrepaidBalance,0) FROM Contracts WHERE Id = @Id]]>
   </select>
   <select id="Receipt.Select.Receipt.WithContractBalance">
-    <![CDATA[SELECT r.Amount, r.ContractId, c.OutstandingBalance FROM Receipts r LEFT JOIN Contracts c ON c.Id = r.ContractId WHERE r.Id = @Id]]>
+    <![CDATA[SELECT r.Amount, r.ContractId, r.ReceivedDate, c.OutstandingBalance FROM Receipts r LEFT JOIN Contracts c ON c.Id = r.ContractId WHERE r.Id = @Id]]>
   </select>
   <select id="Receipt.Select.Receipt.WithContractInfo">
     <![CDATA[SELECT r.Amount, r.ContractId, r.ReceivedDate, r.CompanyId, r.ReceiptNo, c.ContractNo FROM Receipts r LEFT JOIN Contracts c ON c.Id = r.ContractId WHERE r.Id = @Id]]>

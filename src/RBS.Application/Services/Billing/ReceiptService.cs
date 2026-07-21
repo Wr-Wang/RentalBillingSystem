@@ -118,6 +118,14 @@ public class ReceiptService : IReceiptService
                                 SId = subjects["2203"], SCode = "2203", Dir = "Credit",
                                 Amt = overflow, SrcType = "Receipt", SrcId = id,
                                 Desc = (string)receiptFull.ReceiptNo, CBy = Guid.Empty }, tx);
+
+                    // 4. 回写账单已收金额（利用已算出的 period/amt/cId）
+                    var pParts = period.Split('-');
+                    var pYear = int.Parse(pParts[0]);
+                    var pMonth = int.Parse(pParts[1]);
+                    await conn.ExecuteAsync(
+                        _sql.Get("DebitNote.Update.DebitNote.AddPayment"),
+                        new { ContractId = cId, PeriodYear = pYear, PeriodMonth = pMonth, Amount = amt }, tx);
                 }
             }
 
@@ -195,6 +203,14 @@ public class ReceiptService : IReceiptService
         if (overflow > 0)
             await conn.ExecuteAsync(_sql.Get("Accounting.Update.Contract.PrepaidBalanceDecrement"),
                 new { Id = cId, Amt = overflow }, tx);
+
+        // 回滚账单已收金额
+        var rvParts = period.Split('-');
+        var rvYear = int.Parse(rvParts[0]);
+        var rvMonth = int.Parse(rvParts[1]);
+        await conn.ExecuteAsync(
+            _sql.Get("DebitNote.Update.DebitNote.ReversePayment"),
+            new { ContractId = cId, PeriodYear = rvYear, PeriodMonth = rvMonth, Amount = amt }, tx);
 
         entity.Cancel();
         await _uow.Receipts.UpdateAsync(entity, ct);

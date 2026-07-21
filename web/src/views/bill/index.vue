@@ -76,27 +76,14 @@
         <el-table-column prop="period" label="账期" width="80" sortable="custom" />
         <el-table-column prop="dueDate" label="到期日" width="100" sortable="custom" />
         <el-table-column prop="totalAmount" label="应收总额" width="120" sortable="custom">
-          <template #default="{ row }">¥{{ row.totalAmount?.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="totalReceived" label="已收" width="110" sortable="custom">
-          <template #default="{ row }">¥{{ row.totalReceived?.toLocaleString() }}</template>
+          <template #default="{ row }">{{ formatMoney(row.totalAmount) }}</template>
         </el-table-column>
         <el-table-column label="欠费" width="110">
           <template #default="{ row }">
             <span v-if="row.totalAmount - row.totalReceived > 0" style="color: #f56c6c; font-weight: 600;">
-              ¥{{ (row.totalAmount - row.totalReceived).toLocaleString() }}
+              {{ formatMoney(row.totalAmount - row.totalReceived) }}
             </span>
             <span v-else style="color: #67c23a;">已结清</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="90">
-          <template #default="{ row }">
-            <el-tag
-              :type="row.status === 'Paid' ? 'success' : row.status === 'Partial' ? 'warning' : row.status === 'Cancelled' ? 'info' : 'danger'"
-              size="small"
-            >
-              {{ row.status === 'Paid' ? '已付清' : row.status === 'Partial' ? '部分' : row.status === 'Cancelled' ? '已取消' : '待收款' }}
-            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="历史标记" width="80" align="center">
@@ -105,8 +92,10 @@
             <span v-else style="color: #c0c4cc;">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="generatedAt" label="生成时间" width="160" sortable="custom" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="出账日期" width="100" sortable="custom" prop="billedDate">
+          <template #default="{ row }">{{ row.billedDate || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button text size="small" type="primary" @click="previewBill(row)">
               <el-icon><View /></el-icon>预览
@@ -118,6 +107,24 @@
               @click="exportPdf(row)"
             >
               <el-icon><Download /></el-icon>{{ row.isHistorical ? '历史PDF' : 'PDF' }}
+            </el-button>
+            <el-button
+              v-if="row.status !== 'Cancelled'"
+              text
+              size="small"
+              type="danger"
+              @click="handleCancel(row)"
+            >
+              作废
+            </el-button>
+            <el-button
+              v-if="row.status !== 'Paid'"
+              text
+              size="small"
+              type="danger"
+              @click="handleDelete(row)"
+            >
+              删除
             </el-button>
           </template>
         </el-table-column>
@@ -142,8 +149,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getDebitNotes, exportDebitNotePdf, getContracts } from '../../api/index'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getDebitNotes, exportDebitNotePdf, getContracts, cancelDebitNote, deleteDebitNote } from '../../api/index'
+import { formatMoney } from '../../utils/index'
 import { useUserStore } from '../../store/user'
 
 const router = useRouter()
@@ -197,20 +205,21 @@ async function fetchList() {
     }
     const res = await getDebitNotes(params)
     const items = res.items || res.data || []
-    // API 返回字段映射
+    // API 返回字段映射（数据库字段：BillNo, PeriodYear, PeriodMonth）
     billList.value = items.map(n => ({
       id: n.id,
-      billNo: n.noteNo || n.billNo,
+      billNo: n.billNo || '',
       contractId: n.contractId,
       contractNo: n.contractNo || '',
-      tenantName: n.tenantName || n.tenant?.name || '',
-      roomName: n.roomFullCode || n.roomName || '',
-      period: n.period,
+      tenantName: n.tenantName || '',
+      roomName: n.roomName || '',
+      period: n.periodYear && n.periodMonth != null ? `${n.periodYear}-${String(n.periodMonth).padStart(2, '0')}` : '',
       dueDate: n.dueDate || '',
       totalAmount: n.totalAmount || 0,
       totalReceived: n.totalReceived || 0,
       status: n.status,
       generatedAt: n.createdAt || n.generatedAt || '',
+      billedDate: (n.generatedAt || n.createdAt || '').slice(0, 10),
       isHistorical: n.isHistorical || false
     }))
     total.value = res.total ?? items.length
@@ -266,6 +275,36 @@ async function exportPdf(row) {
     ElMessage.success(`账单 ${row.billNo}（${tag}）PDF 已下载${row.isHistorical ? '，已标注「历史账单」标记' : ''}`)
   } catch {
     ElMessage.success(`账单 ${row.billNo}（${tag}）的 PDF 正在生成${row.isHistorical ? '，PDF已标注「历史账单」标记' : ''}`)
+  }
+}
+
+async function handleCancel(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定作废账单「${row.billNo}」吗？作废后不可恢复。`,
+      '作废账单',
+      { confirmButtonText: '确认作废', cancelButtonText: '取消', type: 'warning' }
+    )
+    await cancelDebitNote(row.id, { reason: '手动作废' })
+    ElMessage.success('账单已作废')
+    await fetchList()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e?.response?.data?.message || '作废失败')
+  }
+}
+
+async function handleDelete(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除账单「${row.billNo}」吗？删除后关联应收将重置为未出账状态，可重新生成。`,
+      '删除账单',
+      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }
+    )
+    await deleteDebitNote(row.id)
+    ElMessage.success('账单已删除')
+    await fetchList()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e?.response?.data?.message || '作废失败')
   }
 }
 

@@ -96,14 +96,15 @@
         :data="pendingContracts"
         v-loading="loading"
         stripe
+        style="width: 100%"
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="contractNo" label="合同号" width="200" />
+        <el-table-column prop="contractNo" label="合同号" min-width="180" />
         <el-table-column prop="tenantName" label="租客" width="90" />
-        <el-table-column prop="roomName" label="房屋" width="120" />
-        <el-table-column label="应收金额" width="120">
-          <template #default="{ row }">¥{{ (row.estimatedAmount || 0).toLocaleString() }}</template>
+        <el-table-column prop="roomName" label="房屋" min-width="140" />
+        <el-table-column label="应收金额" min-width="120">
+          <template #default="{ row }">{{ formatMoney(row.estimatedAmount) }}</template>
         </el-table-column>
         <el-table-column prop="contractStatus" label="合同状态" width="90">
           <template #default="{ row }">
@@ -148,15 +149,15 @@
         style="margin-bottom: 16px;"
       />
 
-      <el-table :data="generatedContracts" v-loading="loading" stripe>
-        <el-table-column prop="contractNo" label="合同号" width="200" />
+      <el-table :data="generatedContracts" v-loading="loading" stripe style="width: 100%">
+        <el-table-column prop="contractNo" label="合同号" min-width="180" />
         <el-table-column prop="tenantName" label="租客" width="90" />
-        <el-table-column prop="roomName" label="房屋" width="120" />
-        <el-table-column prop="billNo" label="账单编号" width="170" />
-        <el-table-column label="应收金额" width="120">
-          <template #default="{ row }">¥{{ (row.estimatedAmount || 0).toLocaleString() }}</template>
+        <el-table-column prop="roomName" label="房屋" min-width="140" />
+        <el-table-column prop="billNo" label="账单编号" min-width="170" />
+        <el-table-column label="应收金额" min-width="120">
+          <template #default="{ row }">{{ formatMoney(row.estimatedAmount) }}</template>
         </el-table-column>
-        <el-table-column prop="generatedAt" label="生成时间" width="160" />
+        <el-table-column prop="generatedAt" label="生成时间" min-width="160" />
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button text size="small" type="primary" @click="previewBill(row)">
@@ -203,6 +204,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import { getContracts, getBuildingList, getHousingUnits, generateDebitNotes, getDebitNotes, exportDebitNotePdf } from '@/api'
+import { formatMoney } from '@/utils/index'
 import { chinaTime } from '@/utils/chinaTime'
 
 const router = useRouter()
@@ -289,13 +291,22 @@ async function loadContracts() {
     const res = await getContracts({ pageSize: 200, status: filters.contractStatus || undefined })
     const items = res.items || res.data || []
 
-    // 获取已生成账单的合同 ID 集合
-    let generatedContractIds = new Set()
+    // 获取已生成账单，按合同 ID 建立映射
+    let generatedBillMap = {}
     try {
       const debitNotes = await getDebitNotes({})
-      // 后端返回所有 debit notes，过滤当前账期
       const dnItems = Array.isArray(debitNotes) ? debitNotes : (debitNotes.items || debitNotes.data || [])
-      dnItems.filter(d => d.period === periodLabel).forEach(d => generatedContractIds.add(d.contractId))
+      const pYear = parseInt(periodLabel.split('-')[0])
+      const pMonth = parseInt(periodLabel.split('-')[1])
+      dnItems
+        .filter(d => d.periodYear === pYear && d.periodMonth === pMonth)
+        .forEach(d => {
+          generatedBillMap[d.contractId] = {
+            billNo: d.billNo || '',
+            generatedAt: d.generatedAt || '',
+            debitNoteId: d.id || ''
+          }
+        })
     } catch { /* 静默 */ }
 
     allContracts.value = items.map(c => ({
@@ -307,9 +318,10 @@ async function loadContracts() {
       roomId: c.roomId || '',
       estimatedAmount: c.rentAmount || 0,
       contractStatus: c.status || 'Active',
-      hasExistingBill: generatedContractIds.has(c.id),
-      billNo: '',
-      generatedAt: '',
+      hasExistingBill: !!generatedBillMap[c.id],
+      billNo: generatedBillMap[c.id]?.billNo || '',
+      generatedAt: generatedBillMap[c.id]?.generatedAt || '',
+      debitNoteId: generatedBillMap[c.id]?.debitNoteId || '',
       isHistorical: false,
       periodLabel,
       _generating: false
@@ -392,12 +404,14 @@ async function doGenerate(row) {
 
 // ==================== Actions ====================
 function previewBill(row) {
-  router.push(`/bills/preview/${row.id}`)
+  const dnId = row.debitNoteId || row.id
+  router.push(`/bills/preview/${dnId}`)
 }
 
 async function exportPdf(row) {
+  const dnId = row.debitNoteId || row.id
   try {
-    const blob = await exportDebitNotePdf(row.id)
+    const blob = await exportDebitNotePdf(dnId)
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

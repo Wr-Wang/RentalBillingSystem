@@ -10,3 +10,14 @@ export function toGuidId(id) {
     .padEnd(32, '0').slice(0, 32)
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`
 }
+
+/**
+ * 金额格式化：保留两位小数 + 千分位
+ * @param {number|string|null|undefined} value
+ * @param {string} [prefix='¥'] 前缀符号
+ * @returns {string}
+ */
+export function formatMoney(value, prefix = '¥') {
+  const num = Number(value) || 0
+  return prefix + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}

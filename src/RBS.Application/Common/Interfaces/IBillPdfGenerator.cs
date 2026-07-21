@@ -8,5 +8,7 @@ namespace RBS.Application.Common.Interfaces;
 public interface IBillPdfGenerator
 {
     byte[] Generate(DebitNote note, IReadOnlyList<(string FeeName, decimal Amount)> items,
-        string contractNo, string tenantName, string? companyName);
+        string contractNo, string tenantName, string? companyName,
+        string? buildingAddress = null, string? generatedAt = null,
+        decimal previousBalance = 0, IReadOnlyList<(decimal Amount, string Date, string ReceiptNo)>? receipts = null);
 }

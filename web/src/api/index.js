@@ -312,6 +312,8 @@ export function getDebitNotes(params) { return request({ url: '/debitnotes', met
 export function getDebitNote(id) { return request({ url: `/debitnotes/${id}`, method: 'get' }) }
 export function generateDebitNotes(data) { return request({ url: '/debitnotes/generate', method: 'post', data }) }
 export function exportDebitNotePdf(id) { return request({ url: `/debitnotes/${id}/pdf`, method: 'get', responseType: 'blob' }) }
+export function cancelDebitNote(id, data) { return request({ url: `/debitnotes/${id}/cancel`, method: 'post', data }) }
+export function deleteDebitNote(id) { return request({ url: `/debitnotes/${id}`, method: 'delete' }) }
 
 
 // Holidays

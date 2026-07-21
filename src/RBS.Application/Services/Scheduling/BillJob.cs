@@ -3,6 +3,7 @@ using System.Data;
 using System.Text.Json;
 using Dapper;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.Services.Billing;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
 using RBS.Core.Interfaces.Persistence;
@@ -224,19 +225,18 @@ public class BillJob : ScheduledJobBase
         string contractNo, Guid companyId, string period, decimal totalAmount, decimal prepaid,
         Guid taskLogId, bool isHistorical, DateOnly? dueDate, IDbTransaction tx, CancellationToken ct)
     {
-        var roomCode = await conn.QuerySingleOrDefaultAsync<string>(
-            _sql.Get("Lease.Select.HousingUnit.RoomCodeByContract"), new { Id = contractId }, tx);
-        var tenantName = await conn.QuerySingleOrDefaultAsync<string>(
-            _sql.Get("Lease.Select.Tenant.PrimaryNameByContract"), new { Id = contractId }, tx);
+        var periodParts = period.Split('-');
+        var periodYear = int.Parse(periodParts[0]);
+        var periodMonth = int.Parse(periodParts[1]);
 
+        var noteNo = await DebitNoteService.GenerateBillNoAsync(conn, tx);
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.DebitNote.FromBillJob"),
             new
             {
-                Id = dnId, NoteNo = $"DN-{contractNo}-{period.Replace("-", "")}",
-                CId = contractId, CNo = contractNo ?? "", Period = period, CoId = companyId,
-                Room = roomCode ?? "", Tenant = tenantName ?? "", Amt = totalAmount,
-                Prepaid = prepaid, IsHist = isHistorical, Due = dueDate,
-                TaskLogId = taskLogId, CBy = Guid.Empty
+                Id = dnId, NoteNo = noteNo,
+                CId = contractId, CoId = companyId, Amt = totalAmount,
+                IsHist = isHistorical, Due = dueDate,
+                PeriodYear = periodYear, PeriodMonth = periodMonth, CBy = Guid.Empty
             }, tx);
     }
 
