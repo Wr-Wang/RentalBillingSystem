@@ -111,7 +111,7 @@ public class ReportingService : IReportingService
         using var conn = _db.CreateConnection(); conn.Open();
         var result = await conn.QueryAsync(
             _sql.Get("Billing.Select.FeeRevenue.All"),
-            new { Period = period });
+            new { Period = period, CompanyId = (Guid?)null });
         return result;
     }
 

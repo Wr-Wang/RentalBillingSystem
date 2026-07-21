@@ -344,6 +344,13 @@
       ISNULL((SELECT SUM(r.Amount) FROM Receipts r WHERE FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period AND r.Status = 'Confirmed' AND (@CompanyId IS NULL OR r.CompanyId = @CompanyId)), 0) AS TotalReceived
       FROM Journals j WHERE (@Period IS NULL OR j.Period = @Period) AND (@CompanyId IS NULL OR j.CompanyId = @CompanyId) GROUP BY j.Period ORDER BY j.Period DESC]]>
   </select>
+  <!-- 费用收入分布统计：按收费项目汇总各月金额 -->
+  <select id="Billing.Select.FeeRevenue.All">
+    <![CDATA[SELECT fc.Name, fc.Code, SUM(j.Amount) AS Total
+      FROM Journals j JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
+      WHERE (@Period IS NULL OR j.Period = @Period) AND (@CompanyId IS NULL OR j.CompanyId = @CompanyId)
+      GROUP BY fc.Name, fc.Code ORDER BY Total DESC]]>
+  </select>
   <select id="Billing.Select.Contract.OverdueData">
     <![CDATA[SELECT c.Id, c.ContractNo, t.Name AS TenantName, h.FullCode AS RoomFullCode
       FROM Contracts c LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1

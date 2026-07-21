@@ -381,7 +381,7 @@ const routes = [
         path: 'reports/companyoverview',
         name: 'ReportCompanyOverview',
         component: () => import('../views/report/companyOverview.vue'),
-        meta: { title: '多公司总览', icon: 'DataAnalysis', roles: ['Admin'] }
+        meta: { title: '多公司总览', icon: 'DataAnalysis', scope: 'System', roles: ['Admin'] }
       },
       // Report shortcuts for companyoverview
       { path: 'companyoverview', redirect: '/reports/companyoverview', meta: { hidden: true } },
