@@ -31,7 +31,7 @@
           <el-tag :type="row.isActive ? 'success' : 'danger'" size="small">{{ row.isActive ? '启用' : '停用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button text size="small" type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button text size="small" :type="row.isActive ? 'danger' : 'success'" @click="toggleStatus(row)">
@@ -43,7 +43,7 @@
     </el-table>
 
     <!-- 新增/编辑用户 Dialog -->
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑用户' : '新增用户'" width="550px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑用户' : '新增用户'" width="550px">
       <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
         <el-form-item label="用户名" prop="username">
           <el-input v-model="form.username" :disabled="isEdit" />
@@ -61,7 +61,8 @@
           <el-input v-model="form.email" />
         </el-form-item>
         <el-form-item label="所属公司">
-          <el-select v-model="form.homeCompanyId" placeholder="选择公司（选填）" clearable style="width:100%">
+          <el-select v-model="form.homeCompanyId" placeholder="选择公司（选填）" clearable style="width:100%"
+            :disabled="!userStore.isSuperAdmin">
             <el-option label="系统用户（无归属）" :value="null" />
             <el-option v-for="l in companyList" :key="l.id" :label="l.name" :value="l.id" />
           </el-select>
@@ -83,10 +84,13 @@
     </el-dialog>
 
     <!-- 修改密码 Dialog -->
-    <el-dialog v-model="showPwdDialog" title="修改密码" width="400px">
+    <el-dialog :draggable="true" v-model="showPwdDialog" title="修改密码" width="400px">
       <el-form :model="pwdForm" label-width="100px" :rules="pwdRules" ref="pwdFormRef">
         <el-form-item label="新密码" prop="password">
           <el-input v-model="pwdForm.password" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input v-model="pwdForm.confirmPassword" type="password" show-password />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -133,9 +137,16 @@ const rules = {
 const showPwdDialog = ref(false)
 const savingPwd = ref(false)
 const pwdFormRef = ref(null)
-const pwdForm = ref({ id: null, password: '' })
+const pwdForm = ref({ id: null, password: '', confirmPassword: '' })
 const pwdRules = {
-  password: [{ required: true, message: '请输入新密码', trigger: 'blur' }]
+  password: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
+  confirmPassword: [
+    { required: true, message: '请确认新密码', trigger: 'blur' },
+    { validator: (rule, value, callback) => {
+      if (value !== pwdForm.value.password) callback(new Error('两次密码不一致'))
+      else callback()
+    }, trigger: 'blur' }
+  ]
 }
 
 async function fetchUsers() {
@@ -169,7 +180,11 @@ async function fetchCompanies() {
 
 function openCreate() {
   isEdit.value = false
-  form.value = { id: null, username: '', password: '', displayName: '', phone: '', email: '', homeCompanyId: null, isSuperAdmin: false, roleIds: [] }
+  form.value = {
+    id: null, username: '', password: '', displayName: '', phone: '', email: '',
+    homeCompanyId: userStore.isSuperAdmin ? null : (userStore.user?.companyId || null),
+    isSuperAdmin: false, roleIds: []
+  }
   showDialog.value = true
 }
 
@@ -182,7 +197,7 @@ function openEdit(row) {
     displayName: row.displayName || '',
     phone: row.phone || '',
     email: row.email || '',
-    homeCompanyId: row.homeCompanyId || null,
+    homeCompanyId: row.companyId || null,
     isSuperAdmin: row.isSuperAdmin || false,
     roleIds: row.roleIds ? [...row.roleIds] : []
   }
@@ -190,7 +205,7 @@ function openEdit(row) {
 }
 
 function openChangePwd(row) {
-  pwdForm.value = { id: row.id, password: '' }
+  pwdForm.value = { id: row.id, password: '', confirmPassword: '' }
   showPwdDialog.value = true
 }
 
@@ -205,7 +220,7 @@ async function save() {
         displayName: form.value.displayName || undefined,
         phone: form.value.phone || undefined,
         email: form.value.email || undefined,
-        homeCompanyId: form.value.homeCompanyId || undefined,
+        companyId: form.value.homeCompanyId || undefined,
         isSuperAdmin: form.value.isSuperAdmin,
         roleIds: form.value.roleIds.length > 0 ? form.value.roleIds : []
       }
@@ -218,7 +233,7 @@ async function save() {
         displayName: form.value.displayName,
         phone: form.value.phone || undefined,
         email: form.value.email || undefined,
-        homeCompanyId: form.value.homeCompanyId || undefined,
+        companyId: form.value.homeCompanyId || undefined,
         isSuperAdmin: form.value.isSuperAdmin,
         roleIds: form.value.roleIds.length > 0 ? form.value.roleIds : undefined
       }

@@ -10,11 +10,13 @@ public class RoleService : IRoleService
 {
     private readonly IUnitOfWork _uow;
     private readonly ITenantService _tenant;
+    private readonly ICurrentUserService _currentUser;
 
-    public RoleService(IUnitOfWork uow, ITenantService tenant)
+    public RoleService(IUnitOfWork uow, ITenantService tenant, ICurrentUserService currentUser)
     {
         _uow = uow;
         _tenant = tenant;
+        _currentUser = currentUser;
     }
 
     public async Task<List<RoleDto>> GetListAsync(CancellationToken ct = default)
@@ -79,13 +81,13 @@ public class RoleService : IRoleService
 
     public async Task SaveMenuIdsAsync(Guid id, List<Guid> menuIds, CancellationToken ct = default)
     {
-        var role = await _uow.Roles.GetByIdWithRoleMenusAsync(id, ct)
-            ?? throw new KeyNotFoundException("角色不存在");
+        // 先验证角色存在
+        var exists = await _uow.Roles.ExistsAsync(id, ct);
+        if (!exists) throw new KeyNotFoundException("角色不存在");
 
         var allowedIds = await FilterSystemMenusAsync(menuIds, ct);
-        role.AssignMenus(allowedIds);
-
-        await _uow.CommitAsync(ct);
+        // 直接操作 RoleMenus 表（变更追踪无法感知 _roleMenus 集合变化）
+        await _uow.Roles.SaveRoleMenusAsync(id, allowedIds, _currentUser.UserId, ct);
     }
 
     private async Task<List<Guid>> FilterSystemMenusAsync(List<Guid> menuIds, CancellationToken ct)

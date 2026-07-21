@@ -30,7 +30,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑税率' : '新增税率'" width="500px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑税率' : '新增税率'" width="500px">
       <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="如：增值税普通发票" />

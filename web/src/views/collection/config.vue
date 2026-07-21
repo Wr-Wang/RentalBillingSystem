@@ -56,7 +56,7 @@
     </el-card>
 
     <!-- Add Stage Dialog -->
-    <el-dialog v-model="showAddStage" title="新增催缴阶段" width="400px">
+    <el-dialog :draggable="true" v-model="showAddStage" title="新增催缴阶段" width="400px">
       <el-form :model="newStage" label-width="100px">
         <el-form-item label="阶段名称">
           <el-input v-model="newStage.name" />

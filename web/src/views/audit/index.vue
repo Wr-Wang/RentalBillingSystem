@@ -110,7 +110,7 @@
     </div>
 
     <!-- 版本对比 Dialog -->
-    <el-dialog v-model="showCompare" title="版本对比" width="700px">
+    <el-dialog :draggable="true" v-model="showCompare" title="版本对比" width="700px">
       <el-table :data="compareData" stripe>
         <el-table-column prop="field" label="字段" width="150" />
         <el-table-column prop="oldValue" label="旧值" min-width="200" />

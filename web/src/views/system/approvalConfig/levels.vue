@@ -27,7 +27,7 @@
         </el-table-column>
       </el-table>
     </el-card>
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑级别' : '新增级别'" width="500px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑级别' : '新增级别'" width="500px">
       <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
         <el-form-item label="审批角色" prop="roleId">
           <el-select v-model="form.roleId" style="width:100%">

@@ -59,7 +59,7 @@
     </div>
 
     <!-- Terminate Dialog -->
-    <el-dialog v-model="showTerminate" title="合同终止" width="500px">
+    <el-dialog :draggable="true" v-model="showTerminate" title="合同终止" width="500px">
       <el-form :model="terminateForm" label-width="100px">
         <el-form-item label="终止类型">
           <el-radio-group v-model="terminateForm.type">
@@ -124,7 +124,7 @@
     </el-dialog>
 
     <!-- Renew Dialog -->
-    <el-dialog v-model="showRenewDialog" title="合同续签" width="620px">
+    <el-dialog :draggable="true" v-model="showRenewDialog" title="合同续签" width="620px">
       <el-alert v-if="renewFromRejected" title="上次续签被驳回，请修改后重新提交" type="warning" show-icon :closable="false" style="margin-bottom: 16px;" />
       <el-alert v-else title="续签将创建新合同，原合同标记为已续签。审批通过后自动执行。" type="success" show-icon :closable="false" style="margin-bottom: 16px;" />
       <!-- 检查结果提示 -->

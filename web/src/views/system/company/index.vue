@@ -85,7 +85,7 @@
     </el-card>
 
     <!-- 新增/编辑公司 Dialog -->
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑公司' : '新增公司'" width="650px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑公司' : '新增公司'" width="650px">
       <el-form :model="form" label-width="110px" :rules="rules" ref="formRef">
         <el-divider content-position="left">基础信息</el-divider>
         <el-row :gutter="20">
@@ -183,7 +183,7 @@
     </el-dialog>
 
     <!-- 公司详情 Dialog -->
-    <el-dialog v-model="showDetail" :title="detailForm?.name || '公司详情'" width="800px">
+    <el-dialog :draggable="true" v-model="showDetail" :title="detailForm?.name || '公司详情'" width="800px">
       <template v-if="detailForm">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="编号">{{ detailForm.code }}</el-descriptions-item>
@@ -227,7 +227,7 @@
     </el-dialog>
 
     <!-- 创建登录账号 Dialog -->
-    <el-dialog v-model="showUserDialog" title="创建公司登录账号" width="450px">
+    <el-dialog :draggable="true" v-model="showUserDialog" title="创建公司登录账号" width="450px">
       <el-form :model="userForm" label-width="100px">
         <el-form-item label="用户名" prop="username">
           <el-input v-model="userForm.username" />

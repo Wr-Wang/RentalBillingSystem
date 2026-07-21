@@ -27,7 +27,7 @@
     </el-table>
 
     <!-- 新增/编辑角色 Dialog -->
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑角色' : '新增角色'" width="450px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑角色' : '新增角色'" width="450px">
       <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
         <el-form-item label="角色名称" prop="name">
           <el-input v-model="form.name" />
@@ -46,7 +46,7 @@
     </el-dialog>
 
     <!-- 分配菜单权限 Dialog -->
-    <el-dialog v-model="showMenuDialog" title="分配菜单权限" width="600px" class="menu-assign-dialog">
+    <el-dialog :draggable="true" v-model="showMenuDialog" title="分配菜单权限" width="600px" class="menu-assign-dialog">
       <div class="menu-assign-toolbar">
         <el-input
           v-model="menuFilter"

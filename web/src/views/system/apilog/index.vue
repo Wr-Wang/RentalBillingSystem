@@ -81,7 +81,7 @@
     </el-card>
 
     <!-- 详情 Dialog -->
-    <el-dialog v-model="showDetailDialog" title="API 调用详情" width="900px">
+    <el-dialog :draggable="true" v-model="showDetailDialog" title="API 调用详情" width="900px">
       <template v-if="detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="方法">
@@ -114,7 +114,7 @@
     </el-dialog>
 
     <!-- 按日期删除 Dialog -->
-    <el-dialog v-model="clearDialogVisible" title="按日期范围删除" width="450px">
+    <el-dialog :draggable="true" v-model="clearDialogVisible" title="按日期范围删除" width="450px">
       <el-form label-width="100px">
         <el-form-item label="开始时间">
           <el-date-picker v-model="clearRange.startDate" type="datetime" placeholder="留空则不限" value-format="YYYY-MM-DDTHH:mm" style="width:100%" />

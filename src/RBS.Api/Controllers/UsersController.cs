@@ -15,9 +15,9 @@ public class UsersController : ControllerBase
     public UsersController(IUserService userService) => _userService = userService;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? companyId = null, CancellationToken ct = default)
     {
-        var result = await _userService.GetListAsync(ct);
+        var result = await _userService.GetListAsync(companyId, ct);
         return Ok(result);
     }
 

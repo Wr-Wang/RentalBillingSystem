@@ -87,7 +87,8 @@ export const useUserStore = defineStore('user', () => {
   function setUserData(payload, tokenVal) {
     const userData = payload.user || payload
     token.value = tokenVal || token.value
-    user.value = userData
+    // 合并 roles（登录响应 roles 在顶层不在 user 内部）
+    user.value = { ...userData, roles: userData.roles || payload.roles || [] }
     permissions.value = payload.permissions || []
 
     companyId.value = userData.companyId || null

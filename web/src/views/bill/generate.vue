@@ -175,7 +175,7 @@
     </el-card>
 
     <!-- ====== Generate Result Dialog ====== -->
-    <el-dialog v-model="showResult" title="生成结果" width="600px">
+    <el-dialog :draggable="true" v-model="showResult" title="生成结果" width="600px">
       <el-table :data="generateResults" stripe size="small">
         <el-table-column prop="contractNo" label="合同号" width="200" />
         <el-table-column prop="tenantName" label="租客" width="90" />

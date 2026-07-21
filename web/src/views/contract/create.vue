@@ -244,7 +244,7 @@
     </el-card>
 
     <!-- New Tenant Dialog -->
-    <el-dialog v-model="showNewTenant" title="新增租客" width="450px">
+    <el-dialog :draggable="true" v-model="showNewTenant" title="新增租客" width="450px">
       <el-form :model="newTenantForm" label-width="100px">
         <el-form-item label="姓名">
           <el-input v-model="newTenantForm.name" />

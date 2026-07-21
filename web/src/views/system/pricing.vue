@@ -51,7 +51,7 @@
     </el-tabs>
 
     <!-- 定价 Dialog -->
-    <el-dialog v-model="showPricing" :title="isEditPricing ? '编辑定价' : '新增定价'" width="500px">
+    <el-dialog :draggable="true" v-model="showPricing" :title="isEditPricing ? '编辑定价' : '新增定价'" width="500px">
       <el-form :model="pricingForm" label-width="100px" :rules="pricingRules" ref="pricingFormRef">
         <el-form-item label="房型" prop="roomTypeId">
           <el-select v-model="pricingForm.roomTypeId" style="width:100%">
@@ -74,7 +74,7 @@
     </el-dialog>
 
     <!-- 楼层级别 Dialog -->
-    <el-dialog v-model="showBand" :title="isEditBand ? '编辑级别' : '新增级别'" width="500px">
+    <el-dialog :draggable="true" v-model="showBand" :title="isEditBand ? '编辑级别' : '新增级别'" width="500px">
       <el-form :model="bandForm" label-width="100px" :rules="bandRules" ref="bandFormRef">
         <el-form-item label="名称" prop="name">
           <el-input v-model="bandForm.name" />

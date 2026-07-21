@@ -132,7 +132,7 @@
     </template>
 
     <!-- 新建/编辑任务 -->
-    <el-dialog v-model="jobFormVisible" :title="isEditingJob?'编辑任务':'新建任务'" width="500px">
+    <el-dialog :draggable="true" v-model="jobFormVisible" :title="isEditingJob?'编辑任务':'新建任务'" width="500px">
       <el-form label-width="100px">
         <el-form-item label="任务名称"><el-input v-model="jobForm.jobName" /></el-form-item>
         <el-form-item label="调度类型"><el-radio-group v-model="jobForm.scheduleType"><el-radio value="Daily">每天</el-radio><el-radio value="Monthly">每月</el-radio></el-radio-group></el-form-item>
@@ -153,7 +153,7 @@
       <template #footer><el-button @click="execDrawerVisible=false">取消</el-button><el-button type="primary" @click="saveExec">保存</el-button></template>
     </el-drawer>
 
-    <el-dialog v-model="execConfirmVisible" title="确认手动执行" width="500px">
+    <el-dialog :draggable="true" v-model="execConfirmVisible" title="确认手动执行" width="500px">
       <div v-if="execJob" style="padding:4px 0;">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="任务名称" :span="2"><strong>{{ execJob.jobName }}</strong></el-descriptions-item>
@@ -207,12 +207,12 @@ async function fetchJobs() {
         const pending = list.filter(e => e.status === 'Pending')
         // 下次执行（最近的 Pending）
         const next = pending.sort((a,b) => new Date(a.targetDate)-new Date(b.targetDate))[0]
-        job._nextRun = next ? formatDate(next.targetDate) : null
+        job._nextRun = next ? chinaTime.formatDate(next.targetDate) : null
         job._pendingCount = pending.length
         // 上次执行（最近的 Completed/Failed/Processing）
         const done = list.filter(e => e.status !== 'Pending')
         const last = done.sort((a,b) => new Date(b.targetDate)-new Date(a.targetDate))[0]
-        job._lastRun = last ? formatDate(last.targetDate) : null
+        job._lastRun = last ? chinaTime.formatDate(last.targetDate) : null
         if (last) job.lastRunStatus = last.status
       } catch { job._nextRun = null; job._lastRun = null }
     }
@@ -236,7 +236,7 @@ const lastRunText = ref('')
 
 function handleExecute(job) {
   execJob.value = job
-  lastRunText.value = job.lastRunAt ? formatDate(job.lastRunAt) : '从未执行'
+  lastRunText.value = job.lastRunAt ? chinaTime.formatDate(job.lastRunAt) : '从未执行'
   execConfirmVisible.value = true
 }
 

@@ -127,6 +127,20 @@ export function computeBillMonth(billedAt) {
   return `${year}-${pad(targetMonth)}`
 }
 
+/**
+ * 将任意格式的日期转为 MM-dd 标签（用于趋势图 X 轴等紧凑场景）
+ * 兼容 "2026-07-01"、"2026-07-01T00:00:00"、Date 对象等格式
+ * 先统一格式化为 yyyy-MM-dd，再取 MM-dd
+ * @param {any} d
+ * @returns {string}
+ */
+export function formatMonthDay(d) {
+  if (!d) return ''
+  const normalized = formatDate(d)
+  const m = normalized.match(/^\d{4}-(\d{2}-\d{2})$/)
+  return m ? m[1] : normalized.slice(-5)
+}
+
 export const chinaTime = {
   /** 获取当前东八区时间 */
   now() {
@@ -150,6 +164,8 @@ export const chinaTime = {
   },
   /** 格式化日期（委托） */
   formatDate,
+  /** 格式化月份-日 MM-dd（委托） */
+  formatMonthDay,
   /** 格式化时间（含时分，委托） */
   formatTime,
   /** 格式化时间（含时分秒，委托） */

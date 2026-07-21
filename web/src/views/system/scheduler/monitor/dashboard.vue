@@ -165,23 +165,48 @@ async function fetchDashboard() {
 async function fetchTrend() {
   trendLoading.value = true
   try {
-    const data = await getMonitorTrend(30)
+    const raw = await getMonitorTrend(30)
+    // 构建完整 30 天日期字典，补全缺失日期（无数据的天 successRate = null）
+    const dateMap = {}
+    for (const d of (Array.isArray(raw) ? raw : [])) {
+      const key = chinaTime.formatDate(d.date) // 统一 key 为 yyyy-MM-dd
+      if (key) dateMap[key] = d
+    }
+    const today = new Date()
+    const days = []
+    for (let i = 29; i >= 0; i--) {
+      const dt = new Date(today)
+      dt.setDate(dt.getDate() - i)
+      const y = dt.getFullYear()
+      const m = String(dt.getMonth() + 1).padStart(2, '0')
+      const d = String(dt.getDate()).padStart(2, '0')
+      const key = `${y}-${m}-${d}`
+      days.push({
+        label: chinaTime.formatMonthDay(key),
+        successRate: dateMap[key] != null ? dateMap[key].successRate : null,
+        totalCount: dateMap[key] != null ? dateMap[key].totalCount : 0,
+        failCount: dateMap[key] != null ? dateMap[key].failCount : 0,
+        rawDate: dateMap[key] || null
+      })
+    }
     await nextTick()
     if (trendChartRef.value) {
       trendChart = echarts.init(trendChartRef.value)
+      const lowDays = days.filter(d => d.successRate != null && d.successRate < 80)
       trendChart.setOption({
         tooltip: { trigger: 'axis' },
         grid: { left: 40, right: 20, top: 20, bottom: 30 },
-        xAxis: { type: 'category', data: data.map(d => d.date?.slice(5) || ''), axisLabel: { fontSize: 11 } },
+        xAxis: { type: 'category', data: days.map(d => d.label), axisLabel: { fontSize: 11 } },
         yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
         series: [{
-          type: 'line', data: data.map(d => d.successRate), smooth: true,
+          type: 'line', data: days.map(d => d.successRate), smooth: true,
           lineStyle: { color: '#409eff', width: 2 },
           areaStyle: { color: 'rgba(64,158,255,0.1)' },
           itemStyle: { color: '#409eff' },
+          connectNulls: false, // 无数据的天断开线条，不连接
           markPoint: {
-            data: data.filter(d => d.successRate < 80).map(d => ({
-              name: d.date, value: d.successRate, coord: [d.date?.slice(5) || '', d.successRate]
+            data: lowDays.map(d => ({
+              name: d.label, value: d.successRate, coord: [d.label, d.successRate]
             }))
           }
         }]

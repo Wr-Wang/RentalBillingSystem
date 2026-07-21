@@ -429,7 +429,7 @@
 
     <!--===============================================================-->
     <!-- MODAL: Add Fee Config                                          -->
-    <el-dialog v-model="showFeeConfigDialog" :title="addFeeDialogMode === 'OneTime' ? '添加收费' : '添加费用配置'" width="480px">
+    <el-dialog :draggable="true" v-model="showFeeConfigDialog" :title="addFeeDialogMode === 'OneTime' ? '添加收费' : '添加费用配置'" width="480px">
       <el-form :model="feeConfigForm" label-width="100px">
         <el-form-item label="收费项目">
           <el-select v-model="feeConfigForm.feeCodeId" placeholder="选择收费项目" style="width:100%">
@@ -474,7 +474,7 @@
 
     <!-- MODAL: Other Field Modify (CONTRACT_MODIFY_OTHER)              -->
     <!--===============================================================-->
-    <el-dialog v-model="showOtherModify" title="修改合同信息" width="600px">
+    <el-dialog :draggable="true" v-model="showOtherModify" title="修改合同信息" width="600px">
       <el-alert
         title="起止日期、付款周期等变更需提交审批；租客电话、备注等直接生效。"
         type="info"
@@ -520,7 +520,7 @@
     <!--===============================================================-->
     <!-- MODAL: Renew Contract (审批驱动)                               -->
     <!--===============================================================-->
-    <el-dialog v-model="showRenew" title="合同续签" width="620px" :before-close="() => showRenew = false">
+    <el-dialog :draggable="true" v-model="showRenew" title="合同续签" width="620px" :before-close="() => showRenew = false">
       <el-alert
         title="续签将创建新合同，原合同标记为已续签。提交前请确认续签信息，审批通过后自动执行。"
         type="success"
@@ -596,7 +596,7 @@
     <!--===============================================================-->
     <!-- MODAL: Terminate                                              -->
     <!--===============================================================-->
-    <el-dialog v-model="showTerminate" title="合同终止" width="520px">
+    <el-dialog :draggable="true" v-model="showTerminate" title="合同终止" width="520px">
       <el-alert
         title="提前解约将根据押金金额自动路由审批级别（押金≤5000:1级运营主管; 押金5000~50000:2级部门经理; 押金50000+:3级总经理）。请确保已与租客协商一致。"
         type="warning"
@@ -632,7 +632,7 @@
     </el-dialog>
 
     <!-- Supplementary Fee Dialog -->
-    <el-dialog v-model="showSupplementaryFee" title="补充收费" width="550px">
+    <el-dialog :draggable="true" v-model="showSupplementaryFee" title="补充收费" width="550px">
       <el-form label-width="100px">
         <el-form-item label="收费项目">
           <el-select v-model="suppForm.feeCodeId" placeholder="选择收费项目" style="width:100%">
@@ -655,7 +655,7 @@
     </el-dialog>
 
     <!-- Receivable Preview Dialog -->
-    <el-dialog v-model="showReceivablePreviewDialog" title="生成应收 — 预览" width="720px">
+    <el-dialog :draggable="true" v-model="showReceivablePreviewDialog" title="生成应收 — 预览" width="720px">
       <!-- Loading -->
       <div v-if="receivablePreviewLoading" style="text-align:center;padding:40px 0;">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
@@ -736,7 +736,7 @@
       </template>
     </el-dialog>
     <!-- Add Tenant Dialog -->
-    <el-dialog v-model="showAddTenant" title="添加租户" width="600px">
+    <el-dialog :draggable="true" v-model="showAddTenant" title="添加租户" width="600px">
       <el-tabs v-model="addTenantTab">
         <el-tab-pane label="选择已有租客" name="existing">
           <el-input v-model="tenantSearchKeyword" placeholder="搜索姓名/电话/身份证" style="margin-bottom:12px;">
@@ -775,7 +775,7 @@
     </el-dialog>
 
     <!-- Remove Tenant Dialog -->
-    <el-dialog v-model="showRemoveTenant" title="解绑租客" width="450px">
+    <el-dialog :draggable="true" v-model="showRemoveTenant" title="解绑租客" width="450px">
       <p>确认将租客 <strong>{{ removingTenant?.tenantName }}</strong> 从本合同解绑？</p>
       <el-form style="margin-top:12px;">
         <el-form-item label="解绑原因">

@@ -133,7 +133,7 @@
     </div>
 
     <!-- Export Progress -->
-    <el-dialog v-model="showExportProgress" title="导出PDF" width="400px">
+    <el-dialog :draggable="true" v-model="showExportProgress" title="导出PDF" width="400px">
       <div style="text-align: center; padding: 20px 0;">
         <el-alert
           v-if="bill?.isHistorical"

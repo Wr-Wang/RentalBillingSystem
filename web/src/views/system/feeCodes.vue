@@ -38,7 +38,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑收费项目' : '新增收费项目'" width="500px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑收费项目' : '新增收费项目'" width="500px">
       <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
         <el-form-item label="编码" prop="code">
           <el-input v-model="form.code" :disabled="isEdit" />

@@ -26,7 +26,7 @@
     </el-table>
 
     <!-- 开启新账期对话框 -->
-    <el-dialog v-model="showOpenDialog" title="开启新账期" width="400px">
+    <el-dialog :draggable="true" v-model="showOpenDialog" title="开启新账期" width="400px">
       <el-form :model="openForm">
         <el-form-item label="年份">
           <el-date-picker v-model="openForm.month" type="month" placeholder="选择月份" value-format="YYYY-MM" style="width:100%;" />

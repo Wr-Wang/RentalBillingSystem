@@ -45,7 +45,7 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="showCreateReconciliation" title="新建对账" width="500px">
+    <el-dialog :draggable="true" v-model="showCreateReconciliation" title="新建对账" width="500px">
       <el-form :model="reconForm" label-width="100px">
         <el-form-item label="开始日期"><el-date-picker v-model="reconForm.startDate" type="date" style="width:100%;" /></el-form-item>
         <el-form-item label="结束日期"><el-date-picker v-model="reconForm.endDate" type="date" style="width:100%;" /></el-form-item>

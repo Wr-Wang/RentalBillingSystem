@@ -215,6 +215,21 @@ public class DapperRoleRepository : IRoleRepository
         }
         return role;
     }
+
+    /// <summary>
+    /// 保存角色的菜单权限（全量覆盖：先删后插）。
+    /// 变更追踪无法感知 _roleMenus 集合变化，需直接操作 RoleMenus 表。
+    /// </summary>
+    public async Task SaveRoleMenusAsync(Guid roleId, List<Guid> menuIds, Guid changedBy, CancellationToken ct = default) {
+        using var conn = _db.CreateConnection(); conn.Open();
+        using var tx = conn.BeginTransaction();
+        await conn.ExecuteAsync(_sql.Get("Authorization.Delete.RoleMenus.ByRoleId"), new { RoleId = roleId }, tx);
+        foreach (var menuId in menuIds)
+            await conn.ExecuteAsync(_sql.Get("Authorization.Insert.RoleMenu.Default"),
+                new { Id = Guid.NewGuid(), RoleId = roleId, MenuId = menuId, CreatedBy = changedBy, CreatedAt = ChinaTime.Now }, tx);
+        tx.Commit();
+    }
+
     public Task<PagedResult<Role>> GetPagedAsync(int page, int pageSize, Expression<Func<Role, bool>>? predicate = null, Func<IQueryable<Role>, IOrderedQueryable<Role>>? orderBy = null, CancellationToken ct = default)
         => throw new NotSupportedException("Dapper 不支持 LINQ 表达式分页");
 }

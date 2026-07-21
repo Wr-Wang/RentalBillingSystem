@@ -40,7 +40,7 @@
       />
     </div>
 
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑租客' : '新增租客'" width="450px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑租客' : '新增租客'" width="450px">
       <el-form :model="tenantForm" label-width="100px">
         <el-form-item label="姓名">
           <el-input v-model="tenantForm.name" />

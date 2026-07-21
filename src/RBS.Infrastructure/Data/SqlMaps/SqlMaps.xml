@@ -21,6 +21,9 @@
   <select id="Identity.Select.User.All">
     <![CDATA[SELECT * FROM Users]]>
   </select>
+  <select id="Identity.Select.User.ByCompanyId">
+    <![CDATA[SELECT * FROM Users WHERE CompanyId=@CompanyId]]>
+  </select>
   <select id="Identity.Select.User.AllWithRoles">
     <![CDATA[SELECT * FROM Users; SELECT ur.UserId, ur.RoleId, r.Name AS RoleName, r.Code AS RoleCode FROM UserRoles ur LEFT JOIN Roles r ON r.Id = ur.RoleId]]>
   </select>
@@ -103,6 +106,12 @@
   <delete id="Authorization.Delete.Role.ById">
     <![CDATA[DELETE FROM Roles WHERE Id=@Id]]>
   </delete>
+  <delete id="Authorization.Delete.RoleMenus.ByRoleId">
+    <![CDATA[DELETE FROM RoleMenus WHERE RoleId=@RoleId]]>
+  </delete>
+  <insert id="Authorization.Insert.RoleMenu.Default">
+    <![CDATA[INSERT INTO RoleMenus (Id,RoleId,MenuId,CreatedBy,CreatedAt) VALUES(@Id,@RoleId,@MenuId,@CreatedBy,@CreatedAt)]]>
+  </insert>
 
   <!-- ================================================================
        模块：Menu（菜单）

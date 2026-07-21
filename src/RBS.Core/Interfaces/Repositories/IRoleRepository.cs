@@ -33,4 +33,14 @@ public interface IRoleRepository : IRepository<Role>
     /// <param name="ct">取消令牌</param>
     /// <returns>包含菜单权限的角色实体，未找到时返回 null</returns>
     Task<Role?> GetByIdWithRoleMenusAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// 保存角色的菜单权限（全量覆盖：先删后插）。
+    /// 变更追踪无法感知 _roleMenus 集合变化，需直接操作 RoleMenus 表。
+    /// </summary>
+    /// <param name="roleId">角色 ID</param>
+    /// <param name="menuIds">要分配的菜单 ID 列表</param>
+    /// <param name="changedBy">操作人 ID</param>
+    /// <param name="ct">取消令牌</param>
+    Task SaveRoleMenusAsync(Guid roleId, List<Guid> menuIds, Guid changedBy, CancellationToken ct = default);
 }

@@ -61,7 +61,7 @@
     </el-card>
 
     <!-- Excel Import Dialog -->
-    <el-dialog v-model="showBatchImport" title="Excel批量导入" width="550px">
+    <el-dialog :draggable="true" v-model="showBatchImport" title="Excel批量导入" width="550px">
       <el-alert title="请上传标准抄表模板的 Excel 文件（.xlsx）" type="info" show-icon :closable="false" style="margin-bottom:16px;" />
       <p style="color:#909399;font-size:13px;margin-bottom:12px;">
         模板格式：第一行为表头，包含列：房屋编码、费用类型、上期读数、本期读数

@@ -33,7 +33,7 @@
     </el-card>
 
     <!-- 新增/编辑菜单 Dialog -->
-    <el-dialog v-model="showDialog" :title="isEdit ? '编辑菜单' : '新增菜单'" width="500px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit ? '编辑菜单' : '新增菜单'" width="500px">
       <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
         <el-form-item label="菜单名称" prop="name">
           <el-input v-model="form.name" />

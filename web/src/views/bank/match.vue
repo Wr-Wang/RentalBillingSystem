@@ -54,7 +54,7 @@
     </div>
 
     <!-- Manual Match Dialog -->
-    <el-dialog v-model="showManualMatch" title="手动匹配" width="500px">
+    <el-dialog :draggable="true" v-model="showManualMatch" title="手动匹配" width="500px">
       <el-form label-width="100px">
         <el-form-item label="银行流水">
           <el-tag>{{ manualTarget?.referenceNo || manualTarget?.id }}</el-tag>

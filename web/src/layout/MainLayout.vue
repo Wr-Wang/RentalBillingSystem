@@ -135,7 +135,7 @@
     </div>
 
     <!-- My Profile Dialog -->
-    <el-dialog v-model="showProfile" title="我的资料" width="500px">
+    <el-dialog :draggable="true" v-model="showProfile" title="我的资料" width="500px">
       <el-form :model="profileForm" label-width="100px">
         <el-form-item label="用户名">
           <el-input v-model="profileForm.username" disabled />
@@ -157,7 +157,7 @@
     </el-dialog>
 
     <!-- Change Password Dialog -->
-    <el-dialog v-model="showChangePassword" title="修改密码" width="400px">
+    <el-dialog :draggable="true" v-model="showChangePassword" title="修改密码" width="400px">
       <el-form :model="passwordForm" label-width="100px">
         <el-form-item label="旧密码">
           <el-input v-model="passwordForm.oldPassword" type="password" show-password />
@@ -288,7 +288,11 @@ onMounted(async () => {
   //     initFromRoutes 内部会监听 userStore.profileLoaded，
   //     在用户资料加载完成后自动重新构建菜单
   // -----------------------------------------------------------------------
-  menuStore.initFromRoutes(router.options.routes.find(r => r.path === '/')?.children || [])
+  try {
+    await menuStore.initFromRoutes(router.options.routes.find(r => r.path === '/')?.children || [])
+  } catch {
+    // 菜单初始化失败不影响主流程，后续 watcher 会重新构建
+  }
 
   // 恢复上次的视角状态（超管切换公司）
   userStore.restoreView()

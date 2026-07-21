@@ -62,7 +62,7 @@
       </el-tabs>
     </el-card>
 
-    <el-dialog v-model="showDialog" :title="isEdit?'编辑':'新增节假日'" width="450px">
+    <el-dialog :draggable="true" v-model="showDialog" :title="isEdit?'编辑':'新增节假日'" width="450px">
       <el-form :model="form" label-width="90px" :rules="rules" ref="formRef">
         <el-form-item label="日期" prop="holidayDate"><el-date-picker v-model="form.holidayDate" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
         <el-form-item label="名称"><el-input v-model="form.name" placeholder="如：国庆节" /></el-form-item>
@@ -71,7 +71,7 @@
       <template #footer><el-button @click="showDialog=false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存</el-button></template>
     </el-dialog>
 
-    <el-dialog v-model="showImportResult" title="导入结果" width="600px">
+    <el-dialog :draggable="true" v-model="showImportResult" title="导入结果" width="600px">
       <div style="margin-bottom:12px"><el-tag type="success" style="margin-right:8px">新增 {{ importResult.importedCount||0 }} 条</el-tag><el-tag type="warning">跳过 {{ importResult.skippedCount||0 }} 条</el-tag></div>
       <el-tabs v-if="importResult.imported?.length||importResult.skipped?.length">
         <el-tab-pane v-if="importResult.imported?.length" :label="'新增 ('+importResult.importedCount+')'"><el-table :data="importResult.imported" size="small" max-height="300"><el-table-column prop="holidayDate" label="日期" width="120"/><el-table-column prop="name" label="名称" min-width="120"/><el-table-column label="类型" width="80"><template #default="{row}">{{ row.isWorkingDay?'调休上班':'放假' }}</template></el-table-column></el-table></el-tab-pane>

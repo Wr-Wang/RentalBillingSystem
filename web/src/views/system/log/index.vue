@@ -62,7 +62,7 @@
     </el-card>
 
     <!-- 详情 Dialog -->
-    <el-dialog v-model="showDetailDialog" title="日志详情" width="800px">
+    <el-dialog :draggable="true" v-model="showDetailDialog" title="日志详情" width="800px">
       <template v-if="detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="级别">

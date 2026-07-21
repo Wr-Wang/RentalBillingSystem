@@ -143,7 +143,7 @@
     </el-row>
 
     <!-- Add Unit Dialog -->
-    <el-dialog v-model="showAddUnit" title="新增房源" width="600px">
+    <el-dialog :draggable="true" v-model="showAddUnit" title="新增房源" width="600px">
       <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="100px">
         <el-divider content-position="left">座楼信息</el-divider>
         <el-row :gutter="16">
@@ -223,7 +223,7 @@
     </el-dialog>
 
     <!-- Edit Unit Dialog -->
-    <el-dialog :key="editKey" v-model="showEditUnit" :title="'编辑房源 - ' + editForm.fullCode" width="600px" destroy-on-close>
+    <el-dialog :draggable="true" :key="editKey" v-model="showEditUnit" :title="'编辑房源 - ' + editForm.fullCode" width="600px" destroy-on-close>
       <el-form :model="editForm" label-width="100px">
         <el-divider content-position="left">座楼信息</el-divider>
         <el-row :gutter="16">

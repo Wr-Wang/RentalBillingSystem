@@ -23,10 +23,20 @@ public class UserService : IUserService
         _db = db; _sql = sql; _currentUserService = currentUserService; _uow = uow;
     }
 
-    public async Task<List<UserDto>> GetListAsync(CancellationToken ct = default)
+    public async Task<List<UserDto>> GetListAsync(Guid? companyId = null, CancellationToken ct = default)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var users = (await conn.QueryAsync<User>(_sql.Get("Identity.Select.User.All"))).ToList();
+
+        // 非超管只能看自己公司的用户（数据隔离），忽略前端传入的 companyId
+        Guid? effectiveCompanyId;
+        if (!_currentUserService.IsSuperAdmin)
+            effectiveCompanyId = _currentUserService.CompanyId;
+        else
+            effectiveCompanyId = companyId;
+
+        var sqlKey = effectiveCompanyId.HasValue ? "Identity.Select.User.ByCompanyId" : "Identity.Select.User.All";
+        var param = effectiveCompanyId.HasValue ? new { CompanyId = effectiveCompanyId.Value } : null;
+        var users = (await conn.QueryAsync<User>(_sql.Get(sqlKey), param)).ToList();
         var dtos = new List<UserDto>();
         foreach (var user in users)
             dtos.Add(await MapToDtoAsync(user, conn, ct));
@@ -48,6 +58,8 @@ public class UserService : IUserService
         var user = new User(request.Username, request.DisplayName, BCryptNet.HashPassword(request.Password));
         if (request.IsSuperAdmin) user.GrantSuperAdmin();
         if (request.CompanyId.HasValue) user.SetCompany(request.CompanyId.Value);
+        // 创建时同时设置 Phone/Email（UpdateProfile 一并更新 DisplayName，传当前值不影响）
+        user.UpdateProfile(user.DisplayName, request.Phone, request.Email);
 
         using var conn = _db.CreateConnection(); conn.Open();
         using var tx = conn.BeginTransaction();
@@ -55,7 +67,7 @@ public class UserService : IUserService
         {
             await conn.ExecuteAsync(_sql.Get("Identity.Insert.User.Default"),
                 new { user.Id, user.Username, user.PasswordHash, user.DisplayName,
-                    user.IsActive, user.CompanyId, user.IsSuperAdmin,
+                    user.Phone, user.Email, user.IsActive, user.CompanyId, user.IsSuperAdmin,
                     CreatedBy = _currentUserService.UserId, CreatedAt = ChinaTime.Now });
 
             if (request.RoleIds?.Any() == true)
@@ -89,7 +101,7 @@ public class UserService : IUserService
         try
         {
             await conn.ExecuteAsync(_sql.Get("Identity.Update.User.Default"),
-                new { user.DisplayName, user.PasswordHash, Phone = (string?)null, Email = (string?)null,
+                new { user.DisplayName, user.PasswordHash, user.Phone, user.Email,
                     user.IsActive, user.CompanyId, user.IsSuperAdmin,
                     UpdatedBy = _currentUserService.UserId, UpdatedAt = ChinaTime.Now, Id = id }, tx);
 
