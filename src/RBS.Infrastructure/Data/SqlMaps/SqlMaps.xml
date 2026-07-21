@@ -370,12 +370,14 @@
       WHERE ContractId = @ContractId AND PeriodYear = @PeriodYear AND PeriodMonth = @PeriodMonth
         AND Status IN ('Published', 'Partial', 'Paid')]]>
   </update>
-  <!-- 手动生成账单 INSERT -->
+  <!-- 手动生成账单 INSERT（含快照字段） -->
   <insert id="DebitNote.Insert.DebitNote.ManualGenerate">
     <![CDATA[INSERT INTO DebitNotes (Id, ContractId, PeriodYear, PeriodMonth, BillNo, DueDate,
-      TotalAmount, TotalReceived, Status, GeneratedAt, GeneratedBy, IsHistorical, CompanyId, CreatedBy, CreatedAt)
+      TotalAmount, TotalReceived, Status, GeneratedAt, GeneratedBy, IsHistorical, CompanyId, CreatedBy, CreatedAt,
+      ContractNo, TenantName, BuildingAddress, CompanyName, PreviousBalance)
       VALUES (@Id, @ContractId, @PeriodYear, @PeriodMonth, @BillNo, @DueDate,
-      @TotalAmount, 0, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @GeneratedBy, 0, @CompanyId, @CreatedBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      @TotalAmount, 0, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @GeneratedBy, 0, @CompanyId, @CreatedBy, DATEADD(HOUR, 8, GETUTCDATE()),
+      @ContractNo, @TenantName, @BuildingAddress, @CompanyName, @PreviousBalance)]]>
   </insert>
   <!-- 账单详情（含合同号+公司名） -->
   <select id="DebitNote.Select.DebitNote.DetailById">
@@ -393,6 +395,13 @@
       LEFT JOIN HousingUnits h ON h.Id = c.RoomId
       LEFT JOIN Companies co ON co.Id = dn.CompanyId
       WHERE dn.Id = @Id]]>
+  </select>
+  <!-- PDF 导出查询：直接从快照列读取，无需 JOIN -->
+  <select id="DebitNote.Select.DebitNote.PdfExport">
+    <![CDATA[SELECT Id, ContractId, BillNo, PeriodYear, PeriodMonth, DueDate,
+      TotalAmount, TotalReceived, Status, GeneratedAt, IsHistorical, CompanyId, CreatedAt,
+      ContractNo, TenantName, BuildingAddress, CompanyName, PreviousBalance
+      FROM DebitNotes WHERE Id = @Id]]>
   </select>
   <!-- 账单前后期结余：合同在指定账期之前的未结清总额 -->
   <select id="Billing.Select.Journal.PreviousBalance">
@@ -416,9 +425,21 @@
         AND r.Status = 'Confirmed'
       ORDER BY r.ReceivedDate]]>
   </select>
+  <!-- 收款快照写入 -->
+  <insert id="Billing.Insert.DebitNoteReceipt.Default">
+    <![CDATA[INSERT INTO DebitNoteReceipts (Id, DebitNoteId, Amount, ReceivedDate, PaymentChannel, SortOrder)
+      VALUES (@Id, @DebitNoteId, @Amount, @ReceivedDate, @PaymentChannel, @SortOrder)]]>
+  </insert>
+  <!-- 收款快照查询 -->
+  <select id="Billing.Select.DebitNoteReceipt.ByDebitNoteId">
+    <![CDATA[SELECT * FROM DebitNoteReceipts WHERE DebitNoteId = @Id ORDER BY SortOrder]]>
+  </select>
   <!-- 删除账单（硬删，用于重新生成）：删明细 → 重置 Journals → 删主表 -->
   <delete id="DebitNote.Delete.DebitNoteItems.ByDebitNoteId">
     <![CDATA[DELETE FROM DebitNoteItems WHERE DebitNoteId = @Id]]>
+  </delete>
+  <delete id="DebitNote.Delete.DebitNoteReceipts.ByDebitNoteId">
+    <![CDATA[DELETE FROM DebitNoteReceipts WHERE DebitNoteId = @Id]]>
   </delete>
   <update id="DebitNote.Update.Journal.ResetBilledByDebitNoteId">
     <![CDATA[UPDATE Journals SET IsBilled = 0, DebitNoteId = NULL WHERE DebitNoteId = @Id]]>
@@ -807,6 +828,9 @@
   <select id="Lease.Select.HousingUnit.RoomCodeByContract">
     <![CDATA[SELECT h.FullCode FROM HousingUnits h JOIN Contracts c ON c.RoomId=h.Id WHERE c.Id=@Id]]>
   </select>
+  <select id="Lease.Select.HousingUnit.BuildingAddressByContract">
+    <![CDATA[SELECT h.BuildingAddress FROM HousingUnits h JOIN Contracts c ON c.RoomId=h.Id WHERE c.Id=@Id]]>
+  </select>
   <select id="Lease.Select.Tenant.PrimaryNameByContract">
     <![CDATA[SELECT t.Name FROM Tenants t JOIN ContractTenants ct ON ct.TenantId=t.Id WHERE ct.ContractId=@Id AND ct.IsPrimary=1]]>
   </select>
@@ -836,9 +860,11 @@
   <!-- ReceivablePlan SQL 已删除（由 Journals 替代）-->
   <insert id="Lease.Insert.DebitNote.FromBillJob">
     <![CDATA[INSERT INTO DebitNotes (Id, BillNo, ContractId, PeriodYear, PeriodMonth, CompanyId,
-      TotalAmount, TotalReceived, IsHistorical, DueDate, Status, GeneratedAt, GeneratedBy, CreatedBy, CreatedAt)
+      TotalAmount, TotalReceived, IsHistorical, DueDate, Status, GeneratedAt, GeneratedBy, CreatedBy, CreatedAt,
+      ContractNo, TenantName, BuildingAddress, CompanyName, PreviousBalance)
       VALUES (@Id, @NoteNo, @CId, @PeriodYear, @PeriodMonth, @CoId,
-      @Amt, 0, @IsHist, @Due, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @CBy, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      @Amt, 0, @IsHist, @Due, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @CBy, @CBy, DATEADD(HOUR, 8, GETUTCDATE()),
+      @ContractNo, @TenantName, @BuildingAddress, @CompanyName, @PreviousBalance)]]>
   </insert>
 
   <!-- ===== Journal（日记账）===== -->

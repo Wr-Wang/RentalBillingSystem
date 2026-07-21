@@ -31,6 +31,15 @@ public class DebitNote : AuditableEntity
     /// <summary>租户名称（快照字段），出账时合同中的租户名字</summary>
     public string? TenantName { get; private set; }
 
+    /// <summary>地址（快照字段），出账时房屋单元地址</summary>
+    public string? BuildingAddress { get; private set; }
+
+    /// <summary>公司名称（快照字段），出账时所属公司名，用于 PDF 水印</summary>
+    public string? CompanyName { get; private set; }
+
+    /// <summary>上月结余（快照字段），出账时定格计算的合同前期欠款</summary>
+    public decimal PreviousBalance { get; private set; }
+
     /// <summary>账单总金额，单位：元。所有明细项金额之和。</summary>
     public decimal TotalAmount { get; private set; }
 
@@ -70,11 +79,15 @@ public class DebitNote : AuditableEntity
     public Guid? BillJobTaskLogId { get; private set; }
 
     private readonly List<DebitNoteItem> _items = new();
+    private readonly List<DebitNoteReceipt> _receipts = new();
 
     /// <summary>账单明细行集合，包含各费用项目的应收信息</summary>
     public IReadOnlyCollection<DebitNoteItem> Items => _items.AsReadOnly();
 
-    /// <summary>私有无参构造函数，供 EF Core 延迟加载使用</summary>
+    /// <summary>收款快照集合，出账时定格写入（PDF 用）</summary>
+    public IReadOnlyCollection<DebitNoteReceipt> Receipts => _receipts.AsReadOnly();
+
+    /// <summary>私有无参构造函数，供 EF Core / Dapper 延迟加载使用</summary>
     private DebitNote() : base() { }
 
     /// <summary>
@@ -84,11 +97,13 @@ public class DebitNote : AuditableEntity
     /// <param name="noteNo">账单编号，不能为空</param>
     /// <param name="contractId">关联的合同 ID</param>
     /// <param name="period">所属账期，格式如 "2026-07"</param>
+    /// <param name="id">可选主键，不传则自动生成</param>
     /// <exception cref="ArgumentException">noteNo 为空时抛出</exception>
-    public DebitNote(string noteNo, Guid contractId, string period)
+    public DebitNote(string noteNo, Guid contractId, string period, Guid? id = null) : base()
     {
         if (string.IsNullOrWhiteSpace(noteNo))
             throw new ArgumentException("账单编号不能为空", nameof(noteNo));
+        if (id.HasValue) Id = id.Value;
         NoteNo = noteNo;
         ContractId = contractId;
         Period = period;
@@ -102,11 +117,18 @@ public class DebitNote : AuditableEntity
     /// <param name="contractNo">合同编号</param>
     /// <param name="roomCode">房产全编码</param>
     /// <param name="tenantName">租户名称</param>
-    public void SetSnapshot(string? contractNo, string? roomCode, string? tenantName)
+    /// <param name="buildingAddress">地址</param>
+    /// <param name="companyName">公司名称</param>
+    /// <param name="previousBalance">上月结余</param>
+    public void SetSnapshot(string? contractNo, string? roomCode, string? tenantName,
+        string? buildingAddress = null, string? companyName = null, decimal previousBalance = 0)
     {
         ContractNo = contractNo;
         RoomFullCode = roomCode;
         TenantName = tenantName;
+        BuildingAddress = buildingAddress;
+        CompanyName = companyName;
+        PreviousBalance = previousBalance;
     }
 
     /// <summary>设置收款汇总信息，同时计算应付余额</summary>
@@ -149,5 +171,13 @@ public class DebitNote : AuditableEntity
     {
         _items.Clear();
         _items.AddRange(items);
+    }
+
+    /// <summary>加载收款快照集合</summary>
+    /// <param name="receipts">收款快照集合</param>
+    public void LoadReceipts(IEnumerable<DebitNoteReceipt> receipts)
+    {
+        _receipts.Clear();
+        _receipts.AddRange(receipts);
     }
 }

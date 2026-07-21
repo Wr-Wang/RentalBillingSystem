@@ -344,6 +344,7 @@ async function generateSingle(row) {
     row.hasExistingBill = true
     row.billNo = result.billNo
     row.generatedAt = result.generatedAt
+    row.debitNoteId = result.debitNoteId
   }
 }
 
@@ -368,6 +369,7 @@ async function batchGenerate() {
       row.hasExistingBill = true
       row.billNo = result.billNo
       row.generatedAt = result.generatedAt
+      row.debitNoteId = result.debitNoteId
     }
   }
 
@@ -379,11 +381,13 @@ async function doGenerate(row) {
   const period = getPeriodLabel(filters.period)
   try {
     const res = await generateDebitNotes({ contractId: row.id, period })
+    const dnId = res.id || ''
     const result = {
       contractNo: row.contractNo,
       tenantName: row.tenantName,
       success: true,
-      billNo: res.noteNo || res.id || '-',
+      billNo: res.noteNo || '-',
+      debitNoteId: dnId,
       message: res.message || '生成成功'
     }
     generateResults.value.push(result)
@@ -395,6 +399,7 @@ async function doGenerate(row) {
       tenantName: row.tenantName,
       success: false,
       billNo: '-',
+      debitNoteId: '',
       message: msg
     }
     generateResults.value.push(result)

@@ -229,6 +229,18 @@ public class BillJob : ScheduledJobBase
         var periodYear = int.Parse(periodParts[0]);
         var periodMonth = int.Parse(periodParts[1]);
 
+        // 收集快照数据
+        var tenantName = await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Lease.Select.Tenant.PrimaryNameByContract"), new { Id = contractId }, tx);
+        var buildingAddress = await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Lease.Select.HousingUnit.BuildingAddressByContract"), new { Id = contractId }, tx);
+        var companyRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            _sql.Get("Organization.Select.Company.ById"), new { Id = companyId }, tx);
+        var companyName = companyRow?.Name as string ?? "";
+        var previousBalance = await conn.QuerySingleOrDefaultAsync<decimal>(
+            _sql.Get("Billing.Select.Journal.PreviousBalance"),
+            new { ContractId = contractId, Year = periodYear, Month = periodMonth }, tx);
+
         var noteNo = await DebitNoteService.GenerateBillNoAsync(conn, tx);
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.DebitNote.FromBillJob"),
             new
@@ -236,7 +248,12 @@ public class BillJob : ScheduledJobBase
                 Id = dnId, NoteNo = noteNo,
                 CId = contractId, CoId = companyId, Amt = totalAmount,
                 IsHist = isHistorical, Due = dueDate,
-                PeriodYear = periodYear, PeriodMonth = periodMonth, CBy = Guid.Empty
+                PeriodYear = periodYear, PeriodMonth = periodMonth, CBy = Guid.Empty,
+                ContractNo = contractNo,
+                TenantName = tenantName ?? "",
+                BuildingAddress = buildingAddress ?? "",
+                CompanyName = companyName ?? "",
+                PreviousBalance = previousBalance
             }, tx);
     }
 

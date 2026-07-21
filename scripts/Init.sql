@@ -3231,7 +3231,12 @@ CREATE TABLE [DebitNotes] (
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
     [UpdatedAt] DATETIME2 , -- 更新时间,
     [UpdatedIp] VARCHAR(45) , -- 更新IP,
-    [UpdatedHostname] VARCHAR(100) -- 更新主机名
+    [UpdatedHostname] VARCHAR(100) , -- 更新主机名,
+    [ContractNo] VARCHAR(50) , -- 合同编号（快照，出账时定格）,
+    [TenantName] NVARCHAR(200) , -- 租客姓名（快照，出账时定格）,
+    [BuildingAddress] NVARCHAR(500) , -- 地址（快照，出账时定格）,
+    [CompanyName] NVARCHAR(200) , -- 公司名称（快照，出账时定格，PDF水印用）,
+    [PreviousBalance] DECIMAL(18,2) NOT NULL DEFAULT 0 -- 上月结余（快照，出账时定格）
 )
 GO
 
@@ -3261,6 +3266,11 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同编号（快照，出账时定格）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'ContractNo'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'租客姓名（快照，出账时定格）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'TenantName'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'地址（快照，出账时定格）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'BuildingAddress'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'公司名称（快照，出账时定格，PDF水印用）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'CompanyName'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'上月结余（快照，出账时定格）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNotes', @level2type = N'COLUMN', @level2name = N'PreviousBalance'
 GO
 -- 账单编号唯一
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[DebitNotes]') AND name=N'IX_DebitNotes_BillNo')
@@ -3344,7 +3354,37 @@ CREATE UNIQUE INDEX [IX_DebitNotes_Audit_Id_Version] ON [DebitNotes_Audit]([Id],
 
 
 -- ===================================================================
--- 38. DebitNoteItems 表：账单明细表
+-- 38. DebitNoteReceipts 表：账单收款快照表（PDF用）
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[DebitNoteReceipts]'))
+CREATE TABLE [DebitNoteReceipts] (
+    [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()) , -- 主键,
+    [DebitNoteId] UNIQUEIDENTIFIER NOT NULL REFERENCES DebitNotes(Id) , -- 账单ID,
+    [Amount] DECIMAL(18,2) NOT NULL , -- 收款金额,
+    [ReceivedDate] DATETIME NULL , -- 收款日期,
+    [PaymentChannel] NVARCHAR(100) NULL , -- 支付渠道（快照）,
+    [SortOrder] INT NOT NULL DEFAULT 0 -- 排序号
+)
+GO
+
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'账单收款快照表（出账时定格写入，PDF用）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNoteReceipts'
+GO
+
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNoteReceipts', @level2type = N'COLUMN', @level2name = N'Id'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属账单ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNoteReceipts', @level2type = N'COLUMN', @level2name = N'DebitNoteId'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNoteReceipts', @level2type = N'COLUMN', @level2name = N'Amount'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款日期', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNoteReceipts', @level2type = N'COLUMN', @level2name = N'ReceivedDate'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付渠道（快照）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNoteReceipts', @level2type = N'COLUMN', @level2name = N'PaymentChannel'
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'排序号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'DebitNoteReceipts', @level2type = N'COLUMN', @level2name = N'SortOrder'
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[DebitNoteReceipts]') AND name=N'IX_DebitNoteReceipts_DebitNoteId')
+CREATE INDEX [IX_DebitNoteReceipts_DebitNoteId] ON [DebitNoteReceipts]([DebitNoteId])
+GO
+
+
+-- ===================================================================
+-- 39. DebitNoteItems 表：账单明细表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[DebitNoteItems]'))
 CREATE TABLE [DebitNoteItems] (
@@ -3390,7 +3430,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[DebitNoteI
 CREATE INDEX [IX_DebitNoteItems_DebitNoteId] ON [DebitNoteItems]([DebitNoteId])
 
 
--- 39. AutoRenewConfigs 表：自动续签配置表
+-- 40. AutoRenewConfigs 表：自动续签配置表
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[AutoRenewConfigs]'))
 CREATE TABLE [AutoRenewConfigs] (

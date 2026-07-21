@@ -128,7 +128,7 @@ public class DebitNoteService : IDebitNoteService
         var periodYear = int.Parse(periodParts[0]);
         var periodMonth = int.Parse(periodParts[1]);
 
-        // 3. 创建账单
+        // 3. 创建账单（含快照字段）
         var noteId = Guid.NewGuid();
         using var conn = _db.CreateConnection(); conn.Open();
         var billNo = await GenerateBillNoAsync(conn);
@@ -136,6 +136,23 @@ public class DebitNoteService : IDebitNoteService
         var lastDay = DateTime.DaysInMonth(periodYear, periodMonth);
         var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
         var dueDate = new DateTime(periodYear, periodMonth, dueDay);
+
+        // 收集快照数据（出账时定格，后续变更不影响已生成的账单）
+        var contractNo = contract.ContractNo ?? "";
+        var tenantName = await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Lease.Select.Tenant.PrimaryNameByContract"), new { Id = contractId });
+        var buildingAddress = await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Lease.Select.HousingUnit.BuildingAddressByContract"), new { Id = contractId });
+        var companyRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            _sql.Get("Organization.Select.Company.ById"), new { Id = contract.CompanyId });
+        var companyName = companyRow?.Name as string ?? "";
+        var previousBalance = await conn.QuerySingleOrDefaultAsync<decimal>(
+            _sql.Get("Billing.Select.Journal.PreviousBalance"),
+            new { ContractId = contractId, Year = periodYear, Month = periodMonth });
+        var rawReceipts = (await conn.QueryAsync(
+            _sql.Get("Billing.Select.Receipt.ByContractAndPeriod"),
+            new { ContractId = contractId, Year = periodYear, Month = periodMonth })).ToList();
+
         await conn.ExecuteAsync(
             _sql.Get("DebitNote.Insert.DebitNote.ManualGenerate"),
             new
@@ -149,7 +166,12 @@ public class DebitNoteService : IDebitNoteService
                 TotalAmount = total,
                 GeneratedBy = _currentUser.UserId,
                 CompanyId = contract.CompanyId,
-                CreatedBy = _currentUser.UserId
+                CreatedBy = _currentUser.UserId,
+                ContractNo = contractNo,
+                TenantName = tenantName ?? "",
+                BuildingAddress = buildingAddress ?? "",
+                CompanyName = companyName ?? "",
+                PreviousBalance = previousBalance
             });
 
         // 4. 写入 DebitNoteItems（FeeName 从 FeeCodes 表查询）
@@ -165,55 +187,81 @@ public class DebitNoteService : IDebitNoteService
                     FeeName = feeName, Amount = journal.Amount, CreatedBy = _currentUser.UserId, CreatedAt = ChinaTime.Now });
         }
 
-        // 5. 返回新创建的账单
+        // 5. 写入收款快照
+        int sortOrder = 0;
+        foreach (var r in rawReceipts)
+        {
+            await conn.ExecuteAsync(
+                _sql.Get("Billing.Insert.DebitNoteReceipt.Default"),
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    DebitNoteId = noteId,
+                    Amount = (decimal)(r.Amount ?? 0),
+                    ReceivedDate = (DateTime?)r.ReceivedDate,
+                    PaymentChannel = (string)(r.PaymentChannel ?? "") ?? "",
+                    SortOrder = sortOrder++
+                });
+        }
+
+        // 6. 返回新创建的账单（使用真实的 noteId）
         var created = await GetByIdAsync(noteId, ct);
-        return new DebitNote(billNo, contractId, period);
+        return new DebitNote(billNo, contractId, period, noteId);
     }
 
     public async Task<byte[]> ExportPdfAsync(Guid id, CancellationToken ct)
     {
-        var row = await GetByIdAsync(id, ct)
-            ?? throw new InvalidOperationException($"账单 {id} 不存在");
+        using var conn = _db.CreateConnection(); conn.Open();
 
-        var noteId = (Guid)row.Id;
-        var contractId = (Guid)row.ContractId;
+        using var multi = await conn.QueryMultipleAsync(
+            _sql.Get("DebitNote.Select.DebitNote.PdfExport") + ";" +
+            _sql.Get("Billing.Select.DebitNoteItem.ByDebitNoteId") + ";" +
+            _sql.Get("Billing.Select.DebitNoteReceipt.ByDebitNoteId"),
+            new { Id = id });
+
+        var row = await multi.ReadSingleOrDefaultAsync<dynamic>();
+        if (row == null)
+            throw new InvalidOperationException($"账单 {id} 不存在");
+
         var billNo = (string)row.BillNo;
-        var contractNo = (string)row.ContractNo;
+        var contractId = (Guid)row.ContractId;
         var periodVal = $"{row.PeriodYear:D4}-{row.PeriodMonth:D2}";
         var totalAmount = (decimal)row.TotalAmount;
 
         // 构建 DebitNote 实体供 PDF 生成
         var note = new DebitNote(billNo, contractId, periodVal);
         note.SetTotalAmount(totalAmount);
-        var items = await _uow.GetDebitNoteItemsAsync(id, ct);
-        note.LoadItems(items);
 
-        // 公司名
-        var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
-        var company = contract?.CompanyId != Guid.Empty && contract != null
-            ? await _uow.Companies.GetByIdAsync(contract.CompanyId, ct)
-            : null;
+        // 设置快照数据
+        note.SetSnapshot(
+            contractNo: (string)row.ContractNo ?? "",
+            roomCode: null,
+            tenantName: (string)row.TenantName ?? "",
+            buildingAddress: (string)row.BuildingAddress ?? "",
+            companyName: (string)row.CompanyName ?? "",
+            previousBalance: (decimal)(row.PreviousBalance ?? 0));
 
-        // 费用明细
-        var feeCodes = await _uow.FeeCodes.GetAllAsync(ct);
-        var feeDict = feeCodes.ToDictionary(f => f.Id, f => f.Name);
-        var items2 = note.Items.Select(i => (feeDict.GetValueOrDefault(i.FeeCodeId, "未知"), i.Amount)).ToList();
-        var buildingAddress = (string)row.BuildingAddress;
+        // 加载明细（FeeName 直接从快照列读取，无需查 FeeCodes）
+        var dbItems = (await multi.ReadAsync<DebitNoteItem>()).ToList();
+        note.LoadItems(dbItems);
+
+        // 加载收款快照
+        var dbReceipts = (await multi.ReadAsync<dynamic>()).ToList();
+        var receiptList = dbReceipts.Select(r => new DebitNoteReceipt(
+            id, (decimal)(r.Amount ?? 0),
+            (DateTime?)r.ReceivedDate,
+            (string)(r.PaymentChannel ?? "") ?? "",
+            (int)(r.SortOrder ?? 0)
+        )).ToList();
+        note.LoadReceipts(receiptList);
+
+        // 构建 PDF 参数（直接使用快照字段）
+        var items2 = note.Items.Select(i => (i.FeeName ?? "未知", i.Amount)).ToList();
         var genDate = row.CreatedAt is DateTime dt ? dt.ToString("yyyy-MM-dd") : row.CreatedAt?.ToString()?[..10];
-        var prevBalance = (decimal)(row.PreviousBalance ?? 0);
-        var receiptsList = new List<(decimal, string, string)>();
-        var rawReceipts = row.Receipts as IEnumerable<dynamic>;
-        if (rawReceipts != null)
-        {
-            foreach (var r in rawReceipts)
-            {
-                string label = (string)(r.PaymentChannel ?? "") ?? "";
-                receiptsList.Add(((decimal)r.Amount, ((DateTime?)r.ReceivedDate)?.ToString("yyyy-MM-dd") ?? "", label));
-            }
-        }
+        var receiptsForPdf = note.Receipts.Select(r => (r.Amount, r.ReceivedDate?.ToString("yyyy-MM-dd") ?? "", r.PaymentChannel ?? "")).ToList();
 
-        var tenantName = (string)row.TenantName ?? "";
-        return _pdfGenerator.Generate(note, items2, contractNo, tenantName, company?.Name, buildingAddress, genDate, prevBalance, receiptsList);
+        return _pdfGenerator.Generate(note, items2, note.ContractNo ?? "", note.TenantName ?? "",
+            note.CompanyName, note.BuildingAddress, genDate, note.PreviousBalance, receiptsForPdf);
     }
 
     public async Task CancelAsync(Guid id, string reason, Guid cancelledBy, CancellationToken ct = default)
@@ -258,6 +306,7 @@ public class DebitNoteService : IDebitNoteService
             throw new InvalidOperationException("账单已付清，不允许删除");
 
         using var tx = conn.BeginTransaction();
+        await conn.ExecuteAsync(_sql.Get("DebitNote.Delete.DebitNoteReceipts.ByDebitNoteId"), new { Id = id }, tx);
         await conn.ExecuteAsync(_sql.Get("DebitNote.Delete.DebitNoteItems.ByDebitNoteId"), new { Id = id }, tx);
         await conn.ExecuteAsync(_sql.Get("DebitNote.Update.Journal.ResetBilledByDebitNoteId"), new { Id = id }, tx);
         await conn.ExecuteAsync(_sql.Get("DebitNote.Delete.DebitNote.ById"), new { Id = id }, tx);
