@@ -279,11 +279,6 @@ export function deleteAccountingSubject(id) { return request({ url: `/accounting
 export function getLedger(params) { return request({ url: '/ledger', method: 'get', params }) }
 export function getBalanceSheet(params) { return request({ url: '/financialstatements/balancesheet', method: 'get', params }) }
 export function getIncomeStatement(params) { return request({ url: '/financialstatements/incomestatement', method: 'get', params }) }
-export function getAccountingPeriods() { return request({ url: '/accountingperiods', method: 'get' }) }
-export function openAccountingPeriod(data) { return request({ url: '/accountingperiods', method: 'post', data }) }
-export function closeAccountingPeriod(id) { return request({ url: `/accountingperiods/${id}/close`, method: 'put' }) }
-export function reopenAccountingPeriod(id) { return request({ url: `/accountingperiods/${id}/reopen`, method: 'put' }) }
-export function lockAccountingPeriod(id) { return request({ url: `/accountingperiods/${id}/lock`, method: 'put' }) }
 
 // Banking
 export function getBankStatements(params) { return request({ url: '/banking/statements', method: 'get', params }) }

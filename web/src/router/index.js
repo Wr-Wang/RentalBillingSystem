@@ -263,11 +263,6 @@ const routes = [
             component: () => import('../views/accounting/subjects.vue'),
             meta: { title: '科目表', icon: 'List' }
           },
-          {
-            path: 'periods',
-            name: 'AccountingPeriods',
-            component: () => import('../views/accounting/periods.vue'),
-            meta: { title: '会计期间', icon: 'Calendar' }
           },
           {
             path: 'ledger',

@@ -41,7 +41,6 @@ public static class DependencyInjection
         services.AddScoped<IFeeCodeService, FeeCodeService>();
         services.AddScoped<ITaxRateConfigService, TaxRateConfigService>();
         services.AddScoped<IAccountingSubjectService, AccountingSubjectService>();
-        services.AddScoped<IAccountingPeriodService, AccountingPeriodService>();
         services.AddScoped<ISchedulerService, SchedulerService>();
         services.AddScoped<IJobTemplateService, JobTemplateService>();
         services.AddScoped<IJobScheduleExecutionService, JobScheduleExecutionService>();

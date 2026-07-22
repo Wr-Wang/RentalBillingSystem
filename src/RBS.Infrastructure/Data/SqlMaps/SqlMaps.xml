@@ -1563,28 +1563,6 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[DELETE FROM ApiLogs WHERE Id = @Id]]>
   </delete>
 
-  <!-- 日记账历史数据清理 -->
-  <delete id="Accounting.Delete.JournalAudit.Expired">
-    <![CDATA[DELETE ja FROM [Journals_Audit] ja
-      WHERE EXISTS (
-        SELECT 1 FROM [AccountingPeriods] ap
-        WHERE ap.CompanyId = ja.CompanyId AND ap.Period = ja.Period AND ap.Status = 'Locked'
-      )
-      AND ja.CreatedAt < DATEADD(YEAR, -1, GETDATE())]]>
-  </delete>
-  <delete id="Accounting.Delete.GLBalance.Redundant">
-    <![CDATA[DELETE glb FROM [GeneralLedgerBalances] glb
-      INNER JOIN (
-        SELECT CompanyId, Period, MAX(CalculatedAt) AS LatestAt
-        FROM [GeneralLedgerBalances] GROUP BY CompanyId, Period
-      ) lat ON lat.CompanyId = glb.CompanyId AND lat.Period = glb.Period
-      WHERE lat.LatestAt <> glb.CalculatedAt
-        AND EXISTS (
-          SELECT 1 FROM [AccountingPeriods] ap
-          WHERE ap.CompanyId = glb.CompanyId AND ap.Period = glb.Period
-            AND ap.Status IN ('Closed', 'Locked')
-        )]]>
-  </delete>
   <delete id="Accounting.Delete.GLEntry.OrphanJournalPost">
     <![CDATA[DELETE FROM [GeneralLedgerEntries]
       WHERE SourceType = 'JournalPost'

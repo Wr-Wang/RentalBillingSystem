@@ -437,10 +437,6 @@ public class SchedulerController : ControllerBase
         {
             var result = new
             {
-                DeletedAuditRecords = await conn.ExecuteAsync(
-                    _sql.Get("Accounting.Delete.JournalAudit.Expired"), transaction: tx),
-                DeletedRedundantBalances = await conn.ExecuteAsync(
-                    _sql.Get("Accounting.Delete.GLBalance.Redundant"), transaction: tx),
                 DeletedOrphanGLEntries = await conn.ExecuteAsync(
                     _sql.Get("Accounting.Delete.GLEntry.OrphanJournalPost"), transaction: tx),
             };
@@ -456,9 +452,7 @@ public class SchedulerController : ControllerBase
                     new
                     {
                         Id = Guid.NewGuid(),
-                        Msg = $"日记账历史数据清理完成: Journals_Audit={result.DeletedAuditRecords}, "
-                            + $"GLBalances={result.DeletedRedundantBalances}, "
-                            + $"OrphanGLEntries={result.DeletedOrphanGLEntries}",
+                        Msg = $"数据清理完成: OrphanGLEntries={result.DeletedOrphanGLEntries}",
                         Machine = Environment.MachineName
                     });
             }

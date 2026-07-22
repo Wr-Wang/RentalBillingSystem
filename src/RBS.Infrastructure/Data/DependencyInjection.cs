@@ -87,7 +87,6 @@ public static class DependencyInjection
         services.AddScoped<IRepository<FloorLevelBand>, DapperRepository<FloorLevelBand>>();
         services.AddScoped<IRepository<TaxRateConfig>, DapperRepository<TaxRateConfig>>();
         services.AddScoped<IRepository<AccountingSubject>, DapperRepository<AccountingSubject>>();
-        services.AddScoped<IRepository<AccountingPeriod>, DapperRepository<AccountingPeriod>>();
         services.AddScoped<IGLBalanceRepository, DapperGLBalanceRepository>();
 
         // ===== IUnitOfWork（Scoped） =====

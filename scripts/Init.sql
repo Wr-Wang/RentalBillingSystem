@@ -4112,6 +4112,7 @@ IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JournalEntries
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JournalEntries]')) DROP TABLE [JournalEntries]
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers_Audit]')) DROP TABLE [Vouchers_Audit]
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Vouchers]')) DROP TABLE [Vouchers]
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[AccountingPeriods]')) DROP TABLE [AccountingPeriods]
 
 -- ===================================================================
 

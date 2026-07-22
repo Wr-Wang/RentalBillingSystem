@@ -158,8 +158,6 @@ public interface IUnitOfWork : IDisposable
 
     // ===== 会计 =====
 
-    /// <summary>会计期间仓储</summary>
-    IRepository<AccountingPeriod> AccountingPeriods { get; }
 
     // ===== 系统配置 =====
 

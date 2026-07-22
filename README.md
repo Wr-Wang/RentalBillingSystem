@@ -192,7 +192,6 @@ SchedulingHostedService (BackgroundService, 60s 轮询)
 
 - **科目表**：支持树形科目结构（4 级编码体系）
 - **自动分录**：每笔收款确认后自动生成记账凭证
-- **凭证管理**：过账→审核→反过账，会计期间管控
 - **日记账**：支持按科目/期间/对方科目多维度查询
 - **明细账/总账**：逐笔追溯，支持按科目层级汇总
 - **报表**：资产负债表、利润表，支持多公司合并报表
@@ -313,7 +312,7 @@ RentalBillingSystem/
 │   │   ├── Services/                 # 应用服务（20+ 服务类）
 │   │   │   ├── Contract/             # 合同服务、续签服务、租客服务
 │   │   │   ├── Billing/              # 应收/收款/押金/账单/银行对账/日记账
-│   │   │   ├── Accounting/           # 科目/凭证/会计期间/自动凭证
+│   │   │   ├── Accounting/           # 科目/凭证/自动凭证
 │   │   │   ├── Approval/             # 审批服务
 │   │   │   ├── Import/               # 通用导入服务
 │   │   │   ├── Reporting/            # 报表服务
@@ -466,7 +465,6 @@ API 遵循 RESTful 风格，基础路径 `/api`。
 | 抄表 | `/api/meterreadings` | CRUD, confirm, estimate |
 | 会计科目 | `/api/accountingsubjects` | tree |
 | 凭证/日记账 | `/api/vouchers`, `/api/journalentries` | CRUD, post, reverse |
-| 会计期间 | `/api/accountingperiods` | CRUD, open, close |
 | 财务报表 | `/api/financialstatements` | balanceSheet, incomeStatement |
 | 明细账 | `/api/ledger` | query |
 | 催缴 | `/api/collectionstages`, `/api/collectionrecords` | CRUD, auto |
