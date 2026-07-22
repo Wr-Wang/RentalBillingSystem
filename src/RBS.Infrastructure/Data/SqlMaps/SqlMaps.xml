@@ -1865,7 +1865,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT mr.*, cfc.FeeCodeId FROM MeterReadings mr INNER JOIN ContractFeeConfigs cfc ON cfc.Id=mr.ContractFeeConfigId WHERE cfc.ContractId IN (SELECT Id FROM Contracts WHERE CompanyId=@CompanyId) AND YEAR(mr.ReadingDate)=@Year AND MONTH(mr.ReadingDate)=@Month ORDER BY mr.ReadingDate DESC]]>
   </select>
   <select id="Lease.Select.Contract.Expiring">
-    <![CDATA[SELECT * FROM Contracts WHERE EndDate=@Date AND Status='Active']]>
+    <![CDATA[SELECT * FROM Contracts WHERE EndDate=@Date AND Status='Active' AND (@CompanyId IS NULL OR CompanyId = @CompanyId)]]>
   </select>
   <select id="Lease.Select.Contract.HasActiveForHousingUnit">
     <![CDATA[SELECT COUNT(1) FROM Contracts WHERE RoomId=@Id AND Status='Active']]>
