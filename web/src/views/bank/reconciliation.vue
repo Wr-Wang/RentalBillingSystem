@@ -130,8 +130,8 @@ const enterprisePaymentNotBank = computed(() =>
     .reduce((s, r) => s + Math.abs(r.amount || 0), 0)
 )
 
-const bankReceiptNotEnterprise = computed(() => enterprisePaymentNotBank)
-const bankPaymentNotEnterprise = computed(() => enterpriseReceiptNotBank)
+const bankReceiptNotEnterprise = computed(() => enterprisePaymentNotBank.value)
+const bankPaymentNotEnterprise = computed(() => enterpriseReceiptNotBank.value)
 
 const adjustedBankBalance = computed(() => bankBalance.value + enterpriseReceiptNotBank.value - enterprisePaymentNotBank.value)
 const adjustedBookBalance = computed(() => bookBalance.value + bankReceiptNotEnterprise.value - bankPaymentNotEnterprise.value)
@@ -172,7 +172,25 @@ async function loadReconDetail() {
   if (!selectedReconId.value) { matches.value = []; return }
   try {
     const res = await getBankMatches({})
-    matches.value = Array.isArray(res) ? res : (res.items || res.data || [])
+    const allMatches = Array.isArray(res) ? res : (res.items || res.data || [])
+
+    // 只保留当前对账期内的匹配记录
+    const recon = reconciliations.value.find(r => r.id === selectedReconId.value)
+    if (recon) {
+      const periodStmtIds = new Set(
+        statements.value
+          .filter(s => {
+            const d = s.transactionDate || ''
+            return d >= recon.startDate && d <= recon.endDate
+          })
+          .map(s => s.id)
+      )
+      matches.value = allMatches.filter(m =>
+        periodStmtIds.has(m.bankStatementId || m.bankstatementid)
+      )
+    } else {
+      matches.value = allMatches
+    }
   } catch { /* 静默 */ }
 }
 

@@ -250,22 +250,6 @@ const routes = [
         meta: { title: '总账管理', icon: 'DataBoard', roles: ['Admin', 'FinanceSupervisor', 'FinanceDirector', 'Accountant'] }
       },
       // =====================================================================
-      // 会计管理
-      {
-        path: 'accounting',
-        component: RouteView,
-        redirect: '/accounting/subjects',
-        meta: { title: '会计管理', icon: 'DataBoard', roles: ['Admin', 'FinanceSupervisor', 'FinanceDirector', 'Accountant'] },
-        children: [
-          {
-            path: 'subjects',
-            name: 'AccountingSubjects',
-            component: () => import('../views/accounting/subjects.vue'),
-            meta: { title: '科目表', icon: 'List' }
-          },
-        ]
-      },
-      // =====================================================================
       // 银行对账
       {
         path: 'bank',
@@ -387,7 +371,6 @@ const routes = [
       { path: 'pricing', redirect: '/system/pricing', meta: { hidden: true } },
       { path: 'paymentchannels', redirect: '/system/paymentchannels', meta: { hidden: true } },
       { path: 'taxrates', redirect: '/system/taxrates', meta: { hidden: true } },
-      { path: 'accountingsubjects', redirect: '/system/accountingsubjects', meta: { hidden: true } },
       { path: 'scheduler', redirect: '/system/scheduler', meta: { hidden: true } },
       { path: 'holidays', redirect: '/system/holidays', meta: { hidden: true } },
       { path: 'interest', redirect: '/system/interest', meta: { hidden: true } },
@@ -407,7 +390,7 @@ const routes = [
       { path: 'records', redirect: '/collection/records', meta: { hidden: true } },
       { path: 'myrequests', redirect: '/approvals/myrequests', meta: { hidden: true } },
       { path: 'history', redirect: '/approvals/history', meta: { hidden: true } },
-      { path: 'subjects', redirect: '/accounting/subjects', meta: { hidden: true } },
+      { path: 'subjects', redirect: '/system/accountingsubjects', meta: { hidden: true } },
       { path: 'journal', redirect: '/accounting/journal', meta: { hidden: true } },
       // { path: 'vouchers', redirect: '/accounting/vouchers', meta: { hidden: true } }, // 已删除
       { path: 'users', redirect: '/system/organization/users', meta: { hidden: true } },
@@ -487,12 +470,6 @@ const routes = [
             meta: { title: '税率配置', icon: 'CollectionTag' }
           },
           {
-            path: 'accountingsubjects',
-            name: 'SystemAccountingSubjects',
-            component: () => import('../views/system/accountingSubject.vue'),
-            meta: { title: '会计科目管理', icon: 'DataBoard' }
-          },
-          {
             path: 'scheduler',
             name: 'SystemScheduler',
             component: () => import('../views/system/scheduler/scheduler.vue'),
@@ -539,12 +516,17 @@ const routes = [
             name: 'SystemApiLogs',
             component: () => import('../views/system/apilog/index.vue'),
             meta: { title: 'API 日志', icon: 'Monitor', roles: ['Admin'], scope: 'System' }
-          }
+          },
+          {
+            path: 'accountingsubjects',
+            name: 'SystemAccountingSubjects',
+            component: () => import('../views/accounting/subjects.vue'),
+            meta: { title: '会计科目管理', icon: 'DataBoard', roles: ['Admin', 'FinanceSupervisor', 'FinanceDirector', 'Accountant'] }
+          },
         ]
       }
     ]
   },
-  // 404 catch-all
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound, meta: { title: '页面不存在', hidden: true } }
 ]
 

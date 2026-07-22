@@ -465,10 +465,15 @@
   </select>
   <!-- 费用收入分布统计：按收费项目汇总各月金额 -->
   <select id="Billing.Select.FeeRevenue.All">
-    <![CDATA[SELECT fc.Name, fc.Code, SUM(j.Amount) AS Total
-      FROM Journals j JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
+    <![CDATA[SELECT fc.Name, fc.Code, SUM(j.Amount) AS TotalAmount,
+      ISNULL(SUM(r.Amount), 0) AS TotalReceived
+      FROM Journals j
+      JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
+      LEFT JOIN Receipts r ON r.CompanyId = j.CompanyId
+        AND FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period
+        AND r.Status = 'Confirmed'
       WHERE (@Period IS NULL OR j.Period = @Period) AND (@CompanyId IS NULL OR j.CompanyId = @CompanyId)
-      GROUP BY fc.Name, fc.Code ORDER BY Total DESC]]>
+      GROUP BY fc.Name, fc.Code ORDER BY TotalAmount DESC]]>
   </select>
   <select id="Billing.Select.Contract.OverdueData">
     <![CDATA[SELECT c.Id, c.ContractNo, t.Name AS TenantName, h.FullCode AS RoomFullCode
@@ -857,7 +862,13 @@
       COALESCE(r.Received, 0) AS Received,
       DATEDIFF(DAY, j.DueDate, CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)) AS DaysOverdue
       FROM Journals j
-      OUTER APPLY (SELECT 0 AS Received) r
+      OUTER APPLY (
+        SELECT ISNULL(SUM(r.Amount), 0) AS Received
+        FROM Receipts r
+        WHERE r.ContractId = j.ContractId
+          AND FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period
+          AND r.Status = 'Confirmed'
+      ) r
       WHERE j.CompanyId = @CompanyId AND j.DueDate < CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
         AND j.Amount > COALESCE(r.Received, 0)]]>
   </select>
@@ -912,7 +923,13 @@
       FROM Journals j
       LEFT JOIN Contracts c ON c.Id = j.ContractId
       LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
-      OUTER APPLY (SELECT 0 AS Received) ra
+      OUTER APPLY (
+        SELECT ISNULL(SUM(r.Amount), 0) AS Received
+        FROM Receipts r
+        WHERE r.ContractId = j.ContractId
+          AND FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period
+          AND r.Status = 'Confirmed'
+      ) ra
       WHERE j.Id = @Id]]>
   </select>
   <select id="Billing.Select.Journal.ByContractWithPayment">
@@ -924,7 +941,13 @@
       FROM Journals j
       LEFT JOIN Contracts c ON c.Id = j.ContractId
       LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
-      OUTER APPLY (SELECT 0 AS Received) ra
+      OUTER APPLY (
+        SELECT ISNULL(SUM(r.Amount), 0) AS Received
+        FROM Receipts r
+        WHERE r.ContractId = j.ContractId
+          AND FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period
+          AND r.Status = 'Confirmed'
+      ) ra
       WHERE j.ContractId = @CId ORDER BY j.Period]]>
   </select>
   <insert id="Billing.Insert.Journal.Default">
@@ -1589,7 +1612,13 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       JOIN Contracts c ON c.Id = j.ContractId
       LEFT JOIN ContractTenants ct ON ct.ContractId = c.Id AND ct.IsPrimary = 1
       LEFT JOIN Tenants t ON t.Id = ct.TenantId
-      OUTER APPLY (SELECT 0 AS Received) r
+      OUTER APPLY (
+        SELECT ISNULL(SUM(r.Amount), 0) AS Received
+        FROM Receipts r
+        WHERE r.ContractId = j.ContractId
+          AND FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period
+          AND r.Status = 'Confirmed'
+      ) r
       LEFT JOIN HousingUnits h ON h.Id = c.RoomId
       WHERE j.DueDate < CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
         AND j.Amount > COALESCE(r.Received, 0)

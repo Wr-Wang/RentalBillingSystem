@@ -753,9 +753,6 @@ DECLARE @M_Report uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_Report,N'财务报表','report:view','/reports','TrendCharts',NULL,11,1,@SysUserId,@Now);
 
-DECLARE @M_Accounting uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting,N'会计核算','accounting:view','/accounting','Files',NULL,13,1,@SysUserId,@Now);
 
 DECLARE @M_Bank uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -990,8 +987,8 @@ INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],
 VALUES (@M_Report_Export,N'导出报表Excel','report:export',NULL,@M_Report,10,1,@SysUserId,@Now);
 
 DECLARE @M_Accounting_Subjects uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_Subjects,N'科目表','accounting:subjects','/accounting/subjects',@M_Accounting,1,1,@SysUserId,@Now);
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_Accounting_Subjects,N'会计科目管理','system:accountingsubjects','/system/accountingsubjects','DataBoard',@M_System,13,1,@SysUserId,@Now);
 
 DECLARE @M_Journal uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1009,15 +1006,15 @@ VALUES (@M_GL,N'总账管理','gl:view','/gl','DataBoard',NULL,12,1,@SysUserId,@
 
 DECLARE @M_Accounting_SubjectCreate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_SubjectCreate,N'新增科目','accounting:subjectcreate',NULL,@M_Accounting,10,1,@SysUserId,@Now);
+VALUES (@M_Accounting_SubjectCreate,N'新增科目','accounting:subjectcreate',NULL,@M_Accounting_Subjects,10,1,@SysUserId,@Now);
 
 DECLARE @M_Accounting_Post uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_Post,N'过账','accounting:post',NULL,@M_Accounting,11,1,@SysUserId,@Now);
+VALUES (@M_Accounting_Post,N'过账','accounting:post',NULL,@M_Accounting_Subjects,11,1,@SysUserId,@Now);
 
 DECLARE @M_Accounting_Reverse uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_Reverse,N'冲销凭证','accounting:reverse',NULL,@M_Accounting,12,1,@SysUserId,@Now);
+VALUES (@M_Accounting_Reverse,N'冲销凭证','accounting:reverse',NULL,@M_Accounting_Subjects,12,1,@SysUserId,@Now);
 
 DECLARE @M_Bank_Import uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1079,9 +1076,6 @@ DECLARE @M_System_TaxRate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_TaxRate,N'税率配置','system:taxrate','/system/taxrates','CollectionTag',@M_System,12,1,@SysUserId,@Now);
 
-DECLARE @M_System_AccountingSubject uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_System_AccountingSubject,N'会计科目管理','system:accountingsubject','/system/accountingsubjects','DataBoard',@M_System,13,1,@SysUserId,@Now);
 
 DECLARE @M_System_Holiday uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1233,11 +1227,9 @@ VALUES (@M_System_TaxRateEdit,N'编辑税率','system:taxrateedit',@M_System_Tax
 
 DECLARE @M_System_SubjectCreate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_System_SubjectCreate,N'新增科目','system:accountingsubjectcreate',@M_System_AccountingSubject,10,1,@SysUserId,@Now);
 
 DECLARE @M_System_SubjectEdit uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_System_SubjectEdit,N'编辑科目','system:accountingsubjectedit',@M_System_AccountingSubject,11,1,@SysUserId,@Now);
 
 DECLARE @M_System_HolidayCreate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1419,8 +1411,7 @@ WHERE M.PermissionCode IN (
   'receipt:confirm',
   'bill:view',
   'bill:list',
-  'accounting:view',
-  'accounting:subjects',
+  'system:accountingsubjects',
   --'accounting:vouchers',（已删除）
   'journal:view',
   'gl:view',
@@ -1454,7 +1445,7 @@ WHERE M.PermissionCode IN (
   'notification:view', 'notification:markallread',
   'receipt:view', 'receipt:list',
   'bill:view', 'bill:list',
-  'journal:view', 'gl:view', 'accounting:view', 'accounting:subjects',
+  'journal:view', 'gl:view', 'system:accountingsubjects',
   'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
   'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )
