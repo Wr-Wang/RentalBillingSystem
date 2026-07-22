@@ -518,6 +518,8 @@ onMounted(() => {
     const d = new Date()
     filter.period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   }
+  // 立即加载一次（watch 在 setup 阶段已触发，但当时 period 可能还未设置）
+  fetchData()
 })
 
 // 监听公司视角就绪后自动加载

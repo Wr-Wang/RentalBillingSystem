@@ -43,15 +43,15 @@ public class GLController : ControllerBase
         if (string.IsNullOrEmpty(period))
             return BadRequest(new { message = "请提供会计期间(period)，格式 yyyy-MM" });
 
-        var companyId = _tenant.EffectiveCompanyId;
-        if (companyId == null)
+        var companyId = _tenant.EffectiveCompanyId ?? _tenant.DefaultCompanyId;
+        if (companyId == Guid.Empty)
             return Ok(new { period, items = Array.Empty<object>(), totals = new { } });
 
         if (!string.IsNullOrEmpty(sourceType) && !ValidSourceTypes.Contains(sourceType))
             return BadRequest(new { message = $"无效的来源类型: {sourceType}，有效值: {string.Join(", ", ValidSourceTypes)}" });
 
         var result = await _glService.GetBalancesAsync(
-            companyId.Value, period, subjectCode, subjectLevel,
+            companyId, period, subjectCode, subjectLevel,
             contractNo, sourceType, hideZero, ct);
 
         return Ok(new { period, items = result.Items, totals = result.Totals });
