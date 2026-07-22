@@ -194,7 +194,7 @@ SchedulingHostedService (BackgroundService, 60s 轮询)
 - **自动分录**：每笔收款确认后自动生成记账凭证
 - **日记账**：支持按科目/期间/对方科目多维度查询
 - **总账**：逐笔追溯，支持按科目层级汇总
-- **报表**：资产负债表、利润表，支持多公司合并报表
+- **报表**：多公司合并报表
 
 ### 催缴管理
 
@@ -465,7 +465,6 @@ API 遵循 RESTful 风格，基础路径 `/api`。
 | 抄表 | `/api/meterreadings` | CRUD, confirm, estimate |
 | 会计科目 | `/api/accountingsubjects` | tree |
 | 凭证/日记账 | `/api/vouchers`, `/api/journalentries` | CRUD, post, reverse |
-| 财务报表 | `/api/financialstatements` | balanceSheet, incomeStatement |
 | 催缴 | `/api/collectionstages`, `/api/collectionrecords` | CRUD, auto |
 | 利息 | `/api/interestconfig` | CRUD |
 | 税率 | `/api/taxrateconfigs` | CRUD |

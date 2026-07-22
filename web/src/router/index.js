@@ -263,19 +263,6 @@ const routes = [
             component: () => import('../views/accounting/subjects.vue'),
             meta: { title: '科目表', icon: 'List' }
           },
-          {
-          {
-            path: 'balancesheet',
-            name: 'BalanceSheet',
-            component: () => import('../views/accounting/balanceSheet.vue'),
-            meta: { title: '资产负债表', icon: 'DataBoard' }
-          },
-          {
-            path: 'incomestatement',
-            name: 'IncomeStatement',
-            component: () => import('../views/accounting/incomeStatement.vue'),
-            meta: { title: '利润表', icon: 'DataLine' }
-          }
         ]
       },
       // =====================================================================

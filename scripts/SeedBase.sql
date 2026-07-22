@@ -1006,13 +1006,6 @@ VALUES (@M_GL,N'总账管理','gl:view','/gl','DataBoard',NULL,12,1,@SysUserId,@
 
 
 
-nDECLARE @M_Accounting_BalanceSheet uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_BalanceSheet,N'资产负债表','accounting:balancesheet','/accounting/balancesheet',@M_Accounting,7,1,@SysUserId,@Now);
-
-DECLARE @M_Accounting_IncomeStatement uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_IncomeStatement,N'利润表','accounting:incomestatement','/accounting/incomestatement',@M_Accounting,8,1,@SysUserId,@Now);
 
 DECLARE @M_Accounting_SubjectCreate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1461,7 +1454,7 @@ WHERE M.PermissionCode IN (
   'notification:view', 'notification:markallread',
   'receipt:view', 'receipt:list',
   'bill:view', 'bill:list',
-  'journal:view', 'gl:view', 'accounting:view', 'accounting:subjects', 'accounting:balancesheet', 'accounting:incomestatement',
+  'journal:view', 'gl:view', 'accounting:view', 'accounting:subjects',
   'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
   'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )
