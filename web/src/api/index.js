@@ -223,7 +223,6 @@ export function postJournals(ids) { return request({ url: '/journals/post', meth
 
 // GL（总账）
 export function getGLBalance(params) { return request({ url: '/gl', method: 'get', params }) }
-export function getTrialBalance(params) { return request({ url: '/gl/trialbalance', method: 'get', params }) }
 
 // Prepaid（预收明细）
 export function getPrepaids(params) { return request({ url: '/prepaids', method: 'get', params }) }

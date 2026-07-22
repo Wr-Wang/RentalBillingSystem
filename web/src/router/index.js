@@ -264,12 +264,6 @@ const routes = [
             meta: { title: '科目表', icon: 'List' }
           },
           {
-            path: 'trialbalance',
-            name: 'TrialBalance',
-            component: () => import('../views/accounting/trialBalance.vue'),
-            meta: { title: '试算平衡表', icon: 'ScaleToOriginal' }
-          },
-          {
             path: 'periods',
             name: 'AccountingPeriods',
             component: () => import('../views/accounting/periods.vue'),
@@ -429,7 +423,6 @@ const routes = [
       { path: 'feerevenue', redirect: '/reports/feerevenue', meta: { hidden: true } },
       { path: 'occupancyrate', redirect: '/reports/occupancyrate', meta: { hidden: true } },
       // Accounting shortcuts
-      { path: 'trialbalance', redirect: '/accounting/trialbalance', meta: { hidden: true } },
       // Other convenience shortcuts
       { path: 'import', redirect: '/buildings/import', meta: { hidden: true } },
       { path: 'register', redirect: '/receipts/register', meta: { hidden: true } },

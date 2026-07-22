@@ -1004,9 +1004,6 @@ VALUES (@M_GL,N'总账管理','gl:view','/gl','DataBoard',NULL,12,1,@SysUserId,@
 
 -- 凭证管理菜单已删除（系统不再使用 Voucher）
 
-DECLARE @M_Accounting_TrialBalance uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-VALUES (@M_Accounting_TrialBalance,N'试算平衡表','accounting:trialbalance','/accounting/trialbalance',@M_Accounting,4,1,@SysUserId,@Now);
 
 DECLARE @M_Accounting_Periods uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
@@ -1438,7 +1435,6 @@ WHERE M.PermissionCode IN (
   'accounting:view',
   'accounting:subjects',
   --'accounting:vouchers',（已删除）
-  'accounting:trialbalance',
   'journal:view',
   'gl:view',
   'report:view',
@@ -1471,7 +1467,7 @@ WHERE M.PermissionCode IN (
   'notification:view', 'notification:markallread',
   'receipt:view', 'receipt:list',
   'bill:view', 'bill:list',
-  'journal:view', 'gl:view', 'accounting:view', 'accounting:subjects', 'accounting:trialbalance', 'accounting:periods', 'accounting:ledger', 'accounting:balancesheet', 'accounting:incomestatement',
+  'journal:view', 'gl:view', 'accounting:view', 'accounting:subjects', 'accounting:periods', 'accounting:ledger', 'accounting:balancesheet', 'accounting:incomestatement',
   'report:view', 'report:collectionrate', 'report:overduedetail', 'report:dailyreceipt', 'report:monthlyreceipt', 'report:feerevenue',
   'system:scheduler', 'system:schedulerviewlog', 'system:monitor:view'
 )
