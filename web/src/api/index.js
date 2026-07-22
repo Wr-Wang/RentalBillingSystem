@@ -315,6 +315,17 @@ export function exportDebitNotePdf(id) { return request({ url: `/debitnotes/${id
 export function cancelDebitNote(id, data) { return request({ url: `/debitnotes/${id}/cancel`, method: 'post', data }) }
 export function deleteDebitNote(id) { return request({ url: `/debitnotes/${id}`, method: 'delete' }) }
 
+/** DemandNote PDF 预览（内联显示） */
+export function demandNotePreview() { return request({ url: '/note/dnpreview', method: 'get', responseType: 'blob' }) }
+
+/** DemandNote PDF 导出（下载） */
+export function demandNoteDownload() { return request({ url: '/note/dndownload', method: 'get', responseType: 'blob' }) }
+
+/** ReminderNote PDF 预览（内联显示） */
+export function reminderNotePreview() { return request({ url: '/note/rnpreview', method: 'get', responseType: 'blob' }) }
+
+/** ReminderNote PDF 导出（下载） */
+export function reminderNoteDownload() { return request({ url: '/note/rndownload', method: 'get', responseType: 'blob' }) }
 
 // Holidays
 export function getHolidayCalendars(params) { return request({ url: '/holidaycalendars', method: 'get', params }) }

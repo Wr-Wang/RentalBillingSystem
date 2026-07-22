@@ -21,4 +21,10 @@
     <ProjectReference Include="..\RBS.Application\RBS.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Content\Fonts\SimHei.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

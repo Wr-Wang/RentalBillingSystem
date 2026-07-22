@@ -153,6 +153,18 @@ const routes = [
         component: () => import('../views/bill/preview.vue'),
         meta: { title: '账单预览', hidden: true }
       },
+      {
+        path: 'bills/demandnotepreview',
+        name: 'DemandNotePreview',
+        component: () => import('../views/bill/demandNotePreview.vue'),
+        meta: { title: 'DemandNote 预览', hidden: true }
+      },
+      {
+        path: 'bills/remindernotepreview',
+        name: 'ReminderNotePreview',
+        component: () => import('../views/bill/reminderNotePreview.vue'),
+        meta: { title: 'ReminderNote 预览', hidden: true }
+      },
       // =====================================================================
       // 租客管理
       {

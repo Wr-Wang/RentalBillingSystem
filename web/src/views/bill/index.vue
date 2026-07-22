@@ -6,6 +6,12 @@
         <el-button type="primary" @click="$router.push('/bills/generate')">
           <el-icon><Plus /></el-icon>生成账单
         </el-button>
+        <el-button type="success" v-if="false" @click="$router.push('/bills/demandnotepreview')">
+          <el-icon><View /></el-icon>DemandNote 预览
+        </el-button>
+        <el-button type="danger" v-if="false" @click="$router.push('/bills/remindernotepreview')">
+          <el-icon><View /></el-icon>ReminderNote 预览
+        </el-button>
         <el-button @click="fetchList">
           <el-icon><Refresh /></el-icon>刷新
         </el-button>
