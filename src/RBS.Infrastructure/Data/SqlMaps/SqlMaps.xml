@@ -1660,21 +1660,6 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       ORDER BY [VoucherDate] DESC
       OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
   </select>
-  <select id="Accounting.Select.Ledger.BySubject">
-    <![CDATA[SELECT je.Id, je.VoucherId, je.EntryNo, je.Direction, je.Amount, je.Summary,
-              v.VoucherNo, v.VoucherDate, v.Period,
-              s.Code AS SubjectCode, s.Name AS SubjectName,
-              SUM(CASE WHEN je.Direction='Debit' THEN je.Amount ELSE -je.Amount END)
-                OVER (ORDER BY v.VoucherDate, v.VoucherNo, je.EntryNo ROWS UNBOUNDED PRECEDING) AS Balance
-      FROM JournalEntries je
-      JOIN Vouchers v ON v.Id = je.VoucherId
-      JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
-      WHERE s.Code = @SubjectCode
-        AND (@CompanyId IS NULL OR v.CompanyId = @CompanyId)
-        AND (@StartDate IS NULL OR v.VoucherDate >= @StartDate)
-        AND (@EndDate IS NULL OR v.VoucherDate <= @EndDate)
-      ORDER BY v.VoucherDate, v.VoucherNo, je.EntryNo]]>
-  </select>
   <select id="Accounting.Select.Voucher.PagedCount">
     <![CDATA[SELECT COUNT(1) FROM [Vouchers]
       WHERE (@CompanyId IS NULL OR CompanyId = @CompanyId)
@@ -2138,13 +2123,6 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <update id="Accounting.Update.Voucher.Description">
     <![CDATA[UPDATE Vouchers SET Description = @Desc WHERE Id = @Id]]>
   </update>
-  <select id="Accounting.Select.Ledger.OpeningBalance">
-    <![CDATA[SELECT ISNULL(SUM(CASE WHEN je.Direction='Debit' THEN je.Amount ELSE -je.Amount END), 0)
-      FROM JournalEntries je
-      JOIN Vouchers v ON v.Id = je.VoucherId
-      JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
-      WHERE s.Code = @Code AND v.CompanyId = @Cid AND v.VoucherDate < @Date]]>
-  </select>
 
   <!-- ================================================================
        模块：Common — 控制器级别 SQL（SystemLogsController / AuditController）

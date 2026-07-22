@@ -276,7 +276,6 @@ export function getAccountingSubjects(params) { return request({ url: '/accounti
 export function createAccountingSubject(data) { return request({ url: '/accountingsubjects', method: 'post', data }) }
 export function updateAccountingSubject(id, data) { return request({ url: `/accountingsubjects/${id}`, method: 'put', data }) }
 export function deleteAccountingSubject(id) { return request({ url: `/accountingsubjects/${id}`, method: 'delete' }) }
-export function getLedger(params) { return request({ url: '/ledger', method: 'get', params }) }
 export function getBalanceSheet(params) { return request({ url: '/financialstatements/balancesheet', method: 'get', params }) }
 export function getIncomeStatement(params) { return request({ url: '/financialstatements/incomestatement', method: 'get', params }) }
 

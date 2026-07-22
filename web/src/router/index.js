@@ -263,13 +263,7 @@ const routes = [
             component: () => import('../views/accounting/subjects.vue'),
             meta: { title: '科目表', icon: 'List' }
           },
-          },
           {
-            path: 'ledger',
-            name: 'AccountingLedger',
-            component: () => import('../views/accounting/ledger.vue'),
-            meta: { title: '明细账', icon: 'List' }
-          },
           {
             path: 'balancesheet',
             name: 'BalanceSheet',
@@ -429,11 +423,6 @@ const routes = [
       { path: 'subjects', redirect: '/accounting/subjects', meta: { hidden: true } },
       { path: 'journal', redirect: '/accounting/journal', meta: { hidden: true } },
       // { path: 'vouchers', redirect: '/accounting/vouchers', meta: { hidden: true } }, // 已删除
-      { path: 'ledger', redirect: '/accounting/ledger', meta: { hidden: true } },
-      { path: 'balancesheet', redirect: '/accounting/balancesheet', meta: { hidden: true } },
-      { path: 'incomestatement', redirect: '/accounting/incomestatement', meta: { hidden: true } },
-      { path: 'match', redirect: '/bank/match', meta: { hidden: true } },
-      { path: 'reconciliation', redirect: '/bank/reconciliation', meta: { hidden: true } },
       { path: 'users', redirect: '/system/organization/users', meta: { hidden: true } },
       { path: 'roles', redirect: '/system/organization/roles', meta: { hidden: true } },
       // =====================================================================
