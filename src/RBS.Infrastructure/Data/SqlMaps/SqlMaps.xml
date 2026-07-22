@@ -1044,6 +1044,12 @@
         ELSE CONCAT(DATEPART(YEAR, DATEADD(MONTH, 1, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 1, @BilledAt)) AS VARCHAR(2)), 2)) END,
       @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
+  <select id="Billing.Select.Journal.InterestExists">
+    <![CDATA[SELECT COUNT(1) FROM Journals WHERE ParentJournalId = @ParentId AND EntryType = 'Interest']]>
+  </select>
+  <update id="Billing.Update.Contract.OutstandingBalanceAddInterest">
+    <![CDATA[UPDATE Contracts SET OutstandingBalance = OutstandingBalance + @Amt WHERE Id = @Id]]>
+  </update>
 
 
   

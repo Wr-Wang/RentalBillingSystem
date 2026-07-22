@@ -60,7 +60,7 @@ public class TerminateJob : ITerminateJob
                 new { Cid = contractId }, tx);
 
             var receivableBal = await conn.QuerySingleAsync<decimal>(
-                _sql.Get("Billing.Select.Journal.BalanceByContract"),
+                _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
                 new { Code = "1122", CId = contractId }, tx);
             await _stepLogger.CompleteStepAsync(step02, 1, null, ct);
 

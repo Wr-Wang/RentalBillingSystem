@@ -144,6 +144,9 @@ public class FailedContractDto
         "BillStep02" => "加载费用配置",
         "BillStep03" => "生成应收/GL",
         "BillStep04" => "生成账单快照",
+        "SettleStep01" => "查询待处理合同",
+        "SettleStep02" => "预收抵应收",
+        "SettleStep03" => "计算逾期利息",
         _ => StepName
     };
 }

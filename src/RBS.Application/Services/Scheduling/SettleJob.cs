@@ -33,9 +33,6 @@ public class SettleJob : ScheduledJobBase
         var taskLogId = await BeginTaskLogAsync(JobName, companyId, targetMonth,
             "Manual", mode == ExecuteMode.DryRun ? "DryRun" : "Execute", null, ct);
 
-        if (mode == ExecuteMode.DryRun)
-            return new JobResult(0, 0, summary: "DryRun 完成");
-
         // 预查会计科目
         var subjects = await LoadSubjectsAsync(ct);
 
@@ -45,6 +42,14 @@ public class SettleJob : ScheduledJobBase
 
         if (contracts.Count == 0)
             return new JobResult(0, 0, summary: "无待处理合同");
+
+        if (mode == ExecuteMode.DryRun)
+        {
+            var totalPrepaid = contracts.Sum(c => c.PrepaidBalance);
+            var totalOutstanding = contracts.Sum(c => c.OutstandingBalance);
+            return new JobResult(contracts.Count, 0, summary:
+                $"DryRun：{contracts.Count} 份待处理合同，预存总额 {totalPrepaid:N2}，欠款总额 {totalOutstanding:N2}");
+        }
 
         var counters = new int[3]; // [0]=offset, [1]=penalty, [2]=overdue
         var success = 0; var fail = 0;
@@ -74,7 +79,7 @@ public class SettleJob : ScheduledJobBase
                         $"预收抵应收-{contract.ContractNo}", null, null, token);
 
                     var receivable = await conn.QuerySingleAsync<decimal>(
-                        _sql.Get("Billing.Select.Journal.BalanceByContract"),
+                        _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
                         new { Code = "1122", CId = contract.Id }, tx);
 
                     if (receivable > 0)
@@ -123,6 +128,13 @@ public class SettleJob : ScheduledJobBase
                     if (balance <= 0) continue;
                     var interest = Math.Round(balance * 0.0005m * Math.Min(daysOverdue, 90), 2);
                     if (interest <= 0) continue;
+
+                    // 幂等检查：已存在该逾期父单的利息分录则跳过
+                    var exists = await conn.QuerySingleAsync<int>(
+                        _sql.Get("Billing.Select.Journal.InterestExists"),
+                        new { ParentId = (Guid)journal.Id }, tx);
+                    if (exists > 0) continue;
+
                     var billedAt = ChinaTime.Now;
                     await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Interest"),
                         new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
@@ -131,6 +143,10 @@ public class SettleJob : ScheduledJobBase
                             Amt = interest, Due = today,
                             BilledAt = billedAt, DNId = (Guid?)null,
                             ParentId = (Guid)journal.Id, Summary = "", CBy = Guid.Empty }, tx);
+                    // 同步更新合同欠款余额
+                    await conn.ExecuteAsync(
+                        _sql.Get("Billing.Update.Contract.OutstandingBalanceAddInterest"),
+                        new { Amt = interest, Id = contract.Id }, tx);
                     interestCount++;
                     }
 
