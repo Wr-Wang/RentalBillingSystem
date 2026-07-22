@@ -23,10 +23,12 @@ public class AutoRenewJob : IScheduledJob
     private readonly ISqlLoader _sql;
     private readonly ITaskStepLogger _stepLogger;
     private readonly JobExecutionContext _jobContext;
+    private readonly INotificationService _notificationService;
 
     public AutoRenewJob(IUnitOfWork uow, IRenewalService renewalService,
         IDbConnectionFactory db, ISqlLoader sql,
-        ITaskStepLogger stepLogger, JobExecutionContext jobContext)
+        ITaskStepLogger stepLogger, JobExecutionContext jobContext,
+        INotificationService notificationService)
     {
         _uow = uow;
         _renewalService = renewalService;
@@ -34,6 +36,7 @@ public class AutoRenewJob : IScheduledJob
         _sql = sql;
         _stepLogger = stepLogger;
         _jobContext = jobContext;
+        _notificationService = notificationService;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
@@ -42,7 +45,7 @@ public class AutoRenewJob : IScheduledJob
         var today = DateOnly.FromDateTime(ChinaTime.Now);
         var targetDate = today.AddDays(7);
 
-        // Step: 查询到期合同
+        // Step01: 查询到期合同
         var stepQuery = await _stepLogger.StartStepAsync(taskLogId,
             "AutoRenew.Query", "查询到期前7天的续签合同", null, null, ct);
 
@@ -59,11 +62,14 @@ public class AutoRenewJob : IScheduledJob
         if (expiring.Count == 0)
             return "今日无到期前 7 天且启用自动续签的合同";
 
-        // Step: 提交续签
+        // Step02: 逐合同提交续签审批
         var stepSubmit = await _stepLogger.StartStepAsync(taskLogId,
             "AutoRenew.Submit", "逐合同提交续签审批", null, null, ct);
 
         int submitted = 0;
+        int failed = 0;
+        var errors = new System.Collections.Concurrent.ConcurrentBag<(string ContractNo, string Error)>();
+
         foreach (var contract in expiring)
         {
             try
@@ -82,12 +88,40 @@ public class AutoRenewJob : IScheduledJob
                     }, Guid.Empty, ct);
                 if (result != null) submitted++;
             }
-            catch { /* 单个合同失败不影响其他 */ }
+            catch (Exception ex)
+            {
+                failed++;
+                errors.Add((contract.ContractNo ?? "未知", ex.Message));
+            }
         }
 
         await _stepLogger.CompleteStepAsync(stepSubmit, submitted, null, ct);
 
-        return $"已为 {submitted}/{expiring.Count} 份合同提交自动续签";
+        // Step03: 通知运营人员续签结果
+        bool notified = false;
+        var stepNotify = await _stepLogger.StartStepAsync(taskLogId,
+            "AutoRenew.Notify", "推送自动续签结果通知", null, null, ct);
+        try
+        {
+            var failDetail = failed > 0
+                ? $"，{failed} 份失败（{string.Join("; ", errors.Take(3).Select(e => $"{e.ContractNo}:{e.Error}"))}）"
+                : "";
+            await _notificationService.NotifyRoleAsync("OpsSupervisor",
+                $"自动续签任务完成",
+                $"共 {submitted}/{expiring.Count} 份合同续签已提交{failDetail}",
+                "Renewal", null, ct);
+            notified = true;
+            await _stepLogger.CompleteStepAsync(stepNotify, expiring.Count, null, ct);
+        }
+        catch
+        {
+            await _stepLogger.FailStepAsync(stepNotify, "通知发送失败", null, ct);
+        }
+
+        var summary = $"已为 {submitted}/{expiring.Count} 份合同提交自动续签";
+        if (failed > 0) summary += $"（{failed} 份失败）";
+        if (notified) summary += "，已通知运营人员";
+        return summary;
     }
 }
 
@@ -214,13 +248,16 @@ public class RenewalReminderJob : IScheduledJob
     private readonly IUnitOfWork _uow;
     private readonly ITaskStepLogger _stepLogger;
     private readonly JobExecutionContext _jobContext;
+    private readonly INotificationService _notificationService;
 
     public RenewalReminderJob(IUnitOfWork uow,
-        ITaskStepLogger stepLogger, JobExecutionContext jobContext)
+        ITaskStepLogger stepLogger, JobExecutionContext jobContext,
+        INotificationService notificationService)
     {
         _uow = uow;
         _stepLogger = stepLogger;
         _jobContext = jobContext;
+        _notificationService = notificationService;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
@@ -246,15 +283,27 @@ public class RenewalReminderJob : IScheduledJob
         if (expiring.Count == 0)
             return "今日无到期前 14 天的合同";
 
-        // Step: 通知
+        // Step: 通知运营人员
+        bool notified = false;
         var stepNotify = await _stepLogger.StartStepAsync(taskLogId,
             "Reminder.Notify", "发送到期提醒通知", null, null, ct);
+        try
+        {
+            var sampleDate = expiring.First().EndDate?.ToString("yyyy-MM-dd") ?? "";
+            await _notificationService.NotifyRoleAsync("OpsSupervisor",
+                $"合同到期提醒",
+                $"{expiring.Count} 份合同即将于 {sampleDate} 到期，请及时处理续签",
+                "Renewal", null, ct);
+            notified = true;
+            await _stepLogger.CompleteStepAsync(stepNotify, expiring.Count, null, ct);
+        }
+        catch
+        {
+            await _stepLogger.FailStepAsync(stepNotify, "通知发送失败", null, ct);
+        }
 
-        // TODO: 集成通知服务发送提醒
-        // 当前只返回统计信息，通知集成待后续实现
-
-        await _stepLogger.CompleteStepAsync(stepNotify, expiring.Count, null, ct);
-
-        return $"{expiring.Count} 份合同即将到期（{expiring.First().EndDate:yyyy-MM-dd}），已通知运营人员";
+        var result = $"{expiring.Count} 份合同即将到期";
+        if (notified) result += "，已通知运营人员";
+        return result;
     }
 }
