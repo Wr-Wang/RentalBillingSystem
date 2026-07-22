@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Core.Entities.Billing;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
+using Dapper;
 
 namespace RBS.Api.Controllers;
 
@@ -11,7 +13,14 @@ namespace RBS.Api.Controllers;
 public class CollectionRecordsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
-    public CollectionRecordsController(IUnitOfWork uow) => _uow = uow;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
+    public CollectionRecordsController(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
+    {
+        _uow = uow;
+        _db = db;
+        _sql = sql;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractId, CancellationToken ct)
@@ -19,7 +28,28 @@ public class CollectionRecordsController : ControllerBase
         var all = await _uow.CollectionRecords.GetAllAsync(ct);
         if (contractId.HasValue && contractId.Value != Guid.Empty)
             all = all.Where(r => r.ContractId == contractId.Value).ToList();
-        return Ok(all.OrderByDescending(r => r.CreatedAt));
+
+        // 批量查询合同号
+        var contractIds = all.Select(r => r.ContractId).Distinct().ToList();
+        Dictionary<Guid, string> contractNoMap;
+        using (var conn = _db.CreateConnection())
+        {
+            conn.Open();
+            var contracts = await conn.QueryAsync<(Guid Id, string No)>(
+                _sql.Get("Lease.Select.Contract.IdNoPairs"),
+                new { Ids = contractIds });
+            contractNoMap = contracts.ToDictionary(c => c.Id, c => c.No);
+        }
+
+        var result = all.Select(r => new
+        {
+            r.Id, r.ContractId,
+            ContractNo = contractNoMap.GetValueOrDefault(r.ContractId, ""),
+            r.StageNo, r.Channel, r.Content, r.Status, r.SentAt,
+            r.OperatedBy, r.CompanyId, r.CreatedAt
+        }).OrderByDescending(r => r.CreatedAt);
+
+        return Ok(result);
     }
 
     [HttpPost("manual")]

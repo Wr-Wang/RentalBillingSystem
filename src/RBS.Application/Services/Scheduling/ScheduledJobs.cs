@@ -102,16 +102,19 @@ public class CollectionJob : IScheduledJob
     private readonly ISqlLoader _sql;
     private readonly ITaskStepLogger _stepLogger;
     private readonly JobExecutionContext _jobContext;
+    private readonly INotificationService _notificationService;
 
     public CollectionJob(IUnitOfWork uow,
         IDbConnectionFactory db, ISqlLoader sql,
-        ITaskStepLogger stepLogger, JobExecutionContext jobContext)
+        ITaskStepLogger stepLogger, JobExecutionContext jobContext,
+        INotificationService notificationService)
     {
         _uow = uow;
         _db = db;
         _sql = sql;
         _stepLogger = stepLogger;
         _jobContext = jobContext;
+        _notificationService = notificationService;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
@@ -140,6 +143,11 @@ public class CollectionJob : IScheduledJob
         var today = DateOnly.FromDateTime(ChinaTime.Now);
         int created = 0;
 
+        // 预加载已存在的催缴记录（移至循环外，避免重复查询全表）
+        var existingRecords = await _uow.CollectionRecords.GetAllAsync(ct);
+        var dedupSet = new HashSet<(Guid, int)>(existingRecords.Select(r =>
+            (r.ContractId, r.StageNo)));
+
         foreach (var journal in overdueJournals)
         {
             var daysOverdue = today.DayNumber - (DateOnly.FromDateTime((DateTime)journal.DueDate)).DayNumber;
@@ -151,32 +159,49 @@ public class CollectionJob : IScheduledJob
 
             if (stage == null) continue;
 
-            var existingRecords = await _uow.CollectionRecords.GetAllAsync(ct);
-            var alreadyExists = existingRecords.Any(r =>
-                r.ContractId == (Guid)journal.ContractId && r.StageNo == stage.StageNo);
+            var key = ((Guid)journal.ContractId, stage.StageNo);
+            if (!dedupSet.Add(key)) continue; // HashSet 去重，O(1)
 
-            if (!alreadyExists)
+            var channel = stage.ActionType switch
             {
-                var channel = stage.ActionType switch
-                {
-                    "SMS" => "SMS",
-                    "CALL" => "PHONE",
-                    "VISIT" => "VISIT",
-                    "LEGAL" => "LEGAL",
-                    _ => "SMS"
-                };
-                var content = $"{stage.StageName} - 逾期{daysOverdue}天";
-                var record = new CollectionRecord((Guid)journal.ContractId, stage.StageNo, channel, content, companyId);
-                await _uow.CollectionRecords.AddAsync(record, ct);
-                created++;
-            }
+                "SMS" => "SMS",
+                "CALL" => "PHONE",
+                "VISIT" => "VISIT",
+                "LEGAL" => "LEGAL",
+                _ => "SMS"
+            };
+            var content = $"{stage.StageName} - 逾期{daysOverdue}天";
+            var record = new CollectionRecord((Guid)journal.ContractId, stage.StageNo, channel, content, companyId);
+            await _uow.CollectionRecords.AddAsync(record, ct);
+            created++;
         }
 
         await _uow.CommitAsync(ct);
 
         await _stepLogger.CompleteStepAsync(stepCreate, created, null, ct);
 
-        return $"{created} 条催缴记录已创建";
+        // Step: 通知运营人员
+        bool notified = false;
+        if (created > 0)
+        {
+            var stepNotify = await _stepLogger.StartStepAsync(taskLogId,
+                "Collection.Notify", "推送催缴结果通知", null, null, ct);
+            try
+            {
+                await _notificationService.NotifyRoleAsync("OpsSupervisor",
+                    $"催缴任务完成",
+                    $"本月共创建 {created} 条催缴记录",
+                    "Collection", null, ct);
+                notified = true;
+                await _stepLogger.CompleteStepAsync(stepNotify, 1, null, ct);
+            }
+            catch
+            {
+                await _stepLogger.FailStepAsync(stepNotify, "通知发送失败", null, ct);
+            }
+        }
+
+        return $"创建 {created} 条催缴记录" + (notified ? "，已通知运营人员" : "");
     }
 }
 

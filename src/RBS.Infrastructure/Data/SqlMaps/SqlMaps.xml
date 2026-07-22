@@ -1339,6 +1339,9 @@
   <select id="Lease.Select.Contract.Default">
     <![CDATA[SELECT * FROM Contracts WHERE Id = @Id]]>
   </select>
+  <select id="Lease.Select.Contract.IdNoPairs">
+    <![CDATA[SELECT Id, ContractNo AS No FROM Contracts WHERE Id IN @Ids]]>
+  </select>
   <select id="Lease.Select.Contract.DetailMulti">
     <![CDATA[SELECT c.*, r.FullCode AS RoomFullCode FROM Contracts c LEFT JOIN HousingUnits r ON r.Id = c.RoomId WHERE c.Id = @Id;
 SELECT ct.ContractId, ct.TenantId, t.Name AS TenantName, ct.IsPrimary FROM ContractTenants ct INNER JOIN Tenants t ON t.Id = ct.TenantId WHERE ct.ContractId = @Id;
