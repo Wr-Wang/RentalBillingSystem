@@ -9,5 +9,5 @@ public class JournalDto
     public DateOnly DueDate { get; set; }
     public string EntryType { get; set; } = "Normal";
     public bool GLPosted { get; set; }
-    public string? BillMonth => Period;
+    public string? BillMonth { get; set; }
 }

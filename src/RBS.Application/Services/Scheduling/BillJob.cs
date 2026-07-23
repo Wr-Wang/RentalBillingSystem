@@ -43,9 +43,6 @@ public class BillJob : ScheduledJobBase
     protected override async Task<JobResult> ExecuteCoreAsync(
         Guid companyId, string targetMonth, ExecuteMode mode, CancellationToken ct)
     {
-        // 账单月 = 归属账期次月（7月出账 → 8月）
-        var billPeriod = CalculateNextMonth(targetMonth);
-
         var taskLogId = await BeginTaskLogAsync(JobName, companyId, targetMonth,
             "Manual", mode == ExecuteMode.DryRun ? "DryRun" : "Execute", null, ct);
 
@@ -114,7 +111,7 @@ public class BillJob : ScheduledJobBase
                 // 批量查询本合同+本账期已存在的 FeeCodeId，用于去重
                 var existingFeeCodes = (await conn.QueryAsync<Guid>(
                     _sql.Get("Billing.Select.Journal.ExistingFeeCodesByContractPeriod"),
-                    new { ContractId = contract.Id, Period = billPeriod }, tx)).ToHashSet();
+                    new { ContractId = contract.Id, Period = targetMonth }, tx)).ToHashSet();
 
                 // 收集待写入数据（跳过已存在的费用项目）
                 var journalBatch = new List<object>(plans.Count);
@@ -133,7 +130,7 @@ public class BillJob : ScheduledJobBase
                     {
                         Id = journal.Id, CoId = journal.CompanyId, CId = journal.ContractId,
                         FId = journal.FeeCodeId, FConfigId = journal.FeeConfigId,
-                        SubjId = journal.AccountingSubjectId, Period = billPeriod,
+                        SubjId = journal.AccountingSubjectId, Period = targetMonth,
                         Amt = journal.Amount, Due = journal.DueDate, EntryType = journal.EntryType,
                         BilledAt = journal.BilledAt, DNId = journal.DebitNoteId,
                         ParentId = journal.ParentJournalId, Summary = journal.Summary, CBy = Guid.Empty
@@ -151,7 +148,7 @@ public class BillJob : ScheduledJobBase
                         glBatch.Add(new
                         {
                             Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
-                            CNo = contractNo ?? "", Period = billPeriod,
+                            CNo = contractNo ?? "", Period = targetMonth,
                             SId = subjects["1122"], SCode = "1122", Dir = "Debit",
                             Amt = journal.Amount, SrcType = "BillJob", SrcId = journal.Id,
                             Desc = "", CBy = Guid.Empty
@@ -159,7 +156,7 @@ public class BillJob : ScheduledJobBase
                         glBatch.Add(new
                         {
                             Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
-                            CNo = contractNo ?? "", Period = billPeriod,
+                            CNo = contractNo ?? "", Period = targetMonth,
                             SId = subjects["6001"], SCode = "6001", Dir = "Credit",
                             Amt = journal.Amount, SrcType = "BillJob", SrcId = journal.Id,
                             Desc = "", CBy = Guid.Empty
@@ -196,13 +193,13 @@ public class BillJob : ScheduledJobBase
                         // 未入账的 GL 只有 2 条，不批量
                         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
                             new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
-                                CNo = contractNo ?? "", Period = billPeriod,
+                                CNo = contractNo ?? "", Period = targetMonth,
                                 SId = subjects["1122"], SCode = "1122", Dir = "Debit",
                                 Amt = ubAmt, SrcType = "BillJob", SrcId = (Guid)ub.Id,
                                 Desc = "", CBy = Guid.Empty }, tx);
                         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
                             new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
-                                CNo = contractNo ?? "", Period = billPeriod,
+                                CNo = contractNo ?? "", Period = targetMonth,
                                 SId = subjects["6001"], SCode = "6001", Dir = "Credit",
                                 Amt = ubAmt, SrcType = "BillJob", SrcId = (Guid)ub.Id,
                                 Desc = "", CBy = Guid.Empty }, tx);
@@ -222,7 +219,7 @@ public class BillJob : ScheduledJobBase
                     var prepaid = contract.PrepaidBalance;
                     dnId = Guid.NewGuid();
                     await PersistDebitNoteAsync(conn, dnId, contract.Id, contractNo ?? "",
-                        companyId, billPeriod, totalAmount, prepaid, taskLogId, false, null, tx, token);
+                        companyId, targetMonth, totalAmount, prepaid, taskLogId, false, null, tx, token);
 
                     // 批量写入 DebitNoteItems（此时已拿到 dnId）
                     if (itemTuples.Count > 0)
@@ -408,11 +405,4 @@ public class BillJob : ScheduledJobBase
         return JsonSerializer.Serialize(report);
     }
 
-    /// <summary>计算次月（7月出账 → 8月）</summary>
-    private static string CalculateNextMonth(string yyyyMm)
-    {
-        var parts = yyyyMm.Split('-');
-        var dt = new DateTime(int.Parse(parts[0]), int.Parse(parts[1]), 1).AddMonths(1);
-        return $"{dt.Year}-{dt.Month:D2}";
-    }
 }

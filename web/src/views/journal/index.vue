@@ -63,7 +63,19 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="billMonth" label="账单月" width="85" align="center">
+        <el-table-column prop="period" width="75" align="center">
+          <template #header>
+            <el-tooltip content="费用归属期，该笔应收对应的实际业务月份" placement="top">
+              <span>账期 <el-icon><InfoFilled /></el-icon></span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="billMonth" width="85" align="center">
+          <template #header>
+            <el-tooltip content="预计到账月，按出账日计算（每月25日20:00为截点：之前出账→次月，之后→下下月）" placement="top">
+              <span>账单月 <el-icon><InfoFilled /></el-icon></span>
+            </el-tooltip>
+          </template>
           <template #default="{ row }">
             <span>{{ row.billMonth || '-' }}</span>
           </template>
@@ -109,7 +121,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { formatDate } from '@/utils/chinaTime'
 import { getJournals, generateJournals, getFeeCodes, postJournals } from '@/api'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, InfoFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()

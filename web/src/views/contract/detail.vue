@@ -916,17 +916,17 @@ const groupedTimeline = computed(() => {
   for (const r of receivableTimeline.value) {
     const key = r.period || '未知'
     if (!map.has(key)) {
-      map.set(key, { period: key, dueDate: r.dueDate, billMonth: r.billMonth, items: [], totalAmount: 0, receiptItems: [] })
+      map.set(key, { period: key, dueDate: r.dueDate, billMonth: r.period, items: [], totalAmount: 0, receiptItems: [] })
     }
     const g = map.get(key)
     g.items.push(r)
     g.totalAmount += r.amount || 0
     if (r.dueDate && r.dueDate < g.dueDate) g.dueDate = r.dueDate
-    if (!g.billMonth && r.billMonth) g.billMonth = r.billMonth
+    if (!g.period && r.period) g.period = r.period
   }
   // 将收款记录匹配到对应账期（按 receiptMonth 匹配 billMonth）
   for (const rc of receipts.value) {
-    let matched = [...map.values()].find(g => g.billMonth === rc.receiptMonth || g.period === rc.receiptMonth)
+    let matched = [...map.values()].find(g => g.period === rc.receiptMonth || g.period === rc.receiptMonth)
     if (!matched) {
       const key = rc.receiptMonth
       if (!map.has(key)) {
@@ -1098,7 +1098,7 @@ async function fetchContract() {
           entryType: r.entryType || '',
           glPosted: r.glPosted || false,
           billedAt: r.billedAt || '',
-          billMonth: r.billMonth || '',
+          billMonth: r.period || '',
           contractNo: r.contractNo || ''
         }
       })
