@@ -274,7 +274,6 @@
                 <el-tag :type="group.statusTagType" size="small" effect="dark" class="period-status-badge">
                   {{ group.statusText }}
                 </el-tag>
-                <span v-if="group.billMonth" class="period-billmonth-label">账单月 {{ group.billMonth }}</span>
                 <span class="period-due-label">到期日 {{ formatDate(group.dueDate) }}</span>
                 <el-tag v-if="group.allPosted" size="small" type="success" effect="plain" style="margin-left:4px;">GL已入账</el-tag>
                 <el-tag v-else-if="group.somePosted" size="small" type="warning" effect="plain" style="margin-left:4px;">GL部分入账</el-tag>

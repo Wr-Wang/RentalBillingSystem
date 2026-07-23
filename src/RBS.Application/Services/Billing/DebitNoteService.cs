@@ -10,7 +10,7 @@ using RBS.Core.Interfaces.UnitOfWork;
 namespace RBS.Application.Services.Billing;
 
 /// <summary>
-/// 欠款通知单服务 — 生成账单快照 + 导出 PDF
+/// 缴费通知单服务 — 生成账单快照 + 导出 PDF
 /// </summary>
 public class DebitNoteService : IDebitNoteService
 {

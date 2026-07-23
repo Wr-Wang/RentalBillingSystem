@@ -3067,7 +3067,6 @@ CREATE TABLE [Journals] (
     [PostedAt] DATETIME2 NULL , -- 总账写入时间,
     [IsBilled] BIT NOT NULL DEFAULT (0) , -- 是否已写入DebitNote(0=未入账单,1=已入账),
     [BilledAt] DATETIME2 NOT NULL , -- 出账时间,
-    [BillMonth] VARCHAR(7) NOT NULL DEFAULT (''), -- 账单月(格式: yyyy-MM),
     [DebitNoteId] UNIQUEIDENTIFIER NULL , -- 关联账单ID,
     [ParentJournalId] UNIQUEIDENTIFIER NULL , -- 关联源日记账ID（利息/调整/冲销指向被操作的源记录）,
     [Summary] NVARCHAR(500) NULL , -- 摘要说明,

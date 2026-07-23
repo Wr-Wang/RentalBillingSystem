@@ -7,7 +7,7 @@ using RBS.Core.Entities.Billing;
 namespace RBS.Infrastructure.PdfGeneration;
 
 /// <summary>
-/// 账单 PDF 生成器 — 使用 QuestPDF 渲染通知单
+/// 账单 PDF 生成器 — 使用 QuestPDF 渲染缴费通知单
 /// </summary>
 /// <remarks>
 /// 功能说明：
@@ -15,7 +15,7 @@ namespace RBS.Infrastructure.PdfGeneration;
 ///   <item><description>静态构造函数设置 QuestPDF 为 Community 许可证（免费使用）</description></item>
 ///   <item><description>Generate 方法生成 A4 版式的 PDF 字节流</description></item>
 ///   <item><description>PDF 内容包含：公司名称、单号、合同/租客/账期信息、费用明细表格、合计金额（数字+大写）、备注说明</description></item>
-///   <item><description>草稿状态的账单标题显示"通知单（草稿）"</description></item>
+///   <item><description>草稿状态的账单标题显示"缴费通知单（草稿）"</description></item>
 ///   <item><description>使用 SimSun（宋体）作为默认字体，适合中文显示</description></item>
 ///   <item><description>页脚显示"第 X 页 / 共 Y 页"</description></item>
 /// </list>
@@ -33,9 +33,9 @@ public class BillPdfGenerator : IBillPdfGenerator
     }
 
     /// <summary>
-    /// 生成通知单 PDF 字节流
+    /// 生成缴费通知单 PDF 字节流
     /// </summary>
-    /// <param name="note">通知单实体</param>
+    /// <param name="note">缴费通知单实体</param>
     /// <param name="items">费用明细列表（费用名称 + 金额）</param>
     /// <param name="contractNo">合同编号</param>
     /// <param name="tenantName">租客姓名</param>
@@ -46,7 +46,7 @@ public class BillPdfGenerator : IBillPdfGenerator
         string? buildingAddress = null, string? generatedAt = null,
         decimal previousBalance = 0, IReadOnlyList<(decimal Amount, string Date, string Channel)>? receipts = null)
     {
-        var title = "通知单";
+        var title = "缴费通知单";
         var genDate = generatedAt ?? note.CreatedAt.ToString("yyyy-MM-dd");
         var feesTotal = items.Sum(i => i.Amount);
         var paysTotal = receipts?.Sum(r => r.Amount) ?? 0;

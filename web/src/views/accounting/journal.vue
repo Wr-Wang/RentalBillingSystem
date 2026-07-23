@@ -68,7 +68,6 @@
           </template>
         </el-table-column>
         <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="period" label="期间" width="80" align="center" />
         <el-table-column prop="billMonth" label="账单月" width="75" align="center">
           <template #default="{ row }">
             <span>{{ row.billMonth || '-' }}</span>

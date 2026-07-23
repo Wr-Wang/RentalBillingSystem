@@ -63,7 +63,6 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="period" label="账期" width="85" align="center" />
         <el-table-column prop="billMonth" label="账单月" width="85" align="center">
           <template #default="{ row }">
             <span>{{ row.billMonth || '-' }}</span>

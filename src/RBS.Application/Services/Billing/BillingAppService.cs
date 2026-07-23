@@ -45,7 +45,6 @@ public class BillingAppService : IBillingService
             DueDate = DateOnly.FromDateTime((DateTime)p.DueDate),
             EntryType = (string)p.EntryType,
             GLPosted = (bool)p.GLPosted,
-            BillMonth = (string?)(p.BillMonth ?? null)
         }).ToList();
     }
 
