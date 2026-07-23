@@ -8,7 +8,6 @@ namespace RBS.Application.Services.Scheduling;
 
 public abstract class ScheduledJobBase : IScheduledJob
 {
-    private static readonly SemaphoreSlim _companySemaphore = new(2, 2);
     protected const int ContractParallelism = 20;
 
     protected readonly ITaskLogRepository _taskLogRepo;
@@ -32,16 +31,8 @@ public abstract class ScheduledJobBase : IScheduledJob
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct = default)
     {
-        await _companySemaphore.WaitAsync(ct);
-        try
-        {
-            var result = await ExecuteCoreAsync(companyId, targetMonth, ExecuteMode.Execute, ct);
-            return result.Summary;
-        }
-        finally
-        {
-            _companySemaphore.Release();
-        }
+        var result = await ExecuteCoreAsync(companyId, targetMonth, ExecuteMode.Execute, ct);
+        return result.Summary;
     }
 
     /// <summary>带选项的执行入口（供 API 调用）</summary>

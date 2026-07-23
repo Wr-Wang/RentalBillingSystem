@@ -481,7 +481,7 @@ public class ApprovalService : IApprovalService
         }
 
         // Fallback: 旧审批无结构化数据时，保留原有逻辑
-        var fallback = BuildBizDetailFromDescription(approval);
+        var fallback = await BuildBizDetailFromDescriptionAsync(approval);
         if (fallback != null) return fallback;
 
         // 最终 fallback：至少返回标题
@@ -616,7 +616,7 @@ public class ApprovalService : IApprovalService
         return dto.Fields.Count > 0 ? dto : null;
     }
     /// <summary>旧审批回调：保留原有正则解析 + ContractRenewal/ChangeRequest 分支</summary>
-    private ApprovalBizDetailDto? BuildBizDetailFromDescription(ApprovalRequest approval)
+    private async Task<ApprovalBizDetailDto?> BuildBizDetailFromDescriptionAsync(ApprovalRequest approval)
     {
         var desc = approval.Description;
         var dto = new ApprovalBizDetailDto { Title = approval.Title ?? "" };
@@ -624,10 +624,10 @@ public class ApprovalService : IApprovalService
         // 优先按 TargetEntityType 分发（不依赖 Description）
         if (approval.TargetEntityType == "ContractRenewal" && approval.TargetEntityId != Guid.Empty)
         {
-            var renewal = _uow.RenewalRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
+            var renewal = await _uow.RenewalRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
             if (renewal != null)
             {
-                var oldContract = _uow.Contracts.GetByIdAsync(renewal.OldContractId, CancellationToken.None).GetAwaiter().GetResult();
+                var oldContract = await _uow.Contracts.GetByIdAsync(renewal.OldContractId, CancellationToken.None);
                 dto.Fields.Add(new BizFieldDto { Label = "原合同号", OldValue = oldContract?.ContractNo, NewValue = renewal.ContractNo, IsChanged = true });
                 dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = $"¥{renewal.PreviousRent:N2}", NewValue = $"¥{renewal.NewRent:N2}", IsChanged = true });
                 dto.Fields.Add(new BizFieldDto { Label = "到期日", OldValue = oldContract?.EndDate?.ToString("yyyy-MM-dd") ?? "不限", NewValue = renewal.NewEndDate.ToString("yyyy-MM-dd"), IsChanged = true });
@@ -644,7 +644,7 @@ public class ApprovalService : IApprovalService
         // ContractActivation 类型：新建合同审批
         if (approval.TargetEntityType == "ContractActivation" && approval.TargetEntityId != Guid.Empty)
         {
-            var req = _uow.ContractCreateRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
+            var req = await _uow.ContractCreateRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
             if (req != null)
             {
                 using var conn = _connectionFactory.CreateConnection(); conn.Open();
@@ -687,7 +687,7 @@ public class ApprovalService : IApprovalService
 		// ContractModify 类型：加载合同修改请求，展示新旧字段对比
 		if (approval.TargetEntityType == "ContractModify" && approval.TargetEntityId != Guid.Empty)
 		{
-			var req = _uow.ContractModifyRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
+			var req = await _uow.ContractModifyRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
 			if (req != null)
 			{
 				using var conn = _connectionFactory.CreateConnection(); conn.Open();
@@ -725,7 +725,7 @@ public class ApprovalService : IApprovalService
             if (match.Success)
             {
                 var newAmount = match.Groups[1].Value;
-                var contract = _uow.Contracts.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
+                var contract = await _uow.Contracts.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
                 dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = newAmount, NewValue = $"¥{newAmount}", IsChanged = true });
 
                 var dateMatch = System.Text.RegularExpressions.Regex.Match(desc, @"生效日期[：:](\S+)");
@@ -739,7 +739,7 @@ public class ApprovalService : IApprovalService
         }
         else if (!string.IsNullOrEmpty(desc) && approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == true)
         {
-            var contract = _uow.Contracts.GetByIdAsync(approval.TargetEntityId, CancellationToken.None).GetAwaiter().GetResult();
+            var contract = await _uow.Contracts.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
             dto.Fields.Add(new BizFieldDto { Label = "合同号", OldValue = contract?.ContractNo, NewValue = null, IsChanged = false });
             dto.Fields.Add(new BizFieldDto { Label = "终止原因", OldValue = null, NewValue = approval.Description, IsChanged = true });
         }

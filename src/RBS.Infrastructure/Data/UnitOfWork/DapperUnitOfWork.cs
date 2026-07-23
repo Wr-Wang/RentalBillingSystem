@@ -244,7 +244,20 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
                         parms.Add($"@{k}", prop?.GetValue(entry.Entity));
                     }
 
-                    affected += await conn.ExecuteAsync(sql, parms, tx);
+                    // RowVersion 乐观锁：实体有此属性时加入 WHERE 条件
+                    var rvProp = entry.Entity.GetType().GetProperty("RowVersion");
+                    if (rvProp != null && rvProp.GetValue(entry.Entity) is byte[] rv)
+                    {
+                        sql += " AND RowVersion=@RowVersion";
+                        parms.Add("@RowVersion", rv);
+                    }
+
+                    var rowCount = await conn.ExecuteAsync(sql, parms, tx);
+                    if (rowCount == 0 && rvProp != null)
+                    {
+                        throw new InvalidOperationException($"并发冲突：{tableName}(Id={id}) 已被其他操作修改，请刷新后重试");
+                    }
+                    affected += rowCount;
 
                     // 收集审计（延迟写入避免与事务表竞争）
                     var updatedBy = entry.Entity.GetType().GetProperty("UpdatedBy")?.GetValue(entry.Entity) as Guid? ?? Guid.Empty;
@@ -398,7 +411,12 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
             {
                 return await CommitAsync(ct);
             }
-            catch (Exception) when (attempt < maxRetries)
+            catch (InvalidOperationException)
+            {
+                // 并发冲突（RowVersion 不匹配）不重试，直接抛出
+                throw;
+            }
+            catch (Exception ex) when (attempt < maxRetries && IsTransient(ex))
             {
                 // 短暂等待后重试，首次重试无延迟
                 if (attempt > 1)
@@ -406,6 +424,19 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
             }
         }
         return await CommitAsync(ct);
+    }
+
+    private static bool IsTransient(Exception ex)
+    {
+        // SQL Server 可恢复的错误：死锁（1205）、超时（-2）、快照隔离冲突（3960）
+        if (ex is Microsoft.Data.SqlClient.SqlException sqlEx)
+            return sqlEx.Number is 1205 or -2 or 3960;
+        if (ex.InnerException is Microsoft.Data.SqlClient.SqlException innerSqlEx)
+            return innerSqlEx.Number is 1205 or -2 or 3960;
+        // 超时异常
+        if (ex is TaskCanceledException or OperationCanceledException)
+            return true;
+        return false;
     }
 
     /// <summary>
