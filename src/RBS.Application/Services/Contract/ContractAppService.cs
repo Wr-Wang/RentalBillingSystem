@@ -11,6 +11,7 @@ using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Interfaces.UnitOfWork;
 using System.Data;
+using Microsoft.Extensions.Logging;
 using ContractEntity = RBS.Core.Entities.Contract.Contract;
 
 namespace RBS.Application.Services.Contract;
@@ -27,6 +28,7 @@ public class ContractAppService : IContractService
     private readonly IContractDomainService _contractDomain;
     private readonly IReceivableGenerationService _receivableGen;
     private readonly IApprovalService _approvalService;
+    private readonly ILogger<ContractAppService> _logger;
 
     /// <summary>
     /// 构造函数
@@ -34,10 +36,12 @@ public class ContractAppService : IContractService
     public ContractAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql,
         IContractDomainService contractDomain,
         IReceivableGenerationService receivableGen,
-        IApprovalService approvalService)
+        IApprovalService approvalService,
+        ILogger<ContractAppService> logger)
     {
         _uow = uow; _db = db; _sql = sql; _contractDomain = contractDomain;
         _receivableGen = receivableGen; _approvalService = approvalService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -443,7 +447,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
                     }
                 }
             }
-            catch { /* TODO: 补差 JE 失败不阻断调价 */ }
+            catch (Exception ex) { _logger.LogWarning(ex, "调价补差 JE 失败（不阻断调价），合同 {ContractId}", contractId); }
         }
 
         return new { contractId };

@@ -218,8 +218,9 @@ public class BillJob : ScheduledJobBase
 
                     var prepaid = contract.PrepaidBalance;
                     dnId = Guid.NewGuid();
-                    await PersistDebitNoteAsync(conn, dnId, contract.Id, contractNo ?? "",
-                        companyId, targetMonth, totalAmount, prepaid, taskLogId, false, null, tx, token);
+                    await PersistDebitNoteAsync(conn, tx, new DebitNoteRequest(
+                        dnId, contract.Id, contractNo ?? "", companyId,
+                        targetMonth, totalAmount, taskLogId), token);
 
                     // 批量写入 DebitNoteItems（此时已拿到 dnId）
                     if (itemTuples.Count > 0)
@@ -345,41 +346,43 @@ public class BillJob : ScheduledJobBase
         return rows.ToDictionary(r => r.Code, r => r.Id);
     }
 
-    private async Task PersistDebitNoteAsync(IDbConnection conn, Guid dnId, Guid contractId,
-        string contractNo, Guid companyId, string period, decimal totalAmount, decimal prepaid,
-        Guid taskLogId, bool isHistorical, DateOnly? dueDate, IDbTransaction tx, CancellationToken ct)
+    private async Task PersistDebitNoteAsync(IDbConnection conn, IDbTransaction tx, DebitNoteRequest req, CancellationToken ct)
     {
-        var periodParts = period.Split('-');
+        var periodParts = req.Period.Split('-');
         var periodYear = int.Parse(periodParts[0]);
         var periodMonth = int.Parse(periodParts[1]);
 
-        // 收集快照数据
         var tenantName = await conn.QuerySingleOrDefaultAsync<string>(
-            _sql.Get("Lease.Select.Tenant.PrimaryNameByContract"), new { Id = contractId }, tx);
+            _sql.Get("Lease.Select.Tenant.PrimaryNameByContract"), new { Id = req.ContractId }, tx);
         var buildingAddress = await conn.QuerySingleOrDefaultAsync<string>(
-            _sql.Get("Lease.Select.HousingUnit.BuildingAddressByContract"), new { Id = contractId }, tx);
+            _sql.Get("Lease.Select.HousingUnit.BuildingAddressByContract"), new { Id = req.ContractId }, tx);
         var companyRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            _sql.Get("Organization.Select.Company.ById"), new { Id = companyId }, tx);
+            _sql.Get("Organization.Select.Company.ById"), new { Id = req.CompanyId }, tx);
         var companyName = companyRow?.Name as string ?? "";
         var previousBalance = await conn.QuerySingleOrDefaultAsync<decimal>(
             _sql.Get("Billing.Select.Journal.PreviousBalance"),
-            new { ContractId = contractId, Year = periodYear, Month = periodMonth }, tx);
+            new { ContractId = req.ContractId, Year = periodYear, Month = periodMonth }, tx);
 
         var noteNo = await DebitNoteService.GenerateBillNoAsync(conn, tx);
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.DebitNote.FromBillJob"),
             new
             {
-                Id = dnId, NoteNo = noteNo,
-                CId = contractId, CoId = companyId, Amt = totalAmount,
-                IsHist = isHistorical, Due = dueDate,
+                Id = req.DnId, NoteNo = noteNo,
+                CId = req.ContractId, CoId = req.CompanyId, Amt = req.TotalAmount,
+                IsHist = req.IsHistorical, Due = req.DueDate,
                 PeriodYear = periodYear, PeriodMonth = periodMonth, CBy = Guid.Empty,
-                ContractNo = contractNo,
+                ContractNo = req.ContractNo,
                 TenantName = tenantName ?? "",
                 BuildingAddress = buildingAddress ?? "",
                 CompanyName = companyName ?? "",
                 PreviousBalance = previousBalance
             }, tx);
     }
+
+    private record DebitNoteRequest(
+        Guid DnId, Guid ContractId, string ContractNo, Guid CompanyId,
+        string Period, decimal TotalAmount, Guid TaskLogId,
+        bool IsHistorical = false, DateOnly? DueDate = null);
 
     protected override async Task<string> BuildDryRunReportAsync(
         Guid companyId, string targetMonth, Guid taskLogId, CancellationToken ct)

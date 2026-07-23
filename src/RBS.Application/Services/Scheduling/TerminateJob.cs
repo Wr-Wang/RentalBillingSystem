@@ -32,60 +32,58 @@ public class TerminateJob : ITerminateJob
 
     public async Task ExecuteAsync(Guid contractId, string? actualEndDate, string depositReturn, string reason, CancellationToken ct)
     {
-        // TODO: companyId 后续从合同查询后补填
-        var taskLogEntry = new RBS.Core.Entities.Scheduling.TaskLog("TerminateJob", Guid.Empty, "", "Event", "Execute");
+        using var conn = _db.CreateConnection(); conn.Open();
+
+        // Step00: 预查合同信息（先拿到 companyId 再创建任务日志）
+        var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            _sql.Get("Terminate.Select.Contract.Detail"), new { Id = contractId });
+        if (contract == null) throw new InvalidOperationException("合同不存在");
+
+        var companyId = (Guid)contract.CompanyId;
+        var taskLogEntry = new RBS.Core.Entities.Scheduling.TaskLog("TerminateJob", companyId, "", "Event", "Execute");
         var taskLogId = await _taskLogRepo.CreateAsync(taskLogEntry, ct);
         var subjects = await LoadSubjectsAsync(ct);
 
-        using var conn = _db.CreateConnection(); conn.Open();
         using var tx = conn.BeginTransaction();
 
         try
         {
-            // Step01: 查询合同信息
-            var step01 = await _stepLogger.StartStepAsync(taskLogId, "TermStep01", "查询合同信息", null, null, ct);
-            var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                _sql.Get("Terminate.Select.Contract.Detail"), new { Id = contractId }, tx);
-            if (contract == null) throw new InvalidOperationException("合同不存在");
-
-            var companyId = (Guid)contract.CompanyId;
             var now = ChinaTime.Now;
             var period = $"{now.Year:D4}-{now.Month:D2}";
-            await _stepLogger.CompleteStepAsync(step01, 1, null, ct);
 
-            // Step02: 查询押金 + 应收余额
-            var step02 = await _stepLogger.StartStepAsync(taskLogId, "TermStep02", "查询押金与应收余额", null, null, ct);
+            // Step01: 查询押金 + 应收余额
+            var step01 = await _stepLogger.StartStepAsync(taskLogId, "TermStep01", "查询押金与应收余额", null, null, ct);
             var depositAmt = await conn.QuerySingleOrDefaultAsync<decimal>(
                 _sql.Get("Contract.Select.DepositConfig.AmountByContract"),
                 new { Cid = contractId }, tx);
-
             var receivableBal = await conn.QuerySingleAsync<decimal>(
                 _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
                 new { Code = "1122", CId = contractId }, tx);
-            await _stepLogger.CompleteStepAsync(step02, 1, null, ct);
+            await _stepLogger.CompleteStepAsync(step01, 1, null, ct);
 
             if (depositAmt <= 0)
             {
                 await _stepLogger.SkipStepAsync(
-                    await _stepLogger.StartStepAsync(taskLogId, "TermStep03", "押金结算", null, null, ct),
+                    await _stepLogger.StartStepAsync(taskLogId, "TermStep02", "押金结算", null, null, ct),
                     "无押金，跳过结算", null, ct);
                 tx.Commit();
                 await _taskLogRepo.CompleteAsync(taskLogId, 1, 1, 0, 0, "无押金，终止结算完成", ct);
                 return;
             }
 
-            // Step03: 创建终止结算 Journal + GL 更新
-            var step03 = await _stepLogger.StartStepAsync(taskLogId, "TermStep03", "生成终止结算日记账", null, null, ct);
+            // Step02: 创建终止结算 Journal
+            var step02 = await _stepLogger.StartStepAsync(taskLogId, "TermStep02", "生成终止结算日记账", null, null, ct);
 
-            var deduction = 0m; // TODO: 从 TerminationBizData 获取扣款明细
+            // 扣款：目前从 TerminationBizData 暂未传递扣款明细，默认为 0
+            // TODO: 后续从 ApprovalBizData.Reason 或新增扣款字段获取
+            var deduction = 0m;
             var offsetAmt = Math.Min(receivableBal, depositAmt);
             var refundAmt = depositAmt - offsetAmt - deduction;
 
-            var nowUtc = ChinaTime.Now;
             var billedAt = ChinaTime.Now;
             var dueDate = DateOnly.FromDateTime(now);
 
-            // 借方：2241 押金（全额冲减）— Journal 记录
+            // 借方：2241 押金（全额冲减）
             await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),
                 new
                 {
@@ -140,8 +138,7 @@ public class TerminateJob : ITerminateJob
                         Summary = "退还押金", CBy = Guid.Empty
                     }, tx);
 
-            // TODO: 此处应补充 deduction 的业务逻辑（从 TerminationBizData 获取扣款明细）
-            await _stepLogger.CompleteStepAsync(step03, 1, null, ct);
+            await _stepLogger.CompleteStepAsync(step02, 1, null, ct);
 
             tx.Commit();
             await _taskLogRepo.CompleteAsync(taskLogId, 1, 1, 0, 0, "终止结算完成", ct);
