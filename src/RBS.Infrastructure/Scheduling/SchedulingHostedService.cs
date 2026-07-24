@@ -26,20 +26,27 @@ public class SchedulingHostedService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     /// <summary>日志记录器</summary>
     private readonly ILogger<SchedulingHostedService> _logger;
-    /// <summary>轮询间隔（60 秒）</summary>
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(60);
+    /// <summary>单个 Job 最长执行时间（超过则视为僵死，让下游继续）</summary>
+    private readonly TimeSpan _jobTimeout;
+    /// <summary>调度引擎轮询间隔</summary>
+    private readonly TimeSpan _pollInterval;
     /// <summary>缓存 SqlLoader 实例（因运行在 Singleton 中，懒加载避免启动时依赖未就绪）</summary>
     private ISqlLoader? _cachedSql;
+    private readonly int _schedulerParallelism;
 
     /// <summary>
     /// 初始化调度宿主服务
     /// </summary>
     /// <param name="scopeFactory">服务作用域工厂</param>
     /// <param name="logger">日志记录器</param>
-    public SchedulingHostedService(IServiceScopeFactory scopeFactory, ILogger<SchedulingHostedService> logger)
+    public SchedulingHostedService(IServiceScopeFactory scopeFactory, ILogger<SchedulingHostedService> logger,
+        RBS.Application.Services.Scheduling.SchedulingOptions? options = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _schedulerParallelism = options?.SchedulerParallelism ?? 0;
+        _jobTimeout = TimeSpan.FromMinutes(options?.JobTimeoutMinutes ?? 180);
+        _pollInterval = TimeSpan.FromSeconds(options?.PollIntervalSeconds ?? 60);
     }
 
     private ISqlLoader Sql => _cachedSql ??= ResolveSql();
@@ -69,7 +76,7 @@ public class SchedulingHostedService : BackgroundService
                 _logger.LogError(ex, "调度轮询异常");
             }
 
-            await Task.Delay(PollInterval, stoppingToken);
+            await Task.Delay(_pollInterval, stoppingToken);
         }
 
         _logger.LogInformation("调度引擎停止");
@@ -123,9 +130,10 @@ public class SchedulingHostedService : BackgroundService
 
         // 按公司分组：公司间并行，公司内串行
         var groups = dueItems.GroupBy(x => x.Execution.CompanyId).ToList();
+        var parallelism = _schedulerParallelism > 0 ? _schedulerParallelism : Math.Max(1, Environment.ProcessorCount / 2);
         var parallelOptions = new ParallelOptions
         {
-            MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
+            MaxDegreeOfParallelism = parallelism,
             CancellationToken = ct
         };
 
@@ -251,7 +259,10 @@ public class SchedulingHostedService : BackgroundService
 
         try
         {
-            var result = await job.ExecuteAsync(execution.CompanyId, execution.Month, ct);
+            // 单个 Job 超时控制：超过 30 分钟自动取消，让下游继续
+            using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            jobCts.CancelAfter(_jobTimeout);
+            var result = await job.ExecuteAsync(execution.CompanyId, execution.Month, jobCts.Token);
 
             if (executeStepId.HasValue)
             {

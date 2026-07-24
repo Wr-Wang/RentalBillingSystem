@@ -20,8 +20,9 @@ public class SettleJob : ScheduledJobBase
     public SettleJob(
         ITaskLogRepository taskLogRepo, ITaskStepLogger stepLogger, IUnitOfWork uow,
         IDbConnectionFactory db, ISqlLoader sql,
-        JobExecutionContext jobContext)
-        : base(taskLogRepo, stepLogger, uow, jobContext)
+        JobExecutionContext jobContext,
+        SchedulingOptions? options = null)
+        : base(taskLogRepo, stepLogger, uow, jobContext, options)
     {
         _db = db;
         _sql = sql;

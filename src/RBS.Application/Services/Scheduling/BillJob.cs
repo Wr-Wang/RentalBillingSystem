@@ -23,6 +23,7 @@ public class BillJob : ScheduledJobBase
     private readonly IBillingDomainService _billingDomain;
     private readonly IBillJobFailedContractRepository _failedContractRepo;
     private readonly IDebitNoteService _debitNoteService;
+    private readonly int _pdfParallelism;
 
     public BillJob(
         ITaskLogRepository taskLogRepo, ITaskStepLogger stepLogger, IUnitOfWork uow,
@@ -30,14 +31,16 @@ public class BillJob : ScheduledJobBase
         IBillingDomainService billingDomain,
         IBillJobFailedContractRepository failedContractRepo,
         IDebitNoteService debitNoteService,
-        JobExecutionContext jobContext)
-        : base(taskLogRepo, stepLogger, uow, jobContext)
+        JobExecutionContext jobContext,
+        SchedulingOptions? options = null)
+        : base(taskLogRepo, stepLogger, uow, jobContext, options)
     {
         _db = db;
         _sql = sql;
         _billingDomain = billingDomain;
         _failedContractRepo = failedContractRepo;
         _debitNoteService = debitNoteService;
+        _pdfParallelism = options?.PdfParallelism ?? 16;
     }
 
     protected override async Task<JobResult> ExecuteCoreAsync(
@@ -302,7 +305,7 @@ public class BillJob : ScheduledJobBase
                         step06, null, ct);
 
                     await Parallel.ForEachAsync(subBatch,
-                        new ParallelOptions { MaxDegreeOfParallelism = 16, CancellationToken = ct },
+                        new ParallelOptions { MaxDegreeOfParallelism = _pdfParallelism, CancellationToken = ct },
                         async (item, token) =>
                     {
                         try

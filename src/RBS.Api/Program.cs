@@ -93,6 +93,12 @@ builder.Services.AddApplicationLayer();
 builder.Services.AddSingleton<RBS.Api.Middleware.ApiLogChannel>();
 builder.Services.AddHostedService<RBS.Api.Services.ApiLogWriterService>();
 
+// 调度任务并行度配置
+builder.Services.Configure<RBS.Application.Services.Scheduling.SchedulingOptions>(
+    builder.Configuration.GetSection("Scheduling"));
+builder.Services.AddSingleton(sp =>
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<RBS.Application.Services.Scheduling.SchedulingOptions>>().Value);
+
 var app = builder.Build();
 
 // ===== 中间件管道（顺序敏感） =====

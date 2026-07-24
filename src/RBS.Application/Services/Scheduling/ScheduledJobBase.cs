@@ -8,7 +8,7 @@ namespace RBS.Application.Services.Scheduling;
 
 public abstract class ScheduledJobBase : IScheduledJob
 {
-    protected const int ContractParallelism = 20;
+    protected readonly int ContractParallelism;
 
     protected readonly ITaskLogRepository _taskLogRepo;
     protected readonly ITaskStepLogger _stepLogger;
@@ -21,12 +21,14 @@ public abstract class ScheduledJobBase : IScheduledJob
         ITaskLogRepository taskLogRepo,
         ITaskStepLogger stepLogger,
         IUnitOfWork uow,
-        JobExecutionContext jobContext)
+        JobExecutionContext jobContext,
+        SchedulingOptions? options = null)
     {
         _taskLogRepo = taskLogRepo;
         _stepLogger = stepLogger;
         _uow = uow;
         _jobContext = jobContext;
+        ContractParallelism = options?.ContractParallelism ?? 20;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct = default)
