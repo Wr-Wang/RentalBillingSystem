@@ -955,13 +955,8 @@
       AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt, BillMonth,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, DATEADD(DAY, -1, DATEADD(MONTH, 1, DATEADD(MONTH,
-        CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
-        THEN 2 ELSE 1 END,
-        DATEFROMPARTS(YEAR(@BilledAt), MONTH(@BilledAt), 1)))), @EntryType, 1, @BilledAt,
-	      CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
-	        THEN CONCAT(DATEPART(YEAR, DATEADD(MONTH, 2, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 2, @BilledAt)) AS VARCHAR(2)), 2))
-	        ELSE CONCAT(DATEPART(YEAR, DATEADD(MONTH, 1, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 1, @BilledAt)) AS VARCHAR(2)), 2)) END,
+      @SubjId, @Period, @Amt, dbo.fn_CalculateDueDate(@BilledAt), @EntryType, 1, @BilledAt,
+	      dbo.fn_CalculateBillMonth(@BilledAt),
 	      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
   <insert id="Billing.Insert.Journal.Unposted">
@@ -969,13 +964,8 @@
       AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt, BillMonth,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, DATEADD(DAY, -1, DATEADD(MONTH, 1, DATEADD(MONTH,
-        CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
-        THEN 2 ELSE 1 END,
-        DATEFROMPARTS(YEAR(@BilledAt), MONTH(@BilledAt), 1)))), @EntryType, 0, @BilledAt,
-	      CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
-	        THEN CONCAT(DATEPART(YEAR, DATEADD(MONTH, 2, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 2, @BilledAt)) AS VARCHAR(2)), 2))
-	        ELSE CONCAT(DATEPART(YEAR, DATEADD(MONTH, 1, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 1, @BilledAt)) AS VARCHAR(2)), 2)) END,
+      @SubjId, @Period, @Amt, dbo.fn_CalculateDueDate(@BilledAt), @EntryType, 0, @BilledAt,
+	      dbo.fn_CalculateBillMonth(@BilledAt),
 	      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
   <select id="Billing.Select.Journal.ByCompanyPeriod">
@@ -1035,13 +1025,8 @@
       AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt, BillMonth,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, DATEADD(DAY, -1, DATEADD(MONTH, 1, DATEADD(MONTH,
-        CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
-        THEN 2 ELSE 1 END,
-        DATEFROMPARTS(YEAR(@BilledAt), MONTH(@BilledAt), 1)))), 'Interest', 0, @BilledAt,
-	      CASE WHEN DATEPART(DAY, @BilledAt) > 25 OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
-	        THEN CONCAT(DATEPART(YEAR, DATEADD(MONTH, 2, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 2, @BilledAt)) AS VARCHAR(2)), 2))
-	        ELSE CONCAT(DATEPART(YEAR, DATEADD(MONTH, 1, @BilledAt)), '-', RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, 1, @BilledAt)) AS VARCHAR(2)), 2)) END,
+      @SubjId, @Period, @Amt, dbo.fn_CalculateDueDate(@BilledAt), 'Interest', 0, @BilledAt,
+	      dbo.fn_CalculateBillMonth(@BilledAt),
 	      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
   <select id="Billing.Select.Journal.InterestExists">

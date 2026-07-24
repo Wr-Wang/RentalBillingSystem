@@ -3047,6 +3047,36 @@ CREATE UNIQUE INDEX [IX_TaxRateConfigs_Audit_Id_Version] ON [TaxRateConfigs_Audi
 
 
 -- ===================================================================
+-- 工具函数：账单月/到期日计算（25日20:00截点，前→次月，后→下下月）
+-- ===================================================================
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'dbo.fn_CalculateBillMonth')) DROP FUNCTION dbo.fn_CalculateBillMonth
+GO
+CREATE FUNCTION dbo.fn_CalculateBillMonth(@BilledAt DATETIME2)
+RETURNS VARCHAR(7) AS
+BEGIN
+    DECLARE @m INT = CASE
+        WHEN DATEPART(DAY, @BilledAt) > 25
+          OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN 2 ELSE 1 END;
+    RETURN CONCAT(DATEPART(YEAR, DATEADD(MONTH, @m, @BilledAt)), '-',
+        RIGHT('0' + CAST(DATEPART(MONTH, DATEADD(MONTH, @m, @BilledAt)) AS VARCHAR(2)), 2));
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'dbo.fn_CalculateDueDate')) DROP FUNCTION dbo.fn_CalculateDueDate
+GO
+CREATE FUNCTION dbo.fn_CalculateDueDate(@BilledAt DATETIME2)
+RETURNS DATE AS
+BEGIN
+    DECLARE @m INT = CASE
+        WHEN DATEPART(DAY, @BilledAt) > 25
+          OR (DATEPART(DAY, @BilledAt) = 25 AND DATEPART(HOUR, @BilledAt) >= 20)
+        THEN 2 ELSE 1 END;
+    RETURN DATEADD(DAY, -1, DATEADD(MONTH, 1,
+        DATEADD(MONTH, @m, DATEFROMPARTS(YEAR(@BilledAt), MONTH(@BilledAt), 1))));
+END
+GO
+
+-- ===================================================================
 -- 36. Journals 表：日记账表（不可变的出账记录，替代 ReceivablePlans）
 -- ===================================================================
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans_Audit]')) DROP TABLE [ReceivablePlans_Audit]
