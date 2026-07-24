@@ -29,6 +29,7 @@ public class ApprovalService : IApprovalService
     private readonly ISqlLoader _sql;
     private readonly IApprovalDomainService _approvalDomain;
     private readonly IApprovalNumberGenerator _approvalNoGenerator;
+    private readonly ApprovalBizDetailBuilder _bizDetailBuilder;
 
     /// <summary>
     /// 构造函数
@@ -48,7 +49,8 @@ public class ApprovalService : IApprovalService
         IServiceProvider serviceProvider,
         ISqlLoader sql,
         IApprovalDomainService approvalDomain,
-        IApprovalNumberGenerator approvalNoGenerator)
+        IApprovalNumberGenerator approvalNoGenerator,
+        ApprovalBizDetailBuilder bizDetailBuilder)
     {
         _uow = uow;
         _tenantService = tenantService;
@@ -58,6 +60,7 @@ public class ApprovalService : IApprovalService
         _sql = sql;
         _approvalDomain = approvalDomain;
         _approvalNoGenerator = approvalNoGenerator;
+        _bizDetailBuilder = bizDetailBuilder;
     }
 
     // =====================================================================
@@ -464,292 +467,8 @@ public class ApprovalService : IApprovalService
     {
         var approval = await _uow.ApprovalRequests.GetByIdAsync(id, ct);
         if (approval == null) return null;
-
-        // 优先从 ApprovalBizData 表读取结构化业务数据（新审批）
-        var bizData = await _uow.ApprovalBizData.GetByApprovalRequestIdAsync(id, ct);
-        if (bizData != null)
-        {
-            try
-            {
-                return await BuildBizDetailFromStructuredData(bizData, approval, ct);
-            }
-            catch (Exception ex)
-            {
-                // ★ 定位无业务数据的根因
-                System.Diagnostics.Debug.WriteLine($"[BizDetail] BuildBizDetailFromStructuredData failed for approval {id}: {ex}");
-            }
-        }
-
-        // Fallback: 旧审批无结构化数据时，保留原有逻辑
-        var fallback = await BuildBizDetailFromDescriptionAsync(approval);
-        if (fallback != null) return fallback;
-
-        // 最终 fallback：至少返回标题
-        return new ApprovalBizDetailDto
-        {
-            Title = approval.Title ?? "",
-            BizType = approval.TargetEntityType,
-            Fields = new List<BizFieldDto>()
-        };
+        return await _bizDetailBuilder.GetBizDetailAsync(approval);
     }
-
-    private async Task<ApprovalBizDetailDto?> BuildBizDetailFromStructuredData(
-        ApprovalBizData bizData, ApprovalRequest approval, CancellationToken ct)
-    {
-        var dto = new ApprovalBizDetailDto
-        {
-            Title = approval.Title ?? "",
-            EffectiveDate = bizData.EffectiveDate?.ToString("yyyy-MM-dd")
-        };
-
-        switch (bizData.ChangeType)
-        {
-            case "RENT_ADJUST":
-                var diff = (bizData.NewAmount ?? 0) - (bizData.OldAmount ?? 0);
-                var pct = bizData.OldAmount > 0 ? diff / bizData.OldAmount.Value * 100 : 0;
-                dto.BizType = "RENT_ADJUST";
-                dto.Fields = new List<BizFieldDto>
-                {
-                    new() { Label = "调整前月租", OldValue = $"¥{bizData.OldAmount:N2}" },
-                    new() { Label = "调整后月租", NewValue = $"¥{bizData.NewAmount:N2}", IsChanged = true },
-                    new() { Label = "调整差额",   NewValue = $"{(diff >= 0 ? "+" : "")}¥{diff:N2} ({(pct >= 0 ? "+" : "")}{pct:F1}%)", IsChanged = true },
-                    new() { Label = "生效日期",   NewValue = bizData.EffectiveDate?.ToString("yyyy-MM-dd"), IsChanged = true },
-                    new() { Label = "调整原因",   NewValue = bizData.Reason },
-                };
-                break;
-
-            case "FEE_ADJUST":
-                var feeItems = await _uow.ApprovalFeeItems.GetByApprovalRequestIdAsync(approval.Id, ct);
-                dto.BizType = "FEE_ADJUST";
-                dto.Fields = new List<BizFieldDto>
-                {
-                    new() { Label = "调价项目数", NewValue = $"{feeItems.Count} 项", IsChanged = true },
-                    new() { Label = "生效日期",   NewValue = bizData.EffectiveDate?.ToString("yyyy-MM-dd"), IsChanged = true },
-                };
-
-                // 逐项查询当前活跃配置，补充原数据信息
-                dto.FeeItems = new List<BizFeeItemDto>();
-                using (var conn = _connectionFactory.CreateConnection())
-                {
-                    conn.Open();
-                    foreach (var item in feeItems)
-                    {
-                        var oldConfig = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                            _sql.Get("Lease.Select.ContractFeeConfig.FullCurrentByContractAndFee"),
-                            new { ContractId = item.ContractId, FeeCodeId = item.FeeCodeId });
-
-                        // 旧配置无 ChargeType 时直接从 FeeCodes 表查询
-                        var chargeType = oldConfig?.ChargeType as string;
-                        if (string.IsNullOrEmpty(chargeType))
-                        {
-                            var feeCodeInfo = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                                _sql.Get("FeeCode.Select.FeeCode.ChargeTypeById"), new { Id = item.FeeCodeId });
-                            chargeType = feeCodeInfo?.ChargeType as string;
-                        }
-
-                        dto.FeeItems.Add(new BizFeeItemDto
-                        {
-                            FeeName = item.FeeName,
-                            OldAmount = item.OldAmount,
-                            NewAmount = item.NewAmount,
-                            BillingMode = item.BillingMode,
-                            Unit = item.Unit,
-                            EffectiveDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd"),
-                            OldEffectiveDate = oldConfig?.EffectiveDate is DateTime oldEd
-                                ? oldEd.ToString("yyyy-MM-dd") : oldConfig?.EffectiveDate as string,
-                            OldExpiryDate = oldConfig?.ExpiryDate is DateTime oldXd
-                                ? oldXd.ToString("yyyy-MM-dd") : oldConfig?.ExpiryDate as string,
-                            OldBillingMode = oldConfig?.BillingMode as string,
-                            OldUnit = oldConfig?.Unit as string,
-                            ChargeType = chargeType,
-                        });
-                    }
-                }
-                break;
-
-            case "RECEIVABLE_GENERATE":
-                dto.BizType = "RECEIVABLE_GENERATE";
-                dto.Fields = new List<BizFieldDto>
-                {
-                    new() { Label = "合同号",   NewValue = bizData.ContractNo },
-                    new() { Label = "应收合计", NewValue = bizData.NewAmount.HasValue ? $"¥{bizData.NewAmount:N2}" : "-", IsChanged = true },
-                    new() { Label = "账期范围", NewValue = bizData.Reason },
-                };
-
-                // 加载费用明细（带 ChargeType 区分周期/一次性）
-                using (var conn = _connectionFactory.CreateConnection())
-                {
-                    conn.Open();
-                    var items = conn.Query<dynamic>(
-                        _sql.Get("ReceivableGenerate.Select.Items.WithChargeTypeByRequestId"),
-                        new { RequestId = approval.TargetEntityId }).ToList();
-                    if (items.Count > 0)
-                    {
-                        dto.FeeItems = items.Select(i => new BizFeeItemDto
-                        {
-                            FeeName = (string)i.FeeName,
-                            NewAmount = (decimal)i.Amount,
-                            EffectiveDate = (string)i.Period,
-                            ChargeType = (string)(i.ChargeType ?? "Recurring"),
-                        }).ToList();
-                    }
-                }
-                break;
-
-            case "TERMINATE":
-                dto.BizType = "TERMINATE";
-                dto.Fields = new List<BizFieldDto>
-                {
-                    new() { Label = "终止类型", NewValue = bizData.TerminateType == "EARLY" ? "提前解约" : "到期终止" },
-                    new() { Label = "实际搬离日", NewValue = bizData.ActualEndDate?.ToString("yyyy-MM-dd") },
-                    new() { Label = "押金处理", NewValue = bizData.DepositReturn switch
-                    {
-                        "FULL" => "全额退还",
-                        "DEDUCT" => "扣款后退还",
-                        "LAST_RENT" => "抵扣最后月租",
-                        _ => bizData.DepositReturn
-                    }},
-                    new() { Label = "终止原因", NewValue = bizData.Reason },
-                };
-                break;
-        }
-        return dto.Fields.Count > 0 ? dto : null;
-    }
-    /// <summary>旧审批回调：保留原有正则解析 + ContractRenewal/ChangeRequest 分支</summary>
-    private async Task<ApprovalBizDetailDto?> BuildBizDetailFromDescriptionAsync(ApprovalRequest approval)
-    {
-        var desc = approval.Description;
-        var dto = new ApprovalBizDetailDto { Title = approval.Title ?? "" };
-
-        // 优先按 TargetEntityType 分发（不依赖 Description）
-        if (approval.TargetEntityType == "ContractRenewal" && approval.TargetEntityId != Guid.Empty)
-        {
-            var renewal = await _uow.RenewalRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
-            if (renewal != null)
-            {
-                var oldContract = await _uow.Contracts.GetByIdAsync(renewal.OldContractId, CancellationToken.None);
-                dto.Fields.Add(new BizFieldDto { Label = "原合同号", OldValue = oldContract?.ContractNo, NewValue = renewal.ContractNo, IsChanged = true });
-                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = $"¥{renewal.PreviousRent:N2}", NewValue = $"¥{renewal.NewRent:N2}", IsChanged = true });
-                dto.Fields.Add(new BizFieldDto { Label = "到期日", OldValue = oldContract?.EndDate?.ToString("yyyy-MM-dd") ?? "不限", NewValue = renewal.NewEndDate.ToString("yyyy-MM-dd"), IsChanged = true });
-                var oldDeposit = renewal.OldDepositAmount;
-                var newDeposit = renewal.DepositHandling == "NEW" ? (renewal.NewDepositAmount ?? oldDeposit) : oldDeposit;
-                dto.Fields.Add(new BizFieldDto { Label = "押金", OldValue = $"¥{oldDeposit:N2}", NewValue = $"¥{newDeposit:N2}", IsChanged = newDeposit != oldDeposit });
-                dto.Fields.Add(new BizFieldDto { Label = "押金处理方式", OldValue = null, NewValue = renewal.DepositHandling == "TRANSFER" ? "原押金延续" : "重新收取", IsChanged = false });
-                if (!string.IsNullOrEmpty(renewal.Remark))
-                    dto.Fields.Add(new BizFieldDto { Label = "备注", OldValue = null, NewValue = renewal.Remark, IsChanged = true });
-            }
-            return dto.Fields.Count > 0 ? dto : null;
-        }
-
-        // ContractActivation 类型：新建合同审批
-        if (approval.TargetEntityType == "ContractActivation" && approval.TargetEntityId != Guid.Empty)
-        {
-            var req = await _uow.ContractCreateRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
-            if (req != null)
-            {
-                using var conn = _connectionFactory.CreateConnection(); conn.Open();
-                var room = conn.QuerySingleOrDefault(_sql.Get("ContractCreate.Select.Room.FullCode"), new { Id = req.RoomId });
-                var tenants = conn.Query(_sql.Get("ContractCreate.Select.Tenants.NamesByRequest"), new { Id = req.Id }).ToList();
-                var fees = conn.Query(_sql.Get("ContractCreate.Select.Fees.NamesByRequest"), new { Id = req.Id }).ToList();
-
-                dto.BizType = "ContractActivation";
-                dto.Fields.Add(new BizFieldDto { Label = "合同编号", NewValue = req.ContractNo });
-                dto.Fields.Add(new BizFieldDto { Label = "房屋", NewValue = room?.FullCode ?? "" });
-                dto.Fields.Add(new BizFieldDto { Label = "起租日期", NewValue = req.StartDate.ToString("yyyy-MM-dd") });
-                dto.Fields.Add(new BizFieldDto { Label = "到期日期", NewValue = req.EndDate?.ToString("yyyy-MM-dd") ?? "不限" });
-                dto.Fields.Add(new BizFieldDto { Label = "付款周期", NewValue = req.PaymentCycle switch { "Monthly" => "月付", "Quarterly" => "季付", "HalfYearly" => "半年付", "Yearly" => "年付", _ => req.PaymentCycle } });
-                dto.Fields.Add(new BizFieldDto { Label = "租客", NewValue = string.Join("、", tenants.Select(t => (string)t.Name)) });
-                var feeItems = fees.Select(f => new BizFeeItemDto
-                {
-                    FeeName = f.Name, NewAmount = f.Amount,
-                    ChargeType = f.ChargeType, BillingMode = f.BillingMode,
-                    EffectiveDate = f.EffectiveDate
-                }).ToList();
-                dto.FeeItems = feeItems;
-                var onceFees = fees.Where(f => f.ChargeType == "OneTime").ToList();
-                var recFees = fees.Where(f => f.ChargeType == "Recurring").ToList();
-                if (onceFees.Count > 0)
-                {
-                    var t = onceFees.Sum(f => (decimal)f.Amount);
-                    dto.Fields.Add(new BizFieldDto { Label = $"一次性费用（{onceFees.Count} 项）", NewValue = $"¥{t:N2}" });
-                }
-                if (recFees.Count > 0)
-                {
-                    var t = recFees.Sum(f => (decimal)f.Amount);
-                    dto.Fields.Add(new BizFieldDto { Label = $"周期性费用（{recFees.Count} 项）", NewValue = $"¥{t:N2}/月" });
-                }
-                var grandTotal = fees.Sum(f => (decimal)f.Amount);
-                dto.Fields.Add(new BizFieldDto { Label = $"费用合计（{fees.Count} 项）", NewValue = $"¥{grandTotal:N2}" });
-            }
-            return dto.Fields.Count > 0 ? dto : null;
-        }
-
-		// ContractModify 类型：加载合同修改请求，展示新旧字段对比
-		if (approval.TargetEntityType == "ContractModify" && approval.TargetEntityId != Guid.Empty)
-		{
-			var req = await _uow.ContractModifyRequests.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
-			if (req != null)
-			{
-				using var conn = _connectionFactory.CreateConnection(); conn.Open();
-				var contract = conn.QuerySingleOrDefault<dynamic>(
-					_sql.Get("Lease.Select.Contract.Default"), new { Id = req.ContractId });
-				var tenant = conn.QuerySingleOrDefault<dynamic>(
-					_sql.Get("Lease.Select.ContractTenant.PrimaryByContract"), new { Id = req.ContractId });
-				var oldPhone = tenant?.TenantPhone as string ?? "";
-
-				dto.BizType = "ContractModify";
-				if (req.StartDate.HasValue)
-					dto.Fields.Add(new BizFieldDto { Label = "起租日期", OldValue = contract?.StartDate is DateTime sd ? sd.ToString("yyyy-MM-dd") : "", NewValue = req.StartDate.Value.ToString("yyyy-MM-dd"), IsChanged = true });
-				if (req.EndDate.HasValue)
-					dto.Fields.Add(new BizFieldDto { Label = "到期日期", OldValue = contract?.EndDate is DateTime ed ? ed.ToString("yyyy-MM-dd") : "不限", NewValue = req.EndDate.Value.ToString("yyyy-MM-dd"), IsChanged = true });
-				if (!string.IsNullOrEmpty(req.PaymentCycle))
-					dto.Fields.Add(new BizFieldDto { Label = "付款周期", OldValue = contract?.PaymentCycle, NewValue = req.PaymentCycle, IsChanged = true });
-				if (req.PaymentDueDay.HasValue)
-					dto.Fields.Add(new BizFieldDto { Label = "付款到期日", OldValue = (contract?.PaymentDueDay?.ToString() ?? "5") + "日", NewValue = req.PaymentDueDay + "日", IsChanged = true });
-				if (req.AllowDepositAsLastRent.HasValue)
-				{
-					var oldVal = contract?.AllowDepositAsLastRent is bool b ? (b ? "是" : "否") : "否";
-					dto.Fields.Add(new BizFieldDto { Label = "押金抵最后月租", OldValue = oldVal, NewValue = req.AllowDepositAsLastRent.Value ? "是" : "否", IsChanged = true });
-				}
-				if (!string.IsNullOrEmpty(req.TenantPhone))
-					dto.Fields.Add(new BizFieldDto { Label = "租客电话", OldValue = oldPhone, NewValue = req.TenantPhone, IsChanged = true });
-				if (!string.IsNullOrEmpty(req.Remark))
-					dto.Fields.Add(new BizFieldDto { Label = "备注", OldValue = null, NewValue = req.Remark, IsChanged = true });
-			}
-			return dto.Fields.Count > 0 ? dto : null;
-		}
-
-		if (!string.IsNullOrEmpty(desc) && approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == false)
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(desc, @"→\s*¥([\d,]+)");
-            if (match.Success)
-            {
-                var newAmount = match.Groups[1].Value;
-                var contract = await _uow.Contracts.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
-                dto.Fields.Add(new BizFieldDto { Label = "月租金", OldValue = newAmount, NewValue = $"¥{newAmount}", IsChanged = true });
-
-                var dateMatch = System.Text.RegularExpressions.Regex.Match(desc, @"生效日期[：:](\S+)");
-                if (dateMatch.Success)
-                    dto.Fields.Add(new BizFieldDto { Label = "生效日期", OldValue = null, NewValue = dateMatch.Groups[1].Value, IsChanged = true });
-
-                var reasonMatch = System.Text.RegularExpressions.Regex.Match(desc, @"调整原因[：:](\S+)");
-                if (reasonMatch.Success)
-                    dto.Fields.Add(new BizFieldDto { Label = "调整原因", OldValue = null, NewValue = reasonMatch.Groups[1].Value, IsChanged = true });
-            }
-        }
-        else if (!string.IsNullOrEmpty(desc) && approval.TargetEntityType == "Contract" && approval.Title?.StartsWith("[合同终止]") == true)
-        {
-            var contract = await _uow.Contracts.GetByIdAsync(approval.TargetEntityId, CancellationToken.None);
-            dto.Fields.Add(new BizFieldDto { Label = "合同号", OldValue = contract?.ContractNo, NewValue = null, IsChanged = false });
-            dto.Fields.Add(new BizFieldDto { Label = "终止原因", OldValue = null, NewValue = approval.Description, IsChanged = true });
-        }
-
-        return dto.Fields.Count > 0 ? dto : null;
-    }
-
-
-
-
     private async Task<ApprovalRequestDto> MapToDtoAsync(ApprovalRequest entity, CancellationToken ct)
     {
         string? typeName = null;

@@ -382,6 +382,18 @@ public class BillJob : ScheduledJobBase
             }, tx);
     }
 
+    /// <summary>
+    /// DebitNote 创建参数 — 替代 12 个独立参数，减少方法签名复杂度
+    /// </summary>
+    /// <param name="DnId">DebitNote 主键</param>
+    /// <param name="ContractId">合同 ID</param>
+    /// <param name="ContractNo">合同编号</param>
+    /// <param name="CompanyId">公司 ID</param>
+    /// <param name="Period">账期 yyyy-MM</param>
+    /// <param name="TotalAmount">账单总金额</param>
+    /// <param name="TaskLogId">任务日志 ID</param>
+    /// <param name="IsHistorical">是否历史账单</param>
+    /// <param name="DueDate">到期日</param>
     private record DebitNoteRequest(
         Guid DnId, Guid ContractId, string ContractNo, Guid CompanyId,
         string Period, decimal TotalAmount, Guid TaskLogId,
