@@ -3,6 +3,7 @@ using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using RBS.Application.Common;
 using RBS.Application.Common.Interfaces;
+using RBS.Application.Services.Contract;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
 using RBS.Core.Entities.Approval;
@@ -36,6 +37,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly ITerminateJob _terminateJob;
     private readonly IServiceProvider _serviceProvider;
     private readonly IBillingDomainService _billingDomain;
+    private readonly IContractTimelineService _timelineService;
 
     /// <summary>
     /// 构造函数
@@ -62,7 +64,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         IDbConnectionFactory db,
         IBillingDomainService billingDomain,
         ITerminateJob terminateJob,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IContractTimelineService timelineService)
     {
         _importService = importService;
         _contractService = contractService;
@@ -75,6 +78,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _billingDomain = billingDomain;
         _terminateJob = terminateJob;
         _serviceProvider = serviceProvider;
+            _timelineService = timelineService;
     }
 
     /// <summary>
@@ -699,7 +703,13 @@ if (chargeType == "OneTime")
 		            throw;
 		        }
 
-		        // 初始化应收（事务外独立执行，失败不阻断审批完成）
+		        // 写入变更历史（独立连接，失败不阻断主流程）
+        try { await _timelineService.InsertChangeHistoryAsync(contractId, "CONTRACT_ACTIVATE",
+                "合同创建审批通过",
+                $"合同 {request.ContractNo} 已激活，起租 {request.StartDate:yyyy-MM-dd}",
+                null, null, request.StartDate.ToString("yyyy-MM-dd"), request.CreatedBy); } catch { }
+
+        // 初始化应收（事务外独立执行，失败不阻断审批完成）
 		        try
 		        {
 		            var receivableGen = _serviceProvider.GetRequiredService<IReceivableGenerationService>();
@@ -969,6 +979,15 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	                    new { ContractId = bizData.ContractId, TenantId = tenantId }, tx);
 	            }
 
+	            // 写入变更历史（领域服务）
+	            var tenantName = await conn.QuerySingleOrDefaultAsync<string>(
+	                _sql.Get("Contract.Select.Tenant.NameById"), new { Id = tenantId }, tx);
+	            var tenantDisplay = tenantName ?? "未知租客";
+	            var changeTypeLabel = bizData.ChangeType == "TENANT_ADD" ? "添加租客" : "移除租客";
+	            try { await _timelineService.InsertChangeHistoryAsync(bizData.ContractId, "TENANT_CHANGE",
+	                changeTypeLabel, $"租客 {tenantDisplay}（{bizData.ChangeType}）",
+	                null, null, null, Guid.Empty); } catch { }
+
 	            await conn.ExecuteAsync(
 	                _sql.Get("Approval.Update.ApprovalBizData.MarkProcessed"),
 	                new { Id = bizData.Id }, tx);
@@ -1079,6 +1098,13 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	            tx.Commit();
 	        }
 	        catch { tx.Rollback(); throw; }
+
+
+	        // 写入变更历史（独立连接，失败不阻断主流程）
+	        try { await _timelineService.InsertChangeHistoryAsync(request.ContractId, "SUPPLEMENTARY_FEE",
+                "补充收费",
+                $"补充收费 {request.FeeCodeId} ¥{request.Amount:F2}，生效 {request.EffectiveDate}",
+                null, request.Amount, request.EffectiveDate, request.CreatedBy); } catch { }
 	    }
 
         private async Task SendNotificationsAsync(ApprovalCompletedEvent @event, CancellationToken ct)
