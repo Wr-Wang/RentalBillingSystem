@@ -40,6 +40,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly IBillingDomainService _billingDomain;
     private readonly IContractTimelineService _timelineService;
     private readonly IAuditLogWriter _auditWriter;
+    private readonly ICurrentUserService _currentUser;
+    private Guid CurrentUserId => _currentUser?.UserId ?? Guid.Empty;
 
     /// <summary>
     /// 构造函数
@@ -68,7 +70,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         ITerminateJob terminateJob,
         IServiceProvider serviceProvider,
         IContractTimelineService timelineService,
-        IAuditLogWriter auditWriter)
+        IAuditLogWriter auditWriter,
+        ICurrentUserService currentUser)
     {
         _importService = importService;
         _contractService = contractService;
@@ -81,8 +84,9 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _billingDomain = billingDomain;
         _terminateJob = terminateJob;
         _serviceProvider = serviceProvider;
-            _timelineService = timelineService;
-            _auditWriter = auditWriter;
+        _timelineService = timelineService;
+        _auditWriter = auditWriter;
+        _currentUser = currentUser;
     }
 
     /// <summary>
@@ -122,7 +126,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 rollbackConn.Open();
                 await rollbackConn.ExecuteAsync(
                     _sql.Get("Approval.Update.Request.RollbackToPending"),
-                    new { Id = @event.ApprovalRequestId, UpdatedBy = Guid.Empty });
+                    new { Id = @event.ApprovalRequestId, UpdatedBy = CurrentUserId });
                 await rollbackConn.ExecuteAsync(
                     _sql.Get("Approval.Delete.Record.LastByRequest"),
                     new { RequestId = @event.ApprovalRequestId });
@@ -214,7 +218,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                             Title = "合同终止", Detail = bizData.Reason ?? "",
                             OldValue = (decimal?)null, NewValue = (decimal?)null,
                             EffectiveDate = bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
-                            OperatorId = Guid.Empty, OperatorName = "" }); } } catch { }
+                            OperatorId = CurrentUserId, OperatorName = "" }); } } catch { }
                 }
                 else
                 {
@@ -265,7 +269,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         if (feeItems.Count == 0) return;
 
         var approvalReq = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
-        var userId = approvalReq?.CreatedBy ?? Guid.Empty;
+        var userId = approvalReq?.CreatedBy ?? CurrentUserId;
 
         // 校验所有调价项的生效日期在合同起止日期范围内
         var contract = await _uow.Contracts.GetByIdAsync(bizData.ContractId, ct);
@@ -467,7 +471,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                         item.ContractId, item.FeeCodeId,
                         item.NewAmount, item.BillingMode!, item.Unit, (decimal?)null,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                        Guid.Empty,
+                        CurrentUserId,
                         cStart, cEnd);
                         // 生成所有历史月份的日记账（首月及后续各月），不包含未来段
                         for (int i = 0; i < segments.Count; i++)
@@ -503,7 +507,7 @@ if (chargeType == "OneTime")
                             Unit = (string?)null,
                             UnitPrice = (decimal?)null,
                             EffectiveDate = item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                            CreatedBy = Guid.Empty,
+                            CreatedBy = CurrentUserId,
                             Now = ChinaTime.Now
                         }, tx);
                     // 暂记，等 Commit 后再生成 JE（避免独立连接被事务锁阻塞 → 超时）
@@ -525,7 +529,7 @@ if (chargeType == "OneTime")
                 await InsertChangeHistoryAsync(conn, tx, item.ContractId, "FEE_ADD",
                     "添加费用",
                     $"添加 {item.FeeName} ¥{item.NewAmount:F2}，生效 {effDate}",
-                    null, item.NewAmount, effDate, Guid.Empty);
+                    null, item.NewAmount, effDate, CurrentUserId);
             }
 
             // 幂等标记
@@ -583,7 +587,7 @@ if (chargeType == "OneTime")
                     ["ContractId"] = bizData.ContractId,
                     ["ExpiryDate"] = result.EffectiveEndDate,
                     ["IsActive"] = false
-                }, Guid.Empty, ct);
+                }, CurrentUserId, ct);
         }
 
         await _uow.CommitAsync(ct);
@@ -594,7 +598,7 @@ if (chargeType == "OneTime")
                     Title = "合同终止", Detail = bizData.Reason ?? "",
                     OldValue = (decimal?)null, NewValue = (decimal?)null,
                     EffectiveDate = bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
-                    OperatorId = Guid.Empty, OperatorName = "" }); } catch { }
+                    OperatorId = CurrentUserId, OperatorName = "" }); } catch { }
 
         // 生成押金结算凭证（独立事务，失败不阻断终止主流程）
         try
@@ -629,7 +633,7 @@ if (chargeType == "OneTime")
                     rollbackConn.Open();
                     await rollbackConn.ExecuteAsync(
                         _sql.Get("Approval.Update.Request.RollbackToPending"),
-                        new { Id = @event.ApprovalRequestId, UpdatedBy = Guid.Empty });
+                        new { Id = @event.ApprovalRequestId, UpdatedBy = CurrentUserId });
                 }
                 catch { /* 回滚失败不影响原始异常 */ }
                 throw;
@@ -650,7 +654,7 @@ if (chargeType == "OneTime")
                     {
                         ["Id"] = renewal.Id, ["Status"] = "Rejected",
                         ["UpdatedAt"] = ChinaTime.Now
-                    }, Guid.Empty, ct);
+                    }, CurrentUserId, ct);
             }
         }
     }
@@ -881,7 +885,7 @@ if (chargeType == "OneTime")
                                 IsActive = seg.IsActive,
                                 EffectiveDate = seg.EffectiveDate,
                                 ExpiryDate = seg.ExpiryDate,
-                                CreatedBy = Guid.Empty,
+                                CreatedBy = CurrentUserId,
                                 Now = ChinaTime.Now
                             }, tx);
                     }
@@ -959,7 +963,7 @@ if (chargeType == "OneTime")
                     OldValue = (decimal?)null,
                     NewValue = (decimal?)null,
                     EffectiveDate = (string?)null,
-                    OperatorId = Guid.Empty,
+                    OperatorId = CurrentUserId,
                     OperatorName = ""
                 });
         }
@@ -968,7 +972,7 @@ if (chargeType == "OneTime")
         await _uow.CommitAsync(ct);
 
         // 写入 Contracts_Audit 全量快照（修改后的合同数据，失败不阻断）
-        try { await WriteAuditSnapshotAsync("Contracts", request.ContractId, "Update", Guid.Empty, ct); } catch { }
+        try { await WriteAuditSnapshotAsync("Contracts", request.ContractId, "Update", CurrentUserId, ct); } catch { }
     }
 
     /// <summary>构建合同修改变更详情文本</summary>
@@ -1014,7 +1018,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	                await conn.ExecuteAsync(
 	                    _sql.Get("Lease.Insert.ContractTenant.Default"),
 	                    new { ContractId = bizData.ContractId, TenantId = tenantId,
-	                        IsPrimary = false, CreatedBy = Guid.Empty,
+	                        IsPrimary = false, CreatedBy = CurrentUserId,
 	                        CreatedAt = ChinaTime.Now }, tx);
 	            }
 	            else if (bizData.ChangeType == "TENANT_REMOVE")
@@ -1045,7 +1049,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	            var changeTypeLabel = bizData.ChangeType == "TENANT_ADD" ? "添加租客" : "移除租客";
 	            try { await _timelineService.InsertChangeHistoryAsync(bizData.ContractId, "TENANT_CHANGE",
 	                changeTypeLabel, $"租客 {tenantDisplay}（{bizData.ChangeType}）",
-	                null, null, null, Guid.Empty); } catch { }
+	                null, null, null, CurrentUserId); } catch { }
 
 	            await conn.ExecuteAsync(
 	                _sql.Get("Approval.Update.ApprovalBizData.MarkProcessed"),
@@ -1246,7 +1250,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
                 DNId = (Guid?)null,
                 ParentId = (Guid?)null,
                 Summary = summary,
-                CBy = Guid.Empty
+                CBy = CurrentUserId
             }, tx);
     }
 
@@ -1267,7 +1271,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
             foreach (var prop in ((IDictionary<string, object>)entity))
                 dict[prop.Key] = prop.Value;
             await _auditWriter.LogChangesAsync(tableName, entityId.ToString(), action, dict,
-                changedBy ?? Guid.Empty, ct);
+                changedBy ?? CurrentUserId, ct);
         }
         catch { /* 审计写入失败不影响主流程 */ }
     }

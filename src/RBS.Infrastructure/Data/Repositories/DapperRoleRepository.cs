@@ -48,6 +48,7 @@ public class DapperRoleRepository : IRoleRepository
     }
     public async Task UpdateAsync(Role entity, CancellationToken ct = default)
     {
+        _auditService.PopulateUpdatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Authorization.Update.Role.Default"), entity);
         await _auditService.WriteUpdateAsync("Roles", entity, ct);

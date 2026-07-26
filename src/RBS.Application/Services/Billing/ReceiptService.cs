@@ -14,13 +14,17 @@ public class ReceiptService : IReceiptService
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
     private readonly IAuditLogWriter _auditWriter;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IClientInfoService _clientInfo;
 
-    public ReceiptService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter)
+    public ReceiptService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, ICurrentUserService currentUser, IClientInfoService clientInfo)
     {
         _uow = uow;
         _db = db;
         _sql = sql;
         _auditWriter = auditWriter;
+        _currentUser = currentUser;
+        _clientInfo = clientInfo;
     }
 
     public async Task<List<ReceiptDto>> GetAllAsync(Guid? companyId, string? status, Guid? contractId, CancellationToken ct)
@@ -155,8 +159,10 @@ public class ReceiptService : IReceiptService
                         ["CreatedAt"] = receiptEntity.CreatedAt,
                         ["UpdatedBy"] = receiptEntity.UpdatedBy,
                         ["UpdatedAt"] = receiptEntity.UpdatedAt,
+                        ["UpdatedIp"] = _clientInfo.GetClientIp(),
+                        ["UpdatedHostname"] = _clientInfo.GetClientHostname(),
                     };
-                    await _auditWriter.LogChangesAsync("Receipts", id.ToString(), "Update", dict, Guid.Empty, ct);
+                    await _auditWriter.LogChangesAsync("Receipts", id.ToString(), "Update", dict, _currentUser.UserId, ct);
                 }
             }
             catch { /* 审计写入失败不影响主操作 */ }

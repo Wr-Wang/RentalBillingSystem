@@ -53,6 +53,7 @@ public class DapperCompanyRepository : ICompanyRepository
 
     public async Task UpdateAsync(Company entity, CancellationToken ct = default)
     {
+        _auditService.PopulateUpdatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Default"), entity);
         await _auditService.WriteUpdateAsync("Companies", entity, ct);

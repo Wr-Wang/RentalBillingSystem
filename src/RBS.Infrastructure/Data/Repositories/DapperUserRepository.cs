@@ -52,6 +52,7 @@ public class DapperUserRepository : IUserRepository
     }
     public async Task UpdateAsync(User entity, CancellationToken ct = default)
     {
+        _auditService.PopulateUpdatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Identity.Update.User.Default"), entity);
         await _auditService.WriteUpdateAsync("Users", entity, ct);

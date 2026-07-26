@@ -91,8 +91,11 @@ public class DapperRepository<T> : IRepository<T> where T : AuditableEntity
     {
         var oldEntity = await GetByIdAsync(GetEntityGuidId(entity), ct);
 
+        // 在 UPDATE 前填充 UpdatedBy/At/Ip/Hostname，使业务表也能记录操作人
+        _auditService.PopulateUpdatedFields(entity);
+
         using var conn = _db.CreateConnection(); conn.Open();
-        var exclude = new HashSet<string> { "Id", "CreatedBy", "CreatedAt", "CreatedIp", "CreatedHostname", "UpdatedBy", "UpdatedAt", "UpdatedIp", "UpdatedHostname" };
+        var exclude = new HashSet<string> { "Id", "CreatedBy", "CreatedAt", "CreatedIp", "CreatedHostname" };
         var sets = string.Join(",",
             typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
                 .Where(p => p.CanRead && p.CanWrite && !exclude.Contains(p.Name) && !IsNavProp(p))

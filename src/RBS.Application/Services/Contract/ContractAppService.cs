@@ -31,6 +31,7 @@ public class ContractAppService : IContractService
     private readonly IApprovalService _approvalService;
     private readonly ILogger<ContractAppService> _logger;
     private readonly IAuditLogWriter _auditWriter;
+    private readonly ICurrentUserService _currentUser;
 
     /// <summary>
     /// 构造函数
@@ -40,11 +41,12 @@ public class ContractAppService : IContractService
         IReceivableGenerationService receivableGen,
         IApprovalService approvalService,
         ILogger<ContractAppService> logger,
-        IAuditLogWriter auditWriter)
+        IAuditLogWriter auditWriter,
+        ICurrentUserService currentUser)
     {
         _uow = uow; _db = db; _sql = sql; _contractDomain = contractDomain;
         _receivableGen = receivableGen; _approvalService = approvalService;
-        _logger = logger; _auditWriter = auditWriter;
+        _logger = logger; _auditWriter = auditWriter; _currentUser = currentUser;
     }
 
     /// <summary>
@@ -234,7 +236,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
                 ["Id"] = contract.Id, ["ContractNo"] = contract.ContractNo,
                 ["RoomId"] = contract.RoomId, ["CompanyId"] = contract.CompanyId,
                 ["Status"] = contract.Status, ["CreatedAt"] = contract.CreatedAt
-            }, Guid.Empty, ct);
+            }, _currentUser.UserId, ct);
 
         return (await GetByIdAsync(contract.Id, ct))!;
     }

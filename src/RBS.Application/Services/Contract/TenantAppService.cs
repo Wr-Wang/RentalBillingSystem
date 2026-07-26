@@ -6,6 +6,7 @@ using RBS.Core.Common;
 using RBS.Core.Interfaces.Repositories;
 using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.Contract;
@@ -15,12 +16,14 @@ public class TenantAppService : ITenantAppService
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
+    private readonly ICurrentUserService _currentUser;
 
-    public TenantAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
+    public TenantAppService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser)
     {
         _uow = uow;
         _db = db;
         _sql = sql;
+        _currentUser = currentUser;
     }
 
     public async Task<PagedResult<TenantDto>> GetPagedAsync(Guid companyId, string? keyword, int page, int pageSize, CancellationToken ct)
@@ -87,7 +90,7 @@ public class TenantAppService : ITenantAppService
         tenant.SetEmergency(request.EmergencyContact, request.EmergencyPhone);
         tenant.SetAddress(request.Address);
         tenant.SetRemark(request.Remark);
-        tenant.SetCreated(Guid.Empty, ChinaTime.Now, null, null);
+        tenant.SetCreated(_currentUser.UserId, ChinaTime.Now, null, null);
 
         await _uow.Tenants.AddAsync(tenant, ct);
         await _uow.CommitAsync(ct);

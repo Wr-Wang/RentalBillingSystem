@@ -49,7 +49,7 @@
   <update id="Identity.Update.User.Default">
     <![CDATA[UPDATE Users SET DisplayName=@DisplayName,PasswordHash=@PasswordHash,Phone=@Phone,Email=@Email,
       IsActive=@IsActive,CompanyId=@CompanyId,IsSuperAdmin=@IsSuperAdmin,
-      UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
+      UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
   </update>
   <update id="Identity.Update.User.DefaultCompanyId">
     <![CDATA[UPDATE Users SET DefaultCompanyId = @CompanyId WHERE Id = @Id]]>
@@ -101,7 +101,7 @@
     <![CDATA[INSERT INTO Roles (Id,Name,Code,Description,IsActive,CreatedBy,CreatedAt) VALUES(@Id,@Name,@Code,@Description,@IsActive,@CreatedBy,@CreatedAt)]]>
   </insert>
   <update id="Authorization.Update.Role.Default">
-    <![CDATA[UPDATE Roles SET Name=@Name,Code=@Code,Description=@Description,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
+    <![CDATA[UPDATE Roles SET Name=@Name,Code=@Code,Description=@Description,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
   </update>
   <delete id="Authorization.Delete.Role.ById">
     <![CDATA[DELETE FROM Roles WHERE Id=@Id]]>
@@ -133,7 +133,7 @@
       VALUES(@Id,@Name,@PermissionCode,@Path,@Icon,@ParentId,@SortOrder,@IsActive,@Scope,@CreatedBy,@CreatedAt)]]>
   </insert>
   <update id="Authorization.Update.Menu.Default">
-    <![CDATA[UPDATE Menus SET Name=@Name,Path=@Path,Icon=@Icon,SortOrder=@SortOrder,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
+    <![CDATA[UPDATE Menus SET Name=@Name,Path=@Path,Icon=@Icon,SortOrder=@SortOrder,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
   </update>
   <delete id="Authorization.Delete.Menu.ById">
     <![CDATA[DELETE FROM Menus WHERE Id=@Id]]>
@@ -162,7 +162,7 @@
       VALUES(@Id,@Name,@Code,@ContactPerson,@Phone,@Address,@IdType,@IdNumber,@BankName,@BankAccount,@BankAccountName,@SettlementCycle,@SettlementDay,@CommissionRate,@Remark,@IsActive,@CreatedBy,@CreatedAt)]]>
   </insert>
   <update id="Organization.Update.Company.Default">
-    <![CDATA[UPDATE Companies SET Name=@Name,Code=@Code,ContactPerson=@ContactPerson,Phone=@Phone,Address=@Address,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
+    <![CDATA[UPDATE Companies SET Name=@Name,Code=@Code,ContactPerson=@ContactPerson,Phone=@Phone,Address=@Address,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
   </update>
   <delete id="Organization.Delete.Company.ById">
     <![CDATA[DELETE FROM Companies WHERE Id=@Id]]>
@@ -208,7 +208,7 @@
       FROM ApprovalRequests WHERE RequestNo LIKE @Prefix + '%']]>
   </select>
   <update id="Approval.Update.Request.Default">
-    <![CDATA[UPDATE ApprovalRequests SET Status=@Status,CurrentLevel=@CurrentLevel,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt WHERE Id=@Id]]>
+    <![CDATA[UPDATE ApprovalRequests SET Status=@Status,CurrentLevel=@CurrentLevel,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
   </update>
   <delete id="Approval.Delete.Request.ById">
     <![CDATA[DELETE FROM ApprovalRequests WHERE Id=@Id]]>
@@ -1148,19 +1148,19 @@
 
   <update id="Approval.Update.Request.ToApproved">
     <![CDATA[UPDATE ApprovalRequests SET Status = 'Approved',
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+      UpdatedBy = @p0, UpdatedAt = @p1, UpdatedIp = @p3, UpdatedHostname = @p4 WHERE Id = @p2 AND Status = 'Pending']]>
   </update>
   <update id="Approval.Update.Request.AdvanceLevel">
     <![CDATA[UPDATE ApprovalRequests SET CurrentLevel = CurrentLevel + 1,
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+      UpdatedBy = @p0, UpdatedAt = @p1, UpdatedIp = @p3, UpdatedHostname = @p4 WHERE Id = @p2 AND Status = 'Pending']]>
   </update>
   <update id="Approval.Update.Request.ToRejected">
     <![CDATA[UPDATE ApprovalRequests SET Status = 'Rejected',
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+      UpdatedBy = @p0, UpdatedAt = @p1, UpdatedIp = @p3, UpdatedHostname = @p4 WHERE Id = @p2 AND Status = 'Pending']]>
   </update>
   <update id="Approval.Update.Request.ToCancelled">
     <![CDATA[UPDATE ApprovalRequests SET Status = 'Cancelled',
-      UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'Pending']]>
+      UpdatedBy = @p0, UpdatedAt = @p1, UpdatedIp = @p3, UpdatedHostname = @p4 WHERE Id = @p2 AND Status = 'Pending']]>
   </update>
   <update id="Approval.Update.ImportBatch.Cancelled">
     <![CDATA[UPDATE ImportBatches SET Status = 'Cancelled',

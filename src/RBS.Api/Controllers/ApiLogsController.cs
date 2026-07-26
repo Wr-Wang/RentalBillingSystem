@@ -136,17 +136,26 @@ public class ApiLogsController : ControllerBase
         if (auth != null) return auth;
 
         using var conn = _db.CreateConnection(); conn.Open();
-        var where = new List<string>();
-        var parms = new DynamicParameters();
-        if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value.AddHours(-8)); }
-        if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value.AddHours(-8)); }
-        var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
 
-        // 批次删除，每次最多 1000 条，避免锁表
-        await conn.ExecuteAsync($@"
-            DELETE TOP(1000) FROM ApiLogs {w};
-            WHILE @@ROWCOUNT > 0
-                DELETE TOP(1000) FROM ApiLogs {w};", parms);
+        // 无日期条件 = 清空全部 → TRUNCATE 秒级完成（比 DELETE 逐批快百倍）
+        if (!startDate.HasValue && !endDate.HasValue)
+        {
+            await conn.ExecuteAsync("TRUNCATE TABLE ApiLogs");
+        }
+        else
+        {
+            var where = new List<string>();
+            var parms = new DynamicParameters();
+            if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value.AddHours(-8)); }
+            if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value.AddHours(-8)); }
+            var w = "WHERE " + string.Join(" AND ", where);
+
+            // 批次删除，避免锁表
+            await conn.ExecuteAsync($@"
+                DELETE TOP(1000) FROM ApiLogs {w};
+                WHILE @@ROWCOUNT > 0
+                    DELETE TOP(1000) FROM ApiLogs {w};", parms);
+        }
         return NoContent();
     }
 }

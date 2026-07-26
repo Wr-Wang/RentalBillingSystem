@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RBS.Core.Entities.Base;
 using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
+using RBS.Core.Interfaces.Services;
 
 namespace RBS.Application.Services.Organization;
 
@@ -19,10 +20,11 @@ public class CompanyService : ICompanyService
     private readonly ISqlLoader _sql;
     private readonly IUnitOfWork _uow;
     private readonly IServiceProvider _sp;
+    private readonly ICurrentUserService _currentUser;
 
-    public CompanyService(IDbConnectionFactory db, ISqlLoader sql, IUnitOfWork uow, IServiceProvider sp)
+    public CompanyService(IDbConnectionFactory db, ISqlLoader sql, IUnitOfWork uow, IServiceProvider sp, ICurrentUserService currentUser)
     {
-        _db = db; _sql = sql; _uow = uow; _sp = sp;
+        _db = db; _sql = sql; _uow = uow; _sp = sp; _currentUser = currentUser;
     }
 
     public async Task<PagedResult<CompanyDto>> GetPagedAsync(CompanyQuery query, CancellationToken ct = default)
@@ -74,7 +76,7 @@ public class CompanyService : ICompanyService
     public async Task<CompanyDto> CreateAsync(CreateCompanyRequest request, CancellationToken ct = default)
     {
         var company = new Company(request.Name);
-        company.SetCreated(Guid.Empty, ChinaTime.Now, null, null);
+        company.SetCreated(_currentUser.UserId, ChinaTime.Now, null, null);
         ApplyCompanyFields(company, request);
         await _uow.Companies.AddAsync(company, ct);
 
@@ -109,8 +111,7 @@ public class CompanyService : ICompanyService
             else company.Deactivate();
         }
 
-        // 设置更新审计信息
-        company.SetUpdated(Guid.Empty, ChinaTime.Now, null, null);
+        // UpdatedBy/UpdatedIp/UpdatedHostname 由审计装饰器（RepositoryAuditService）从 JWT/HTTP 自动捕获
         await _uow.Companies.UpdateAsync(company, ct);
     }
 

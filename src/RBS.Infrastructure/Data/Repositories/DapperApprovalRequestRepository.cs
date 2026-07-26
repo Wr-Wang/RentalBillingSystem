@@ -52,6 +52,7 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
 
     public async Task UpdateAsync(ApprovalRequest entity, CancellationToken ct = default)
     {
+        _auditService.PopulateUpdatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Approval.Update.Request.Default"), entity);
         await _auditService.WriteUpdateAsync("ApprovalRequests", entity, ct);

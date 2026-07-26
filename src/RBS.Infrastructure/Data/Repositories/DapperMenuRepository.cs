@@ -48,6 +48,7 @@ public class DapperMenuRepository : IMenuRepository
     }
     public async Task UpdateAsync(Menu entity, CancellationToken ct = default)
     {
+        _auditService.PopulateUpdatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Authorization.Update.Menu.Default"), entity);
         await _auditService.WriteUpdateAsync("Menus", entity, ct);

@@ -232,6 +232,9 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
             {
                 foreach (var (id, entry) in entities)
                 {
+                    // 在提交前填充 UpdatedBy/At/Ip/Hostname，确保业务表和审计表都记录操作人
+                    _auditService.PopulateUpdatedFields(entry.Entity);
+
                     var now = EntityToDict(entry.Entity);
                     var changes = DiffDict(entry.Snapshot, now);
                     if (changes.Count == 0) continue;

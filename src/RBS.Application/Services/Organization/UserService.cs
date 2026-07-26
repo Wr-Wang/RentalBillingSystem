@@ -18,10 +18,11 @@ public class UserService : IUserService
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditLogWriter _auditWriter;
+    private readonly IClientInfoService _clientInfo;
 
-    public UserService(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUserService, IUnitOfWork uow, IAuditLogWriter auditWriter)
+    public UserService(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUserService, IUnitOfWork uow, IAuditLogWriter auditWriter, IClientInfoService clientInfo)
     {
-        _db = db; _sql = sql; _currentUserService = currentUserService; _uow = uow; _auditWriter = auditWriter;
+        _db = db; _sql = sql; _currentUserService = currentUserService; _uow = uow; _auditWriter = auditWriter; _clientInfo = clientInfo;
     }
 
     public async Task<List<UserDto>> GetListAsync(Guid? companyId = null, CancellationToken ct = default)
@@ -99,12 +100,15 @@ public class UserService : IUserService
         if (request.IsSuperAdmin.HasValue && request.IsSuperAdmin.Value != user.IsSuperAdmin) { if (request.IsSuperAdmin.Value) user.GrantSuperAdmin(); else user.RevokeSuperAdmin(); }
 
         using var tx = conn.BeginTransaction();
+        var ip = _clientInfo.GetClientIp();
+        var hostname = _clientInfo.GetClientHostname();
         try
         {
             await conn.ExecuteAsync(_sql.Get("Identity.Update.User.Default"),
                 new { user.DisplayName, user.PasswordHash, user.Phone, user.Email,
                     user.IsActive, user.CompanyId, user.IsSuperAdmin,
-                    UpdatedBy = _currentUserService.UserId, UpdatedAt = ChinaTime.Now, Id = id }, tx);
+                    UpdatedBy = _currentUserService.UserId, UpdatedAt = ChinaTime.Now,
+                    UpdatedIp = ip, UpdatedHostname = hostname, Id = id }, tx);
 
             if (request.RoleIds != null)
             {
@@ -138,6 +142,8 @@ public class UserService : IUserService
                 ["CreatedHostname"] = user.CreatedHostname,
                 ["UpdatedBy"] = _currentUserService.UserId,
                 ["UpdatedAt"] = ChinaTime.Now,
+                ["UpdatedIp"] = ip,
+                ["UpdatedHostname"] = hostname,
             };
             await _auditWriter.LogChangesAsync("Users", user.Id.ToString(), "Update", userDict, _currentUserService.UserId, ct);
         }

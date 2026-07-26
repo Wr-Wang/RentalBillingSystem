@@ -31,6 +31,7 @@ public class ApprovalService : IApprovalService
     private readonly IApprovalNumberGenerator _approvalNoGenerator;
     private readonly IApprovalBizDetailBuilder _bizDetailBuilder;
     private readonly IAuditLogWriter _auditWriter;
+    private readonly IClientInfoService _clientInfo;
 
     /// <summary>
     /// 构造函数
@@ -52,7 +53,8 @@ public class ApprovalService : IApprovalService
         IApprovalDomainService approvalDomain,
         IApprovalNumberGenerator approvalNoGenerator,
         IApprovalBizDetailBuilder bizDetailBuilder,
-        IAuditLogWriter auditWriter)
+        IAuditLogWriter auditWriter,
+        IClientInfoService clientInfo)
     {
         _uow = uow;
         _tenantService = tenantService;
@@ -64,6 +66,7 @@ public class ApprovalService : IApprovalService
         _approvalNoGenerator = approvalNoGenerator;
         _bizDetailBuilder = bizDetailBuilder;
         _auditWriter = auditWriter;
+        _clientInfo = clientInfo;
     }
 
     // =====================================================================
@@ -169,12 +172,16 @@ public class ApprovalService : IApprovalService
             await tx.CommitAsync(ct);
 
             // ★ 审计：记录重提交变更
+            var ip = _clientInfo.GetClientIp();
+            var hostname = _clientInfo.GetClientHostname();
             var entityDict = AuditDict(entity, new Dictionary<string, object?>
             {
                 ["Status"] = "Pending",
                 ["CurrentLevel"] = 1,
                 ["UpdatedBy"] = userId,
-                ["UpdatedAt"] = now
+                ["UpdatedAt"] = now,
+                ["UpdatedIp"] = ip,
+                ["UpdatedHostname"] = hostname
             });
             await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
             await _auditWriter.LogChangesAsync("ApprovalRecords", recordId.ToString(), "Create",
@@ -241,8 +248,10 @@ public class ApprovalService : IApprovalService
                 updateSql = _sql.Get("Approval.Update.Request.AdvanceLevel");
             }
 
+            var ip = _clientInfo.GetClientIp();
+            var hostname = _clientInfo.GetClientHostname();
             var rows = await _uow.ExecuteSqlRawAsync(updateSql,
-                new object[] { userId, now, id }, ct);
+                new object[] { userId, now, id, ip, hostname }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
@@ -263,7 +272,9 @@ public class ApprovalService : IApprovalService
                 ["Status"] = newStatus,
                 ["CurrentLevel"] = newLevel,
                 ["UpdatedBy"] = userId,
-                ["UpdatedAt"] = now
+                ["UpdatedAt"] = now,
+                ["UpdatedIp"] = ip,
+                ["UpdatedHostname"] = hostname
             });
             await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
             await _auditWriter.LogChangesAsync("ApprovalRecords", newRecord.Id.ToString(), "Create",
@@ -328,9 +339,11 @@ public class ApprovalService : IApprovalService
         using var tx = await _uow.BeginTransactionAsync(ct);
         try
         {
+            var ip = _clientInfo.GetClientIp();
+            var hostname = _clientInfo.GetClientHostname();
             var rows = await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Approval.Update.Request.ToRejected"),
-                new object[] { userId, now, id }, ct);
+                new object[] { userId, now, id, ip, hostname }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
@@ -348,7 +361,9 @@ public class ApprovalService : IApprovalService
             {
                 ["Status"] = "Rejected",
                 ["UpdatedBy"] = userId,
-                ["UpdatedAt"] = now
+                ["UpdatedAt"] = now,
+                ["UpdatedIp"] = ip,
+                ["UpdatedHostname"] = hostname
             });
             await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
             await _auditWriter.LogChangesAsync("ApprovalRecords", newRecord.Id.ToString(), "Create",
@@ -403,9 +418,11 @@ public class ApprovalService : IApprovalService
         try
         {
             // 更新审批状态
+            var ip = _clientInfo.GetClientIp();
+            var hostname = _clientInfo.GetClientHostname();
             var rows = await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Approval.Update.Request.ToCancelled"),
-                new object[] { userId, now, id }, ct);
+                new object[] { userId, now, id, ip, hostname }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
@@ -431,7 +448,9 @@ public class ApprovalService : IApprovalService
             {
                 ["Status"] = "Cancelled",
                 ["UpdatedBy"] = userId,
-                ["UpdatedAt"] = now
+                ["UpdatedAt"] = now,
+                ["UpdatedIp"] = ip,
+                ["UpdatedHostname"] = hostname
             });
             await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
             await _auditWriter.LogChangesAsync("ApprovalRecords", recordId.ToString(), "Create",
