@@ -23,7 +23,7 @@
               style="width: 140px;" @change="fetchData" />
           </el-form-item>
           <el-form-item label="层级">
-            <el-select v-model="filter.subjectLevel" placeholder="全部" clearable style="width: 95px;">
+            <el-select v-model="filter.subjectLevel" placeholder="全部" clearable filterable style="width: 95px;">
               <el-option label="全部" :value="null" />
               <el-option label="1级" :value="1" />
               <el-option label="2级" :value="2" />
@@ -32,7 +32,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="来源">
-            <el-select v-model="filter.sourceType" placeholder="全部" clearable style="width: 105px;">
+            <el-select v-model="filter.sourceType" placeholder="全部" clearable filterable style="width: 105px;">
               <el-option label="全部" value="" />
               <el-option label="收款" value="Receipt" />
               <el-option label="过账" value="JournalPost" />

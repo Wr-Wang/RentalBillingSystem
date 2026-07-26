@@ -1,0 +1,146 @@
+{
+  "companies": {
+    "displayName": "公司",
+    "keyFields": ["Name", "Code", "ContactPerson", "Phone"]
+  },
+  "contracts": {
+    "displayName": "合同",
+    "keyFields": ["ContractNo", "TenantName"]
+  },
+  "contractfeeconfigs": {
+    "displayName": "费用配置",
+    "keyFields": ["FeeName", "Amount"]
+  },
+  "tenants": {
+    "displayName": "租客",
+    "keyFields": ["Name", "Phone"]
+  },
+  "users": {
+    "displayName": "用户",
+    "keyFields": ["DisplayName", "Username"]
+  },
+  "roles": {
+    "displayName": "角色",
+    "keyFields": ["Name", "Code"]
+  },
+  "menus": {
+    "displayName": "菜单",
+    "keyFields": ["Name", "Path"]
+  },
+  "approvaltypes": {
+    "displayName": "审批类型",
+    "keyFields": ["Name", "Code"]
+  },
+  "approvallevelconfigs": {
+    "displayName": "审批级别",
+    "keyFields": ["ApprovalTypeId", "LevelNo"]
+  },
+  "approvalrequests": {
+    "displayName": "审批申请",
+    "keyFields": ["RequestNo", "Title"]
+  },
+  "approvalrecords": {
+    "displayName": "审批记录",
+    "keyFields": ["Action", "ApproverId"]
+  },
+  "housingunits": {
+    "displayName": "房源",
+    "keyFields": ["FullCode", "BuildingName", "RoomName"]
+  },
+  "roomtypes": {
+    "displayName": "房型",
+    "keyFields": ["Name"]
+  },
+  "floorlevelbands": {
+    "displayName": "楼层级别",
+    "keyFields": ["Name"]
+  },
+  "roompricingstandards": {
+    "displayName": "定价标准",
+    "keyFields": ["RoomType", "StandardRent"]
+  },
+  "renewalrequests": {
+    "displayName": "续签请求",
+    "keyFields": ["OldContractNo", "NewRent"]
+  },
+  "feecodes": {
+    "displayName": "收费项目",
+    "keyFields": ["Name", "Code"]
+  },
+  "feecodetemplates": {
+    "displayName": "费用模板",
+    "keyFields": ["Name"]
+  },
+  "taxrateconfigs": {
+    "displayName": "税率配置",
+    "keyFields": ["TaxName", "Rate"]
+  },
+  "journals": {
+    "displayName": "日记账",
+    "keyFields": ["Period", "Amount"]
+  },
+  "debitnotes": {
+    "displayName": "账单",
+    "keyFields": ["BillNo", "ContractNo", "PeriodYear", "PeriodMonth"]
+  },
+  "paymentchannels": {
+    "displayName": "支付通道",
+    "keyFields": ["Name"]
+  },
+  "receipts": {
+    "displayName": "收款",
+    "keyFields": ["ReceiptNo", "Amount"]
+  },
+  "depositlogs": {
+    "displayName": "押金日志",
+    "keyFields": ["ContractId", "Amount"]
+  },
+  "collectionstages": {
+    "displayName": "催缴阶段",
+    "keyFields": ["Name", "DayOffset"]
+  },
+  "collectionrecords": {
+    "displayName": "催缴记录",
+    "keyFields": ["ContactPerson", "ContactResult"]
+  },
+  "accountingsubjects": {
+    "displayName": "会计科目",
+    "keyFields": ["Name", "Code"]
+  },
+  "bankstatements": {
+    "displayName": "银行流水",
+    "keyFields": ["TransactionNo", "Amount"]
+  },
+  "jobschedules": {
+    "displayName": "调度任务",
+    "keyFields": ["JobName", "CompanyId"]
+  },
+  "jobtemplates": {
+    "displayName": "任务模板",
+    "keyFields": ["Name"]
+  },
+  "jobscheduleexecutions": {
+    "displayName": "调度执行",
+    "keyFields": ["JobScheduleId", "TargetDate"]
+  },
+  "holidaycalendars": {
+    "displayName": "节假日",
+    "keyFields": ["HolidayName", "HolidayDate"]
+  },
+  "interestconfigs": {
+    "displayName": "利息配置",
+    "keyFields": ["Name", "Rate"]
+  },
+  "importbatches": {
+    "displayName": "导入批次",
+    "keyFields": ["BatchNo", "Status"]
+  },
+  "importbatchitems": {
+    "displayName": "导入明细",
+    "keyFields": ["RowIndex", "Status"]
+  },
+  "userroles": {
+    "displayName": "用户角色",
+    "keyFields": ["UserId", "RoleId"]
+  }
+}

@@ -74,9 +74,9 @@ public class CompanyService : ICompanyService
     public async Task<CompanyDto> CreateAsync(CreateCompanyRequest request, CancellationToken ct = default)
     {
         var company = new Company(request.Name);
+        company.SetCreated(Guid.Empty, ChinaTime.Now, null, null);
         ApplyCompanyFields(company, request);
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(_sql.Get("Organization.Insert.Company.Default"), company);
+        await _uow.Companies.AddAsync(company, ct);
 
         // 发布公司创建事件 → 自动注册 JobSchedule
         try
@@ -91,9 +91,7 @@ public class CompanyService : ICompanyService
 
     public async Task UpdateAsync(Guid id, CreateCompanyRequest request, CancellationToken ct = default)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
-        var company = await conn.QuerySingleOrDefaultAsync<Company>(
-            _sql.Get("Organization.Select.Company.ById"), new { Id = id })
+        var company = await _uow.Companies.GetByIdAsync(id, ct)
             ?? throw new KeyNotFoundException("公司不存在");
 
         company.Rename(request.Name);
@@ -111,13 +109,17 @@ public class CompanyService : ICompanyService
             else company.Deactivate();
         }
 
-        await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Default"), company);
+        // 设置更新审计信息
+        company.SetUpdated(Guid.Empty, ChinaTime.Now, null, null);
+        await _uow.Companies.UpdateAsync(company, ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(_sql.Get("Organization.Update.Company.Deactivate"), new { Id = id });
+        var company = await _uow.Companies.GetByIdAsync(id, ct)
+            ?? throw new KeyNotFoundException("公司不存在");
+        company.Deactivate();
+        await _uow.Companies.UpdateAsync(company, ct);
     }
 
     public async Task<CompanyStatsDto?> GetStatsAsync(Guid id, CancellationToken ct = default)

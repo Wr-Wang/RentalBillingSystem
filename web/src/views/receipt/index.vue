@@ -47,7 +47,7 @@
         <el-card shadow="never" class="search-bar">
           <el-form :model="filter" inline>
             <el-input v-model="filter.keyword" placeholder="收据号/参考号" clearable style="width:160px;" @clear="fetchReceipts" @keyup.enter="fetchReceipts" />
-            <el-select v-model="filter.status" placeholder="状态" clearable style="width:110px;" @change="fetchReceipts">
+            <el-select v-model="filter.status" placeholder="状态" clearable filterable style="width:110px;" @change="fetchReceipts">
               <el-option label="全部" value="All" />
               <el-option label="待确认" value="Pending" />
               <el-option label="已确认" value="Confirmed" />

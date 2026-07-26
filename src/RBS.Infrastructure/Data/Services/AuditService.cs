@@ -3,6 +3,7 @@ using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Organization;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Infrastructure.Data.Configs;
 
 namespace RBS.Infrastructure.Data.Services;
 
@@ -10,40 +11,42 @@ namespace RBS.Infrastructure.Data.Services;
 /// 审计日志查询服务 — 使用 Dapper 查询 {TableName}_Audit 表
 /// </summary>
 /// <remarks>
-/// 提供三种查询能力：
+/// v2 增强：
 /// <list type="bullet">
-///   <item><description>GetHistoryAsync — 分页查询审计历史（支持按记录 ID/日期范围筛选）</description></item>
-///   <item><description>CompareAsync — 对比两个版本的字段差异</description></item>
-///   <item><description>GetStatsAsync — 统计今日/本周/本月审计记录量和表数量</description></item>
+///   <item><description>通过 AuditFieldConfigLoader 获取实体中文名和关键字段配置</description></item>
+///   <item><description>展示时分离"关键信息区"和"变更数据区"</description></item>
+///   <item><description>读取 AuditChangedFields 列，精准定位变更字段</description></item>
 /// </list>
-/// 表名使用 SanitizeTableName 消毒，防止 SQL 注入。
 /// </remarks>
 public class AuditService : IAuditService
 {
     private readonly IDbConnectionFactory _db;
+    private readonly AuditFieldConfigLoader _configLoader;
 
     /// <summary>
     /// 初始化审计服务
     /// </summary>
-    /// <param name="db">数据库连接工厂</param>
-    public AuditService(IDbConnectionFactory db) => _db = db;
+    public AuditService(IDbConnectionFactory db, AuditFieldConfigLoader configLoader)
+    {
+        _db = db;
+        _configLoader = configLoader;
+    }
 
     /// <summary>
     /// 分页查询审计日志历史
     /// </summary>
-    /// <remarks>
-    /// SQL 策略：
-    /// <list type="bullet">
-    ///   <item><description>动态拼接 WHERE 条件（记录 ID、开始日期、结束日期均为可选）</description></item>
-    ///   <item><description>先 COUNT 查总数，再 OFFSET-FETCH 分页</description></item>
-    ///   <item><description>审计元字段（AuditAction/AuditVersionNo/AuditChangedAt/AuditChangedBy）从 Changes 字典中排除</description></item>
-    /// </list>
-    /// </remarks>
-    /// <param name="query">审计查询参数</param>
-    /// <param name="ct">取消令牌</param>
-    /// <returns>分页审计条目</returns>
     public async Task<PagedResult<AuditEntryDto>> GetHistoryAsync(AuditQuery query, CancellationToken ct = default)
     {
+        // 配置查找：先精确匹配表名，再尝试单数化匹配
+        var config = _configLoader.GetConfig(query.TableName);
+        if (config == null)
+        {
+            // 尝试去掉末尾的 s 匹配单数形式（如 Companies → companies）
+            var singular = query.TableName.EndsWith("s", StringComparison.OrdinalIgnoreCase)
+                ? query.TableName[..^1] : query.TableName;
+            config = _configLoader.GetConfig(singular);
+        }
+
         var tableName = $"{SanitizeTableName(query.TableName)}_Audit";
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
@@ -83,28 +86,64 @@ public class AuditService : IAuditService
         var items = rows.Select(r =>
         {
             var dict = (IDictionary<string, object>)r;
-            var changes = new Dictionary<string, object?>();
-            foreach (var kv in dict)
+
+            var auditAction = dict.ContainsKey("AuditAction") ? dict["AuditAction"]?.ToString() : "Unknown";
+            var changedFieldsStr = dict.ContainsKey("AuditChangedFields") ? dict["AuditChangedFields"]?.ToString() : null;
+
+            // ---- 提取关键字段 ----
+            var keyValues = new Dictionary<string, object?>();
+            if (config != null)
             {
-                if (kv.Key is "AuditAction" or "AuditVersionNo" or "AuditChangedAt" or "AuditChangedBy")
-                    continue;
-                changes[kv.Key] = kv.Value;
+                foreach (var kf in config.KeyFields)
+                {
+                    if (dict.ContainsKey(kf))
+                        keyValues[kf] = dict[kf];
+                }
             }
+            // 如果没有任何关键字段匹配，至少展示 Id
+            if (keyValues.Count == 0 && dict.ContainsKey("Id"))
+            {
+                keyValues["Id"] = dict["Id"];
+            }
+
+            // ---- 解析变更字段 ----
+            var changedFieldNames = new List<string>();
+            var changedValues = new Dictionary<string, object?>();
+
+            if (auditAction == "Update" && !string.IsNullOrEmpty(changedFieldsStr))
+            {
+                changedFieldNames = changedFieldsStr
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToList();
+                foreach (var fn in changedFieldNames)
+                {
+                    if (dict.ContainsKey(fn))
+                        changedValues[fn] = dict[fn];
+                }
+            }
+
             return new AuditEntryDto
             {
-                Id = $"{dict["Id"]}_{dict["AuditVersionNo"]}",
+                Id = dict.ContainsKey("AuditId")
+                    ? $"{dict["Id"]}_{dict["AuditVersionNo"]}"
+                    : $"{dict["Id"]}_{dict["AuditVersionNo"]}",
                 EntityId = dict["Id"]?.ToString() ?? "",
-                AuditAction = dict["AuditAction"]?.ToString() ?? "",
+                AuditAction = auditAction ?? "",
                 AuditVersionNo = dict["AuditVersionNo"] is int v ? v : 1,
                 AuditChangedAt = dict["AuditChangedAt"] is DateTime dt ? dt : DateTime.MinValue,
                 AuditChangedBy = dict["AuditChangedBy"] is Guid g ? g : Guid.Empty,
-                Changes = changes
+                EntityDisplayName = !string.IsNullOrEmpty(config?.DisplayName) ? config.DisplayName : query.TableName,
+                KeyValues = keyValues,
+                ChangedFieldNames = changedFieldNames,
+                ChangedValues = changedValues,
             };
         }).ToList();
 
         return new PagedResult<AuditEntryDto>
         {
-            Items = items, Total = total, Page = query.Page,
+            Items = items,
+            Total = total,
+            Page = query.Page,
             PageSize = query.PageSize,
             TotalPages = total > 0 ? (int)Math.Ceiling(total / (double)query.PageSize) : 0
         };
@@ -113,13 +152,8 @@ public class AuditService : IAuditService
     /// <summary>
     /// 对比指定记录的两个审计版本之间的字段差异
     /// </summary>
-    /// <param name="tableName">业务表名</param>
-    /// <param name="recordId">记录 ID</param>
-    /// <param name="v1">旧版本号</param>
-    /// <param name="v2">新版本号</param>
-    /// <param name="ct">取消令牌</param>
-    /// <returns>字段级别差异列表（每个字段含新旧值和是否变更标记）</returns>
-    public async Task<List<AuditCompareDto>> CompareAsync(string tableName, string recordId, int v1, int v2, CancellationToken ct = default)
+    public async Task<List<AuditCompareDto>> CompareAsync(
+        string tableName, string recordId, int v1, int v2, CancellationToken ct = default)
     {
         var table = $"{SanitizeTableName(tableName)}_Audit";
         using var conn = _db.CreateConnection(); conn.Open();
@@ -136,19 +170,24 @@ public class AuditService : IAuditService
 
         foreach (var key in oldDict.Keys)
         {
-            if (key is "AuditAction" or "AuditVersionNo" or "AuditChangedAt" or "AuditChangedBy")
+            if (key is "AuditId" or "AuditAction" or "AuditVersionNo" or "AuditChangedAt"
+                or "AuditChangedBy" or "AuditChangedHostname" or "AuditChangedFields")
                 continue;
             result.Add(new AuditCompareDto
             {
                 Field = key,
                 OldValue = oldDict[key]?.ToString(),
                 NewValue = newDict.TryGetValue(key, out var nv) ? nv?.ToString() : null,
-                Changed = oldDict[key]?.ToString() != (newDict.TryGetValue(key, out var nv2) ? nv2?.ToString() : null)
+                Changed = oldDict[key]?.ToString() !=
+                          (newDict.TryGetValue(key, out var nv2) ? nv2?.ToString() : null)
             });
         }
         return result;
     }
 
+    /// <summary>
+    /// 审计统计
+    /// </summary>
     public async Task<AuditStatsDto> GetStatsAsync(CancellationToken ct = default)
     {
         var now = RBS.Core.Common.ChinaTime.Now;
@@ -183,6 +222,14 @@ public class AuditService : IAuditService
             MonthCount = (int)monthSum,
             TotalTables = tables.Count
         };
+    }
+
+    /// <summary>
+    /// 获取所有已配置的审计表清单（供前端动态加载下拉列表）
+    /// </summary>
+    public List<AuditTableInfo> GetAuditTables()
+    {
+        return _configLoader.GetAllTables();
     }
 
     private static string SanitizeTableName(string tableName)

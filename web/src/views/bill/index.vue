@@ -25,7 +25,7 @@
         <el-option v-for="c in contracts" :key="c.id" :label="c.contractNo + ' - ' + c.tenantName" :value="c.id" />
       </el-select>
       <el-date-picker v-model="search.period" type="month" placeholder="账期" style="width: 140px;" />
-      <el-select v-model="search.status" placeholder="状态" clearable style="width: 110px;">
+      <el-select v-model="search.status" placeholder="状态" clearable filterable style="width: 110px;">
         <el-option label="待收款" value="Pending" />
         <el-option label="部分已收" value="Partial" />
         <el-option label="已付清" value="Paid" />

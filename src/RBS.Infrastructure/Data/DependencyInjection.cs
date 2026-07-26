@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
@@ -17,6 +18,7 @@ using RBS.Core.Entities.Property;
 using RBS.Core.Entities.Approval;
 using RBS.Core.Entities.SystemConfig;
 using RBS.Infrastructure.Data.TypeHandlers;
+using RBS.Infrastructure.Data.Configs;
 using RBS.Infrastructure.PdfGeneration;
 using RBS.Infrastructure.Scheduling;
 using DapperUnitOfWork = RBS.Infrastructure.Data.UnitOfWork.DapperUnitOfWork;
@@ -107,7 +109,20 @@ public static class DependencyInjection
         // 审计查询服务和日志写入器（独立连接，失败不影响主操作）
         services.AddScoped<RBS.Application.Common.Interfaces.IAuditService, AuditService>();
         services.AddScoped<IAuditLogWriter>(sp =>
-            new AuditLogWriter(connectionString));
+            new AuditLogWriter(connectionString, sp.GetRequiredService<ILogger<AuditLogWriter>>()));
+
+        // ===== 客户端信息服务（用于审计 IP/主机名捕获） =====
+        // 注意：IHttpContextAccessor 由 API 层 Program.cs 注册，此处只需注册 IClientInfoService
+        // 如果 IHttpContextAccessor 不可用（如后台任务），IClientInfoService 返回 null
+
+        // ===== 审计装饰器（统一所有仓储的审计逻辑） =====
+        services.AddScoped<RepositoryAuditService>();
+
+        // ===== 审计字段配置（Singleton — 启动时从 JSON 加载） =====
+        var configJsonPath = Path.Combine(AppContext.BaseDirectory, "Data", "Configs", "audit-field-config.json");
+        if (!File.Exists(configJsonPath))
+            configJsonPath = Path.Combine(Directory.GetCurrentDirectory(), "Data", "Configs", "audit-field-config.json");
+        services.AddSingleton(new AuditFieldConfigLoader(configJsonPath));
 
         // ===== 领域服务（Scoped） =====
         services.AddScoped<IContractDomainService, ContractDomainService>();

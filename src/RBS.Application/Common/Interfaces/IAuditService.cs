@@ -16,4 +16,16 @@ public interface IAuditService
 
     /// <summary>审计统计</summary>
     Task<AuditStatsDto> GetStatsAsync(CancellationToken ct = default);
+
+    /// <summary>获取所有已配置的审计表清单（供前端动态加载）</summary>
+    List<AuditTableInfo> GetAuditTables();
+}
+
+/// <summary>
+/// 审计表信息（用于前端下拉列表）
+/// </summary>
+public class AuditTableInfo
+{
+    public string TableName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
 }

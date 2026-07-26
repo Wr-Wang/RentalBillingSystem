@@ -17,10 +17,11 @@ public class UserService : IUserService
     private readonly ISqlLoader _sql;
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IAuditLogWriter _auditWriter;
 
-    public UserService(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUserService, IUnitOfWork uow)
+    public UserService(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUserService, IUnitOfWork uow, IAuditLogWriter auditWriter)
     {
-        _db = db; _sql = sql; _currentUserService = currentUserService; _uow = uow;
+        _db = db; _sql = sql; _currentUserService = currentUserService; _uow = uow; _auditWriter = auditWriter;
     }
 
     public async Task<List<UserDto>> GetListAsync(Guid? companyId = null, CancellationToken ct = default)
@@ -116,6 +117,31 @@ public class UserService : IUserService
             tx.Commit();
         }
         catch { tx.Rollback(); throw; }
+
+        // 审计：写入 Users_Audit 全量快照（独立连接，失败不阻断）
+        try
+        {
+            var userDict = new Dictionary<string, object?>
+            {
+                ["Id"] = user.Id,
+                ["Username"] = user.Username,
+                ["DisplayName"] = user.DisplayName,
+                ["Phone"] = user.Phone,
+                ["Email"] = user.Email,
+                ["IsActive"] = user.IsActive,
+                ["CompanyId"] = user.CompanyId,
+                ["IsSuperAdmin"] = user.IsSuperAdmin,
+                ["DefaultCompanyId"] = user.DefaultCompanyId,
+                ["CreatedBy"] = user.CreatedBy,
+                ["CreatedAt"] = user.CreatedAt,
+                ["CreatedIp"] = user.CreatedIp,
+                ["CreatedHostname"] = user.CreatedHostname,
+                ["UpdatedBy"] = _currentUserService.UserId,
+                ["UpdatedAt"] = ChinaTime.Now,
+            };
+            await _auditWriter.LogChangesAsync("Users", user.Id.ToString(), "Update", userDict, _currentUserService.UserId, ct);
+        }
+        catch { /* 审计写入失败不影响主操作 */ }
     }
 
     public async Task SetDefaultCompanyAsync(Guid userId, Guid? companyId, CancellationToken ct = default)

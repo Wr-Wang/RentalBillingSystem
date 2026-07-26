@@ -377,6 +377,7 @@ export function getMonitorFailedContracts(id) { return request({ url: `/monitor/
 export function getAuditHistory(tableName, params) { return request({ url: `/audit/${tableName}/history`, method: 'get', params }) }
 export function compareAuditVersions(tableName, recordId, v1, v2) { return request({ url: `/audit/${tableName}/compare`, method: 'get', params: { recordId, v1, v2 } }) }
 export function rollbackAudit(tableName, recordId, versionNo) { return request({ url: `/audit/${tableName}/rollback`, method: 'post', params: { recordId, versionNo } }) }
+export function getAuditTables() { return request({ url: '/audit/tables', method: 'get' }) }
 export function getAuditStats(params) { return request({ url: '/audit/stats', method: 'get', params }) }
 
 // System Logs

@@ -9,7 +9,7 @@
 
     <div class="search-bar" style="flex-shrink:0;">
       <el-input v-model="search.keyword" placeholder="合同号/租客名/房间号" clearable style="width: 220px;" />
-      <el-select v-model="search.status" placeholder="合同状态" clearable style="width: 140px;">
+      <el-select v-model="search.status" placeholder="合同状态" clearable filterable style="width: 140px;">
         <el-option label="草稿" value="Draft" />
         <el-option label="待审批" value="PendingApproval" />
         <el-option label="活跃" value="Active" />

@@ -11,7 +11,7 @@
     <el-card shadow="never" class="search-bar">
       <el-form :inline="true">
         <el-form-item label="级别">
-          <el-select v-model="filter.level" placeholder="全部" clearable style="width:120px" @change="fetchList">
+          <el-select v-model="filter.level" placeholder="全部" clearable filterable style="width:120px" @change="fetchList">
             <el-option label="错误" value="Error" />
             <el-option label="警告" value="Warning" />
             <el-option label="信息" value="Info" />

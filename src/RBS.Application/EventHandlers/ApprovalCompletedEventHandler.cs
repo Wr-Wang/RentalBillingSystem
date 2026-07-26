@@ -11,6 +11,7 @@ using RBS.Core.Entities.Base;
 using RBS.Core.Entities.Contract;
 using RBS.Core.Entities.Billing;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.EventHandlers;
@@ -38,6 +39,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly IServiceProvider _serviceProvider;
     private readonly IBillingDomainService _billingDomain;
     private readonly IContractTimelineService _timelineService;
+    private readonly IAuditLogWriter _auditWriter;
 
     /// <summary>
     /// 构造函数
@@ -65,7 +67,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         IBillingDomainService billingDomain,
         ITerminateJob terminateJob,
         IServiceProvider serviceProvider,
-        IContractTimelineService timelineService)
+        IContractTimelineService timelineService,
+        IAuditLogWriter auditWriter)
     {
         _importService = importService;
         _contractService = contractService;
@@ -79,6 +82,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _terminateJob = terminateJob;
         _serviceProvider = serviceProvider;
             _timelineService = timelineService;
+            _auditWriter = auditWriter;
     }
 
     /// <summary>
@@ -305,11 +309,22 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             if (item.BillingMode == "MeterBased")
             {
                 // 抄表计量：Amount 不变，调 UnitPrice
+                var meterConfigId = Guid.NewGuid();
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Contract.Insert.ContractFeeConfig.MeterBased"),
-                    new { Id = Guid.NewGuid(), ContractId = item.ContractId, FeeCodeId = item.FeeCodeId,
+                    new { Id = meterConfigId, ContractId = item.ContractId, FeeCodeId = item.FeeCodeId,
                         Amount = item.OldAmount, Unit = item.Unit, UnitPrice = item.NewAmount,
                         EffectiveDate = effectiveDate, CreatedBy = userId });
+                // ★ 审计：新建 MeterBased FeeConfig
+                await _auditWriter.LogChangesAsync("ContractFeeConfigs", meterConfigId.ToString(), "Create",
+                    new Dictionary<string, object?>
+                    {
+                        ["Id"] = meterConfigId, ["ContractId"] = item.ContractId,
+                        ["FeeCodeId"] = item.FeeCodeId, ["BillingMode"] = "MeterBased",
+                        ["Amount"] = item.OldAmount, ["Unit"] = item.Unit,
+                        ["UnitPrice"] = item.NewAmount, ["EffectiveDate"] = effectiveDate,
+                        ["IsActive"] = true, ["CreatedBy"] = userId
+                    }, userId, ct);
             }
             else
             {
@@ -319,11 +334,21 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                         item.OldAmount, item.NewAmount, effectiveDate, userId); }
 
                 // 固定金额：调 Amount
+                var fixedConfigId = Guid.NewGuid();
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Lease.Insert.ContractFeeConfig.AfterAdjust"),
-                    new { Id = Guid.NewGuid(), ContractId = item.ContractId, FeeCodeId = item.FeeCodeId,
+                    new { Id = fixedConfigId, ContractId = item.ContractId, FeeCodeId = item.FeeCodeId,
                         BillingMode = "FixedAmount", Amount = item.NewAmount,
                         EffectiveDate = effectiveDate, CreatedBy = userId, Now = ChinaTime.Now }, ct);
+                // ★ 审计：新建 FixedAmount FeeConfig
+                await _auditWriter.LogChangesAsync("ContractFeeConfigs", fixedConfigId.ToString(), "Create",
+                    new Dictionary<string, object?>
+                    {
+                        ["Id"] = fixedConfigId, ["ContractId"] = item.ContractId,
+                        ["FeeCodeId"] = item.FeeCodeId, ["BillingMode"] = "FixedAmount",
+                        ["Amount"] = item.NewAmount, ["EffectiveDate"] = effectiveDate,
+                        ["IsActive"] = true, ["CreatedBy"] = userId
+                    }, userId, ct);
             }
         }
 
@@ -538,9 +563,29 @@ if (chargeType == "OneTime")
             contract!, journals, bizData.ActualEndDate, bizData.Reason ?? "合同终止");
 
         if (contract != null) await _uow.Contracts.UpdateAsync(contract, ct);
+
+        // ★ 审计：记录到期前活跃费用配置
+        List<dynamic> activeCfgs;
+        using (var auditConn = _db.CreateConnection()) { auditConn.Open();
+            activeCfgs = (await auditConn.QueryAsync(
+                _sql.Get("Lease.Select.ContractFeeConfig.ActiveByContract"),
+                new { Id = bizData.ContractId })).ToList(); }
+
         await _uow.ExecuteSqlRawAsync(
             _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
             new { ExpiryDate = result.EffectiveEndDate, ContractId = bizData.ContractId }, ct);
+        foreach (var cfg in activeCfgs)
+        {
+            await _auditWriter.LogChangesAsync("ContractFeeConfigs",
+                ((IDictionary<string, object>)cfg)["Id"]?.ToString() ?? Guid.Empty.ToString(), "Update",
+                new Dictionary<string, object?>
+                {
+                    ["ContractId"] = bizData.ContractId,
+                    ["ExpiryDate"] = result.EffectiveEndDate,
+                    ["IsActive"] = false
+                }, Guid.Empty, ct);
+        }
+
         await _uow.CommitAsync(ct);
 
         try { using var conn = _db.CreateConnection(); conn.Open();
@@ -595,9 +640,17 @@ if (chargeType == "OneTime")
             var renewal = await _uow.RenewalRequests.GetByIdAsync(@event.TargetEntityId, ct);
             if (renewal != null)
             {
+                var oldStatus = renewal.Status;
                 await _uow.ExecuteSqlRawAsync(
                     _sql.Get("Approval.Update.RenewalRequest.ToRejected"),
                     new { Id = renewal.Id }, ct);
+                // ★ 审计：续签驳回
+                await _auditWriter.LogChangesAsync("RenewalRequests", renewal.Id.ToString(), "Update",
+                    new Dictionary<string, object?>
+                    {
+                        ["Id"] = renewal.Id, ["Status"] = "Rejected",
+                        ["UpdatedAt"] = ChinaTime.Now
+                    }, Guid.Empty, ct);
             }
         }
     }
@@ -708,6 +761,9 @@ if (chargeType == "OneTime")
                 "合同创建审批通过",
                 $"合同 {request.ContractNo} 已激活，起租 {request.StartDate:yyyy-MM-dd}",
                 null, null, request.StartDate.ToString("yyyy-MM-dd"), request.CreatedBy); } catch { }
+
+			        // 写入 Contracts_Audit 全量快照（事务外查询，失败不阻断）
+			        try { await WriteAuditSnapshotAsync("Contracts", contractId, "Create", request.CreatedBy, ct); } catch { }
 
         // 初始化应收（事务外独立执行，失败不阻断审批完成）
 		        try
@@ -910,6 +966,9 @@ if (chargeType == "OneTime")
         catch { /* 变更历史写入失败不影响主流程 */ }
 
         await _uow.CommitAsync(ct);
+
+        // 写入 Contracts_Audit 全量快照（修改后的合同数据，失败不阻断）
+        try { await WriteAuditSnapshotAsync("Contracts", request.ContractId, "Update", Guid.Empty, ct); } catch { }
     }
 
     /// <summary>构建合同修改变更详情文本</summary>
@@ -1025,6 +1084,8 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 
 	        using var conn = _db.CreateConnection(); conn.Open();
 	        using var tx = conn.BeginTransaction();
+
+	        Guid configId; // 提升到 try 外，供后续审计写入使用
 	        try
 	        {
 	            // ★ 校验新生效日不与其他 FeeConfig 区间交叉
@@ -1042,7 +1103,6 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	                            new { Id = request.FeeCodeId }, tx);
 	            var feeChargeType = (string)(feeCodeInfo?.ChargeType ?? "Recurring");
 
-	            Guid configId;
 	            if (feeChargeType == "Recurring")
 	            {
 	                var segments = _billingDomain.CalculateMonthlySplit(
@@ -1105,8 +1165,11 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
                 "补充收费",
                 $"补充收费 {request.FeeCodeId} ¥{request.Amount:F2}，生效 {request.EffectiveDate}",
                 null, request.Amount, request.EffectiveDate, request.CreatedBy); } catch { }
-	    }
 
+	        // 写入 ContractFeeConfigs_Audit 全量快照（事务外查询，失败不阻断）
+	        try { await WriteAuditSnapshotAsync("ContractFeeConfigs", configId, "Create", request.CreatedBy, ct); } catch { }
+
+	    }
         private async Task SendNotificationsAsync(ApprovalCompletedEvent @event, CancellationToken ct)
     {
         var request = await _uow.ApprovalRequests.GetByIdAsync(@event.ApprovalRequestId, ct);
@@ -1185,6 +1248,28 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
                 Summary = summary,
                 CBy = Guid.Empty
             }, tx);
+    }
+
+    /// <summary>
+    /// 写入 _Audit 全量快照 — 从业务表查询当前数据并写入审计镜像表
+    /// </summary>
+    private async Task WriteAuditSnapshotAsync(string tableName, Guid entityId, string action,
+        Guid? changedBy = null, CancellationToken ct = default)
+    {
+        try
+        {
+            using var qConn = _db.CreateConnection();
+            qConn.Open();
+            var entity = await qConn.QuerySingleOrDefaultAsync<dynamic>(
+                $"SELECT * FROM [{tableName}] WHERE Id=@Id", new { Id = entityId });
+            if (entity == null) return;
+            var dict = new Dictionary<string, object?>();
+            foreach (var prop in ((IDictionary<string, object>)entity))
+                dict[prop.Key] = prop.Value;
+            await _auditWriter.LogChangesAsync(tableName, entityId.ToString(), action, dict,
+                changedBy ?? Guid.Empty, ct);
+        }
+        catch { /* 审计写入失败不影响主流程 */ }
     }
 
 }

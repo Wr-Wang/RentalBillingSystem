@@ -9,6 +9,7 @@ using RBS.Core.Entities.Base;
 using RBS.Core.Entities.Contract;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 using System.Data;
 using Microsoft.Extensions.Logging;
@@ -29,6 +30,7 @@ public class ContractAppService : IContractService
     private readonly IReceivableGenerationService _receivableGen;
     private readonly IApprovalService _approvalService;
     private readonly ILogger<ContractAppService> _logger;
+    private readonly IAuditLogWriter _auditWriter;
 
     /// <summary>
     /// 构造函数
@@ -37,11 +39,12 @@ public class ContractAppService : IContractService
         IContractDomainService contractDomain,
         IReceivableGenerationService receivableGen,
         IApprovalService approvalService,
-        ILogger<ContractAppService> logger)
+        ILogger<ContractAppService> logger,
+        IAuditLogWriter auditWriter)
     {
         _uow = uow; _db = db; _sql = sql; _contractDomain = contractDomain;
         _receivableGen = receivableGen; _approvalService = approvalService;
-        _logger = logger;
+        _logger = logger; _auditWriter = auditWriter;
     }
 
     /// <summary>
@@ -223,6 +226,16 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         var contract = new ContractEntity(contractNo, request.RoomId, request.CompanyId);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Lease.Insert.Contract.Default"), contract);
+
+        // ★ 审计：合同创建
+        await _auditWriter.LogChangesAsync("Contracts", contract.Id.ToString(), "Create",
+            new Dictionary<string, object?>
+            {
+                ["Id"] = contract.Id, ["ContractNo"] = contract.ContractNo,
+                ["RoomId"] = contract.RoomId, ["CompanyId"] = contract.CompanyId,
+                ["Status"] = contract.Status, ["CreatedAt"] = contract.CreatedAt
+            }, Guid.Empty, ct);
+
         return (await GetByIdAsync(contract.Id, ct))!;
     }
 
@@ -290,19 +303,48 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
                 PaymentCycle = request.PaymentCycle, Status = "Active", CompanyId = request.CompanyId,
                 CreatedBy = userId, CreatedAt = now
             }, ct);
+
+        // ★ 审计：合同创建
+        await _auditWriter.LogChangesAsync("Contracts", contractId.ToString(), "Create",
+            new Dictionary<string, object?>
+            {
+                ["Id"] = contractId, ["ContractNo"] = request.ContractNo,
+                ["RoomId"] = request.RoomId, ["StartDate"] = request.StartDate,
+                ["EndDate"] = request.EndDate, ["Status"] = "Active",
+                ["CompanyId"] = request.CompanyId, ["CreatedBy"] = userId, ["CreatedAt"] = now
+            }, userId, ct);
+
         foreach (var t in tenants)
+        {
             await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.ContractTenant.Default"),
                 new { ContractId = contractId, t.TenantId, t.IsPrimary,
                     CreatedBy = userId, CreatedAt = now }, ct);
+            await _auditWriter.LogChangesAsync("ContractTenants", $"{contractId}_{t.TenantId}", "Create",
+                new Dictionary<string, object?>
+                {
+                    ["ContractId"] = contractId, ["TenantId"] = t.TenantId,
+                    ["IsPrimary"] = t.IsPrimary, ["CreatedBy"] = userId, ["CreatedAt"] = now
+                }, userId, ct);
+        }
         foreach (var f in feeList)
+        {
+            var feeConfigId = Guid.NewGuid();
             await _uow.ExecuteSqlRawAsync(_sql.Get("Lease.Insert.ContractFeeConfig.Default"),
                 new
                 {
-                    Id = Guid.NewGuid(), ContractId = contractId, f.FeeCodeId,
+                    Id = feeConfigId, ContractId = contractId, f.FeeCodeId,
                     BillingMode = f.BillingMode, Amount = f.Amount,
                     EffectiveDate = f.EffectiveDate ?? request.StartDate.ToString("yyyy-MM-dd"),
                     CreatedBy = userId, CreatedAt = now
                 }, ct);
+            await _auditWriter.LogChangesAsync("ContractFeeConfigs", feeConfigId.ToString(), "Create",
+                new Dictionary<string, object?>
+                {
+                    ["Id"] = feeConfigId, ["ContractId"] = contractId,
+                    ["FeeCodeId"] = f.FeeCodeId, ["BillingMode"] = f.BillingMode,
+                    ["Amount"] = f.Amount, ["CreatedBy"] = userId, ["CreatedAt"] = now
+                }, userId, ct);
+        }
 
         var contract = await _uow.Contracts.GetByIdAsync(contractId, ct);
         if (contract != null) { contract.Activate(); await _uow.CommitAsync(ct); }
@@ -484,6 +526,21 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
             // 无审批 → 直接执行
             await _uow.ExecuteSqlRawAsync(
                 _sql.Get("ContractModify.Update.Contract.ApplyChanges"), modifyReq, ct);
+
+            // ★ 审计：合同信息变更
+            var updatedContract = await _uow.Contracts.GetByIdAsync(contractId, ct);
+            if (updatedContract != null)
+            {
+                await _auditWriter.LogChangesAsync("Contracts", contractId.ToString(), "Update",
+                    new Dictionary<string, object?>
+                    {
+                        ["Id"] = contractId, ["ContractNo"] = updatedContract.ContractNo,
+                        ["StartDate"] = updatedContract.StartDate,
+                        ["EndDate"] = updatedContract.EndDate,
+                        ["PaymentCycle"] = updatedContract.PaymentCycle,
+                        ["UpdatedAt"] = now
+                    }, userId, ct);
+            }
 
             modifyReq.Complete();
             await _uow.ContractModifyRequests.UpdateAsync(modifyReq, ct);

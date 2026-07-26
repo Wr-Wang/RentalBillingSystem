@@ -5486,3 +5486,128 @@ IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6602')
 PRINT N'会计科目种子数据已初始化。';
 GO
 
+-- ===================================================================
+-- 66. UserRoles_Audit 表：用户角色关联表审计
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[UserRoles_Audit]'))
+CREATE TABLE [UserRoles_Audit] (
+    [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY ,
+    [AuditAction] VARCHAR(20) NOT NULL ,
+    [AuditVersionNo] INT NOT NULL ,
+    [AuditChangedAt] DATETIME2 NOT NULL ,
+    [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL ,
+    [AuditChangedHostname] VARCHAR(100) ,
+    [Id] UNIQUEIDENTIFIER NOT NULL ,
+    [UserId] UNIQUEIDENTIFIER ,
+    [RoleId] UNIQUEIDENTIFIER ,
+    [CreatedBy] UNIQUEIDENTIFIER ,
+    [CreatedAt] DATETIME2
+)
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'用户角色关联表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'UserRoles_Audit'
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[UserRoles_Audit]') AND name=N'IX_UserRoles_Audit_Id_Version')
+CREATE UNIQUE INDEX [IX_UserRoles_Audit_Id_Version] ON [UserRoles_Audit]([Id], [AuditVersionNo])
+GO
+
+
+-- ===================================================================
+-- 63. CollectionRecords_Audit 表：催缴记录表审计
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[CollectionRecords_Audit]'))
+CREATE TABLE [CollectionRecords_Audit] (
+    [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY ,
+    [AuditAction] VARCHAR(20) NOT NULL ,
+    [AuditVersionNo] INT NOT NULL ,
+    [AuditChangedAt] DATETIME2 NOT NULL ,
+    [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL ,
+    [AuditChangedHostname] VARCHAR(100) ,
+    [Id] UNIQUEIDENTIFIER NOT NULL ,
+    [ContractId] UNIQUEIDENTIFIER ,
+    [StageNo] INT ,
+    [Channel] VARCHAR(20) ,
+    [Content] NVARCHAR(MAX) ,
+    [Status] VARCHAR(20) ,
+    [SentAt] DATETIME2 ,
+    [OperatedBy] UNIQUEIDENTIFIER ,
+    [CompanyId] UNIQUEIDENTIFIER ,
+    [CreatedBy] UNIQUEIDENTIFIER ,
+    [CreatedAt] DATETIME2 ,
+    [CreatedIp] VARCHAR(45) ,
+    [CreatedHostname] VARCHAR(100) ,
+    [UpdatedBy] UNIQUEIDENTIFIER ,
+    [UpdatedAt] DATETIME2 ,
+    [UpdatedIp] VARCHAR(45) ,
+    [UpdatedHostname] VARCHAR(100)
+)
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'催缴记录表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'CollectionRecords_Audit'
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[CollectionRecords_Audit]') AND name=N'IX_CollectionRecords_Audit_Id_Version')
+CREATE UNIQUE INDEX [IX_CollectionRecords_Audit_Id_Version] ON [CollectionRecords_Audit]([Id], [AuditVersionNo])
+GO
+
+-- ===================================================================
+-- 64. JobScheduleExecutions_Audit 表：执行排期表审计
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[JobScheduleExecutions_Audit]'))
+CREATE TABLE [JobScheduleExecutions_Audit] (
+    [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY ,
+    [AuditAction] VARCHAR(20) NOT NULL ,
+    [AuditVersionNo] INT NOT NULL ,
+    [AuditChangedAt] DATETIME2 NOT NULL ,
+    [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL ,
+    [AuditChangedHostname] VARCHAR(100) ,
+    [Id] UNIQUEIDENTIFIER NOT NULL ,
+    [JobScheduleId] UNIQUEIDENTIFIER ,
+    [TargetDate] DATETIME2 ,
+    [OriginalDate] DATETIME2 ,
+    [Month] NVARCHAR(7) ,
+    [Status] NVARCHAR(20) ,
+    [Reason] NVARCHAR(500) ,
+    [IsAdjusted] BIT ,
+    [IsCustom] BIT ,
+    [CompanyId] UNIQUEIDENTIFIER ,
+    [CreatedBy] UNIQUEIDENTIFIER ,
+    [CreatedAt] DATETIME2 ,
+    [CreatedIp] NVARCHAR(50) ,
+    [CreatedHostname] NVARCHAR(100) ,
+    [UpdatedBy] UNIQUEIDENTIFIER ,
+    [UpdatedAt] DATETIME2 ,
+    [UpdatedIp] NVARCHAR(50) ,
+    [UpdatedHostname] NVARCHAR(100)
+)
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'执行排期表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'JobScheduleExecutions_Audit'
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[JobScheduleExecutions_Audit]') AND name=N'IX_JobScheduleExecutions_Audit_Id_Version')
+CREATE UNIQUE INDEX [IX_JobScheduleExecutions_Audit_Id_Version] ON [JobScheduleExecutions_Audit]([Id], [AuditVersionNo])
+GO
+
+-- ===================================================================
+-- 65. ImportBatchItems_Audit 表：导入明细表审计
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ImportBatchItems_Audit]'))
+CREATE TABLE [ImportBatchItems_Audit] (
+    [AuditId] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY ,
+    [AuditAction] VARCHAR(20) NOT NULL ,
+    [AuditVersionNo] INT NOT NULL ,
+    [AuditChangedAt] DATETIME2 NOT NULL ,
+    [AuditChangedBy] UNIQUEIDENTIFIER NOT NULL ,
+    [AuditChangedHostname] VARCHAR(100) ,
+    [Id] UNIQUEIDENTIFIER NOT NULL ,
+    [BatchId] UNIQUEIDENTIFIER ,
+    [RowNo] INT ,
+    [RawData] NVARCHAR(MAX) ,
+    [Status] VARCHAR(20) ,
+    [ErrorMessage] NVARCHAR(2000) ,
+    [CreatedBy] UNIQUEIDENTIFIER ,
+    [CreatedAt] DATETIME2
+)
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'导入明细表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ImportBatchItems_Audit'
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ImportBatchItems_Audit]') AND name=N'IX_ImportBatchItems_Audit_Id_Version')
+CREATE UNIQUE INDEX [IX_ImportBatchItems_Audit_Id_Version] ON [ImportBatchItems_Audit]([Id], [AuditVersionNo])
+GO
+

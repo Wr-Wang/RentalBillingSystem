@@ -6,7 +6,7 @@
     <el-card>
       <template #header>银行流水列表</template>
       <div class="search-bar">
-        <el-select v-model="search.status" placeholder="状态" clearable style="width:140px;" @change="loadData">
+        <el-select v-model="search.status" placeholder="状态" clearable filterable style="width:140px;" @change="loadData">
           <el-option label="未匹配" value="Unmatched" />
           <el-option label="已匹配" value="Matched" />
           <el-option label="已对账" value="Reconciled" />

@@ -2,6 +2,7 @@ using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Billing;
 using RBS.Core.Interfaces.Persistence;
+using RBS.Core.Interfaces.Services;
 using RBS.Core.Common;
 using RBS.Core.Interfaces.UnitOfWork;
 
@@ -12,12 +13,14 @@ public class ReceiptService : IReceiptService
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;
     private readonly ISqlLoader _sql;
+    private readonly IAuditLogWriter _auditWriter;
 
-    public ReceiptService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
+    public ReceiptService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter)
     {
         _uow = uow;
         _db = db;
         _sql = sql;
+        _auditWriter = auditWriter;
     }
 
     public async Task<List<ReceiptDto>> GetAllAsync(Guid? companyId, string? status, Guid? contractId, CancellationToken ct)
@@ -130,6 +133,34 @@ public class ReceiptService : IReceiptService
             }
 
             tx.Commit();
+
+            // 审计：写入 Receipts_Audit 全量快照（重新查询确保最新数据，独立连接）
+            try
+            {
+                var receiptEntity = await _uow.Receipts.GetByIdAsync(id, ct);
+                if (receiptEntity != null)
+                {
+                    var dict = new Dictionary<string, object?>
+                    {
+                        ["Id"] = receiptEntity.Id,
+                        ["ReceiptNo"] = receiptEntity.ReceiptNo,
+                        ["Amount"] = receiptEntity.Amount,
+                        ["ReceivedDate"] = receiptEntity.ReceivedDate,
+                        ["Status"] = receiptEntity.Status,
+                        ["ContractId"] = receiptEntity.ContractId,
+                        ["CompanyId"] = receiptEntity.CompanyId,
+                        ["PaymentChannelId"] = receiptEntity.PaymentChannelId,
+                        ["ReferenceNo"] = receiptEntity.ReferenceNo,
+                        ["CreatedBy"] = receiptEntity.CreatedBy,
+                        ["CreatedAt"] = receiptEntity.CreatedAt,
+                        ["UpdatedBy"] = receiptEntity.UpdatedBy,
+                        ["UpdatedAt"] = receiptEntity.UpdatedAt,
+                    };
+                    await _auditWriter.LogChangesAsync("Receipts", id.ToString(), "Update", dict, Guid.Empty, ct);
+                }
+            }
+            catch { /* 审计写入失败不影响主操作 */ }
+
             return new { id };
         }
         catch (Exception) when (tx is not null)

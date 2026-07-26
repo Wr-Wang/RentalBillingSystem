@@ -17,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RBS.Core.Common;
 using RBS.Core.Entities.Base;
 using RBS.Infrastructure.Data.Repositories;
+using RBS.Infrastructure.Data.Services;
 
 namespace RBS.Infrastructure.Data.UnitOfWork;
 
@@ -46,6 +47,8 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     private readonly ITenantService? _tenant;
     /// <summary>服务提供者（可选，用于延迟解析领域事件调度器以避免循环依赖）</summary>
     private readonly IServiceProvider? _serviceProvider;
+    /// <summary>审计装饰器（统一审计逻辑）</summary>
+    private readonly RepositoryAuditService _auditService;
     /// <summary>共享连接（用于事务）</summary>
     private IDbConnection? _sharedConnection;
     /// <summary>共享事务（由 BeginTransactionAsync 创建）</summary>
@@ -62,14 +65,14 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     /// <param name="sql">SQL 映射加载器</param>
     /// <param name="auditWriter">审计日志写入器</param>
     /// <param name="tenant">多租户服务（可选）</param>
-    public DapperUnitOfWork(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, ITenantService? tenant = null, IServiceProvider? serviceProvider = null) { _db = db; _sql = sql; _auditWriter = auditWriter;
-        _tenant = tenant; _serviceProvider = serviceProvider; }
+    public DapperUnitOfWork(IDbConnectionFactory db, ISqlLoader sql, IAuditLogWriter auditWriter, ITenantService? tenant = null, IServiceProvider? serviceProvider = null, RepositoryAuditService? auditService = null) { _db = db; _sql = sql; _auditWriter = auditWriter;
+        _tenant = tenant; _serviceProvider = serviceProvider; _auditService = auditService ?? new RepositoryAuditService(auditWriter); }
 
-    public IUserRepository Users => _users ??= new DapperUserRepository(_db, _sql, _auditWriter, this);
-    public IRoleRepository Roles => _roles ??= new DapperRoleRepository(_db, _sql, _auditWriter, this);
-    public IMenuRepository Menus => _menus ??= new DapperMenuRepository(_db, _sql, _auditWriter, this);
-    public ICompanyRepository Companies => _companies ??= new DapperCompanyRepository(_db, _sql, _auditWriter, this);
-    public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new DapperApprovalRequestRepository(_db, _sql, _auditWriter, this);
+    public IUserRepository Users => _users ??= new DapperUserRepository(_db, _sql, _auditWriter, this, _auditService);
+    public IRoleRepository Roles => _roles ??= new DapperRoleRepository(_db, _sql, _auditWriter, this, _auditService);
+    public IMenuRepository Menus => _menus ??= new DapperMenuRepository(_db, _sql, _auditWriter, this, _auditService);
+    public ICompanyRepository Companies => _companies ??= new DapperCompanyRepository(_db, _sql, _auditWriter, this, _auditService);
+    public IApprovalRequestRepository ApprovalRequests => _approvalRequests ??= new DapperApprovalRequestRepository(_db, _sql, _auditWriter, this, _auditService);
     public IFeeCodeRepository FeeCodes => _feeCodes ??= new DapperFeeCodeRepository(_db, _sql, _auditWriter, this, _tenant);
     public IRepository<FeeCodeTemplate> FeeCodeTemplates => _feeCodeTemplates ??= new DapperRepository<FeeCodeTemplate>(_db, _auditWriter, tracker: this, tenant: _tenant);
     public IPaymentChannelRepository PaymentChannels => _paymentChannels ??= new DapperPaymentChannelRepository(_db, _sql, _auditWriter, this, _tenant);
@@ -259,9 +262,18 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
                     }
                     affected += rowCount;
 
-                    // 收集审计（延迟写入避免与事务表竞争）
+                    // 收集审计：记录全量快照（延迟写入避免与事务表竞争）
                     var updatedBy = entry.Entity.GetType().GetProperty("UpdatedBy")?.GetValue(entry.Entity) as Guid? ?? Guid.Empty;
-                    auditBatch.Add((tableName, id.ToString(), "Update", changes, updatedBy));
+                    if (updatedBy == Guid.Empty)
+                    {
+                        // 业务层未设 UpdatedBy 时兜底取 CreatedBy
+                        updatedBy = entry.Entity.GetType().GetProperty("CreatedBy")?.GetValue(entry.Entity) as Guid? ?? Guid.Empty;
+                    }
+                    // 从请求上下文填充 UpdatedIp/UpdatedHostname（通过审计装饰器）
+                    var (ip, hn) = _auditService.GetClientInfo();
+                    if (ip != null) now["UpdatedIp"] = ip;
+                    if (hn != null) now["UpdatedHostname"] = hn;
+                    auditBatch.Add((tableName, id.ToString(), "Update", now, updatedBy));
                 }
             }
 

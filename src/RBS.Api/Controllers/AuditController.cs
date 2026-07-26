@@ -23,6 +23,14 @@ public class AuditController : ControllerBase
         _sql = sql;
     }
 
+    /// <summary>获取所有已配置的审计表清单（供前端下拉列表动态加载）</summary>
+    [HttpGet("tables")]
+    public IActionResult GetAuditTables()
+    {
+        var tables = _auditService.GetAuditTables();
+        return Ok(tables);
+    }
+
     /// <summary>分页查询审计历史</summary>
     [HttpGet("{tableName}/history")]
     public async Task<IActionResult> GetHistory(
@@ -103,7 +111,8 @@ public class AuditController : ControllerBase
         foreach (var kv in rowDict)
         {
             var key = kv.Key;
-            if (key is "AuditId" or "AuditAction" or "AuditVersionNo" or "AuditChangedAt" or "AuditChangedBy" or "RowVersion" or "Id")
+            if (key is "AuditId" or "AuditAction" or "AuditVersionNo" or "AuditChangedAt" or "AuditChangedBy"
+                or "AuditChangedHostname" or "AuditChangedFields" or "RowVersion" or "Id")
                 continue;
             updateFields.Add($"[{key}]=@{key}");
             updateParms[key] = kv.Value;

@@ -13,7 +13,7 @@
     <el-card shadow="never" class="search-bar">
       <el-form :inline="true">
         <el-form-item label="方法">
-          <el-select v-model="filter.method" placeholder="全部" clearable style="width:100px" @change="fetchList">
+          <el-select v-model="filter.method" placeholder="全部" clearable filterable style="width:100px" @change="fetchList">
             <el-option label="GET" value="GET" />
             <el-option label="POST" value="POST" />
             <el-option label="PUT" value="PUT" />

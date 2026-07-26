@@ -80,6 +80,7 @@ builder.Services.AddHttpContextAccessor();
 // ===== 当前用户服务 =====
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IClientInfoService, RBS.Infrastructure.Data.Services.ClientInfoService>();
 
 // ===== 基础设施层（仓储、工作单元、多租户、审计、PDF、调度） =====
 builder.Services.AddInfrastructureData(builder.Configuration);

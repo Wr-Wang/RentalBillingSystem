@@ -51,12 +51,12 @@
     <!-- Search -->
     <div class="search-bar">
       <el-input v-model="search.keyword" placeholder="搜索座楼/房号/地址" clearable style="width: 220px;" @clear="handleSearch" />
-      <el-select v-model="search.status" placeholder="房屋状态" clearable style="width: 140px;" @change="handleSearch">
+      <el-select v-model="search.status" placeholder="房屋状态" clearable filterable style="width: 140px;" @change="handleSearch">
         <el-option label="空置" value="Vacant" />
         <el-option label="已租" value="Rented" />
         <el-option label="维修" value="Maintenance" />
       </el-select>
-      <el-select v-model="search.buildingName" placeholder="选择座楼" clearable style="width: 150px;" @change="handleSearch">
+      <el-select v-model="search.buildingName" placeholder="选择座楼" clearable filterable style="width: 150px;" @change="handleSearch">
         <el-option v-for="b in buildings" :key="b.buildingName" :label="b.buildingName" :value="b.buildingName" />
       </el-select>
       <el-button type="primary" @click="handleSearch">查询</el-button>

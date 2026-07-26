@@ -7,7 +7,7 @@
 
     <div class="search-bar">
       <el-input v-model="search.keyword" placeholder="合同号" clearable style="width: 200px;" @clear="fetchRecords" @keyup.enter="fetchRecords" />
-      <el-select v-model="search.status" placeholder="状态" clearable style="width: 120px;" @change="fetchRecords">
+      <el-select v-model="search.status" placeholder="状态" clearable filterable style="width: 120px;" @change="fetchRecords">
         <el-option label="全部" value="" />
         <el-option label="待发送" value="Pending" />
         <el-option label="已发送" value="Sent" />

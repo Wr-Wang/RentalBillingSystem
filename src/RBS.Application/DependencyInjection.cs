@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IContractService, ContractAppService>();
         services.AddScoped<IContractNumberGenerator, ContractNumberGenerator>();
         services.AddScoped<IApprovalNumberGenerator, ApprovalNumberGenerator>();
+        services.AddScoped<IApprovalBizDetailBuilder, ApprovalBizDetailBuilder>();
         services.AddScoped<IRenewalService, RenewalService>();
         services.AddScoped<IBillingService, BillingAppService>();
         services.AddScoped<IApprovalTypeService, ApprovalTypeService>();

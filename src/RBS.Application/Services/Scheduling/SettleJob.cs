@@ -80,7 +80,7 @@ public class SettleJob : ScheduledJobBase
                         $"预收抵应收-{contract.ContractNo}", null, null, token);
 
                     var receivable = await conn.QuerySingleAsync<decimal>(
-                        _sql.Get("Billing.Select.JournalEntry.BalanceByContract"),
+                        _sql.Get("Billing.Select.Journal.BalanceByContract"),
                         new { Code = "1122", CId = contract.Id }, tx);
 
                     if (receivable > 0)

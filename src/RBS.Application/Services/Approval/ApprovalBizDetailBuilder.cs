@@ -15,7 +15,7 @@ namespace RBS.Application.Services.Approval;
 /// 拆分自 ApprovalService，职责单一：只负责"审批详情页展示什么数据"
 /// 新增审批业务类型时只需在此类中添加分支，不影响审批流程
 /// </summary>
-public class ApprovalBizDetailBuilder
+public class ApprovalBizDetailBuilder : IApprovalBizDetailBuilder
 {
     private readonly IUnitOfWork _uow;
     private readonly IDbConnectionFactory _db;

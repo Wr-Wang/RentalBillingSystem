@@ -80,10 +80,6 @@ GO
 
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Journals_Audit]'))
     DELETE FROM [Journals_Audit]
-IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[GeneralLedgerBalances_Audit]'))
-    DELETE FROM [GeneralLedgerBalances_Audit]
-IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[PrepaidDetails_Audit]'))
-    DELETE FROM [PrepaidDetails_Audit]
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[ReceivablePlans_Audit]'))
     DELETE FROM [ReceivablePlans_Audit]
 GO

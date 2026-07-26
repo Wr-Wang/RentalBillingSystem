@@ -8,7 +8,9 @@ namespace RBS.Application.Common;
 
 /// <summary>
 /// 周期费用按月拆分辅助方法。
-/// 封装 CalculateMonthlySplit + WithExpiry 批量插入 + 首月分摊 Journal 生成的重复逻辑。
+/// 封装 CalculateMonthlySplit + WithExpiry 批量插入的重复逻辑。
+/// DD 说明：此工具类位于 Application 层是当前架构下的权宜方案，
+/// 理想方案应抽取 IRecurringFeeSplitService 接口并由 Infrastructure 实现。
 /// </summary>
 public static class RecurringFeeSplitHelper
 {
@@ -60,48 +62,5 @@ public static class RecurringFeeSplitHelper
         }
 
         return ids;
-    }
-
-    /// <summary>
-    /// 周期费用拆分配置后，生成首月分摊应收 Journal（GLPosted=0）。
-    /// 如果首段没有到期日（未来配置），则不生成。
-    /// </summary>
-    public static async Task GenerateFirstMonthJournal(
-        IDbConnection conn,
-        IDbTransaction? tx,
-        ISqlLoader sql,
-        List<FeeMonthSegment> segments,
-        List<Guid> configIds,
-        Guid companyId,
-        Guid contractId,
-        Guid feeCodeId,
-        string feeName)
-    {
-        var firstSeg = segments[0];
-        if (firstSeg.ExpiryDate == null) return;
-
-        var segEffDate = DateOnly.Parse(firstSeg.EffectiveDate);
-        var period = segEffDate.ToString("yyyy-MM");
-
-        await conn.ExecuteAsync(
-            sql.Get("Billing.Insert.Journal.Unposted"),
-            new
-            {
-                Id = Guid.NewGuid(),
-                CoId = companyId,
-                CId = contractId,
-                FId = feeCodeId,
-                FConfigId = configIds[0],
-                SubjId = Guid.Empty,
-                Period = period,
-                Amt = firstSeg.Amount,
-                Due = DateOnly.FromDateTime(ChinaTime.Now),
-                EntryType = "Normal",
-                BilledAt = ChinaTime.Now,
-                DNId = (Guid?)null,
-                ParentId = (Guid?)null,
-                Summary = $"应收 {feeName} {period}",
-                CBy = Guid.Empty
-            }, tx);
     }
 }

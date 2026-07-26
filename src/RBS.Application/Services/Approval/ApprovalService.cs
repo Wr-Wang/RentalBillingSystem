@@ -29,7 +29,8 @@ public class ApprovalService : IApprovalService
     private readonly ISqlLoader _sql;
     private readonly IApprovalDomainService _approvalDomain;
     private readonly IApprovalNumberGenerator _approvalNoGenerator;
-    private readonly ApprovalBizDetailBuilder _bizDetailBuilder;
+    private readonly IApprovalBizDetailBuilder _bizDetailBuilder;
+    private readonly IAuditLogWriter _auditWriter;
 
     /// <summary>
     /// 构造函数
@@ -50,7 +51,8 @@ public class ApprovalService : IApprovalService
         ISqlLoader sql,
         IApprovalDomainService approvalDomain,
         IApprovalNumberGenerator approvalNoGenerator,
-        ApprovalBizDetailBuilder bizDetailBuilder)
+        IApprovalBizDetailBuilder bizDetailBuilder,
+        IAuditLogWriter auditWriter)
     {
         _uow = uow;
         _tenantService = tenantService;
@@ -61,6 +63,7 @@ public class ApprovalService : IApprovalService
         _approvalDomain = approvalDomain;
         _approvalNoGenerator = approvalNoGenerator;
         _bizDetailBuilder = bizDetailBuilder;
+        _auditWriter = auditWriter;
     }
 
     // =====================================================================
@@ -164,6 +167,23 @@ public class ApprovalService : IApprovalService
                 new object[] { recordId, id, 0, userId, "Submitted", "重新提交", userId, now }, ct);
 
             await tx.CommitAsync(ct);
+
+            // ★ 审计：记录重提交变更
+            var entityDict = AuditDict(entity, new Dictionary<string, object?>
+            {
+                ["Status"] = "Pending",
+                ["CurrentLevel"] = 1,
+                ["UpdatedBy"] = userId,
+                ["UpdatedAt"] = now
+            });
+            await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
+            await _auditWriter.LogChangesAsync("ApprovalRecords", recordId.ToString(), "Create",
+                new Dictionary<string, object?>
+                {
+                    ["Id"] = recordId, ["RequestId"] = id, ["LevelNo"] = 0,
+                    ["ApproverId"] = userId, ["Action"] = "Submitted",
+                    ["Comment"] = "重新提交", ["CreatedBy"] = userId, ["CreatedAt"] = now
+                }, userId, ct);
         }
         catch (InvalidOperationException) { throw; }
         catch
@@ -234,6 +254,25 @@ public class ApprovalService : IApprovalService
                     comment ?? "", userId, now }, ct);
 
             await tx.CommitAsync(ct);
+
+            // ★ 审计：记录审批变更
+            var newStatus = result.IsCompleted ? "Approved" : "Pending";
+            var newLevel = result.IsCompleted ? entity.MaxLevel : entity.CurrentLevel + 1;
+            var entityDict = AuditDict(entity, new Dictionary<string, object?>
+            {
+                ["Status"] = newStatus,
+                ["CurrentLevel"] = newLevel,
+                ["UpdatedBy"] = userId,
+                ["UpdatedAt"] = now
+            });
+            await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
+            await _auditWriter.LogChangesAsync("ApprovalRecords", newRecord.Id.ToString(), "Create",
+                new Dictionary<string, object?>
+                {
+                    ["Id"] = newRecord.Id, ["RequestId"] = id, ["LevelNo"] = newRecord.LevelNo,
+                    ["ApproverId"] = userId, ["Action"] = result.Action,
+                    ["Comment"] = comment ?? "", ["CreatedBy"] = userId, ["CreatedAt"] = now
+                }, userId, ct);
         }
         catch (InvalidOperationException) { throw; }
         catch
@@ -303,6 +342,22 @@ public class ApprovalService : IApprovalService
                     comment, userId, now }, ct);
 
             await tx.CommitAsync(ct);
+
+            // ★ 审计：记录驳回
+            var entityDict = AuditDict(entity, new Dictionary<string, object?>
+            {
+                ["Status"] = "Rejected",
+                ["UpdatedBy"] = userId,
+                ["UpdatedAt"] = now
+            });
+            await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
+            await _auditWriter.LogChangesAsync("ApprovalRecords", newRecord.Id.ToString(), "Create",
+                new Dictionary<string, object?>
+                {
+                    ["Id"] = newRecord.Id, ["RequestId"] = id, ["LevelNo"] = newRecord.LevelNo,
+                    ["ApproverId"] = userId, ["Action"] = result.Action,
+                    ["Comment"] = comment, ["CreatedBy"] = userId, ["CreatedAt"] = now
+                }, userId, ct);
         }
         catch (InvalidOperationException) { throw; }
         catch
@@ -370,6 +425,22 @@ public class ApprovalService : IApprovalService
             }
 
             await tx.CommitAsync(ct);
+
+            // ★ 审计：记录撤回
+            var entityDict = AuditDict(entity, new Dictionary<string, object?>
+            {
+                ["Status"] = "Cancelled",
+                ["UpdatedBy"] = userId,
+                ["UpdatedAt"] = now
+            });
+            await _auditWriter.LogChangesAsync("ApprovalRequests", id.ToString(), "Update", entityDict, userId, ct);
+            await _auditWriter.LogChangesAsync("ApprovalRecords", recordId.ToString(), "Create",
+                new Dictionary<string, object?>
+                {
+                    ["Id"] = recordId, ["RequestId"] = id, ["LevelNo"] = entity.CurrentLevel,
+                    ["ApproverId"] = userId, ["Action"] = "Cancelled",
+                    ["Comment"] = reason ?? "提交人撤回", ["CreatedBy"] = userId, ["CreatedAt"] = now
+                }, userId, ct);
         }
         catch (InvalidOperationException) { throw; }
         catch
@@ -612,5 +683,27 @@ public class ApprovalService : IApprovalService
                 };
             }).ToList()
         };
+    }
+
+    /// <summary>
+    /// 构造审计字典 — 取实体的当前属性快照，并用 overrides 覆盖 SQL 变更后的值
+    /// </summary>
+    private static Dictionary<string, object?> AuditDict(object entity, Dictionary<string, object?> overrides)
+    {
+        var dict = new Dictionary<string, object?>();
+        var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        foreach (var p in props)
+        {
+            if (p.Name is "DomainEvents" or "RowVersion") continue;
+            if (!p.CanWrite) continue;
+            if (p.PropertyType == typeof(System.Collections.IList) || p.PropertyType.IsGenericType) continue;
+            dict[p.Name] = p.GetValue(entity);
+        }
+        // 用 SQL 变更后的值覆盖
+        foreach (var kv in overrides)
+        {
+            dict[kv.Key] = kv.Value;
+        }
+        return dict;
     }
 }

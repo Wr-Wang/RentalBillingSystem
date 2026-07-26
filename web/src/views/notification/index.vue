@@ -44,7 +44,7 @@
 
     <!-- Search/Filter -->
     <div class="search-bar">
-      <el-select v-model="search.readStatus" placeholder="已读状态" clearable style="width: 130px;" @change="handleSearch">
+      <el-select v-model="search.readStatus" placeholder="已读状态" clearable filterable style="width: 130px;" @change="handleSearch">
         <el-option label="全部" value="" />
         <el-option label="未读" value="unread" />
         <el-option label="已读" value="read" />

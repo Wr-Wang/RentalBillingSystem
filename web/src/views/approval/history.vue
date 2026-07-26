@@ -9,7 +9,7 @@
 
     <div class="search-bar">
       <el-input v-model="search.keyword" placeholder="搜索标题" clearable style="width: 200px;" @clear="fetchHistory" @keyup.enter="fetchHistory" />
-      <el-select v-model="search.status" placeholder="审批结果" clearable style="width: 140px;" @change="fetchHistory">
+      <el-select v-model="search.status" placeholder="审批结果" clearable filterable style="width: 140px;" @change="fetchHistory">
         <el-option label="待审批" value="Pending" />
         <el-option label="已通过" value="Approved" />
         <el-option label="已驳回" value="Rejected" />

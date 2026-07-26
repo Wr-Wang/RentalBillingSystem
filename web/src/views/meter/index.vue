@@ -13,7 +13,7 @@
 
     <div class="search-bar">
       <el-date-picker v-model="search.month" type="month" placeholder="选择月份" @change="fetchList" />
-      <el-select v-model="search.feeCode" placeholder="费用类型" clearable style="width: 140px;" @change="fetchList">
+      <el-select v-model="search.feeCode" placeholder="费用类型" clearable filterable style="width: 140px;" @change="fetchList">
         <el-option label="水费" value="WATER" />
         <el-option label="电费" value="ELECTRIC" />
         <el-option label="燃气费" value="GAS" />
