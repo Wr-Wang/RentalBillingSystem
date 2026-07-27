@@ -11,8 +11,6 @@ namespace RBS.Infrastructure.Data;
 /// <remarks>
 /// 在静态构造函数中注册全局 Dapper 类型处理器：
 /// <list type="bullet">
-///   <item><description>DapperDateOnlyHandler — DateOnly ↔ DateTime 转换</description></item>
-///   <item><description>DapperNullableDateOnlyHandler — Nullable DateOnly 处理</description></item>
 ///   <item><description>DapperRoomStatusHandler — RoomStatus 值对象 ↔ 字符串转换</description></item>
 /// </list>
 /// 设计为单例生命周期，所有仓储复用同一工厂。
@@ -26,8 +24,6 @@ public class DbConnectionFactory : IDbConnectionFactory
     /// </summary>
     static DbConnectionFactory()
     {
-        SqlMapper.AddTypeHandler(new DapperDateOnlyHandler());
-        SqlMapper.AddTypeHandler(new DapperNullableDateOnlyHandler());
         SqlMapper.AddTypeHandler(new DapperRoomStatusHandler());
     }
 

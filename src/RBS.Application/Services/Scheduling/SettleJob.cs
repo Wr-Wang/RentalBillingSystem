@@ -64,7 +64,7 @@ public class SettleJob : ScheduledJobBase
             {
                 using var conn = _db.CreateConnection(); conn.Open();
                 using var tx = conn.BeginTransaction();
-                var today = DateOnly.FromDateTime(ChinaTime.Now);
+                var today = ChinaTime.Now.Date;
 
                 // Step02: 预收抵应收（基于合同独立预存金额字段）
                 if (contract.PrepaidBalance <= 0)
@@ -123,7 +123,7 @@ public class SettleJob : ScheduledJobBase
                 int interestCount = 0;
                 foreach (var journal in overdueJournals)
                 {
-                    var daysOverdue = today.DayNumber - (DateOnly.FromDateTime((DateTime)journal.DueDate)).DayNumber;
+                    var daysOverdue = (today - ((DateTime)journal.DueDate).Date).Days;
                     if (daysOverdue <= 0) continue;
                     var balance = (decimal)journal.Amount;
                     if (balance <= 0) continue;

@@ -40,5 +40,5 @@ public interface IReceivableGenerationService
     /// <summary>
     /// 计算指定账期的到期日（付款周期末月 × 合同约定日）
     /// </summary>
-    DateOnly CalculateDueDate(string periodStr, ContractEntity contract);
+    DateTime CalculateDueDate(string periodStr, ContractEntity contract);
 }

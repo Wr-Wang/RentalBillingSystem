@@ -31,7 +31,7 @@ public interface IContractRepository : IRepository<Contract>
     /// <param name="date">到期日期</param>
     /// <param name="ct">取消令牌</param>
     /// <returns>到期合同列表</returns>
-    Task<List<Contract>> GetContractsExpiringAsync(DateOnly date, CancellationToken ct = default);
+    Task<List<Contract>> GetContractsExpiringAsync(DateTime date, CancellationToken ct = default);
 
     /// <summary>
     /// 检查指定房屋单元是否已有生效合同。

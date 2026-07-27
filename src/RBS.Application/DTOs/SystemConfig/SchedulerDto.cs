@@ -56,6 +56,7 @@ public class ExecutionDto
 {
     public Guid Id { get; set; }
     public Guid JobScheduleId { get; set; }
+    public Guid CompanyId { get; set; }
     public string Month { get; set; } = string.Empty;
     public DateTime TargetDate { get; set; }
     public DateTime? OriginalDate { get; set; }

@@ -3,7 +3,7 @@ namespace RBS.Application.DTOs.SystemConfig;
 public class HolidayCalendarDto
 {
     public Guid Id { get; set; }
-    public DateOnly HolidayDate { get; set; }
+    public DateTime HolidayDate { get; set; }
     public string? Name { get; set; }
     public bool IsWorkingDay { get; set; }
     public Guid CompanyId { get; set; }
@@ -15,7 +15,7 @@ public class HolidayCalendarDto
 
 public class CreateHolidayCalendarRequest
 {
-    public DateOnly HolidayDate { get; set; }
+    public DateTime HolidayDate { get; set; }
     public string? Name { get; set; }
     public bool IsWorkingDay { get; set; }
     public Guid CompanyId { get; set; }
@@ -23,7 +23,7 @@ public class CreateHolidayCalendarRequest
 
 public class UpdateHolidayCalendarRequest
 {
-    public DateOnly? HolidayDate { get; set; }
+    public DateTime? HolidayDate { get; set; }
     public string? Name { get; set; }
     public bool? IsWorkingDay { get; set; }
 }

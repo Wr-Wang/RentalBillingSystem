@@ -77,27 +77,30 @@ public class BillJob : ScheduledJobBase
             new ParallelOptions { MaxDegreeOfParallelism = ContractParallelism, CancellationToken = ct },
             async (contract, token) =>
         {
-            string currentStep = "BillStep02";
-            try
+            const int maxRetries = 3;
+            for (int retry = 0; retry <= maxRetries; retry++)
             {
-                string? contractNo = contract.ContractNo;
-                using var conn = _db.CreateConnection();
-                conn.Open();
-                using var tx = conn.BeginTransaction();
+                string currentStep = "BillStep02";
+                try
+                {
+                    string? contractNo = contract.ContractNo;
+                    using var conn = _db.CreateConnection();
+                    conn.Open();
+                    using var tx = conn.BeginTransaction();
 
-                // ===== Step02: 加载费用配置 =====
-                var step02 = await _stepLogger.StartStepAsync(taskLogId, "BillStep02",
-                    $"加载费用-{contractNo}", null, null, token);
-                var periodParts = targetMonth.Split('-');
-                var pYear = int.Parse(periodParts[0]);
-                var pMonth = int.Parse(periodParts[1]);
-                var lastDay = DateTime.DaysInMonth(pYear, pMonth);
-                var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
-                var dueDate = new DateOnly(pYear, pMonth, dueDay);
+                    // ===== Step02: 加载费用配置 =====
+                    var step02 = await _stepLogger.StartStepAsync(taskLogId, "BillStep02",
+                        $"加载费用-{contractNo}", null, null, token);
+                    var periodParts = targetMonth.Split('-');
+                    var pYear = int.Parse(periodParts[0]);
+                    var pMonth = int.Parse(periodParts[1]);
+                    var lastDay = DateTime.DaysInMonth(pYear, pMonth);
+                    var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
+                    var dueDate = new DateTime(pYear, pMonth, dueDay);
 
-                var feeConfigs = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
-                    _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
-                    new { ContractId = contract.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{lastDay}" }, tx)).ToList();
+                    var feeConfigs = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
+                        _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
+                        new { ContractId = contract.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{lastDay}" }, tx)).ToList();
                 await _stepLogger.CompleteStepAsync(step02, feeConfigs.Count, null, token);
 
                 // ===== Step03: 生成 Journals + GL + DebitNoteItems（批量收集→批量写入） =====
@@ -119,7 +122,7 @@ public class BillJob : ScheduledJobBase
                 // 收集待写入数据（跳过已存在的费用项目）
                 var journalBatch = new List<object>(plans.Count);
                 var glBatch = new List<object>(plans.Count * 2);
-                var itemTuples = new List<(Guid FeeCodeId, decimal Amount, string FeeName)>(plans.Count);
+                var itemTuples = new List<(Guid FeeCodeId, decimal Amount, string FeeName, Guid JournalId)>(plans.Count);
                 decimal totalAmount = 0;
                 int created = 0;
 
@@ -143,7 +146,7 @@ public class BillJob : ScheduledJobBase
 
                     // 暂存 DebitNoteItem 数据（DnId 稍后确定）
                     var feeName = feeConfigs.FirstOrDefault(f => f.FeeCodeId == journal.FeeCodeId).FeeName ?? "";
-                    itemTuples.Add((journal.FeeCodeId, journal.Amount, feeName));
+                    itemTuples.Add((journal.FeeCodeId, journal.Amount, feeName, journal.Id));
 
                     // GL 入口（借记 1122 + 贷记 6001）
                     if (subjects.ContainsKey("1122") && subjects.ContainsKey("6001"))
@@ -219,21 +222,47 @@ public class BillJob : ScheduledJobBase
                     var step04 = await _stepLogger.StartStepAsync(taskLogId, "BillStep04",
                         $"生成账单-{contractNo}", null, null, token);
 
-                    var prepaid = contract.PrepaidBalance;
-                    dnId = Guid.NewGuid();
-                    await PersistDebitNoteAsync(conn, tx, new DebitNoteRequest(
-                        dnId, contract.Id, contractNo ?? "", companyId,
-                        targetMonth, totalAmount, taskLogId), token);
+                    // 检查是否已存在该合同+账期的账单（重跑时跳过）
+                    var existingDn = await conn.QuerySingleOrDefaultAsync<Guid?>(
+                        "SELECT Id FROM DebitNotes WHERE ContractId=@Cid AND PeriodYear=@Y AND PeriodMonth=@M",
+                        new { Cid = contract.Id, Y = pYear, M = pMonth }, tx);
+                    if (existingDn.HasValue)
+                    {
+                        dnId = existingDn.Value;
+                    }
+                    else
+                    {
+                        var prepaid = contract.PrepaidBalance;
+                        dnId = Guid.NewGuid();
+                        await PersistDebitNoteAsync(conn, tx, new DebitNoteRequest(
+                            dnId, contract.Id, contractNo ?? "", companyId,
+                            targetMonth, totalAmount, taskLogId), token);
+                    }
 
-                    // 批量写入 DebitNoteItems（此时已拿到 dnId）
+                    // 补录缺失的明细：查出该合同所有未关联本账单的 Journals，排除已在明细中的
+                    var existingJournalIds = (await conn.QueryAsync<Guid>(
+                        "SELECT JournalId FROM DebitNoteItems WHERE DebitNoteId=@DnId AND JournalId IS NOT NULL",
+                        new { DnId = dnId }, tx)).ToHashSet();
+                    var missingItems = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string FeeName, Guid JournalId)>(
+                        @"SELECT j.FeeCodeId, j.Amount, ISNULL(fc.Name,'') AS FeeName, j.Id AS JournalId
+                          FROM Journals j LEFT JOIN FeeCodes fc ON fc.Id=j.FeeCodeId
+                          WHERE j.ContractId=@Cid AND j.Amount>0 AND j.Period <= @P
+                            AND (j.DebitNoteId IS NULL OR j.DebitNoteId != @DnId)",
+                        new { Cid = contract.Id, P = targetMonth, DnId = dnId }, tx))
+                        .Where(t => !existingJournalIds.Contains(t.JournalId))
+                        .ToList();
+                    if (missingItems.Count > 0)
+                        itemTuples = itemTuples.Concat(missingItems).ToList();
+
+                    // 批量写入 DebitNoteItems
                     if (itemTuples.Count > 0)
                     {
                         var itemBatch = itemTuples.Select(t => new
                         {
                             Id = Guid.NewGuid(), DebitNoteId = dnId,
                             FeeCodeId = t.FeeCodeId, FeeName = t.FeeName,
-                            Amount = t.Amount, CreatedBy = Guid.Empty,
-                            CreatedAt = ChinaTime.Now
+                            Amount = t.Amount, JournalId = t.JournalId,
+                            CreatedBy = Guid.Empty, CreatedAt = ChinaTime.Now
                         }).ToList();
                         await conn.ExecuteAsync(_sql.Get("Billing.Insert.DebitNoteItem.Default"), itemBatch, tx);
                     }
@@ -264,15 +293,23 @@ public class BillJob : ScheduledJobBase
                 tx.Commit();
                 debitNoteIds.Add((dnId, contract.CompanyId, pYear, pMonth));
                 Interlocked.Increment(ref success);
-            }
-            catch (Exception ex)
-            {
-                errors.Add((contract.Id, ex.Message));
-                Interlocked.Increment(ref fail);
-                failedContracts.Add(new BillJobFailedContract(
-                    taskLogId, contract.Id, contract.ContractNo ?? "",
-                    currentStep, ex.Message));
-            }
+                break; // 成功后退出重试循环
+                }
+                catch (Exception ex) when (retry < maxRetries && IsDeadlock(ex))
+                {
+                    await Task.Delay(1000 * (retry + 1), token);
+                    // retry
+                }
+                catch (Exception ex)
+                {
+                    errors.Add((contract.Id, ex.Message));
+                    Interlocked.Increment(ref fail);
+                    failedContracts.Add(new BillJobFailedContract(
+                        taskLogId, contract.Id, contract.ContractNo ?? "",
+                        currentStep, ex.Message));
+                    break; // exit retry loop on non-deadlock or max retries
+                }
+            } // end retry for
         });
 
         // Step06: batch generate PDFs organized by company/year-month
@@ -397,7 +434,7 @@ public class BillJob : ScheduledJobBase
     private record DebitNoteRequest(
         Guid DnId, Guid ContractId, string ContractNo, Guid CompanyId,
         string Period, decimal TotalAmount, Guid TaskLogId,
-        bool IsHistorical = false, DateOnly? DueDate = null);
+        bool IsHistorical = false, DateTime? DueDate = null);
 
     protected override async Task<string> BuildDryRunReportAsync(
         Guid companyId, string targetMonth, Guid taskLogId, CancellationToken ct)
@@ -423,4 +460,11 @@ public class BillJob : ScheduledJobBase
         return JsonSerializer.Serialize(report);
     }
 
+    private static bool IsDeadlock(Exception ex)
+    {
+        var msg = ex.Message;
+        if (msg.Contains("死锁") || msg.Contains("deadlock") || msg.Contains("1205"))
+            return true;
+        return ex.InnerException != null && IsDeadlock(ex.InnerException);
+    }
 }

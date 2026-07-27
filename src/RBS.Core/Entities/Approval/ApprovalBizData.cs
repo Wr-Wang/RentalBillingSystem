@@ -44,7 +44,7 @@ public class ApprovalBizData : AuditableEntity
     /// 生效日期（调租/调价使用）
     /// 调价后新金额开始执行的日期
     /// </summary>
-    public DateOnly? EffectiveDate { get; private set; }
+    public DateTime? EffectiveDate { get; private set; }
 
     /// <summary>
     /// 旧金额（调整前）
@@ -78,7 +78,7 @@ public class ApprovalBizData : AuditableEntity
     /// 客户实际搬离房屋的日期，用于计算最终费用
     /// 仅当 ChangeType 为 TERMINATE 时有意义
     /// </summary>
-    public DateOnly? ActualEndDate { get; private set; }
+    public DateTime? ActualEndDate { get; private set; }
 
     /// <summary>
     /// 押金处理方式
@@ -135,7 +135,7 @@ public class ApprovalBizData : AuditableEntity
     /// </summary>
     /// <param name="effectiveDate">新金额生效日期</param>
     /// <param name="reason">调价原因说明</param>
-    public void SetFeeAdjustData(DateOnly? effectiveDate, string? reason)
+    public void SetFeeAdjustData(DateTime? effectiveDate, string? reason)
     {
         EffectiveDate = effectiveDate;
         Reason = reason;
@@ -149,7 +149,7 @@ public class ApprovalBizData : AuditableEntity
     /// <param name="actualEndDate">实际搬离日期</param>
     /// <param name="depositReturn">押金处理方式（FULL / DEDUCT / LAST_RENT）</param>
     /// <param name="reason">终止原因说明</param>
-    public void SetTerminateData(string terminateType, DateOnly? actualEndDate, string? depositReturn, string? reason)
+    public void SetTerminateData(string terminateType, DateTime? actualEndDate, string? depositReturn, string? reason)
     {
         TerminateType = terminateType;
         ActualEndDate = actualEndDate;

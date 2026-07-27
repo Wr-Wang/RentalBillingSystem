@@ -26,5 +26,5 @@ public interface IHolidayCalendarRepository : IRepository<HolidayCalendar>
     /// <param name="date">日期</param>
     /// <param name="ct">取消令牌</param>
     /// <returns>节假日实体，非节假日时返回 null</returns>
-    Task<HolidayCalendar?> GetByDateAsync(Guid companyId, DateOnly date, CancellationToken ct = default);
+    Task<HolidayCalendar?> GetByDateAsync(Guid companyId, DateTime date, CancellationToken ct = default);
 }

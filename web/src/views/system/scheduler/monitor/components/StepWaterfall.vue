@@ -139,7 +139,7 @@ function statusTagType(status) {
 }
 
 function statusLabel(status) {
-  const map = { Completed: '成功', Failed: '失败', Running: '运行中', Stale: '僵死', Reversed: '已反转' }
+  const map = { Completed: '成功', Failed: '失败', Running: '运行中', Stale: '异常中断', Reversed: '已反转' }
   return map[status] || status
 }
 

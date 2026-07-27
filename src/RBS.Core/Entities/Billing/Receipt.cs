@@ -16,7 +16,7 @@ public class Receipt : AggregateRoot, IHasCompany
     /// <summary>收款总金额，创建时确定</summary>
     public decimal Amount { get; private set; }
     /// <summary>收款日期（到账日期）</summary>
-    public DateOnly ReceivedDate { get; private set; }
+    public DateTime ReceivedDate { get; private set; }
     /// <summary>支付渠道标识，记录付款方式（银行转账、微信、支付宝等）</summary>
     public Guid? PaymentChannelId { get; private set; }
     /// <summary>外部流水号/参考号，来自支付渠道的回执</summary>
@@ -50,7 +50,7 @@ public class Receipt : AggregateRoot, IHasCompany
     /// <param name="receivedDate">收款日期（到账日期）</param>
     /// <param name="companyId">公司标识</param>
     /// <exception cref="ArgumentException">收款单号为空或金额小于等于 0 时抛出</exception>
-    public Receipt(string receiptNo, decimal amount, DateOnly receivedDate, Guid companyId) : base()
+    public Receipt(string receiptNo, decimal amount, DateTime receivedDate, Guid companyId) : base()
     {
         if (string.IsNullOrWhiteSpace(receiptNo))
             throw new ArgumentException("收款单号不能为空", nameof(receiptNo));
@@ -71,7 +71,7 @@ public class Receipt : AggregateRoot, IHasCompany
     /// <param name="companyId">公司标识</param>
     /// <param name="paymentChannelId">支付渠道标识（可选）</param>
     /// <returns>新创建的 Pending 状态收款</returns>
-    public static Receipt CreateNew(decimal amount, DateOnly receivedDate, Guid companyId, Guid? paymentChannelId = null)
+    public static Receipt CreateNew(decimal amount, DateTime receivedDate, Guid companyId, Guid? paymentChannelId = null)
     {
         var receipt = new Receipt(GenerateReceiptNo(), amount, receivedDate, companyId);
         if (paymentChannelId.HasValue)

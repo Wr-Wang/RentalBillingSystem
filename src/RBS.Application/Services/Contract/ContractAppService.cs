@@ -379,7 +379,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
         {
             var effDate = item.EffectiveDate ?? "";
             if (!string.IsNullOrEmpty(effDate))
-                ContractEntity.ValidateFeeEffectiveDate(DateOnly.Parse(effDate), contract.StartDate, contract.EndDate, item.FeeName);
+                ContractEntity.ValidateFeeEffectiveDate(DateTime.Parse(effDate), contract.StartDate, contract.EndDate, item.FeeName);
         }
 
         // 找审批类型
@@ -482,7 +482,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
                                     Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contractId,
                                     FId = item.FeeCodeId, FConfigId = (Guid?)null, SubjId = sId,
                                     Period = effM, Amt = Math.Abs(diffAmt),
-                                    Due = DateOnly.FromDateTime(ChinaTime.Now).AddDays(30),
+                                    Due = ChinaTime.Now.Date.AddDays(30),
                                     EntryType = "Supplementary", BilledAt = ChinaTime.Now,
                                     DNId = (Guid?)null, ParentId = (Guid?)null,
                                     Summary = $"{item.FeeName}调价补差", CBy = userId

@@ -23,7 +23,7 @@ public class DapperContractRepository : DapperRepository<Contract>, IContractRep
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<Contract>(_sql.Get("Lease.Select.Contract.ByContractNo"), new { No = contractNo }); }
     public async Task<List<Contract>> GetActiveContractsAsync(Guid companyId, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>(_sql.Get("Lease.Select.Contract.Active"), new { Id = companyId })).ToList(); }
-    public async Task<List<Contract>> GetContractsExpiringAsync(DateOnly date, CancellationToken ct = default)
+    public async Task<List<Contract>> GetContractsExpiringAsync(DateTime date, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<Contract>(_sql.Get("Lease.Select.Contract.Expiring"), new { Date = date })).ToList(); }
     public async Task<bool> HasActiveForHousingUnitAsync(Guid housingUnitId, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Lease.Select.Contract.HasActiveForHousingUnit"), new { Id = housingUnitId }) > 0; }

@@ -206,7 +206,7 @@ public class ReceivableGenerationService : IReceivableGenerationService
         dt.Columns.Add("AccountingSubjectId", typeof(Guid));
         dt.Columns.Add("Period", typeof(string));
         dt.Columns.Add("Amount", typeof(decimal));
-        dt.Columns.Add("DueDate", typeof(DateOnly));
+        dt.Columns.Add("DueDate", typeof(DateTime));
         dt.Columns.Add("EntryType", typeof(string));
         dt.Columns.Add("BilledAt", typeof(DateTime));
         dt.Columns.Add("DebitNoteId", typeof(Guid));
@@ -223,11 +223,11 @@ public class ReceivableGenerationService : IReceivableGenerationService
         var periods = new List<string>();
 
         // 结束月份：有 EndDate 用 EndDate，null 表示长期合同，用当前月兜底
-        DateOnly endDate;
+        DateTime endDate;
         if (contract.EndDate != null)
             endDate = contract.EndDate.Value;
         else
-            endDate = DateOnly.FromDateTime(ChinaTime.Now);
+            endDate = ChinaTime.Now.Date;
 
         var curYear = start.Year; var curMonth = start.Month;
         var endYear = endDate.Year; var endMonth = endDate.Month;
@@ -280,12 +280,12 @@ public class ReceivableGenerationService : IReceivableGenerationService
     /// <summary>
     /// 计算指定账期的到期日 — 取合同到期日与当月最后一天的较小值
     /// </summary>
-    public DateOnly CalculateDueDate(string periodStr, ContractEntity contract)
+    public DateTime CalculateDueDate(string periodStr, ContractEntity contract)
     {
         var period = Period.Parse(periodStr);
         var lastDay = DateTime.DaysInMonth(period.Year, period.Month);
         var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
-        return new DateOnly(period.Year, period.Month, dueDay);
+        return new DateTime(period.Year, period.Month, dueDay);
     }
 
     /// <summary>获取前一账期的期末余额作为当前账期的期初余额</summary>

@@ -35,7 +35,7 @@ public class ContractDomainService : IContractDomainService
     /// <summary>
     /// 暂停合同。
     /// </summary>
-    public async Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateOnly newEndDate, CancellationToken ct = default)
+    public async Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateTime newEndDate, CancellationToken ct = default)
     {
         if (oldContract.Status != "Active" && oldContract.Status != "Expired")
             throw new InvalidOperationException("只有生效中或已到期的合同可以续签");
@@ -60,7 +60,7 @@ public class ContractDomainService : IContractDomainService
     /// </summary>
     public TerminationResult ExecuteContractTermination(
         Contract contract, IReadOnlyList<Journal> journals,
-        DateOnly? actualEndDate, string reason)
+        DateTime? actualEndDate, string reason)
     {
         // 1. 终止合同
         contract.Terminate(reason);
@@ -71,7 +71,7 @@ public class ContractDomainService : IContractDomainService
         // 3. 计算费用配置到期日期（由应用层执行 SQL 更新）
         var effectiveEnd = actualEndDate?.ToString("yyyy-MM-dd")
             ?? contract.EndDate?.ToString("yyyy-MM-dd")
-            ?? DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM-dd");
+            ?? ChinaTime.Now.ToString("yyyy-MM-dd");
 
         return new TerminationResult(effectiveEnd);
     }
@@ -79,15 +79,15 @@ public class ContractDomainService : IContractDomainService
     /// <summary>
     /// 按天分摊计算应收金额。
     /// </summary>
-    public decimal CalculateProratedAmount(decimal monthlyAmount, DateOnly startDate, DateOnly endDate,
-        DateOnly periodStart, DateOnly periodEnd)
+    public decimal CalculateProratedAmount(decimal monthlyAmount, DateTime startDate, DateTime endDate,
+        DateTime periodStart, DateTime periodEnd)
     {
         var daysInMonth = DateTime.DaysInMonth(periodStart.Year, periodStart.Month);
         var dailyRate = monthlyAmount / daysInMonth;
         var effectiveStart = startDate > periodStart ? startDate : periodStart;
         var effectiveEnd = endDate < periodEnd ? endDate : periodEnd;
-        var days = effectiveStart.DayNumber <= effectiveEnd.DayNumber
-            ? effectiveEnd.DayNumber - effectiveStart.DayNumber + 1
+        var days = effectiveStart <= effectiveEnd
+            ? (effectiveEnd - effectiveStart).Days + 1
             : 0;
         return Math.Round(dailyRate * days, 2);
     }

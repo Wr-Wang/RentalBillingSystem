@@ -243,14 +243,14 @@ public sealed class Period : ValueObject
     /// 获取当月的第一天日期
     /// 用于生成应收账单的开始日期、逾期计算的起始基准。
     /// </summary>
-    public DateOnly StartDate => new(Year, Month, 1);
+    public DateTime StartDate => new(Year, Month, 1);
 
     /// <summary>
     /// 获取当月的最后一天日期
     /// 自动处理闰年和大/小月差异（如 2 月 28/29 天、4 月 30 天等）。
     /// 用于计算应收账单的结束日期、逾期天数计算的截止日。
     /// </summary>
-    public DateOnly EndDate => new(Year, Month, DateTime.DaysInMonth(Year, Month));
+    public DateTime EndDate => new(Year, Month, DateTime.DaysInMonth(Year, Month));
 
     protected override IEnumerable<object> GetEqualityComponents()
     {

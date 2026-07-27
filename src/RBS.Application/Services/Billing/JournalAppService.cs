@@ -80,7 +80,7 @@ public class JournalAppService : IJournalAppService
         string FeeName,
         string Period,
         decimal Amount,
-        DateOnly DueDate,
+        DateTime DueDate,
         string ChargeType,
         string? EffStart = null,
         string? EffEnd = null
@@ -139,10 +139,10 @@ public class JournalAppService : IJournalAppService
             var year = int.Parse(period[..4]);
             var month = int.Parse(period[5..7]);
             var daysInMonth = DateTime.DaysInMonth(year, month);
-            var periodStart = new DateOnly(year, month, 1);
-            var periodEnd = new DateOnly(year, month, daysInMonth);
+            var periodStart = new DateTime(year, month, 1);
+            var periodEnd = new DateTime(year, month, daysInMonth);
             var dueDay = contract.EndDate.HasValue ? Math.Min(contract.EndDate.Value.Day, daysInMonth) : daysInMonth;
-            var dueDate = new DateOnly(year, month, dueDay);
+            var dueDate = new DateTime(year, month, dueDay);
 
             // 1) Recurring 费用 — 按天分摊（仅限 BillJob 已执行到的月份为止）
             if (string.Compare(period, maxBilledMonth, StringComparison.Ordinal) > 0)
@@ -155,18 +155,18 @@ public class JournalAppService : IJournalAppService
                     continue;
 
                 decimal prorated = 0;
-                DateOnly? groupEffStart = null, groupEffEnd = null;
+                DateTime? groupEffStart = null, groupEffEnd = null;
 
                 foreach (var fc in group)
                 {
                     var effStart = fc.EffectiveDate != null
-                        ? DateOnly.Parse(fc.EffectiveDate) : periodStart;
+                        ? DateTime.Parse(fc.EffectiveDate) : periodStart;
                     var effEnd = fc.ExpiryDate != null
-                        ? DateOnly.Parse(fc.ExpiryDate) : periodEnd;
+                        ? DateTime.Parse(fc.ExpiryDate) : periodEnd;
                     var overlapStart = effStart > periodStart ? effStart : periodStart;
                     var overlapEnd = effEnd < periodEnd ? effEnd : periodEnd;
                     var coveredDays = overlapStart <= overlapEnd
-                        ? overlapEnd.DayNumber - overlapStart.DayNumber + 1 : 0;
+                        ? (overlapEnd - overlapStart).Days + 1 : 0;
                     if (coveredDays > 0)
                     {
                         prorated += Math.Round(fc.Amount / daysInMonth * coveredDays, 2);
@@ -193,7 +193,7 @@ public class JournalAppService : IJournalAppService
             {
                 items.Add(new PreviewItem(
                     fc.FeeCodeId, fc.Name, period, fc.Amount,
-                    DateOnly.FromDateTime(ChinaTime.Now.AddDays(30)), "OneTime"
+                    ChinaTime.Now.AddDays(30), "OneTime"
                 ));
             }
         }

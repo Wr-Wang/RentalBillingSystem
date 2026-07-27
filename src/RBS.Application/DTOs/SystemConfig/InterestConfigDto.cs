@@ -7,7 +7,7 @@ public class InterestConfigDto
     public int GraceDays { get; set; }
     public decimal? MaxRate { get; set; }
     public decimal? MinAmount { get; set; }
-    public DateOnly EffectiveDate { get; set; }
+    public DateTime EffectiveDate { get; set; }
     public bool IsActive { get; set; }
 }
 
@@ -17,5 +17,5 @@ public class SaveInterestConfigRequest
     public int GraceDays { get; set; } = 0;
     public decimal? MaxRate { get; set; }
     public decimal? MinAmount { get; set; }
-    public DateOnly EffectiveDate { get; set; }
+    public DateTime EffectiveDate { get; set; }
 }

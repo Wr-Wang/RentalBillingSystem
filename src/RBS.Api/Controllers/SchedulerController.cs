@@ -331,10 +331,10 @@ public class SchedulerController : ControllerBase
         var taskStart = log.StartedAt;
         var taskEnd = log.CompletedAt ?? ChinaTime.Now;
 
-        // 1. 标记账单为 Cancelled
+        // 1. 标记账单为 Cancelled（按时间范围匹配）
         await conn.ExecuteAsync(
             _sql.Get("Scheduling.Update.DebitNote.CancelByTaskLog"),
-            new { Id = taskLogId, Reason = body?.Reason ?? "管理员反转" }, tx);
+            new { Start = taskStart, End = taskEnd, Reason = body?.Reason ?? "管理员反转" }, tx);
 
         // 2. 删除 Journal
         await conn.ExecuteAsync(
@@ -415,6 +415,19 @@ public class SchedulerController : ControllerBase
             _sql.Get("Scheduling.Select.ExecutionHeartbeat.ByExecutionId"),
             new { Id = id, Take = take });
         return Ok(beats);
+    }
+
+    /// <summary>手动标记任务日志为已完成（用于修复卡住的 Running/Processing 状态）</summary>
+    [HttpPut("tasklogs/{id}/complete")]
+    public async Task<IActionResult> CompleteTaskLog(Guid id, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await Dapper.SqlMapper.ExecuteAsync(conn,
+            "UPDATE TaskLogs SET Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status IN ('Running','Processing')",
+            new { Id = id });
+        if (affected == 0)
+            return NotFound(new { error = "未找到该日志或状态不允许修改" });
+        return Ok(new { status = "Completed" });
     }
 
     // ===== 日记账历史数据清理 =====

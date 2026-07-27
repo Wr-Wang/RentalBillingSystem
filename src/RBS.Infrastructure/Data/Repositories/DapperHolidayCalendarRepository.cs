@@ -21,6 +21,6 @@ public class DapperHolidayCalendarRepository : DapperRepository<HolidayCalendar>
     }
     public async Task<List<HolidayCalendar>> GetByYearAsync(Guid companyId, int year, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<HolidayCalendar>(_sql.Get("Calendar.Select.Holiday.ByYear"), new { Year = year })).ToList(); }
-    public async Task<HolidayCalendar?> GetByDateAsync(Guid companyId, DateOnly date, CancellationToken ct = default)
+    public async Task<HolidayCalendar?> GetByDateAsync(Guid companyId, DateTime date, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleOrDefaultAsync<HolidayCalendar>(_sql.Get("Calendar.Select.Holiday.ByDate"), new { Date = date }); }
 }

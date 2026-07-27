@@ -57,7 +57,7 @@ public class ContractFeeConfigsController : ControllerBase
         if (contract == null) return NotFound(new { message = "合同不存在" });
 
         // 校验生效日期在合同起止日期范围内
-        var effDate = DateOnly.Parse(request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"));
+        var effDate = DateTime.Parse(request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"));
         Contract.ValidateFeeEffectiveDate(effDate, contract.StartDate, contract.EndDate);
 
         if (contract.Status == "Active")
@@ -223,7 +223,7 @@ public class ContractFeeConfigsController : ControllerBase
         if (contract == null) return NotFound(new { message = "合同不存在" });
 
         // 校验生效日期在合同起止日期范围内
-        Contract.ValidateFeeEffectiveDate(DateOnly.Parse(request.EffectiveDate), contract.StartDate, contract.EndDate);
+        Contract.ValidateFeeEffectiveDate(DateTime.Parse(request.EffectiveDate), contract.StartDate, contract.EndDate);
 
         // Draft 合同直接执行
         using var conn = _db.CreateConnection(); conn.Open();

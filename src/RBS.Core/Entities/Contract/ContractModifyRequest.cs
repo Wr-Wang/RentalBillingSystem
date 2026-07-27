@@ -11,9 +11,9 @@ public class ContractModifyRequest : AuditableEntity
     /// <summary>被修改的合同标识</summary>
     public Guid ContractId { get; private set; }
     /// <summary>新的起租日期，null 表示不变更</summary>
-    public DateOnly? StartDate { get; private set; }
+    public DateTime? StartDate { get; private set; }
     /// <summary>新的到期日期，null 表示不变更</summary>
-    public DateOnly? EndDate { get; private set; }
+    public DateTime? EndDate { get; private set; }
     /// <summary>新的付款周期，null 表示不变更</summary>
     public string? PaymentCycle { get; private set; }
     /// <summary>新的自动续签标志，null 表示不变更</summary>
@@ -55,7 +55,7 @@ public class ContractModifyRequest : AuditableEntity
     /// <param name="paymentDueDay">新的付款到期日，null 表示不变更</param>
     /// <param name="tenantPhone">新的租客联系电话，null 表示不变更</param>
     /// <param name="remark">备注信息，null 表示不变更</param>
-    public void SetField(DateOnly? startDate, DateOnly? endDate, string? paymentCycle, bool? autoRenew,
+    public void SetField(DateTime? startDate, DateTime? endDate, string? paymentCycle, bool? autoRenew,
         bool? allowDepositAsLastRent, int? paymentDueDay, string? tenantPhone, string? remark)
     {
         StartDate = startDate; EndDate = endDate; PaymentCycle = paymentCycle;

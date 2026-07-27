@@ -147,8 +147,8 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
         else
         {
             // 仅 BillJob 需加载节假日数据用于调整
-            var billJobHolidays = new HashSet<DateOnly>();
-            var billJobMakeup = new HashSet<DateOnly>();
+            var billJobHolidays = new HashSet<DateTime>();
+            var billJobMakeup = new HashSet<DateTime>();
             bool isBillJob = job.JobName == "BillJob";
             if (isBillJob)
             {
@@ -159,9 +159,9 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
                     if (h.HolidayDate.Year >= startYear && h.HolidayDate.Year <= endYear)
                     {
                         if (h.IsWorkingDay)
-                            billJobMakeup.Add(h.HolidayDate);  // 调休上班
+                            billJobMakeup.Add(h.HolidayDate.Date);
                         else
-                            billJobHolidays.Add(h.HolidayDate);  // 放假
+                            billJobHolidays.Add(h.HolidayDate.Date);
                     }
                 }
             }
@@ -174,7 +174,10 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
                 {
                     var day = Math.Min(job.DayOfMonth ?? 1, DateTime.DaysInMonth(y, m));
                     var d = new DateTime(y, m, day, job.Hour, job.Minute, 0);
-                    var monthKey = d.ToString("yyyy-MM");
+                    // BillJob 生成的是下个月的账（如7月24日执行生成8月数据），month 取下个月
+                    var monthKey = isBillJob
+                        ? new DateTime(y, m, 1).AddMonths(1).ToString("yyyy-MM")
+                        : d.ToString("yyyy-MM");
                     var originalDate = d;
 
                     // 仅 BillJob 逢周末/节假日调整至最近工作日
@@ -212,9 +215,9 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
 
 
     /// <summary>调整日期到最近工作日（向前或向后）</summary>
-    private DateTime AdjustToWorkingDay(DateTime date, HashSet<DateOnly> holidays, HashSet<DateOnly> makeupDays)
+    private DateTime AdjustToWorkingDay(DateTime date, HashSet<DateTime> holidays, HashSet<DateTime> makeupDays)
     {
-        var d = DateOnly.FromDateTime(date);
+        var d = date.Date;
         if (IsWorkingDay(d, holidays, makeupDays)) return date;
 
         var forward = d.AddDays(1);
@@ -223,24 +226,25 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
         var backward = d.AddDays(-1);
         while (!IsWorkingDay(backward, holidays, makeupDays)) backward = backward.AddDays(-1);
 
-        var fwdDays = forward.DayNumber - d.DayNumber;
-        var bwdDays = d.DayNumber - backward.DayNumber;
+        var fwdDays = (forward - d).Days;
+        var bwdDays = (d - backward).Days;
         var nearest = fwdDays <= bwdDays ? forward : backward;
 
         return new DateTime(nearest.Year, nearest.Month, nearest.Day, date.Hour, date.Minute, date.Second);
     }
 
     /// <summary>判断是否为工作日（含节假日+调休判断）</summary>
-    private bool IsWorkingDay(DateOnly date, HashSet<DateOnly> holidays, HashSet<DateOnly> makeupDays)
+    private bool IsWorkingDay(DateTime date, HashSet<DateTime> holidays, HashSet<DateTime> makeupDays)
     {
+        var d = date.Date;
         // 调休上班日（周末上班）→ 工作日
-        if (makeupDays.Contains(date))
+        if (makeupDays.Contains(d))
             return true;
         // 法定节假日 → 非工作日
-        if (holidays.Contains(date))
+        if (holidays.Contains(d))
             return false;
         // 周六日 → 非工作日
-        if (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
+        if (d.DayOfWeek == DayOfWeek.Saturday || d.DayOfWeek == DayOfWeek.Sunday)
             return false;
         return true;
     }
@@ -249,6 +253,7 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
     {
         Id = e.Id,
         JobScheduleId = e.JobScheduleId,
+        CompanyId = e.CompanyId,
         Month = e.Month,
         TargetDate = e.TargetDate,
         OriginalDate = e.OriginalDate,

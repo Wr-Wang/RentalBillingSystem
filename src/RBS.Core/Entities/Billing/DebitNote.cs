@@ -61,7 +61,7 @@ public class DebitNote : AuditableEntity
     public bool IsHistorical { get; private set; }
 
     /// <summary>付款到期日，由出账时计算设定</summary>
-    public DateOnly? DueDate { get; private set; }
+    public DateTime? DueDate { get; private set; }
 
     /// <summary>出账时间，MarkGenerated 时记录</summary>
     public DateTime? GeneratedAt { get; private set; }
@@ -145,7 +145,7 @@ public class DebitNote : AuditableEntity
     /// <param name="taskLogId">出账任务日志 ID</param>
     /// <param name="isHistorical">是否为历史账单</param>
     /// <param name="dueDate">付款到期日</param>
-    public void MarkGenerated(Guid taskLogId, bool isHistorical = false, DateOnly? dueDate = null)
+    public void MarkGenerated(Guid taskLogId, bool isHistorical = false, DateTime? dueDate = null)
     {
         Status = "Published";
         GeneratedAt = RBS.Core.Common.ChinaTime.Now;

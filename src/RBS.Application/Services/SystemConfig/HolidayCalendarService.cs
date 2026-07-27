@@ -79,7 +79,7 @@ public class HolidayCalendarService : IHolidayCalendarService
 
         // 加载已有数据用于去重
         var existing = await _uow.HolidayCalendars.GetByYearAsync(companyId, year, ct);
-        var existingDates = new HashSet<DateOnly>(existing.Select(h => h.HolidayDate));
+        var existingDates = new HashSet<DateTime>(existing.Select(h => h.HolidayDate));
 
         var toInsert = new List<HolidayCalendar>();
         var imported = new List<HolidayCalendarDto>();
@@ -109,10 +109,10 @@ public class HolidayCalendarService : IHolidayCalendarService
     }
 
     private static void CollectDate(string dateStr, string raw, bool isWorkingDay, Guid companyId,
-        HashSet<DateOnly> existingDates,
+        HashSet<DateTime> existingDates,
         List<HolidayCalendar> toInsert, List<HolidayCalendarDto> imported, List<HolidayCalendarDto> skipped)
     {
-        if (!DateOnly.TryParse(dateStr, out var date)) return;
+        if (!DateTime.TryParse(dateStr, out var date)) return;
         var name = raw.Split(',').ElementAtOrDefault(1) ?? raw.Split(',').ElementAtOrDefault(0) ?? "节假日";
 
         if (existingDates.Contains(date))
@@ -140,7 +140,7 @@ public class HolidayCalendarService : IHolidayCalendarService
     {
         var dt = new DataTable("HolidayCalendars");
         dt.Columns.Add("Id", typeof(Guid));
-        dt.Columns.Add("HolidayDate", typeof(DateOnly));
+        dt.Columns.Add("HolidayDate", typeof(DateTime));
         dt.Columns.Add("Name", typeof(string));
         dt.Columns.Add("IsWorkingDay", typeof(bool));
         dt.Columns.Add("Year", typeof(int));

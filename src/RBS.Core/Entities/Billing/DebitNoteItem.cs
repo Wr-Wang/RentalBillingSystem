@@ -20,6 +20,9 @@ public class DebitNoteItem : AssociationEntity
     /// <summary>应收金额，单位：元。创建时确定不可变更。</summary>
     public decimal Amount { get; private set; }
 
+    /// <summary>关联日记账 ID，用于去重和追溯</summary>
+    public Guid? JournalId { get; private set; }
+
     /// <summary>已收金额，单位：元。通过 RecordPayment 累计。</summary>
     public decimal Received { get; private set; }
 

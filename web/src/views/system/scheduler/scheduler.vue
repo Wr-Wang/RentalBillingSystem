@@ -19,7 +19,7 @@
               <div><el-tag :color="statusColor('Paused')" style="color:#fff;border:0;margin-right:6px;" size="small">已暂停</el-tag> 手动暂停，调度引擎忽略</div>
               <div><el-tag :color="statusColor('Cancelled')" style="color:#fff;border:0;margin-right:6px;" size="small">已取消</el-tag> 手动取消（终态）</div>
               <div style="border-top:1px solid #eee;margin:6px 0 4px;padding-top:4px;"></div>
-              <div><el-tag :color="statusColor('Stale')" style="color:#fff;border:0;margin-right:6px;" size="small">僵死</el-tag> 进程崩溃，等待恢复</div>
+              <div><el-tag :color="statusColor('Stale')" style="color:#fff;border:0;margin-right:6px;" size="small">异常中断</el-tag> 进程崩溃/服务重启导致任务未正常完成</div>
               <div><el-tag :color="statusColor('Reversed')" style="color:#fff;border:0;margin-right:6px;" size="small">已撤销</el-tag> 被管理员反转</div>
             </div>
           </el-popover>
@@ -119,8 +119,10 @@
                 <el-button v-if="row.status==='Pending'" text type="danger" size="small" @click="handleCancelExec(row)">取消</el-button>
                 <!-- Skipped/Paused: 可恢复 -->
                 <el-button v-if="row.status==='Skipped'||row.status==='Paused'" text type="primary" size="small" @click="handleResumeExec(row)">恢复</el-button>
-                <!-- Completed/Processing: 无操作 -->
-                <el-button v-if="row.status==='Processing'||row.status==='Running'" text disabled size="small">执行中</el-button>
+                <!-- 非正常终态排期: 可重跑 -->
+                <el-button v-if="['Stale','Reversed','Skipped','Cancelled'].includes(row.status)" text type="primary" size="small" @click="handleRerunExec(row)">重跑</el-button>
+                <!-- Processing: 标记完成 -->
+                <el-button v-if="row.status==='Processing'||row.status==='Running'" text type="success" size="small" @click="handleCompleteExec(row)">标记完成</el-button>
                 <!-- 通用 -->
                 <el-button text size="small" v-permission="'system:schedulerexcedit'" @click="openEditExec(row)">编辑</el-button>
                 <el-button v-if="row.status!=='Processing'&&row.status!=='Running'" text type="danger" size="small" v-permission="'system:schedulerexecdelete'" @click="confirmDeleteExec(row)">删除</el-button>
@@ -164,8 +166,24 @@
           <el-descriptions-item label="上次状态"><el-tag v-if="execJob.lastRunStatus" size="small" :type="execJob.lastRunStatus==='Success'?'success':'danger'">{{ execJob.lastRunStatus }}</el-tag><span v-else>-</span></el-descriptions-item>
         </el-descriptions>
         <el-alert type="warning" :closable="false" style="margin-top:12px;">
-          <template #title>执行后将立即触发该任务，确认继续？</template>
+          <template #title>将按排期计划的分割数据执行，确认继续？</template>
         </el-alert>
+        <el-form style="margin-top:16px;" label-width="90px" size="small">
+          <el-form-item label="排期计划">
+            <el-select v-model="execScheduleId" placeholder="选择排期" style="width:100%;" @change="onExecScheduleChange">
+              <el-option v-for="ex in execScheduleOptions" :key="ex.id" :value="ex.id" :label="ex.label" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="目标账期">
+            <span style="color:#409eff;">{{ execTargetMonth || '-' }}</span>
+          </el-form-item>
+          <el-form-item label="执行模式">
+            <el-radio-group v-model="execMode">
+              <el-radio value="execute">执行</el-radio>
+              <el-radio value="dryrun">预执行</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-form>
       </div>
       <template #footer>
         <el-button @click="execConfirmVisible=false">取消</el-button>
@@ -208,6 +226,7 @@ async function fetchJobs() {
         // 下次执行（最近的 Pending）
         const next = pending.sort((a,b) => new Date(a.targetDate)-new Date(b.targetDate))[0]
         job._nextRun = next ? chinaTime.formatDate(next.targetDate) : null
+        job._nextTargetMonth = next ? next.month : null
         job._pendingCount = pending.length
         // 上次执行（最近的 Completed/Failed/Processing）
         const done = list.filter(e => e.status !== 'Pending')
@@ -233,10 +252,45 @@ const execConfirmVisible = ref(false)
 const execJob = ref(null)
 const execRunning = ref(false)
 const lastRunText = ref('')
+const execTargetMonth = ref('')
+const execCompanyId = ref('')
+const execMode = ref('execute')
+const execScheduleId = ref('')
+const execScheduleOptions = ref([])
+
+function onExecScheduleChange(id) {
+  const ex = execScheduleOptions.value.find(e => e.id === id)
+  if (ex) {
+    execTargetMonth.value = ex.month
+    execCompanyId.value = ex.companyId
+  }
+}
 
 function handleExecute(job) {
   execJob.value = job
   lastRunText.value = job.lastRunAt ? chinaTime.formatDate(job.lastRunAt) : '从未执行'
+
+  // 构建排期选项：所有非运行中的执行排期
+  const list = executions.value || []
+  const opts = list
+    .filter(e => !['Processing','Running'].includes(e.status))
+    .map(e => ({
+      id: e.id,
+      jobScheduleId: e.jobScheduleId,
+      month: e.month,
+      companyId: e.companyId,
+      label: `${chinaTime.formatDateTime(e.targetDate)}  [${statusLabel(e.status)}]  ${e.month}`
+    }))
+    .sort((a, b) => b.label.localeCompare(a.label))
+  execScheduleOptions.value = opts
+
+  // 默认选中第一个待执行的排期，否则选第一个
+  const pending = opts.find(e => list.find(l => l.id === e.id)?.status === 'Pending')
+  const target = pending || opts[0]
+  execScheduleId.value = target?.id || ''
+  execTargetMonth.value = target?.month || chinaTime.currentMonth()
+  execCompanyId.value = target?.companyId || ''
+  execMode.value = 'execute'
   execConfirmVisible.value = true
 }
 
@@ -244,9 +298,15 @@ async function doExecute() {
   if (!execJob.value) return
   execRunning.value = true
   try {
-    const r = await executeJob(execJob.value.jobName, { mode:'execute', companyId:'00000000-0000-0000-0000-000000000000', targetMonth: chinaTime.currentMonth() })
+    const r = await executeJob(execJob.value.jobName, { mode: execMode.value, companyId: execCompanyId.value || '00000000-0000-0000-0000-000000000000', targetMonth: execTargetMonth.value })
     ElMessage.success(r?.result||'任务已触发')
+    // 标记选中的排期为已完成
+    const selected = execScheduleOptions.value.find(e => e.id === execScheduleId.value)
+    if (selected && selected.jobScheduleId) {
+      try { await updateExecution(selected.jobScheduleId, selected.id, { status: 'Success' }) } catch {}
+    }
     execConfirmVisible.value = false
+    await fetchExecutions()
   } catch {
     ElMessage.error('执行失败')
   } finally {
@@ -372,13 +432,28 @@ async function handleResumeExec(r){
     await fetchExecutions(); await fetchJobs()
   } catch {}
 }
+async function handleCompleteExec(r){
+  try {
+    await updateExecution(selectedJob.value.id, r.id, { status: 'Success', reason: '手动标记完成' })
+    ElMessage.success('已标记为完成')
+    await fetchExecutions(); await fetchJobs()
+  } catch {}
+}
+async function handleRerunExec(r){
+  try {
+    await ElMessageBox.confirm(`确认重跑此排期？将按 ${r.month} 账期重新执行。`,'确认重跑',{type:'info'})
+    await executeJob(selectedJob.value.jobName, { mode:'execute', companyId: r.companyId, targetMonth: r.month })
+    ElMessage.success('任务已触发')
+    await fetchExecutions()
+  } catch {}
+}
 async function handleGenerate(){
   try{genLoading.value=true;const r=await generateExecutions(selectedJob.value.id);ElMessage.success(`生成 ${r.generated||0} 条`);await fetchExecutions()}
   catch{ElMessage.error('生成失败')}finally{genLoading.value=false}
 }
 
 function statusColor(s){return {Completed:'#67c23a',Success:'#67c23a',Failed:'#f56c6c',Processing:'#409eff',Running:'#409eff',Pending:'#909399',Skipped:'#e6a23c',Paused:'#d4a017',Cancelled:'#b0b0b0',Stale:'#e6a23c',Reversed:'#9e9e9e'}[s]||'#909399'}
-function statusLabel(s){return {Pending:'待执行',Processing:'处理中',Running:'执行中',Completed:'已完成',Success:'成功',Failed:'失败',Skipped:'已跳过',Paused:'已暂停',Cancelled:'已取消',Stale:'僵死',Reversed:'已撤销'}[s]||s}
+function statusLabel(s){return {Pending:'待执行',Processing:'处理中',Running:'执行中',Completed:'已完成',Success:'成功',Failed:'失败',Skipped:'已跳过',Paused:'已暂停',Cancelled:'已取消',Stale:'异常中断',Reversed:'已撤销'}[s]||s}
 
 onMounted(fetchJobs)
 </script>

@@ -23,7 +23,7 @@
             <el-option label="成功" value="Completed" />
             <el-option label="失败" value="Failed" />
             <el-option label="运行中" value="Running" />
-            <el-option label="僵死" value="Stale" />
+            <el-option label="异常中断" value="Stale" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -112,10 +112,11 @@
           <span v-else-if="row.successCount == null">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right" @click.stop>
+      <el-table-column label="操作" width="150" fixed="right" @click.stop>
         <template #default="{row}">
           <el-button text size="small" @click.stop="openStepDrawer(row)">详情</el-button>
           <el-button v-if="row.status==='Failed'" text type="primary" size="small" @click.stop="handleRetry(row)">重试</el-button>
+          <el-button v-if="row.status==='Running'||row.status==='Processing'" text type="success" size="small" @click.stop="handleCompleteLog(row)">标记完成</el-button>
           <el-button v-if="row.status==='Completed'&&row.runMode!=='DryRun'&&row.taskName==='BillJob'"
             text type="warning" size="small" @click.stop="handleReverse(row)">反转</el-button>
         </template>
@@ -147,7 +148,16 @@
             <el-table-column label="失败步骤" width="140">
               <template #default="{ row }">{{ row.stepDisplayName }}</template>
             </el-table-column>
-            <el-table-column prop="errorMessage" label="错误信息" min-width="200" />
+            <el-table-column label="错误信息" min-width="200">
+              <template #default="{ row }">
+                <div style="display:flex;align-items:center">
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.errorMessage }}</span>
+                  <el-button link size="small" @click.stop="copyText(row.errorMessage)" style="flex-shrink:0;margin-left:4px;">
+                    <el-icon><CopyDocument /></el-icon>
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column label="状态" width="80">
               <template #default="{ row }">
                 <el-tag v-if="row.isRetried" type="success" size="small">已修复</el-tag>
@@ -171,9 +181,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { chinaTime } from '@/utils/chinaTime'
 import {
   queryMonitorLogs, getMonitorLogDetail, getMonitorFailedContracts,
-  previewReverse
+  previewReverse, completeTaskLog
 } from '../../../../api/index'
 import { executeJob, reverseTask } from '../../../../api/index'
+import { CopyDocument } from '@element-plus/icons-vue'
 import StepWaterfall from './components/StepWaterfall.vue'
 
 const loading = ref(false)
@@ -336,7 +347,7 @@ function statusType(s) {
   return { Completed: 'success', Failed: 'danger', Running: 'primary', Stale: 'warning', Reversed: 'info' }[s] || 'info'
 }
 function statusLabel(s) {
-  return { Completed: '成功', Failed: '失败', Running: '运行中', Stale: '僵死', Reversed: '已反转' }[s] || s
+  return { Completed: '成功', Failed: '失败', Running: '运行中', Stale: '异常中断', Reversed: '已反转' }[s] || s
 }
 function triggerLabel(t) {
   return { Scheduled: '自动', Manual: '手动', Event: '事件' }[t] || t
@@ -345,6 +356,24 @@ function triggerLabel(t) {
 function formatDuration(ms) {
   if (!ms) return '-'
   return (ms / 1000).toFixed(3) + 's'
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage.success('已复制')
+  }).catch(() => {
+    ElMessage.warning('复制失败')
+  })
+}
+
+async function handleCompleteLog(row) {
+  try {
+    await completeTaskLog(row.id)
+    ElMessage.success('已标记为完成')
+    await fetchLogs()
+  } catch {
+    ElMessage.error('标记失败')
+  }
 }
 
 onMounted(fetchLogs)

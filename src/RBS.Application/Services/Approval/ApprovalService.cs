@@ -251,7 +251,7 @@ public class ApprovalService : IApprovalService
             var ip = _clientInfo.GetClientIp();
             var hostname = _clientInfo.GetClientHostname();
             var rows = await _uow.ExecuteSqlRawAsync(updateSql,
-                new object[] { userId, now, id, ip, hostname }, ct);
+                new object[] { userId, now, id, ip ?? "", hostname ?? "" }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
@@ -343,7 +343,7 @@ public class ApprovalService : IApprovalService
             var hostname = _clientInfo.GetClientHostname();
             var rows = await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Approval.Update.Request.ToRejected"),
-                new object[] { userId, now, id, ip, hostname }, ct);
+                new object[] { userId, now, id, ip ?? "", hostname ?? "" }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 
@@ -422,7 +422,7 @@ public class ApprovalService : IApprovalService
             var hostname = _clientInfo.GetClientHostname();
             var rows = await _uow.ExecuteSqlRawAsync(
                 _sql.Get("Approval.Update.Request.ToCancelled"),
-                new object[] { userId, now, id, ip, hostname }, ct);
+                new object[] { userId, now, id, ip ?? "", hostname ?? "" }, ct);
             if (rows == 0)
                 throw new InvalidOperationException("该审批已被其他人处理，请刷新后查看");
 

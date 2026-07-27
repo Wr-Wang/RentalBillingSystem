@@ -62,17 +62,17 @@ public class ReportingService : IReportingService
             {
                 Id = (Guid)p.Id, ContractId = (Guid)p.ContractId, FeeCodeId = (Guid)p.FeeCodeId,
                 Period = (string)p.Period, Amount = (decimal)p.Amount,
-                DueDate = DateOnly.FromDateTime((DateTime)p.DueDate), DaysOverdue = (int)p.DaysOverdue
+                DueDate = (DateTime)p.DueDate, DaysOverdue = (int)p.DaysOverdue
             };
         }).OrderByDescending(p => p.DaysOverdue).ToList();
 
         return enriched;
     }
 
-    public async Task<object> GetDailyReceiptAsync(Guid? companyId, DateOnly? date, CancellationToken ct)
+    public async Task<object> GetDailyReceiptAsync(Guid? companyId, DateTime? date, CancellationToken ct)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        var d = date ?? DateOnly.FromDateTime(ChinaTime.Now);
+        var d = date ?? ChinaTime.Now;
         var result = await conn.QueryAsync(
             _sql.Get("Billing.Select.Receipt.DailyReceipt"),
             new { D = d, CompanyId = companyId });

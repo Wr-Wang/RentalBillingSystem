@@ -19,7 +19,7 @@ public class BankStatement : AuditableEntity, IHasCompany
     /// 交易日期
     /// 银行流水中的交易发生日期（注意：可能与内部系统记账日期不一致）
     /// </summary>
-    public DateOnly TransactionDate { get; private set; }
+    public DateTime TransactionDate { get; private set; }
 
     /// <summary>
     /// 交易金额
@@ -77,7 +77,7 @@ public class BankStatement : AuditableEntity, IHasCompany
     /// <param name="transactionDate">交易日期</param>
     /// <param name="amount">交易金额（正=收入，负=支出）</param>
     /// <param name="balance">交易后余额</param>
-    public BankStatement(Guid companyId, DateOnly transactionDate, decimal amount, decimal balance)
+    public BankStatement(Guid companyId, DateTime transactionDate, decimal amount, decimal balance)
     {
         CompanyId = companyId;
         TransactionDate = transactionDate;

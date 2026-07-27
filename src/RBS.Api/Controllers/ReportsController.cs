@@ -22,7 +22,7 @@ public class ReportsController : ControllerBase
         => Ok(await _reporting.GetOverdueDetailAsync(companyId, period, ct));
 
     [HttpGet("dailyreceipt")]
-    public async Task<IActionResult> GetDailyReceipt([FromQuery] Guid? companyId, [FromQuery] DateOnly? date, CancellationToken ct)
+    public async Task<IActionResult> GetDailyReceipt([FromQuery] Guid? companyId, [FromQuery] DateTime? date, CancellationToken ct)
         => Ok(await _reporting.GetDailyReceiptAsync(companyId, date, ct));
 
     [HttpGet("monthlyreceipt")]

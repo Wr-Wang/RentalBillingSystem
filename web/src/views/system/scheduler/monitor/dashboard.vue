@@ -62,7 +62,7 @@
             <el-table-column label="状态" width="70">
               <template #default="{row}">
                 <el-tag :type="row.status === 'Failed' ? 'danger' : 'warning'" size="small" effect="dark" round>
-                  {{ row.status === 'Failed' ? '失败' : '僵死' }}
+                  {{ row.status === 'Failed' ? '失败' : '异常中断' }}
                 </el-tag>
               </template>
             </el-table-column>

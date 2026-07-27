@@ -140,8 +140,8 @@ public class ContractsController : ControllerBase
     /// <summary>合同更新请求体</summary>
     public class ContractUpdateRequest
     {
-        public DateOnly? StartDate { get; set; }
-        public DateOnly? EndDate { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
         public string? PaymentCycle { get; set; }
         public bool? AutoRenew { get; set; }
     }
@@ -154,8 +154,8 @@ public class ContractsController : ControllerBase
     public class CreateContractRequestDto
     {
         public Guid RoomId { get; set; }
-        public DateOnly StartDate { get; set; }
-        public DateOnly? EndDate { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
         public string PaymentCycle { get; set; } = "Monthly";
         public Guid CompanyId { get; set; }
         public List<Guid> TenantIds { get; set; } = new();

@@ -32,7 +32,7 @@ public class InterestConfigService : IInterestConfigService
         return active != null ? Map(active) : new InterestConfigDto
         {
             DailyRate = 0.0005m, GraceDays = 3, MaxRate = 100, MinAmount = 1,
-            EffectiveDate = DateOnly.FromDateTime(ChinaTime.Now), IsActive = true
+            EffectiveDate = ChinaTime.Now, IsActive = true
         };
     }
 

@@ -27,12 +27,12 @@ public interface IContractDomainService
     /// <summary>
     /// 暂停合同：暂停期间不生成应收计划。
     /// </summary>
-    Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateOnly newEndDate, CancellationToken ct = default);
+    Task<Contract> RenewContractAsync(Contract oldContract, string contractNo, DateTime newEndDate, CancellationToken ct = default);
 
     /// <summary>
     /// 按天分摊计算应收金额。
     /// </summary>
-    decimal CalculateProratedAmount(decimal monthlyAmount, DateOnly startDate, DateOnly endDate, DateOnly periodStart, DateOnly periodEnd);
+    decimal CalculateProratedAmount(decimal monthlyAmount, DateTime startDate, DateTime endDate, DateTime periodStart, DateTime periodEnd);
 
     /// <summary>
     /// 执行合同终止 — 校验并变更合同状态。
@@ -42,5 +42,5 @@ public interface IContractDomainService
     /// <param name="actualEndDate">实际终止日期</param>
     /// <param name="reason">终止原因</param>
     /// <returns>终止结果，含费用配置到期日期</returns>
-    TerminationResult ExecuteContractTermination(Contract contract, IReadOnlyList<Journal> journals, DateOnly? actualEndDate, string reason);
+    TerminationResult ExecuteContractTermination(Contract contract, IReadOnlyList<Journal> journals, DateTime? actualEndDate, string reason);
 }

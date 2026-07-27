@@ -20,13 +20,13 @@ public class BankReconciliation : AuditableEntity, IHasCompany
     /// 对账开始日期
     /// 本次对账周期的起始日期（含）
     /// </summary>
-    public DateOnly StartDate { get; private set; }
+    public DateTime StartDate { get; private set; }
 
     /// <summary>
     /// 对账结束日期
     /// 本次对账周期的结束日期（含）
     /// </summary>
-    public DateOnly EndDate { get; private set; }
+    public DateTime EndDate { get; private set; }
 
     /// <summary>
     /// 对账状态
@@ -81,11 +81,11 @@ public class BankReconciliation : AuditableEntity, IHasCompany
     /// 创建银行对账会话实例，初始状态为 InProgress（进行中）
     /// </summary>
     /// <param name="companyId">所属公司标识</param>
-    /// <param name="startDate">对账开始日期</param>
-    /// <param name="endDate">对账结束日期</param>
+    /// <param name="startDate">对账开始日期时间</param>
+    /// <param name="endDate">对账结束日期时间</param>
     /// <param name="openingBalance">期初余额</param>
     /// <param name="closingBalance">期末余额</param>
-    public BankReconciliation(Guid companyId, DateOnly startDate, DateOnly endDate,
+    public BankReconciliation(Guid companyId, DateTime startDate, DateTime endDate,
         decimal openingBalance, decimal closingBalance)
     {
         CompanyId = companyId;

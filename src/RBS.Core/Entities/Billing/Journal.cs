@@ -41,7 +41,7 @@ public class Journal : AuditableEntity, IHasCompany
     public decimal Amount { get; private set; }
 
     /// <summary>到期日</summary>
-    public DateOnly DueDate { get; private set; }
+    public DateTime DueDate { get; private set; }
 
     /// <summary>
     /// 条目类型
@@ -84,7 +84,7 @@ public class Journal : AuditableEntity, IHasCompany
         Guid accountingSubjectId,
         string period,
         decimal amount,
-        DateOnly dueDate,
+        DateTime dueDate,
         string entryType,
         DateTime billedAt,
         Guid? debitNoteId,

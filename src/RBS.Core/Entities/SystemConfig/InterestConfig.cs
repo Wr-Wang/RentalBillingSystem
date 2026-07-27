@@ -35,7 +35,7 @@ public class InterestConfig : AuditableEntity, IHasCompany
     /// 生效日期，该配置从该日期起生效。
     /// 系统按生效日期查找最新的活跃配置进行计算
     /// </summary>
-    public DateOnly EffectiveDate { get; private set; }
+    public DateTime EffectiveDate { get; private set; }
 
     /// <summary>
     /// 是否启用，true=启用（使用该配置），false=停用（不生效）
@@ -60,7 +60,7 @@ public class InterestConfig : AuditableEntity, IHasCompany
     /// <param name="graceDays">宽限天数</param>
     /// <param name="companyId">所属公司标识</param>
     /// <param name="effectiveDate">生效日期</param>
-    public InterestConfig(decimal dailyRate, int graceDays, Guid companyId, DateOnly effectiveDate)
+    public InterestConfig(decimal dailyRate, int graceDays, Guid companyId, DateTime effectiveDate)
     {
         DailyRate = dailyRate;
         GraceDays = graceDays;
@@ -76,7 +76,7 @@ public class InterestConfig : AuditableEntity, IHasCompany
     /// <param name="maxRate">利息上限百分比（可选）</param>
     /// <param name="minAmount">最低利息（可选）</param>
     /// <param name="effectiveDate">生效日期</param>
-    public void Update(decimal dailyRate, int graceDays, decimal? maxRate, decimal? minAmount, DateOnly effectiveDate)
+    public void Update(decimal dailyRate, int graceDays, decimal? maxRate, decimal? minAmount, DateTime effectiveDate)
     {
         DailyRate = dailyRate;
         GraceDays = graceDays;

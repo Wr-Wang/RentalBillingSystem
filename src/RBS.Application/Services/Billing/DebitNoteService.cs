@@ -184,7 +184,8 @@ public class DebitNoteService : IDebitNoteService
             await conn.ExecuteAsync(
                 _sql.Get("Billing.Insert.DebitNoteItem.Default"),
                 new { Id = Guid.NewGuid(), DebitNoteId = noteId, FeeCodeId = journal.FeeCodeId,
-                    FeeName = feeName, Amount = journal.Amount, CreatedBy = _currentUser.UserId, CreatedAt = ChinaTime.Now });
+                    FeeName = feeName, Amount = journal.Amount, JournalId = journal.Id,
+                    CreatedBy = _currentUser.UserId, CreatedAt = ChinaTime.Now });
         }
 
         // 5. 写入收款快照

@@ -14,9 +14,9 @@ public class ContractDto
     /// <summary>房源完整编码</summary>
     public string? RoomFullCode { get; set; }
     /// <summary>起租日期</summary>
-    public DateOnly StartDate { get; set; }
+    public DateTime StartDate { get; set; }
     /// <summary>到期日期（null 表示不限）</summary>
-    public DateOnly? EndDate { get; set; }
+    public DateTime? EndDate { get; set; }
     /// <summary>付款周期：Monthly / Quarterly / HalfYearly / Yearly</summary>
     public string PaymentCycle { get; set; } = "Monthly";
     /// <summary>合同状态：Draft / Active / Suspended / Terminated</summary>
@@ -111,9 +111,9 @@ public class CreateContractRequest
     /// <summary>房间 ID</summary>
     public Guid RoomId { get; set; }
     /// <summary>起租日期</summary>
-    public DateOnly StartDate { get; set; }
+    public DateTime StartDate { get; set; }
     /// <summary>到期日期</summary>
-    public DateOnly? EndDate { get; set; }
+    public DateTime? EndDate { get; set; }
     /// <summary>付款周期</summary>
     public string PaymentCycle { get; set; } = "Monthly";
     /// <summary>所属公司 ID</summary>
@@ -172,9 +172,9 @@ public class FeeAdjustItem
 public class ContractModifySubmitRequest
 {
     /// <summary>新的起租日期，null 表示不变更</summary>
-    public DateOnly? StartDate { get; set; }
+    public DateTime? StartDate { get; set; }
     /// <summary>新的到期日期，null 表示不变更</summary>
-    public DateOnly? EndDate { get; set; }
+    public DateTime? EndDate { get; set; }
     /// <summary>新的付款周期，null 表示不变更</summary>
     public string? PaymentCycle { get; set; }
     /// <summary>新的自动续签标志，null 表示不变更</summary>

@@ -13,7 +13,7 @@ public class HolidayCalendar : AuditableEntity, IHasCompany
     /// <summary>
     /// 节假日日期（不含时间），标识具体的节假日或调休日
     /// </summary>
-    public DateOnly HolidayDate { get; private set; }
+    public DateTime HolidayDate { get; private set; }
 
     /// <summary>
     /// 节假日名称（可选），如 "春节"、"国庆节"、"元旦调休"
@@ -44,7 +44,7 @@ public class HolidayCalendar : AuditableEntity, IHasCompany
     /// <param name="name">节假日名称（可选）</param>
     /// <param name="isWorkingDay">false=放假, true=调休上班</param>
     /// <param name="companyId">所属公司标识</param>
-    public HolidayCalendar(DateOnly holidayDate, string? name, bool isWorkingDay, Guid companyId)
+    public HolidayCalendar(DateTime holidayDate, string? name, bool isWorkingDay, Guid companyId)
     {
         HolidayDate = holidayDate;
         Name = name;

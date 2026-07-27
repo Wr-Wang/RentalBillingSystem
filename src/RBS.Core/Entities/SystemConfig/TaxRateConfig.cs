@@ -22,7 +22,7 @@ public class TaxRateConfig : AuditableEntity, IHasCompany
     /// 生效日期，该税率从该日期起适用。
     /// 系统按日期查找最新的活跃税率配置进行计算
     /// </summary>
-    public DateOnly EffectiveDate { get; private set; }
+    public DateTime EffectiveDate { get; private set; }
 
     /// <summary>
     /// 是否启用，true=启用（使用该税率），false=停用（不生效）
@@ -47,7 +47,7 @@ public class TaxRateConfig : AuditableEntity, IHasCompany
     /// <param name="rate">税率比例（如 0.06 表示 6%）</param>
     /// <param name="effectiveDate">生效日期</param>
     /// <param name="companyId">所属公司标识</param>
-    public TaxRateConfig(string name, decimal rate, DateOnly effectiveDate, Guid companyId)
+    public TaxRateConfig(string name, decimal rate, DateTime effectiveDate, Guid companyId)
     { Name = name; Rate = rate; EffectiveDate = effectiveDate; CompanyId = companyId; }
 
     /// <summary>重命名税率名称</summary>
@@ -60,7 +60,7 @@ public class TaxRateConfig : AuditableEntity, IHasCompany
 
     /// <summary>设置生效日期</summary>
     /// <param name="date">生效日期</param>
-    public void SetEffectiveDate(DateOnly date) => EffectiveDate = date;
+    public void SetEffectiveDate(DateTime date) => EffectiveDate = date;
 
     /// <summary>启用该税率配置</summary>
     public void Activate() => IsActive = true;

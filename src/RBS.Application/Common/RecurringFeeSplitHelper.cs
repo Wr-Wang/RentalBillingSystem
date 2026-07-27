@@ -31,8 +31,8 @@ public static class RecurringFeeSplitHelper
         decimal? unitPrice,
         string effectiveDate,
         Guid createdBy,
-        DateOnly contractStartDate,
-        DateOnly? contractEndDate)
+        DateTime contractStartDate,
+        DateTime? contractEndDate)
     {
         var segments = billingDomain.CalculateMonthlySplit(amount, effectiveDate, ChinaTime.Now,
             contractStartDate, contractEndDate);

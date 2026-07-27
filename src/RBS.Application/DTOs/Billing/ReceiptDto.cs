@@ -10,7 +10,7 @@ public class ReceiptDto
     public Guid? ContractId { get; set; }
     public string? ContractNo { get; set; }
     public decimal Amount { get; set; }
-    public DateOnly ReceivedDate { get; set; }
+    public DateTime ReceivedDate { get; set; }
     public Guid? PaymentChannelId { get; set; }
     public string? PaymentChannelName { get; set; }
     public string? ReferenceNo { get; set; }

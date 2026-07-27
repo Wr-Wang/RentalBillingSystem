@@ -81,7 +81,7 @@ public class TerminateJob : ITerminateJob
             var refundAmt = depositAmt - offsetAmt - deduction;
 
             var billedAt = ChinaTime.Now;
-            var dueDate = DateOnly.FromDateTime(now);
+            var dueDate = now.Date;
 
             // 借方：2241 押金（全额冲减）
             await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Default"),

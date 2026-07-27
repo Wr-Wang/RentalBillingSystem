@@ -110,10 +110,10 @@ public class RenewalService : IRenewalService
         };
 
         // 默认续签信息
-        var endDate = DateOnly.FromDateTime(DateTime.Today);
-        if (contract.EndDate is DateOnly ed) endDate = ed;
+        var endDate = DateTime.Today;
+        if (contract.EndDate is DateTime ed) endDate = ed;
         var suggestedStart = endDate.AddDays(1);
-        var suggestedEnd = new DateOnly(suggestedStart.Year + 1, suggestedStart.Month, suggestedStart.Day).AddDays(-1);
+        var suggestedEnd = new DateTime(suggestedStart.Year + 1, suggestedStart.Month, suggestedStart.Day).AddDays(-1);
 
         dto.DefaultRenewalInfo = new RenewalDefaultsDto
         {
@@ -130,7 +130,6 @@ public class RenewalService : IRenewalService
     {
         if (dateValue == null) return "";
         if (dateValue is DateTime dt) return dt.ToString("yyyy-MM-dd");
-        if (dateValue is DateOnly d) return d.ToString("yyyy-MM-dd");
         return dateValue.ToString() ?? "";
     }
 
@@ -176,7 +175,7 @@ public class RenewalService : IRenewalService
         // 5. 校验日期逻辑：新合同起租日 = 原合同到期次日，到期日必须晚于起租日
         if (oldContract.EndDate == null) throw new InvalidOperationException("无固定到期日的合同不可续签");
         var newStartDate = oldContract.EndDate.Value.AddDays(1);
-        var parsedNewEndDate = DateOnly.FromDateTime(DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture));
+        var parsedNewEndDate = DateTime.Parse(request.NewEndDate, System.Globalization.CultureInfo.InvariantCulture);
         if (parsedNewEndDate <= newStartDate)
             throw new InvalidOperationException($"新合同到期日期必须晚于起租日期（{newStartDate:yyyy-MM-dd}），当前到期日 {parsedNewEndDate:yyyy-MM-dd} 无效");
 

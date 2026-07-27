@@ -42,7 +42,7 @@ public class BillingAppService : IBillingService
             FeeCodeId = (Guid)p.FeeCodeId,
             Period = (string)p.Period,
             Amount = (decimal)p.Amount,
-            DueDate = DateOnly.FromDateTime((DateTime)p.DueDate),
+            DueDate = (DateTime)p.DueDate,
             EntryType = (string)p.EntryType,
             GLPosted = (bool)p.GLPosted,
             BillMonth = (string?)(p.BillMonth ?? null)

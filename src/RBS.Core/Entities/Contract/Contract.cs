@@ -13,9 +13,9 @@ public class Contract : AggregateRoot, IHasCompany
     /// <summary>房源标识，指向 HousingUnit 聚合根</summary>
     public Guid RoomId { get; private set; }
     /// <summary>合同起租日期，用于生成应收的时间起点</summary>
-    public DateOnly StartDate { get; private set; }
+    public DateTime StartDate { get; private set; }
     /// <summary>合同到期日期，null 表示不限制（无固定到期日，即长期合同）</summary>
-    public DateOnly? EndDate { get; private set; }
+    public DateTime? EndDate { get; private set; }
     /// <summary>付款周期，可选值：Monthly（月付）、Quarterly（季付）、Yearly（年付）、OneTime（一次性）</summary>
     public string PaymentCycle { get; private set; }
     /// <summary>合同状态，基于 ContractStatus 枚举的状态机管理</summary>
@@ -106,7 +106,7 @@ public class Contract : AggregateRoot, IHasCompany
     /// <param name="end">到期日期，null 表示不限制</param>
     /// <exception cref="ArgumentException">当结束日期不为 null 且小于等于开始日期时抛出</exception>
     /// <exception cref="InvalidOperationException">当合同不是草稿状态时抛出</exception>
-    public void SetPeriod(DateOnly start, DateOnly? end)
+    public void SetPeriod(DateTime start, DateTime? end)
     {
         if (end.HasValue && start >= end.Value) throw new ArgumentException("结束日期必须大于开始日期");
         AssertIsDraft();
@@ -235,7 +235,7 @@ public class Contract : AggregateRoot, IHasCompany
         var active = _feeConfigs.FirstOrDefault(f => f.FeeCodeId == feeCodeId && f.IsActive);
         if (active != null)
         {
-            var expiryDate = DateOnly.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
+            var expiryDate = DateTime.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
             active.ExpireOn(expiryDate);
         }
 
@@ -336,7 +336,7 @@ public class Contract : AggregateRoot, IHasCompany
     /// </summary>
     /// <param name="date">目标日期</param>
     /// <returns>合同状态为生效中且日期在合同期内返回 true；EndDate 为 null 时仅判断不早于 StartDate</returns>
-    public bool IsEffectiveOn(DateOnly date)
+    public bool IsEffectiveOn(DateTime date)
         => Status == "Active" && date >= StartDate && (EndDate == null || date <= EndDate.Value);
 
     /// <summary>
@@ -366,8 +366,8 @@ public class Contract : AggregateRoot, IHasCompany
     /// <returns>从 StartDate 到今天的自然天数（含起租日）</returns>
     public int ElapsedDaysSinceStart()
     {
-        var today = DateOnly.FromDateTime(ChinaTime.Now);
-        return today.DayNumber - StartDate.DayNumber;
+        var today = ChinaTime.Now.Date;
+        return (today - StartDate.Date).Days;
     }
 
     /// <summary>
@@ -377,8 +377,8 @@ public class Contract : AggregateRoot, IHasCompany
     public int RemainingDays()
     {
         if (EndDate == null) return int.MaxValue;
-        var today = DateOnly.FromDateTime(ChinaTime.Now);
-        return EndDate.Value.DayNumber - today.DayNumber;
+        var today = ChinaTime.Now.Date;
+        return (EndDate.Value.Date - today).Days;
     }
 
     // ===== 静态校验方法 =====
@@ -391,7 +391,7 @@ public class Contract : AggregateRoot, IHasCompany
     /// <param name="contractEndDate">合同到期日期，null 表示长期</param>
     /// <param name="feeDescription">费用描述（可选，用于错误信息）</param>
     /// <exception cref="InvalidOperationException">当生效日期不在合同日期范围内时抛出</exception>
-    public static void ValidateFeeEffectiveDate(DateOnly effectiveDate, DateOnly contractStartDate, DateOnly? contractEndDate, string? feeDescription = null)
+    public static void ValidateFeeEffectiveDate(DateTime effectiveDate, DateTime contractStartDate, DateTime? contractEndDate, string? feeDescription = null)
     {
         var prefix = feeDescription != null ? $"「{feeDescription}」" : "";
         if (effectiveDate < contractStartDate)

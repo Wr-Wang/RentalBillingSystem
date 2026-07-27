@@ -59,7 +59,7 @@ public class BankingService : IBankingService
             // 按金额匹配（绝对值相等）
             var match = confirmedReceipts.FirstOrDefault(r =>
                 Math.Abs(r.Amount) == Math.Abs(stmt.Amount)
-                && Math.Abs(r.ReceivedDate.DayNumber - stmt.TransactionDate.DayNumber) <= 3);
+                && Math.Abs((r.ReceivedDate - stmt.TransactionDate).TotalDays) <= 3);
 
             if (match == null) continue;
 

@@ -16,7 +16,7 @@ public class BillingDomainService : IBillingDomainService
     /// </summary>
     public List<Journal> GenerateJournals(
         List<(Guid FeeCodeId, decimal Amount, string? EffectiveDate, string? ExpiryDate)> feeConfigs,
-        Guid contractId, Guid companyId, string period, DateOnly dueDate,
+        Guid contractId, Guid companyId, string period, DateTime dueDate,
         Guid defaultSubjectId, DateTime billedAt)
     {
         var journals = new List<Journal>();
@@ -39,17 +39,17 @@ public class BillingDomainService : IBillingDomainService
 
     private static bool IsFeeEffectiveForPeriod(string? effectiveDate, string? expiryDate, string period)
     {
-        var periodStart = DateOnly.Parse($"{period}-01");
+        var periodStart = DateTime.Parse($"{period}-01");
         var periodEnd = periodStart.AddDays(DateTime.DaysInMonth(periodStart.Year, periodStart.Month) - 1);
 
         if (effectiveDate != null)
         {
-            var eff = DateOnly.Parse(effectiveDate);
+            var eff = DateTime.Parse(effectiveDate);
             if (periodEnd < eff) return false;
         }
         if (expiryDate != null)
         {
-            var exp = DateOnly.Parse(expiryDate);
+            var exp = DateTime.Parse(expiryDate);
             if (periodStart > exp) return false;
         }
         return true;
@@ -58,15 +58,15 @@ public class BillingDomainService : IBillingDomainService
     /// <summary>
     /// 计算利息（利息）。基于 Journal 余额和配置计算逾期费用。
     /// </summary>
-    public decimal CalculateInterest(decimal amount, decimal received, DateOnly dueDate,
-        string status, InterestConfig config, DateOnly asOfDate)
+    public decimal CalculateInterest(decimal amount, decimal received, DateTime dueDate,
+        string status, InterestConfig config, DateTime asOfDate)
     {
         if (status == "Paid" || status == "Cancelled")
             return 0;
         if (asOfDate <= dueDate)
             return 0;
 
-        var daysOverdue = asOfDate.DayNumber - dueDate.DayNumber;
+        var daysOverdue = (int)(asOfDate.Date - dueDate.Date).TotalDays;
         var effectiveDays = Math.Max(0, daysOverdue - config.GraceDays);
         if (effectiveDays <= 0) return 0;
 
@@ -96,15 +96,15 @@ public class BillingDomainService : IBillingDomainService
     /// </summary>
     public List<Journal> GenerateProratedJournals(
         List<(Guid FeeCodeId, decimal Amount, string? EffectiveDate, string? ExpiryDate, string FeeName)> feeConfigs,
-        Guid contractId, string period, DateOnly dueDate,
+        Guid contractId, string period, DateTime dueDate,
         Guid companyId, Guid defaultSubjectId, DateTime billedAt)
     {
         var periodParts = period.Split('-');
         var year = int.Parse(periodParts[0]);
         var month = int.Parse(periodParts[1]);
         var daysInMonth = DateTime.DaysInMonth(year, month);
-        var periodStart = new DateOnly(year, month, 1);
-        var periodEnd = new DateOnly(year, month, daysInMonth);
+        var periodStart = new DateTime(year, month, 1);
+        var periodEnd = new DateTime(year, month, daysInMonth);
 
         var groups = feeConfigs.GroupBy(f => f.FeeCodeId);
         var journals = new List<Journal>();
@@ -115,13 +115,13 @@ public class BillingDomainService : IBillingDomainService
             foreach (var config in group)
             {
                 var effStart = config.EffectiveDate != null
-                    ? DateOnly.Parse(config.EffectiveDate) : periodStart;
+                    ? DateTime.Parse(config.EffectiveDate) : periodStart;
                 var effEnd = config.ExpiryDate != null
-                    ? DateOnly.Parse(config.ExpiryDate) : periodEnd;
+                    ? DateTime.Parse(config.ExpiryDate) : periodEnd;
                 var overlapStart = effStart > periodStart ? effStart : periodStart;
                 var overlapEnd = effEnd < periodEnd ? effEnd : periodEnd;
                 var coveredDays = overlapStart <= overlapEnd
-                    ? overlapEnd.DayNumber - overlapStart.DayNumber + 1 : 0;
+                    ? (int)(overlapEnd - overlapStart).TotalDays + 1 : 0;
                 if (coveredDays > 0)
                     totalAmount += Math.Round(config.Amount / daysInMonth * coveredDays, 2);
             }
@@ -152,9 +152,9 @@ public class BillingDomainService : IBillingDomainService
     /// 输出：4 个分段：5/20~5/31(1741.94), 6/1~6/30(4500), 7/1~7/31(4500), 8/1~NULL(4500)
     /// </example>
     public List<FeeMonthSegment> CalculateMonthlySplit(decimal monthlyAmount, string effectiveDate, DateTime now,
-        DateOnly contractStartDate, DateOnly? contractEndDate)
+        DateTime contractStartDate, DateTime? contractEndDate)
     {
-        var effDate = DateOnly.Parse(effectiveDate);
+        var effDate = DateTime.Parse(effectiveDate);
 
         // 兜底裁剪：生效日期不能早于合同起租日
         if (effDate < contractStartDate)
@@ -164,8 +164,8 @@ public class BillingDomainService : IBillingDomainService
         if (contractEndDate.HasValue && effDate > contractEndDate.Value)
             return new List<FeeMonthSegment>();
 
-        var effMonth = new DateOnly(effDate.Year, effDate.Month, 1);
-        var currentMonth = new DateOnly(now.Year, now.Month, 1);
+        var effMonth = new DateTime(effDate.Year, effDate.Month, 1);
+        var currentMonth = new DateTime(now.Year, now.Month, 1);
         var nextMonth = currentMonth.AddMonths(1);
         var segments = new List<FeeMonthSegment>();
 
@@ -200,7 +200,7 @@ public class BillingDomainService : IBillingDomainService
             // segEffDate 不应超过合同到期日
             if (contractEndDate.HasValue)
             {
-                var segEffParsed = DateOnly.Parse(segEffDate);
+                var segEffParsed = DateTime.Parse(segEffDate);
                 if (segEffParsed > contractEndDate.Value)
                     break;
             }
@@ -214,8 +214,8 @@ public class BillingDomainService : IBillingDomainService
             decimal segAmount;
             if (cursor == effMonth)
             {
-                var segEff = DateOnly.Parse(segEffDate);
-                var occupiedDays = actMonthEnd.DayNumber - segEff.DayNumber + 1;
+                var segEff = DateTime.Parse(segEffDate);
+                var occupiedDays = (int)(actMonthEnd - segEff).TotalDays + 1;
                 segAmount = occupiedDays > 0
                     ? Math.Round(monthlyAmount / daysInMonth * occupiedDays, 2)
                     : 0;
@@ -239,7 +239,7 @@ public class BillingDomainService : IBillingDomainService
         }
 
         // 未来长期配置：下月1日起，无到期日，启用（但不超过合同到期日）
-        if (!contractEndDate.HasValue || nextMonth <= DateOnly.FromDateTime(new DateTime(contractEndDate.Value.Year, contractEndDate.Value.Month, 1)))
+        if (!contractEndDate.HasValue || nextMonth <= new DateTime(contractEndDate.Value.Year, contractEndDate.Value.Month, 1))
         {
             segments.Add(new FeeMonthSegment
             {

@@ -30,7 +30,7 @@ public interface IReportingService
     /// <param name="date">日期，null 表示今日</param>
     /// <param name="ct">取消令牌</param>
     /// <returns>每日收款数据</returns>
-    Task<object> GetDailyReceiptAsync(Guid? companyId, DateOnly? date, CancellationToken ct);
+    Task<object> GetDailyReceiptAsync(Guid? companyId, DateTime? date, CancellationToken ct);
 
     /// <summary>
     /// 获取月度收款汇总

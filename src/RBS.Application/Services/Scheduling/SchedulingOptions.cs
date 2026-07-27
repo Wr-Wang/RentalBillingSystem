@@ -15,9 +15,9 @@ public class SchedulingOptions
     /// 合同级并行度
     /// BillJob/SettleJob 内部使用 Parallel.ForEachAsync 并行处理合同的数量上限。
     /// 设为 1 相当于串行。值过大会撑爆数据库连接池（需配合 Max Pool Size 使用）。
-    /// 默认值 20
+    /// 默认值 1（串行，避免并发写入同一套表时的锁冲突）
     /// </summary>
-    public int ContractParallelism { get; set; } = 20;
+    public int ContractParallelism { get; set; } = 1;
 
     /// <summary>
     /// PDF 导出并行度

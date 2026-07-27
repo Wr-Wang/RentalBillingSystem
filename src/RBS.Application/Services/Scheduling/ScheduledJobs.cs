@@ -42,7 +42,7 @@ public class AutoRenewJob : IScheduledJob
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
     {
         var taskLogId = _jobContext.TaskLogId;
-        var today = DateOnly.FromDateTime(ChinaTime.Now);
+        var today = ChinaTime.Now.Date;
         var targetDate = today.AddDays(7);
 
         // Step01: 查询到期合同
@@ -174,7 +174,7 @@ public class CollectionJob : IScheduledJob
         var stepCreate = await _stepLogger.StartStepAsync(taskLogId,
             "Collection.Create", "按逾期阶段创建催缴记录", null, null, ct);
 
-        var today = DateOnly.FromDateTime(ChinaTime.Now);
+        var today = ChinaTime.Now.Date;
         int created = 0;
 
         // 预加载已存在的催缴记录（移至循环外，避免重复查询全表）
@@ -184,7 +184,7 @@ public class CollectionJob : IScheduledJob
 
         foreach (var journal in overdueJournals)
         {
-            var daysOverdue = today.DayNumber - (DateOnly.FromDateTime((DateTime)journal.DueDate)).DayNumber;
+            var daysOverdue = (int)today.Subtract((DateTime)journal.DueDate).TotalDays;
 
             var stage = stages
                 .Where(s => s.IsAuto && daysOverdue >= s.OverdueDaysFrom && daysOverdue <= s.OverdueDaysTo)
@@ -284,7 +284,7 @@ public class RenewalReminderJob : IScheduledJob
         var stepQuery = await _stepLogger.StartStepAsync(taskLogId,
             "Reminder.Query", $"查询到期前{advanceDays}天的合同", null, null, ct);
 
-        var today = DateOnly.FromDateTime(ChinaTime.Now);
+        var today = ChinaTime.Now.Date;
         var targetDate = today.AddDays(advanceDays);
 
         using var conn = _db.CreateConnection(); conn.Open();
@@ -303,7 +303,7 @@ public class RenewalReminderJob : IScheduledJob
             "Reminder.Notify", "发送到期提醒通知", null, null, ct);
         try
         {
-            var sampleDate = expiring.First().EndDate is DateOnly ed
+            var sampleDate = expiring.First().EndDate is DateTime ed
                 ? ed.ToString("yyyy-MM-dd") : targetDate.ToString("yyyy-MM-dd");
             await _notificationService.NotifyRoleAsync("OpsSupervisor",
                 $"合同到期提醒",

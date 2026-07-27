@@ -25,7 +25,7 @@ namespace RBS.Core.Common;
 /// </summary>
 public class ChineseWorkdayCalendar
 {
-    private readonly Func<DateOnly, bool> _isWorkingDayOverride;
+    private readonly Func<DateTime, bool> _isWorkingDayOverride;
 
     /// <summary>
     /// 创建中国工作日日历实例
@@ -37,7 +37,7 @@ public class ChineseWorkdayCalendar
     /// - 如果外部对该日期没有配置，应返回 false（使用默认规则）
     /// 传 null 则仅使用默认规则（周一至周五工作日，周六日休息）。
     /// </param>
-    public ChineseWorkdayCalendar(Func<DateOnly, bool>? isWorkingDayOverride = null)
+    public ChineseWorkdayCalendar(Func<DateTime, bool>? isWorkingDayOverride = null)
     {
         _isWorkingDayOverride = isWorkingDayOverride ?? (_ => false);
     }
@@ -56,7 +56,7 @@ public class ChineseWorkdayCalendar
     /// </summary>
     /// <param name="date">待判断的日期</param>
     /// <returns>如果是工作日则返回 true，否则返回 false</returns>
-    public bool IsWorkingDay(DateOnly date)
+    public bool IsWorkingDay(DateTime date)
     {
         // 先查外部覆盖（调休上班）
         if (_isWorkingDayOverride(date)) return true;
@@ -86,7 +86,7 @@ public class ChineseWorkdayCalendar
     /// </summary>
     /// <param name="date">起始日期</param>
     /// <returns>从起始日期后第一个工作日（不含起始日本身）</returns>
-    public DateOnly GetNextWorkingDay(DateOnly date)
+    public DateTime GetNextWorkingDay(DateTime date)
     {
         var next = date.AddDays(1);
         while (!IsWorkingDay(next)) next = next.AddDays(1);
@@ -99,7 +99,7 @@ public class ChineseWorkdayCalendar
     /// </summary>
     /// <param name="date">起始日期</param>
     /// <returns>起始日期之前最近的工作日（不含起始日本身）</returns>
-    public DateOnly GetPreviousWorkingDay(DateOnly date)
+    public DateTime GetPreviousWorkingDay(DateTime date)
     {
         var prev = date.AddDays(-1);
         while (!IsWorkingDay(prev)) prev = prev.AddDays(-1);
@@ -114,7 +114,7 @@ public class ChineseWorkdayCalendar
     /// <param name="start">起始日期（包含）</param>
     /// <param name="end">结束日期（不包含）</param>
     /// <returns>区间内的工作日天数</returns>
-    public int CountWorkingDays(DateOnly start, DateOnly end)
+    public int CountWorkingDays(DateTime start, DateTime end)
     {
         int count = 0;
         for (var d = start; d < end; d = d.AddDays(1))
@@ -132,7 +132,7 @@ public class ChineseWorkdayCalendar
     /// <param name="start">开始计算的基础日期</param>
     /// <param name="workingDays">需要向前推进的工作日数量</param>
     /// <returns>经过 N 个工作日后的日期</returns>
-    public DateOnly AddWorkingDays(DateOnly start, int workingDays)
+    public DateTime AddWorkingDays(DateTime start, int workingDays)
     {
         var current = start;
         int added = 0;
@@ -149,5 +149,5 @@ public class ChineseWorkdayCalendar
     /// </summary>
     /// <param name="date">待判断的日期</param>
     /// <returns>如果是周六或周日返回 true，否则 false</returns>
-    private static bool _isWeekend(DateOnly date) => date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+    private static bool _isWeekend(DateTime date) => date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
 }

@@ -279,7 +279,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             {
                 var effDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
                 if (!string.IsNullOrEmpty(effDate))
-                    Contract.ValidateFeeEffectiveDate(DateOnly.Parse(effDate), contract.StartDate, contract.EndDate, item.FeeName);
+                    Contract.ValidateFeeEffectiveDate(DateTime.Parse(effDate), contract.StartDate, contract.EndDate, item.FeeName);
             }
         }
 
@@ -287,7 +287,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         {
             var effectiveDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
             if (string.IsNullOrEmpty(effectiveDate)) continue;
-            var expiryDate = DateOnly.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
+            var expiryDate = DateTime.Parse(effectiveDate).AddDays(-1).ToString("yyyy-MM-dd");
 
             // 校验新生效日必须大于原生效日，否则到期日 < 生效日
             using var conn = _db.CreateConnection(); conn.Open();
@@ -297,8 +297,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             if (current != null)
             {
                 var curEff = (DateTime)((dynamic)current).EffectiveDate;
-                var newEff = DateOnly.Parse(effectiveDate);
-                if (newEff <= DateOnly.FromDateTime(curEff))
+                var newEff = DateTime.Parse(effectiveDate);
+                if (newEff <= curEff)
                     throw new InvalidOperationException(
                         $"费用项 {item.FeeName} 的生效日期 {effectiveDate} 必须晚于当前配置的生效日期 {curEff:yyyy-MM-dd}");
             }
@@ -360,7 +360,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
         // ★ Commit 之后再生成补差 Supplementary JE（FeeConfig 已落库，
         //    补差 JE 生成失败不影响 FeeConfig 变更，可手动重试）
-        var currentMonth = DateOnly.FromDateTime(ChinaTime.Now).ToString("yyyy-MM");
+        var currentMonth = ChinaTime.Now.ToString("yyyy-MM");
         var companyId = bizData.CompanyId;
 
         foreach (var item in feeItems)
@@ -371,13 +371,13 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
 
             // 生效月 M ≤ 当前月+1 → 已出账单范围 → 生成补差
             if (string.Compare(effMonth, currentMonth, StringComparison.Ordinal) <= 0 ||
-                effMonth == DateOnly.FromDateTime(ChinaTime.Now).AddMonths(1).ToString("yyyy-MM"))
+                effMonth == ChinaTime.Now.AddMonths(1).ToString("yyyy-MM"))
             {
                 var diff = item.NewAmount - item.OldAmount;
                 if (diff == 0) continue;
 
                 // 生效月按天分摊差价
-                var effDateObj = DateOnly.Parse(effDate);
+                var effDateObj = DateTime.Parse(effDate);
                 var daysInMonth = DateTime.DaysInMonth(effDateObj.Year, effDateObj.Month);
                 var occupiedDays = daysInMonth - effDateObj.Day + 1;
                 var proratedDiff = Math.Round(diff / daysInMonth * occupiedDays, 2);
@@ -389,7 +389,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     jeConn.Open();
                     await InsertJournalAsync(jeConn, null,
                         companyId, item.ContractId, item.FeeCodeId, null,
-                        effMonth, proratedDiff, DateOnly.FromDateTime(ChinaTime.Now),
+                        effMonth, proratedDiff, ChinaTime.Now,
                         "Supplementary", $"调价补差 {item.FeeName} {effMonth}");
                 }
                 catch { /* 补差 JE 失败不影响 FeeConfig 变更，可手动重试 */ }
@@ -412,7 +412,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         if (bizData != null && bizData.IsProcessed) return;
 
         // 校验生效日期在合同起止日期范围内，并缓存合同日期供后续使用
-        var contractCache = new Dictionary<Guid, (DateOnly StartDate, DateOnly? EndDate)>();
+        var contractCache = new Dictionary<Guid, (DateTime StartDate, DateTime? EndDate)>();
         var contractIds = feeItems.Select(f => f.ContractId).Distinct().ToList();
         foreach (var cid in contractIds)
         {
@@ -422,7 +422,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             foreach (var item in feeItems.Where(f => f.ContractId == cid))
             {
                 var effDate = item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd");
-                Contract.ValidateFeeEffectiveDate(DateOnly.Parse(effDate), c.StartDate, c.EndDate, item.FeeName);
+                Contract.ValidateFeeEffectiveDate(DateTime.Parse(effDate), c.StartDate, c.EndDate, item.FeeName);
             }
         }
 
@@ -460,7 +460,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                 if (chargeType == "Recurring")
                 {
                     var (cStart, cEnd) = contractCache.TryGetValue(item.ContractId, out var cd)
-                        ? cd : (DateOnly.FromDateTime(ChinaTime.Now), (DateOnly?)null);
+                        ? cd : (ChinaTime.Now, (DateTime?)null);
                     var segments = _billingDomain.CalculateMonthlySplit(
                         item.NewAmount,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
@@ -479,7 +479,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                             var seg = segments[i];
                             if (seg.ExpiryDate == null) continue;
 
-                            var period = DateOnly.Parse(seg.EffectiveDate).ToString("yyyy-MM");
+                            var period = DateTime.Parse(seg.EffectiveDate).ToString("yyyy-MM");
                             var exists = await conn.QuerySingleAsync<int>(
                                 _sql.Get("Billing.Select.Journal.ExistsByKey"),
                                 new { C = item.ContractId, F = item.FeeCodeId, P = period }, tx);
@@ -488,7 +488,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                             await InsertJournalAsync(conn, tx,
                                 companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, configIds[i],
                                 period, seg.Amount,
-                                DateOnly.FromDateTime(ChinaTime.Now),
+                                ChinaTime.Now,
                                 "Normal", $"应收 {item.FeeName} {period}");
                         }
 }
@@ -516,7 +516,7 @@ if (chargeType == "OneTime")
                     // 插入 ReceivablePlan（一次性费用应收计划，关联到 FeeConfig 实例以支持同费用多次添加）
                     // 使用 Unposted SQL，GLPosted=0，待收款确认后再过账
                     var feeContract = await conn.QuerySingleOrDefaultAsync("SELECT StartDate FROM Contracts WHERE Id = @Id", new { Id = item.ContractId }, tx);
-                    var contractStart = feeContract != null ? DateOnly.FromDateTime((DateTime)feeContract.StartDate) : DateOnly.FromDateTime(ChinaTime.Now);
+                    var contractStart = feeContract != null ? (DateTime)feeContract.StartDate : ChinaTime.Now;
                     var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
                     await InsertJournalAsync(conn, tx,
                         companyId ?? Guid.Empty, item.ContractId, item.FeeCodeId, oneTimeConfigId,
@@ -818,9 +818,9 @@ if (chargeType == "OneTime")
                 new { Id = request.ContractId }, tx);
             if (contractRow != null)
             {
-                var cStart = DateOnly.FromDateTime((DateTime)contractRow.StartDate);
+                var cStart = (DateTime)contractRow.StartDate;
                 var cEnd = contractRow.EndDate != null
-                    ? DateOnly.FromDateTime((DateTime)contractRow.EndDate) : (DateOnly?)null;
+                    ? (DateTime)contractRow.EndDate : (DateTime?)null;
 
                 var allConfigs = (await conn.QueryAsync<dynamic>(
                     _sql.Get("Lease.Select.ContractFeeConfig.WithFeeCodeByContract"),
@@ -911,7 +911,7 @@ if (chargeType == "OneTime")
                 await InsertJournalAsync(conn, tx,
                     request.CompanyId, request.ContractId, (Guid)item.FeeCodeId, null,
                     (string)item.Period, (decimal)item.Amount,
-                    DateOnly.FromDateTime((DateTime)item.DueDate),
+                    (DateTime)item.DueDate,
                     "Normal", $"生成应收 {item.Period}");
 
                 await conn.ExecuteAsync(
@@ -1078,7 +1078,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	        // 校验生效日期在合同起止日期范围内
 	        var contract = await _uow.Contracts.GetByIdAsync(request.ContractId, ct);
 	        if (contract != null && !string.IsNullOrEmpty(request.EffectiveDate))
-	            Contract.ValidateFeeEffectiveDate(DateOnly.Parse(request.EffectiveDate), contract!.StartDate, contract!.EndDate);
+	            Contract.ValidateFeeEffectiveDate(DateTime.Parse(request.EffectiveDate), contract!.StartDate, contract!.EndDate);
 
 	        List<dynamic> items;
         using (var conn3 = _db.CreateConnection()) { conn3.Open();
@@ -1147,7 +1147,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 		                await InsertJournalAsync(conn, tx,
 		                    request.CompanyId, request.ContractId, request.FeeCodeId, configId,
 		                    (string)item.Period, (decimal)item.ProratedAmount,
-		                    DateOnly.FromDateTime(ChinaTime.Now),
+		                    ChinaTime.Now,
 		                    "Normal", $"补充收费 {item.Period}");
 
 	               
@@ -1231,7 +1231,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
     /// </summary>
     private async Task InsertJournalAsync(IDbConnection conn, IDbTransaction? tx,
         Guid companyId, Guid contractId, Guid feeCodeId, Guid? feeConfigId,
-        string period, decimal amount, DateOnly dueDate, string entryType, string summary)
+        string period, decimal amount, DateTime dueDate, string entryType, string summary)
     {
         await conn.ExecuteAsync(_sql.Get("Billing.Insert.Journal.Unposted"),
             new

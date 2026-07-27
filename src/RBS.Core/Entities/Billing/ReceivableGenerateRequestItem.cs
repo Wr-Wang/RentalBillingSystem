@@ -36,7 +36,7 @@ public class ReceivableGenerateRequestItem : AuditableEntity
     /// <summary>
     /// 到期日 — 此笔应收款项的约定付款截止日期。
     /// </summary>
-    public DateOnly DueDate { get; private set; }
+    public DateTime DueDate { get; private set; }
 
     /// <summary>
     /// 分录类型 — 应收款项的业务类型分类。支持以下值：
@@ -69,7 +69,7 @@ public class ReceivableGenerateRequestItem : AuditableEntity
     /// <param name="dueDate">付款到期日。</param>
     /// <param name="entryType">分录类型，"Normal"(正常)、"Deposit"(押金)、"Supplementary"(补录)，默认 "Normal"。</param>
     public ReceivableGenerateRequestItem(Guid requestId, Guid feeCodeId, string feeName,
-        string period, decimal amount, DateOnly dueDate, string entryType = "Normal")
+        string period, decimal amount, DateTime dueDate, string entryType = "Normal")
     {
         RequestId = requestId; FeeCodeId = feeCodeId; FeeName = feeName;
         Period = period; Amount = amount; DueDate = dueDate; EntryType = entryType;

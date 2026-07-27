@@ -21,7 +21,7 @@ public class RenewalRequest : AuditableEntity, IHasCompany
     /// <summary>续签后新租金</summary>
     public decimal NewRent { get; private set; }
     /// <summary>续签后新的到期日期</summary>
-    public DateOnly NewEndDate { get; private set; }
+    public DateTime NewEndDate { get; private set; }
     /// <summary>押金处理方式：TRANSFER（转移）/ RETURN（退还）/ NEW_DEPOSIT（新押金）等</summary>
     public string DepositHandling { get; private set; } = "TRANSFER";
     /// <summary>原合同押金金额</summary>
@@ -51,7 +51,7 @@ public class RenewalRequest : AuditableEntity, IHasCompany
     /// <param name="newRent">续签后新租金</param>
     /// <param name="newEndDate">续签后新到期日期</param>
     /// <param name="companyId">所属公司标识</param>
-    public RenewalRequest(Guid oldContractId, string contractNo, decimal previousRent, decimal newRent, DateOnly newEndDate, Guid companyId)
+    public RenewalRequest(Guid oldContractId, string contractNo, decimal previousRent, decimal newRent, DateTime newEndDate, Guid companyId)
     {
         OldContractId = oldContractId;
         ContractNo = contractNo;

@@ -336,8 +336,8 @@
       ORDER BY dn.CreatedAt DESC]]>
   </select>
   <insert id="Billing.Insert.DebitNoteItem.Default">
-    <![CDATA[INSERT INTO DebitNoteItems (Id, DebitNoteId, FeeCodeId, FeeName, Amount, CreatedBy, CreatedAt)
-      VALUES (@Id, @DebitNoteId, @FeeCodeId, @FeeName, @Amount, @CreatedBy, @CreatedAt)]]>
+    <![CDATA[INSERT INTO DebitNoteItems (Id, DebitNoteId, FeeCodeId, FeeName, Amount, JournalId, CreatedBy, CreatedAt)
+      VALUES (@Id, @DebitNoteId, @FeeCodeId, @FeeName, @Amount, @JournalId, @CreatedBy, @CreatedAt)]]>
   </insert>
   <select id="Billing.Select.DebitNoteItem.ByDebitNoteId">
     <![CDATA[SELECT * FROM DebitNoteItems WHERE DebitNoteId=@Id ORDER BY CreatedAt]]>
@@ -1766,19 +1766,16 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <select id="Monitor.Select.TaskLog.PreviewReverse">
     <![CDATA[
       -- 检查该期是否有收款
-      SELECT COUNT(1) FROM Journals je
-      JOIN AccountingSubjects s ON s.Id = je.AccountingSubjectId
-      WHERE s.Code = '1001' AND je.VoucherId IN
-      (SELECT Id FROM Vouchers WHERE SourceEntityId IN
-      (SELECT ContractId FROM ReceivablePlans WHERE Period = @P));
-      -- 账单数
-      SELECT COUNT(1) FROM DebitNotes WHERE BillJobTaskLogId = @Id AND Status = 'Published';
-      -- 应收计划数
-      SELECT COUNT(1) FROM ReceivablePlans
-      WHERE Period = @P AND CreatedAt >= @Start AND CreatedAt <= @End;
-      -- 凭证数
-      SELECT COUNT(1) FROM Vouchers
-      WHERE SourceEntityType = 'ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End;
+      SELECT COUNT(1) FROM Receipts
+      WHERE FORMAT(ReceivedDate, 'yyyy-MM') = @P AND Status = 'Confirmed';
+      -- 账单数（按账期匹配）
+      SELECT COUNT(1) FROM DebitNotes
+      WHERE PeriodYear = CAST(SUBSTRING(@P, 1, 4) AS INT)
+        AND PeriodMonth = CAST(SUBSTRING(@P, 6, 2) AS INT)
+        AND Status = 'Published';
+      -- Journal 数
+      SELECT COUNT(1) FROM Journals
+      WHERE Period = @P AND Amount > 0;
     ]]>
   </select>
   <select id="Contract.Select.FeeConfig.IdByContractAndCode">
@@ -2070,7 +2067,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT * FROM [JobSchedules] WHERE [Id]=@Id AND [IsActive]=1]]>
   </select>
     <update id="Scheduling.Update.DebitNote.CancelByTaskLog">
-    <![CDATA[UPDATE DebitNotes SET Status='Cancelled', CancelledAt=DATEADD(HOUR, 8, GETUTCDATE()), CancelReason=@Reason WHERE BillJobTaskLogId=@Id AND Status='Published']]>
+    <![CDATA[UPDATE DebitNotes SET Status='Cancelled', CancelledAt=DATEADD(HOUR, 8, GETUTCDATE()), CancelReason=@Reason WHERE CreatedAt >= @Start AND CreatedAt <= @End AND Status='Published']]>
   </update>
     <delete id="Scheduling.Delete.Voucher.ByReceivablePlanTimeRange">
     <![CDATA[DELETE FROM Vouchers WHERE SourceEntityType='ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End]]>

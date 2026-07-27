@@ -12,9 +12,9 @@ public class ContractCreateRequest : AuditableEntity, IHasCompany
     /// <summary>房源标识，指向 HousingUnit 聚合根</summary>
     public Guid RoomId { get; private set; }
     /// <summary>合同起租日期</summary>
-    public DateOnly StartDate { get; private set; }
+    public DateTime StartDate { get; private set; }
     /// <summary>合同到期日期，null 表示不限制</summary>
-    public DateOnly? EndDate { get; private set; }
+    public DateTime? EndDate { get; private set; }
     /// <summary>付款周期：Monthly（月付）/ Quarterly（季付）/ Yearly（年付）/ OneTime（一次性）</summary>
     public string PaymentCycle { get; private set; } = "Monthly";
     /// <summary>所属公司标识</summary>
@@ -40,7 +40,7 @@ public class ContractCreateRequest : AuditableEntity, IHasCompany
     /// <param name="endDate">到期日期，null 表示不限制</param>
     /// <param name="paymentCycle">付款周期</param>
     /// <param name="companyId">所属公司标识</param>
-    public ContractCreateRequest(string contractNo, Guid roomId, DateOnly startDate, DateOnly? endDate, string paymentCycle, Guid companyId)
+    public ContractCreateRequest(string contractNo, Guid roomId, DateTime startDate, DateTime? endDate, string paymentCycle, Guid companyId)
     {
         ContractNo = contractNo;
         RoomId = roomId;
