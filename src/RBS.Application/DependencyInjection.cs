@@ -13,6 +13,7 @@ using RBS.Application.Services.Approval;
 using RBS.Application.Services.SystemConfig;
 using RBS.Application.Services.Accounting;
 using RBS.Application.Services.Reporting;
+using RBS.Application.Services.Region;
 using RBS.Application.Services.Scheduling;
 
 namespace RBS.Application;
@@ -65,6 +66,13 @@ public static class DependencyInjection
         services.AddScoped<IContractTimelineService, ContractTimelineService>();
         services.AddScoped<IReportingService, ReportingService>();
 		services.AddScoped<ITerminateJob, TerminateJob>();
+
+        // ===== 行政区划服务（Scoped） =====
+        // 注：IRegionApiService 由 Infrastructure DI 根据配置注入（有 Key 用高德，无 Key 用桩）
+        services.AddScoped<IRegionService, RegionService>();
+        services.AddScoped<RegionApiSyncService>();
+        services.AddScoped<StatsGovCommunityService>();
+        services.AddScoped<StatsGovRegionService>();
 
         // 调度执行监控
         services.AddScoped<ITaskMonitorService, TaskMonitorService>();

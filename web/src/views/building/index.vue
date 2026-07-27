@@ -159,7 +159,7 @@
           </el-col>
         </el-row>
         <el-form-item label="座楼地址" prop="buildingAddress">
-          <el-input v-model="addForm.buildingAddress" type="textarea" :rows="2" placeholder="座楼地址" />
+          <AddressCascader v-model="addForm.buildingAddress" :max-level="5" />
         </el-form-item>
         <el-divider content-position="left">楼层房号</el-divider>
         <el-row :gutter="16">
@@ -239,7 +239,7 @@
           </el-col>
         </el-row>
         <el-form-item label="座楼地址">
-          <el-input v-model="editForm.buildingAddress" type="textarea" :rows="2" />
+          <AddressCascader v-model="editForm.buildingAddress" :max-level="5" />
         </el-form-item>
         <el-divider content-position="left">楼层房号</el-divider>
         <el-row :gutter="16">
@@ -307,6 +307,7 @@
 </template>
 
 <script setup>
+import AddressCascader from "../../components/AddressCascader.vue"
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'

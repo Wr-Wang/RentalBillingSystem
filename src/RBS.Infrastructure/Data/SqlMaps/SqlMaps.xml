@@ -2198,4 +2198,56 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       (NEWID(), @JobName, @ScheduleType, @Hour, @Minute, @DayOfMonth,
        @TemplateCode, @IsActive, @Cid, @Desc, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
+  <!-- ================================================================
+       模块：Common（通用）— 行政区划
+       ================================================================ -->
+  <select id="Common.Select.Region.Province">
+    <![CDATA[SELECT Id, Code, Name, ParentCode, Level, FullPath, SortOrder
+      FROM Regions WHERE Level=1 ORDER BY SortOrder, Code]]>
+  </select>
+  <select id="Common.Select.Region.ByParentCode">
+    <![CDATA[SELECT Id, Code, Name, ParentCode, Level, FullPath, SortOrder
+      FROM Regions WHERE ParentCode=@ParentCode ORDER BY SortOrder, Code]]>
+  </select>
+  <select id="Common.Select.Region.ByCode">
+    <![CDATA[SELECT Id, Code, Name, ParentCode, Level, FullPath, SortOrder
+      FROM Regions WHERE Code=@Code]]>
+  </select>
+  <select id="Common.Select.Region.ByCodeAndLevel">
+    <![CDATA[SELECT Id, Code, Name, ParentCode, Level, FullPath, SortOrder
+      FROM Regions WHERE Code=@Code AND Level=@Level]]>
+  </select>
+  <select id="Common.Select.Region.Search">
+    <![CDATA[SELECT Id, Code, Name, ParentCode, Level, FullPath, SortOrder
+      FROM Regions
+      WHERE (@Keyword IS NULL OR Name LIKE '%' + @Keyword + '%' OR Code LIKE '%' + @Keyword + '%')
+      ORDER BY Level, SortOrder, Code]]>
+  </select>
+  <select id="Common.Select.Region.All">
+    <![CDATA[SELECT Id, Code, Name, ParentCode, Level, FullPath, SortOrder
+      FROM Regions ORDER BY Level, SortOrder, Code]]>
+  </select>
+  <insert id="Common.Insert.Region.Default">
+    <![CDATA[INSERT INTO Regions (Id, Code, Name, ParentCode, Level, FullPath, SortOrder,
+      CreatedBy, CreatedAt, CreatedIp, CreatedHostname)
+      VALUES (@Id, @Code, @Name, @ParentCode, @Level, @FullPath, @SortOrder,
+      @CreatedBy, @CreatedAt, @CreatedIp, @CreatedHostname)]]>
+  </insert>
+  <update id="Common.Update.Region.Default">
+    <![CDATA[UPDATE Regions SET Name=@Name, SortOrder=@SortOrder,
+      UpdatedBy=@UpdatedBy, UpdatedAt=@UpdatedAt, UpdatedIp=@UpdatedIp, UpdatedHostname=@UpdatedHostname
+      WHERE Id=@Id]]>
+  </update>
+  <delete id="Common.Delete.Region.ByCode">
+    <![CDATA[DELETE FROM Regions WHERE Code=@Code]]>
+  </delete>
+  <delete id="Common.Delete.Region.ByParentCode">
+    <![CDATA[DELETE FROM Regions WHERE ParentCode=@ParentCode]]>
+  </delete>
+  <select id="Common.Select.Region.Exists">
+    <![CDATA[SELECT COUNT(1) FROM Regions WHERE Code=@Code AND Level=@Level]]>
+  </select>
+  <select id="Common.Select.Region.ExistsByCode">
+    <![CDATA[SELECT COUNT(1) FROM Regions WHERE Code=@Code]]>
+  </select>
 </sqlMap>

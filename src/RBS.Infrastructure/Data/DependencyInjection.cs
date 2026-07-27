@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
+using RBS.Application.Services.Region;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 using RBS.Infrastructure.Data.Repositories;
@@ -133,7 +134,20 @@ public static class DependencyInjection
         // ===== 通知服务（Scoped） =====
         services.AddScoped<INotificationService, NotificationService>();
 
-        // ===== 领域事件调度器（Scoped） =====
+        // ===== 行政区划 API（有 Key 用高德，无 Key 用桩） =====
+            var amapKey = configuration.GetSection("Amap:ApiKey")?.Value;
+            if (!string.IsNullOrWhiteSpace(amapKey))
+            {
+                services.AddScoped<IRegionApiService>(sp =>
+                    new AmapRegionApiService(amapKey, sp.GetRequiredService<ILogger<AmapRegionApiService>>()));
+                services.AddScoped<RegionApiStubService>();
+            }
+            else
+            {
+                services.AddScoped<IRegionApiService, RegionApiStubService>();
+            }
+
+            // ===== 领域事件调度器（Scoped） =====
         // 在 UoW 提交成功后自动分发聚合根上的领域事件
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 

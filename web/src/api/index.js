@@ -428,4 +428,15 @@ export function saveAutoRenewConfig(data) { return request({ url: '/autorenewcon
 
 export { handleApiError }
 
+// Regions — 行政区划
+export function getRegionProvinces() { return request({ url: '/regions/provinces', method: 'get' }) }
+export function getRegionChildren(parentCode) { return request({ url: '/regions/children', method: 'get', params: { parentCode } }) }
+export function getRegionByCode(code) { return request({ url: '/regions/byCode', method: 'get', params: { code } }) }
+export function searchRegions(keyword) { return request({ url: '/regions/search', method: 'get', params: { keyword } }) }
+export function getAllRegions() { return request({ url: '/regions', method: 'get' }) }
+export function upsertRegion(data) { return request({ url: '/regions', method: 'post', data }) }
+export function deleteRegion(code) { return request({ url: `/regions/${code}`, method: 'delete' }) }
+export function syncRegions(includeStreet) { return request({ url: '/regions/sync', method: 'post', params: { includeStreet }, timeout: 300000 }) }
+export function syncStatsGov() { return request({ url: '/regions/syncStatsGov', method: 'post', timeout: 600000 }) }
+
 // Change Requests

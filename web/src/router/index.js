@@ -518,6 +518,12 @@ const routes = [
             meta: { title: 'API 日志', icon: 'Monitor', roles: ['Admin'], scope: 'System' }
           },
           {
+            path: 'regions',
+            name: 'SystemRegions',
+            component: () => import('../views/region/index.vue'),
+            meta: { title: '行政区划管理', icon: 'MapLocation' }
+          },
+          {
             path: 'accountingsubjects',
             name: 'SystemAccountingSubjects',
             component: () => import('../views/accounting/subjects.vue'),

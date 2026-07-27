@@ -5611,3 +5611,66 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[ImportBatc
 CREATE UNIQUE INDEX [IX_ImportBatchItems_Audit_Id_Version] ON [ImportBatchItems_Audit]([Id], [AuditVersionNo])
 GO
 
+-- =================================================================
+-- v2026.07.27: Regions 表 — 行政区划字典（省/市/区/街道/社区）
+-- 数据来源：第三方 API 同步，前端级联选择器的数据源
+-- 无外键约束，遵循系统规范
+-- =================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'[Regions]'))
+CREATE TABLE [Regions] (
+    [Id]         UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT (NEWSEQUENTIALID()),
+    [Code]       NVARCHAR(12)  NOT NULL,            -- 行政区划代码（GB/T 2260）
+    [Name]       NVARCHAR(100) NOT NULL,            -- 名称
+    [ParentCode] NVARCHAR(12),                       -- 父级代码
+    [Level]      INT NOT NULL DEFAULT (1),           -- 1=省 2=市 3=区县 4=街道 5=社区
+    [FullPath]   NVARCHAR(500),                      -- 全路径
+    [SortOrder]  INT NOT NULL DEFAULT (0),           -- 排序序号
+    [CreatedBy]  UNIQUEIDENTIFIER NOT NULL,           -- 创建人
+    [CreatedAt]  DATETIME2 NOT NULL DEFAULT (GETUTCDATE()), -- 创建时间
+    [CreatedIp]  VARCHAR(45),                         -- 创建IP
+    [CreatedHostname] VARCHAR(100),                   -- 创建主机名
+    [UpdatedBy]  UNIQUEIDENTIFIER,                    -- 更新人
+    [UpdatedAt]  DATETIME2,                           -- 更新时间
+    [UpdatedIp]  VARCHAR(45),                         -- 更新IP
+    [UpdatedHostname] VARCHAR(100)                    -- 更新主机名
+)
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'行政区划字典', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'主键', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'Id'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'行政区划代码（GB/T 2260）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'Code'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'名称', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'Name'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'父级代码', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'ParentCode'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'层级（1=省 2=市 3=区县 4=街道 5=社区）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'Level'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'全路径（如 广东省/广州市/天河区）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'FullPath'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'排序序号', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'SortOrder'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'CreatedBy'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'CreatedAt'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'CreatedIp'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'CreatedHostname'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'UpdatedBy'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'UpdatedAt'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新IP', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'UpdatedIp'
+GO
+EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'更新主机名', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Regions', @level2type = N'COLUMN', @level2name = N'UpdatedHostname'
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Regions]') AND name=N'IX_Regions_Code')
+CREATE UNIQUE INDEX [IX_Regions_Code] ON [Regions]([Code])
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Regions]') AND name=N'IX_Regions_ParentCode')
+CREATE INDEX [IX_Regions_ParentCode] ON [Regions]([ParentCode])
+GO
+

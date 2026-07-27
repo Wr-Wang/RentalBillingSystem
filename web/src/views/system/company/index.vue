@@ -129,7 +129,7 @@
           </el-col>
         </el-row>
         <el-form-item label="通讯地址">
-          <el-input v-model="form.address" />
+          <AddressCascader v-model="form.address" />
         </el-form-item>
 
         <el-divider content-position="left">收款账户信息</el-divider>
@@ -259,6 +259,7 @@
 </template>
 
 <script setup>
+import AddressCascader from "../../../components/AddressCascader.vue"
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCompanies, createCompany, updateCompany, deleteCompany, createUser } from '../../../api/index'

@@ -1097,6 +1097,10 @@ DECLARE @M_System_ApiLogs uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_ApiLogs,N'API 日志','system:apilogs','/system/apilogs','Monitor',@M_System,18,1,@SysUserId,@Now);
 
+DECLARE @M_System_Regions uniqueidentifier = NEWID();
+INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[Path],[Icon],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
+VALUES (@M_System_Regions,N'行政区划管理','system:region','/system/regions','MapLocation',@M_System,19,1,@SysUserId,@Now);
+
 DECLARE @M_System_UserCreate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_UserCreate,N'新增用户','system:usercreate',@M_System_UserMgmt,10,1,@SysUserId,@Now);

@@ -54,6 +54,9 @@
         <el-form-item label="邮箱">
           <el-input v-model="tenantForm.email" />
         </el-form-item>
+        <el-form-item label="联系地址">
+          <AddressCascader v-model="tenantForm.address" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -64,6 +67,7 @@
 </template>
 
 <script setup>
+import AddressCascader from "../../components/AddressCascader.vue"
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../../store/user'
@@ -83,7 +87,8 @@ const tenantForm = reactive({
   name: '',
   idCard: '',
   phone: '',
-  email: ''
+  email: '',
+  address: ''
 })
 
 function getEffectiveCompanyId() {
@@ -135,6 +140,7 @@ function openCreate() {
   tenantForm.idCard = ''
   tenantForm.phone = ''
   tenantForm.email = ''
+  tenantForm.address = ''
   showDialog.value = true
 }
 
@@ -145,6 +151,7 @@ function openEdit(row) {
   tenantForm.idCard = row.idCard
   tenantForm.phone = row.phone
   tenantForm.email = row.email
+  tenantForm.address = row.address || ''
   showDialog.value = true
 }
 
@@ -163,6 +170,7 @@ async function saveTenant() {
       idCard: tenantForm.idCard || undefined,
       phone: tenantForm.phone || undefined,
       email: tenantForm.email || undefined,
+      address: tenantForm.address || undefined,
       companyId
     }
     if (isEdit.value) {
