@@ -63,7 +63,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="period" width="75" align="center">
+        <el-table-column prop="period" width="95" align="center">
           <template #header>
             <el-tooltip content="费用归属期，该笔应收对应的实际业务月份" placement="top">
               <span>账期 <el-icon><InfoFilled /></el-icon></span>

@@ -6,6 +6,7 @@ using RBS.Application.Common.Interfaces;
 using RBS.Application.Services.Billing;
 using RBS.Core.Common;
 using RBS.Core.DomainServices;
+using RBS.Core.Entities.Billing;
 using RBS.Core.Entities.Scheduling;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
@@ -98,23 +99,65 @@ public class BillJob : ScheduledJobBase
                     var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
                     var dueDate = new DateTime(pYear, pMonth, dueDay);
 
-                    var feeConfigs = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
+                    var feeConfigs = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
                         _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
                         new { ContractId = contract.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{lastDay}" }, tx)).ToList();
-                await _stepLogger.CompleteStepAsync(step02, feeConfigs.Count, null, token);
 
-                // ===== Step03: 生成 Journals + GL + DebitNoteItems（批量收集→批量写入） =====
+                    // 拆分当前月开方式费用配置（ExpiryDate=NULL）：关旧开新，确保按月生成
+                    var nextMonth = new DateTime(pYear, pMonth, 1).AddMonths(1);
+                    var periodEnd = new DateTime(pYear, pMonth, lastDay);
+                    var openConfigs = (await conn.QueryAsync<dynamic>(
+                        @"SELECT cf.Id, cf.FeeCodeId, cf.Amount, cf.BillingMode, cf.CompanyId, cf.EffectiveDate
+                          FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
+                          WHERE cf.ContractId=@Cid AND cf.IsActive=1 AND cf.ExpiryDate IS NULL AND fc.ChargeType='Recurring'",
+                        new { Cid = contract.Id }, tx)).ToList();
+                    foreach (var oc in openConfigs)
+                    {
+                        var effDate = (DateTime)oc.EffectiveDate;
+                        if (effDate > periodEnd) continue;
+                        var coveredDays = (periodEnd - effDate).Days;
+                        var totalDays = lastDay;
+                        var proratedAmount = Math.Round((decimal)oc.Amount / totalDays * coveredDays, 2);
+                        // 关闭当月配置（金额改为已分摊值）
+                        await conn.ExecuteAsync(
+                            "UPDATE ContractFeeConfigs SET ExpiryDate=@End, Amount=@Amt, IsActive=0 WHERE Id=@Id",
+                            new { End = periodEnd, Amt = proratedAmount, Id = (Guid)oc.Id }, tx);
+                        // 新建下月配置（全额）
+                        await conn.ExecuteAsync(
+                            "INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, EffectiveDate, ExpiryDate, IsActive, CompanyId, CreatedBy, CreatedAt) VALUES (NEWID(), @Cid, @FId, @Amt, @Mode, @Eff, NULL, 1, @CoId, @User, @Now)",
+                            new { Cid = contract.Id, FId = (Guid)oc.FeeCodeId, Amt = (decimal)oc.Amount,
+                                Mode = (string)oc.BillingMode, Eff = nextMonth, CoId = (Guid)oc.CompanyId,
+                                User = Guid.Empty, Now = ChinaTime.Now }, tx);
+                    }
+                    // 拆分后重新加载费用配置（确保 Step03 使用更新后的起止日期）
+                    feeConfigs = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
+                        _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
+                        new { ContractId = contract.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{lastDay}" }, tx)).ToList();
+                    await _stepLogger.CompleteStepAsync(step02, feeConfigs.Count, null, token);
+
+                    // ===== Step03: 生成 Journals + GL + DebitNoteItems（批量收集→批量写入） =====
                 currentStep = "BillStep03";
                 var step03 = await _stepLogger.StartStepAsync(taskLogId, "BillStep03",
                     $"生成应收-{contractNo}", null, null, token);
 
-                // 生成 prorated journals（内存计算）
-                var plans = _billingDomain.GenerateProratedJournals(
-                    feeConfigs.Select(f => (f.FeeCodeId, f.Amount, f.EffDate, f.ExpDate, f.FeeName)).ToList(),
-                    contract.Id, targetMonth, dueDate, contract.CompanyId,
-                    subjects.GetValueOrDefault("1122", Guid.Empty), ChinaTime.Now);
+                // 生成 journals：拆分时已分摊金额，直接使用每条配置的全额
+                var plans = feeConfigs.Select(f => new Journal(
+                    companyId: contract.CompanyId,
+                    contractId: contract.Id,
+                    feeCodeId: f.FeeCodeId,
+                    feeConfigId: f.Id,
+                    accountingSubjectId: subjects.GetValueOrDefault("1122", Guid.Empty),
+                    period: targetMonth,
+                    amount: f.Amount,
+                    dueDate: dueDate,
+                    entryType: "Normal",
+                    billedAt: ChinaTime.Now,
+                    debitNoteId: null,
+                    parentJournalId: null,
+                    summary: null
+                )).ToList();
 
-                // 批量查询本合同+本账期已存在的 FeeCodeId，用于去重
+                // 批量查询本合同+本账期已存在的 FeeConfigId，用于去重
                 var existingFeeCodes = (await conn.QueryAsync<Guid>(
                     _sql.Get("Billing.Select.Journal.ExistingFeeCodesByContractPeriod"),
                     new { ContractId = contract.Id, Period = targetMonth }, tx)).ToHashSet();
@@ -129,7 +172,7 @@ public class BillJob : ScheduledJobBase
                 foreach (var journal in plans)
                 {
                     if (journal.Amount <= 0) continue;
-                    if (existingFeeCodes.Contains(journal.FeeCodeId)) continue;
+                    if (journal.FeeConfigId.HasValue && existingFeeCodes.Contains(journal.FeeConfigId.Value)) continue;
 
                     // Journal
                     journalBatch.Add(new
@@ -239,20 +282,20 @@ public class BillJob : ScheduledJobBase
                             targetMonth, totalAmount, taskLogId), token);
                     }
 
-                    // 补录缺失的明细：查出该合同所有未关联本账单的 Journals，排除已在明细中的
+                    // 补充该合同+该账期的全部 Journals（不含已在明细中或已在 itemTuples 中的）
                     var existingJournalIds = (await conn.QueryAsync<Guid>(
                         "SELECT JournalId FROM DebitNoteItems WHERE DebitNoteId=@DnId AND JournalId IS NOT NULL",
                         new { DnId = dnId }, tx)).ToHashSet();
-                    var missingItems = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string FeeName, Guid JournalId)>(
+                    var step3Ids = itemTuples.Select(t => t.JournalId).ToHashSet();
+                    var periodItems = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string FeeName, Guid JournalId)>(
                         @"SELECT j.FeeCodeId, j.Amount, ISNULL(fc.Name,'') AS FeeName, j.Id AS JournalId
                           FROM Journals j LEFT JOIN FeeCodes fc ON fc.Id=j.FeeCodeId
-                          WHERE j.ContractId=@Cid AND j.Amount>0 AND j.Period <= @P
-                            AND (j.DebitNoteId IS NULL OR j.DebitNoteId != @DnId)",
-                        new { Cid = contract.Id, P = targetMonth, DnId = dnId }, tx))
-                        .Where(t => !existingJournalIds.Contains(t.JournalId))
+                          WHERE j.ContractId=@Cid AND j.Period=@P AND j.Amount>0",
+                        new { Cid = contract.Id, P = targetMonth }, tx))
+                        .Where(t => !existingJournalIds.Contains(t.JournalId) && !step3Ids.Contains(t.JournalId))
                         .ToList();
-                    if (missingItems.Count > 0)
-                        itemTuples = itemTuples.Concat(missingItems).ToList();
+                    if (periodItems.Count > 0)
+                        itemTuples = itemTuples.Concat(periodItems).ToList();
 
                     // 批量写入 DebitNoteItems
                     if (itemTuples.Count > 0)

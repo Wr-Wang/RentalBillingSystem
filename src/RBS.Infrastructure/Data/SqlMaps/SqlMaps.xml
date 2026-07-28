@@ -805,7 +805,7 @@
       ORDER BY cf.EffectiveDate]]>
   </select>
   <select id="Lease.Select.FeeConfig.AllForPeriod">
-    <![CDATA[SELECT cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName
+    <![CDATA[SELECT cf.Id, cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName
       FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
       WHERE cf.ContractId=@ContractId
       AND fc.ChargeType = 'Recurring'
@@ -818,7 +818,14 @@
     <![CDATA[SELECT COUNT(1) FROM Journals WHERE ContractId=@C AND FeeCodeId=@F AND Period=@P]]>
   </select>
   <select id="Billing.Select.Journal.ExistingFeeCodesByContractPeriod">
-    <![CDATA[SELECT FeeCodeId FROM Journals WHERE ContractId = @ContractId AND Period = @Period]]>
+    <![CDATA[SELECT j.FeeConfigId FROM Journals j
+      JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
+      WHERE j.ContractId = @ContractId AND j.Period = @Period
+        AND fc.ChargeType = 'Recurring'
+        AND j.FeeConfigId IS NOT NULL
+        AND j.DebitNoteId IS NOT NULL
+        AND EXISTS (SELECT 1 FROM DebitNotes WHERE Id = j.DebitNoteId AND Status != 'Cancelled')
+        AND EXISTS (SELECT 1 FROM DebitNoteItems WHERE DebitNoteId = j.DebitNoteId)]]>
   </select>
   <select id="Billing.Select.Journal.PeriodFeePairsByContract">
     <![CDATA[SELECT Period, FeeCodeId FROM Journals WHERE ContractId=@CId]]>
@@ -938,8 +945,8 @@
       AccountingSubjectId, Period, Amount, DueDate, EntryType, GLPosted, BilledAt, BillMonth,
       DebitNoteId, ParentJournalId, Summary, CreatedBy, CreatedAt)
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
-      @SubjId, @Period, @Amt, dbo.fn_CalculateDueDate(@BilledAt), @EntryType, 1, @BilledAt,
-	      dbo.fn_CalculateBillMonth(@BilledAt),
+      @SubjId, @Period, @Amt, @Due, @EntryType, 1, @BilledAt,
+	      @Period,
 	      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
   </insert>
   <insert id="Billing.Insert.Journal.Unposted">
