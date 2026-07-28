@@ -99,7 +99,7 @@ public class BillJob : ScheduledJobBase
                     var dueDay = contract.EndDate != null ? Math.Min(contract.EndDate.Value.Day, lastDay) : lastDay;
                     var dueDate = new DateTime(pYear, pMonth, dueDay);
 
-                    var feeConfigs = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
+                    var feeConfigs = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName, string? ChargeType)>(
                         _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
                         new { ContractId = contract.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{lastDay}" }, tx)).ToList();
 
@@ -107,9 +107,7 @@ public class BillJob : ScheduledJobBase
                     var nextMonth = new DateTime(pYear, pMonth, 1).AddMonths(1);
                     var periodEnd = new DateTime(pYear, pMonth, lastDay);
                     var openConfigs = (await conn.QueryAsync<dynamic>(
-                        @"SELECT cf.Id, cf.FeeCodeId, cf.Amount, cf.BillingMode, cf.CompanyId, cf.EffectiveDate
-                          FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
-                          WHERE cf.ContractId=@Cid AND cf.IsActive=1 AND cf.ExpiryDate IS NULL AND fc.ChargeType='Recurring'",
+                        _sql.Get("Scheduling.Select.FeeConfig.OpenActive"),
                         new { Cid = contract.Id }, tx)).ToList();
                     foreach (var oc in openConfigs)
                     {
@@ -120,19 +118,34 @@ public class BillJob : ScheduledJobBase
                         var proratedAmount = Math.Round((decimal)oc.Amount / totalDays * coveredDays, 2);
                         // 关闭当月配置（金额改为已分摊值）
                         await conn.ExecuteAsync(
-                            "UPDATE ContractFeeConfigs SET ExpiryDate=@End, Amount=@Amt, IsActive=0 WHERE Id=@Id",
+                            _sql.Get("Scheduling.Update.FeeConfig.CloseByPeriod"),
                             new { End = periodEnd, Amt = proratedAmount, Id = (Guid)oc.Id }, tx);
                         // 新建下月配置（全额）
                         await conn.ExecuteAsync(
-                            "INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, EffectiveDate, ExpiryDate, IsActive, CompanyId, CreatedBy, CreatedAt) VALUES (NEWID(), @Cid, @FId, @Amt, @Mode, @Eff, NULL, 1, @CoId, @User, @Now)",
+                            _sql.Get("Scheduling.Insert.FeeConfig.NextMonth"),
                             new { Cid = contract.Id, FId = (Guid)oc.FeeCodeId, Amt = (decimal)oc.Amount,
                                 Mode = (string)oc.BillingMode, Eff = nextMonth, CoId = (Guid)oc.CompanyId,
                                 User = Guid.Empty, Now = ChinaTime.Now }, tx);
                     }
                     // 拆分后重新加载费用配置（确保 Step03 使用更新后的起止日期）
-                    feeConfigs = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName)>(
+                    feeConfigs = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName, string? ChargeType)>(
                         _sql.Get("Lease.Select.FeeConfig.AllForPeriod"),
                         new { ContractId = contract.Id, PeriodStart = $"{targetMonth}-01", PeriodEnd = $"{targetMonth}-{lastDay}" }, tx)).ToList();
+
+                    // 补录已关闭但无 Journal 的周期费用（如 3~7 月手动关闭后 Journal 被清理）
+                    var missingRecurring = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName, string? ChargeType)>(
+                        _sql.Get("Scheduling.Select.FeeConfig.RecurringWithoutJournal"),
+                        new { Cid = contract.Id, End = periodEnd }, tx)).ToList();
+                    if (missingRecurring.Count > 0)
+                        feeConfigs.AddRange(missingRecurring);
+
+                    // 补录无 Journal 的一次性费用（如押金）
+                    var missingOneTime = (await conn.QueryAsync<(Guid Id, Guid FeeCodeId, decimal Amount, string? EffDate, string? ExpDate, string FeeName, string? ChargeType)>(
+                        _sql.Get("Scheduling.Select.FeeConfig.OneTimeWithoutJournal"),
+                        new { Cid = contract.Id }, tx)).ToList();
+                    if (missingOneTime.Count > 0)
+                        feeConfigs.AddRange(missingOneTime);
+
                     await _stepLogger.CompleteStepAsync(step02, feeConfigs.Count, null, token);
 
                     // ===== Step03: 生成 Journals + GL + DebitNoteItems（批量收集→批量写入） =====
@@ -150,17 +163,12 @@ public class BillJob : ScheduledJobBase
                     period: targetMonth,
                     amount: f.Amount,
                     dueDate: dueDate,
-                    entryType: "Normal",
+                    entryType: f.ChargeType == "OneTime" ? "Deposit" : "Normal",
                     billedAt: ChinaTime.Now,
                     debitNoteId: null,
                     parentJournalId: null,
                     summary: null
                 )).ToList();
-
-                // 批量查询本合同+本账期已存在的 FeeConfigId，用于去重
-                var existingFeeCodes = (await conn.QueryAsync<Guid>(
-                    _sql.Get("Billing.Select.Journal.ExistingFeeCodesByContractPeriod"),
-                    new { ContractId = contract.Id, Period = targetMonth }, tx)).ToHashSet();
 
                 // 收集待写入数据（跳过已存在的费用项目）
                 var journalBatch = new List<object>(plans.Count);
@@ -172,7 +180,22 @@ public class BillJob : ScheduledJobBase
                 foreach (var journal in plans)
                 {
                     if (journal.Amount <= 0) continue;
-                    if (journal.FeeConfigId.HasValue && existingFeeCodes.Contains(journal.FeeConfigId.Value)) continue;
+                    // 直接查数据库判断是否已存在（FeeConfigId + ContractId + Period 且有有效账单）
+                    if (journal.FeeConfigId.HasValue)
+                    {
+                        var exists = await conn.QuerySingleAsync<int>(
+                            _sql.Get("Scheduling.Select.Journal.CheckExistsByFeeConfig"),
+                            new { Fid = journal.FeeConfigId.Value, Cid = contract.Id, P = targetMonth }, tx);
+                        if (exists > 0)
+                        {
+                            System.Console.WriteLine($"[DEDUP] 跳过 {contractNo}/{targetMonth}/FeeConfigId={journal.FeeConfigId.Value} - 已有 {exists} 条");
+                            continue;
+                        }
+                        else
+                        {
+                            System.Console.WriteLine($"[DEDUP] 生成 {contractNo}/{targetMonth}/FeeConfigId={journal.FeeConfigId.Value} - 未找到已存在的记录");
+                        }
+                    }
 
                     // Journal
                     journalBatch.Add(new
@@ -267,7 +290,7 @@ public class BillJob : ScheduledJobBase
 
                     // 检查是否已存在该合同+账期的账单（重跑时跳过）
                     var existingDn = await conn.QuerySingleOrDefaultAsync<Guid?>(
-                        "SELECT Id FROM DebitNotes WHERE ContractId=@Cid AND PeriodYear=@Y AND PeriodMonth=@M",
+                        _sql.Get("Scheduling.Select.DebitNote.ByContractPeriod"),
                         new { Cid = contract.Id, Y = pYear, M = pMonth }, tx);
                     if (existingDn.HasValue)
                     {
@@ -284,13 +307,11 @@ public class BillJob : ScheduledJobBase
 
                     // 补充该合同+该账期的全部 Journals（不含已在明细中或已在 itemTuples 中的）
                     var existingJournalIds = (await conn.QueryAsync<Guid>(
-                        "SELECT JournalId FROM DebitNoteItems WHERE DebitNoteId=@DnId AND JournalId IS NOT NULL",
+                        _sql.Get("Scheduling.Select.DebitNoteItem.ExistingJournalIds"),
                         new { DnId = dnId }, tx)).ToHashSet();
                     var step3Ids = itemTuples.Select(t => t.JournalId).ToHashSet();
                     var periodItems = (await conn.QueryAsync<(Guid FeeCodeId, decimal Amount, string FeeName, Guid JournalId)>(
-                        @"SELECT j.FeeCodeId, j.Amount, ISNULL(fc.Name,'') AS FeeName, j.Id AS JournalId
-                          FROM Journals j LEFT JOIN FeeCodes fc ON fc.Id=j.FeeCodeId
-                          WHERE j.ContractId=@Cid AND j.Period=@P AND j.Amount>0",
+                        _sql.Get("Scheduling.Select.Journal.UnbilledByContractPeriod"),
                         new { Cid = contract.Id, P = targetMonth }, tx))
                         .Where(t => !existingJournalIds.Contains(t.JournalId) && !step3Ids.Contains(t.JournalId))
                         .ToList();

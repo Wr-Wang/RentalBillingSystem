@@ -805,7 +805,7 @@
       ORDER BY cf.EffectiveDate]]>
   </select>
   <select id="Lease.Select.FeeConfig.AllForPeriod">
-    <![CDATA[SELECT cf.Id, cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName
+    <![CDATA[SELECT cf.Id, cf.FeeCodeId, cf.Amount, cf.EffectiveDate, cf.ExpiryDate, fc.Name AS FeeName, fc.ChargeType
       FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
       WHERE cf.ContractId=@ContractId
       AND fc.ChargeType = 'Recurring'
@@ -824,8 +824,7 @@
         AND fc.ChargeType = 'Recurring'
         AND j.FeeConfigId IS NOT NULL
         AND j.DebitNoteId IS NOT NULL
-        AND EXISTS (SELECT 1 FROM DebitNotes WHERE Id = j.DebitNoteId AND Status != 'Cancelled')
-        AND EXISTS (SELECT 1 FROM DebitNoteItems WHERE DebitNoteId = j.DebitNoteId)]]>
+        AND EXISTS (SELECT 1 FROM DebitNotes WHERE Id = j.DebitNoteId AND Status != 'Cancelled')]]>
   </select>
   <select id="Billing.Select.Journal.PeriodFeePairsByContract">
     <![CDATA[SELECT Period, FeeCodeId FROM Journals WHERE ContractId=@CId]]>
@@ -992,6 +991,47 @@
   </update>
   <select id="Billing.Select.Journal.UnbilledByContract">
     <![CDATA[SELECT Id, Amount, GLPosted, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND IsBilled = 0]]>
+  </select>
+  <select id="Scheduling.Select.Journal.CheckExistsByFeeConfig">
+    <![CDATA[SELECT COUNT(1) FROM Journals
+      WHERE FeeConfigId=@Fid AND ContractId=@Cid AND Period=@P]]>
+  </select>
+  <select id="Scheduling.Select.Journal.UnbilledByContractPeriod">
+    <![CDATA[SELECT j.FeeCodeId, j.Amount, ISNULL(fc.Name,'') AS FeeName, j.Id AS JournalId
+      FROM Journals j LEFT JOIN FeeCodes fc ON fc.Id=j.FeeCodeId
+      WHERE j.ContractId=@Cid AND j.Period<=@P AND j.Amount>0
+        AND (j.DebitNoteId IS NULL OR NOT EXISTS (SELECT 1 FROM DebitNotes WHERE Id=j.DebitNoteId))]]>
+  </select>
+  <select id="Scheduling.Select.FeeConfig.OpenActive">
+    <![CDATA[SELECT cf.Id, cf.FeeCodeId, cf.Amount, cf.BillingMode, cf.CompanyId, cf.EffectiveDate
+      FROM ContractFeeConfigs cf JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId
+      WHERE cf.ContractId=@Cid AND cf.IsActive=1 AND cf.ExpiryDate IS NULL AND fc.ChargeType='Recurring']]>
+  </select>
+  <update id="Scheduling.Update.FeeConfig.CloseByPeriod">
+    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate=@End, Amount=@Amt, IsActive=0 WHERE Id=@Id]]>
+  </update>
+  <insert id="Scheduling.Insert.FeeConfig.NextMonth">
+    <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, EffectiveDate, ExpiryDate, IsActive, CompanyId, CreatedBy, CreatedAt)
+      VALUES (NEWID(), @Cid, @FId, @Amt, @Mode, @Eff, NULL, 1, @CoId, @User, @Now)]]>
+  </insert>
+  <select id="Scheduling.Select.DebitNote.ByContractPeriod">
+    <![CDATA[SELECT Id FROM DebitNotes WHERE ContractId=@Cid AND PeriodYear=@Y AND PeriodMonth=@M]]>
+  </select>
+  <select id="Scheduling.Select.DebitNoteItem.ExistingJournalIds">
+    <![CDATA[SELECT JournalId FROM DebitNoteItems WHERE DebitNoteId=@DnId AND JournalId IS NOT NULL]]>
+  </select>
+  <select id="Scheduling.Select.FeeConfig.RecurringWithoutJournal">
+    <![CDATA[SELECT cfc.Id, cfc.FeeCodeId, cfc.Amount, cfc.EffectiveDate, cfc.ExpiryDate, fc.Name AS FeeName, fc.ChargeType
+      FROM ContractFeeConfigs cfc JOIN FeeCodes fc ON fc.Id=cfc.FeeCodeId
+      WHERE cfc.ContractId=@Cid AND cfc.IsActive=0 AND cfc.ExpiryDate IS NOT NULL AND cfc.ExpiryDate<=@End
+        AND fc.ChargeType='Recurring'
+        AND NOT EXISTS (SELECT 1 FROM Journals WHERE FeeConfigId=cfc.Id AND ContractId=@Cid)]]>
+  </select>
+  <select id="Scheduling.Select.FeeConfig.OneTimeWithoutJournal">
+    <![CDATA[SELECT cfc.Id, cfc.FeeCodeId, cfc.Amount, cfc.EffectiveDate, cfc.ExpiryDate, fc.Name AS FeeName, fc.ChargeType
+      FROM ContractFeeConfigs cfc JOIN FeeCodes fc ON fc.Id=cfc.FeeCodeId
+      WHERE cfc.ContractId=@Cid AND fc.ChargeType='OneTime'
+        AND NOT EXISTS (SELECT 1 FROM Journals WHERE FeeConfigId=cfc.Id AND ContractId=@Cid)]]>
   </select>
   <update id="Billing.Update.Journal.SetDebitNoteId">
     <![CDATA[UPDATE Journals SET IsBilled = 1, DebitNoteId = @DNId WHERE Id = @Id AND IsBilled = 0]]>
