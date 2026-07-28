@@ -32,9 +32,11 @@ public static class RecurringFeeSplitHelper
         string effectiveDate,
         Guid createdBy,
         DateTime contractStartDate,
-        DateTime? contractEndDate)
+        DateTime? contractEndDate,
+        DateTime? refDate = null)
     {
-        var segments = billingDomain.CalculateMonthlySplit(amount, effectiveDate, ChinaTime.Now,
+        var refTime = refDate ?? ChinaTime.Now;
+        var segments = billingDomain.CalculateMonthlySplit(amount, effectiveDate, refTime,
             contractStartDate, contractEndDate);
         var ids = new List<Guid>();
 

@@ -723,6 +723,13 @@
         AND e.[CompanyId]=@CompanyId
         AND e.[Month]<=@CurrentMonth]]>
   </select>
+  <select id="Scheduling.Select.Execution.LatestSuccessMonth">
+    <![CDATA[SELECT TOP 1 e.[Month] FROM [JobScheduleExecutions] e
+      JOIN [JobSchedules] s ON s.[Id]=e.[JobScheduleId]
+      WHERE s.[JobName]='BillJob' AND e.[CompanyId]=@CompanyId
+        AND e.[Status]='Success'
+      ORDER BY e.[TargetDate] DESC]]>
+  </select>
 
   <!-- TaskStepLogs -->
   <insert id="Scheduling.Insert.TaskStepLog.Default">

@@ -448,6 +448,22 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         using var tx = conn.BeginTransaction();
         try
         {
+            // 查询 BillJob 最新成功排期的 Month（确定应收截断月份）
+            var latestSuccessMonth = await conn.QuerySingleOrDefaultAsync<string>(
+                _sql.Get("Scheduling.Select.Execution.LatestSuccessMonth"),
+                new { CompanyId = companyId ?? Guid.Empty }, tx);
+            DateTime refDate;
+            if (!string.IsNullOrEmpty(latestSuccessMonth))
+            {
+                var parts = latestSuccessMonth.Split('-');
+                refDate = new DateTime(int.Parse(parts[0]), int.Parse(parts[1]),
+                    DateTime.DaysInMonth(int.Parse(parts[0]), int.Parse(parts[1])));
+            }
+            else
+            {
+                refDate = ChinaTime.Now;
+            }
+
             foreach (var item in feeItems)
             {
                 // 查 FeeCode 的 ChargeType
@@ -464,7 +480,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                     var segments = _billingDomain.CalculateMonthlySplit(
                         item.NewAmount,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
-                        ChinaTime.Now,
+                        refDate,
                         cStart, cEnd);
                     configIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
                         conn, tx, _sql, _billingDomain,
@@ -472,7 +488,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                         item.NewAmount, item.BillingMode!, item.Unit, (decimal?)null,
                         item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                         CurrentUserId,
-                        cStart, cEnd);
+                        cStart, cEnd, refDate);
                         // 生成所有历史月份的日记账（首月及后续各月），不包含未来段
                         for (int i = 0; i < segments.Count; i++)
                         {
