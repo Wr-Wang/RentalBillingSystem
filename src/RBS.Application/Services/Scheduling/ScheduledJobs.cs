@@ -137,11 +137,13 @@ public class CollectionJob : IScheduledJob
     private readonly ITaskStepLogger _stepLogger;
     private readonly JobExecutionContext _jobContext;
     private readonly INotificationService _notificationService;
+    private readonly IContractService _contractService;
 
     public CollectionJob(IUnitOfWork uow,
         IDbConnectionFactory db, ISqlLoader sql,
         ITaskStepLogger stepLogger, JobExecutionContext jobContext,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IContractService contractService)
     {
         _uow = uow;
         _db = db;
@@ -149,6 +151,7 @@ public class CollectionJob : IScheduledJob
         _stepLogger = stepLogger;
         _jobContext = jobContext;
         _notificationService = notificationService;
+        _contractService = contractService;
     }
 
     public async Task<string> ExecuteAsync(Guid companyId, string targetMonth, CancellationToken ct)
@@ -182,6 +185,9 @@ public class CollectionJob : IScheduledJob
         var dedupSet = new HashSet<(Guid, int)>(existingRecords.Select(r =>
             (r.ContractId, r.StageNo)));
 
+        // 跟踪本次创建的催缴记录信息（用于后续通知）
+        var createdRecords = new List<(Guid ContractId, Guid RecordId, int StageNo, int DaysOverdue)>();
+
         foreach (var journal in overdueJournals)
         {
             var daysOverdue = (int)today.Subtract((DateTime)journal.DueDate).TotalDays;
@@ -207,6 +213,7 @@ public class CollectionJob : IScheduledJob
             var content = $"{stage.StageName} - 逾期{daysOverdue}天";
             var record = new CollectionRecord((Guid)journal.ContractId, stage.StageNo, channel, content, companyId);
             await _uow.CollectionRecords.AddAsync(record, ct);
+            createdRecords.Add(((Guid)journal.ContractId, record.Id, stage.StageNo, daysOverdue));
             created++;
         }
 
@@ -214,28 +221,56 @@ public class CollectionJob : IScheduledJob
 
         await _stepLogger.CompleteStepAsync(stepCreate, created, null, ct);
 
-        // Step: 通知运营人员
-        bool notified = false;
-        if (created > 0)
+        // Step: 逐合同推送系统通知
+        if (createdRecords.Count > 0)
         {
             var stepNotify = await _stepLogger.StartStepAsync(taskLogId,
-                "Collection.Notify", "推送催缴结果通知", null, null, ct);
+                "Collection.Notify", "推送催缴系统通知", null, null, ct);
             try
             {
-                await _notificationService.NotifyRoleAsync("OpsSupervisor",
-                    $"催缴任务完成",
-                    $"本月共创建 {created} 条催缴记录",
-                    "Collection", null, ct);
-                notified = true;
-                await _stepLogger.CompleteStepAsync(stepNotify, 1, null, ct);
+                // 批量获取合同号
+                var contractIds = createdRecords.Select(r => r.ContractId).Distinct().ToList();
+                var contractNoMap = await _contractService.GetIdNoPairsAsync(contractIds, ct);
+
+                // 计算各合同欠费总额（从 overdueJournals 汇总）
+                var overdueAmounts = overdueJournals
+                    .GroupBy(j => (Guid)j.ContractId)
+                    .ToDictionary(g => g.Key, g => g.Sum(j => (decimal)j.Amount - (decimal)(j.Received ?? 0)));
+
+                // 按合同聚合阶段（一个合同可能进入多个阶段）
+                var perContract = createdRecords
+                    .GroupBy(r => r.ContractId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                int notifCount = 0;
+                foreach (var kv in perContract)
+                {
+                    var cId = kv.Key;
+                    var records = kv.Value;
+                    var contractNo = contractNoMap.GetValueOrDefault(cId, "");
+                    var totalOverdue = overdueAmounts.GetValueOrDefault(cId, 0);
+                    var maxDays = records.Max(r => r.DaysOverdue);
+                    var stages_ = records.Select(r => stages.FirstOrDefault(s => s.StageNo == r.StageNo)?.StageName ?? $"S{r.StageNo}");
+
+                    var title = $"催缴通知 - {contractNo}";
+                    var content = $"合同 {contractNo} 逾期 {maxDays} 天，欠费 ¥{totalOverdue:N2}，已进入 {string.Join("、", stages_)} 阶段";
+
+                    // 用第一个催缴记录 ID 作为关联参考
+                    await _notificationService.NotifyRoleAsync("OpsSupervisor", "System",
+                        title, content, "CollectionRecord", records[0].RecordId,
+                        companyId, ct);
+                    notifCount++;
+                }
+
+                await _stepLogger.CompleteStepAsync(stepNotify, notifCount, null, ct);
             }
-            catch
+            catch (Exception ex)
             {
-                await _stepLogger.FailStepAsync(stepNotify, "通知发送失败", null, ct);
+                await _stepLogger.FailStepAsync(stepNotify, $"通知发送失败: {ex.Message}", null, ct);
             }
         }
 
-        return $"创建 {created} 条催缴记录" + (notified ? "，已通知运营人员" : "");
+        return $"创建 {created} 条催缴记录，已推送系统通知";
     }
 }
 

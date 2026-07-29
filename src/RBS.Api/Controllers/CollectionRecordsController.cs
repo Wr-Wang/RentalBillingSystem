@@ -13,10 +13,13 @@ public class CollectionRecordsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
     private readonly IContractService _contractService;
-    public CollectionRecordsController(IUnitOfWork uow, IContractService contractService)
+    private readonly INotificationService _notificationService;
+    public CollectionRecordsController(IUnitOfWork uow, IContractService contractService,
+        INotificationService notificationService)
     {
         _uow = uow;
         _contractService = contractService;
+        _notificationService = notificationService;
     }
 
     [HttpGet]
@@ -77,6 +80,22 @@ public class CollectionRecordsController : ControllerBase
         var record = new CollectionRecord(request.ContractId, stage.StageNo, channel, content, companyId);
         await _uow.CollectionRecords.AddAsync(record, ct);
         await _uow.CommitAsync(ct);
+
+        // 发送催缴系统通知
+        try
+        {
+            var contractNoMap = await _contractService.GetIdNoPairsAsync(new List<Guid> { request.ContractId }, ct);
+            var contractNo = contractNoMap.GetValueOrDefault(request.ContractId, "");
+            await _notificationService.NotifyRoleAsync("OpsSupervisor", "System",
+                $"催缴通知 - {contractNo}",
+                $"合同 {contractNo} 已手动发起「{stage.StageName}」催缴（{channel}）",
+                "CollectionRecord", record.Id, companyId, ct);
+        }
+        catch
+        {
+            // 通知失败不影响催缴记录创建
+        }
+
         return Ok(new { message = "催缴记录已创建", id = record.Id });
     }
 }

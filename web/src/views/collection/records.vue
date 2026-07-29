@@ -19,8 +19,8 @@
 
     <el-table :data="records" v-loading="loading" stripe>
       <el-table-column type="index" label="#" width="50" />
-      <el-table-column prop="contractNo" label="合同号" width="180" />
-      <el-table-column label="催缴阶段" width="100">
+      <el-table-column prop="contractNo" label="合同号" min-width="220" show-overflow-tooltip />
+      <el-table-column label="催缴阶段" width="150">
         <template #default="{ row }">S{{ row.stageNo }} {{ getStageName(row.stageNo) }}</template>
       </el-table-column>
       <el-table-column prop="channel" label="渠道" width="80">

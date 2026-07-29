@@ -107,7 +107,7 @@
           <el-select v-model="manualForm.channel" style="width:100%">
             <el-option label="短信" value="SMS" />
             <el-option label="电话" value="Phone" />
-            <el-option label="系统通知" value="WeChat" />
+            <el-option label="系统通知" value="System" />
           </el-select>
         </el-form-item>
         <el-form-item label="催缴内容">

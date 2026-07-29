@@ -40,7 +40,12 @@ public interface INotificationService
     Task NotifyAllParticipantsAsync(Guid approvalRequestId, string title, string? content,
         CancellationToken ct = default);
 
-    /// <summary>通知指定角色的所有用户</summary>
+    /// <summary>通知指定角色的所有用户（使用默认分类 "Approval"）</summary>
     Task NotifyRoleAsync(string roleCode, string title, string? content,
         string? referenceType = null, Guid? referenceId = null, CancellationToken ct = default);
+
+    /// <summary>通知指定角色的所有用户（指定通知分类）</summary>
+    Task NotifyRoleAsync(string roleCode, string category, string title, string? content,
+        string? referenceType = null, Guid? referenceId = null, Guid? companyId = null,
+        CancellationToken ct = default);
 }

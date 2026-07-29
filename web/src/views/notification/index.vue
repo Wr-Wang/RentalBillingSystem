@@ -188,7 +188,7 @@ function bizPath(item) {
   if (cat === 'approval') return '/approvals'
   if (cat === 'renewal') return '/contracts'
   if (cat === 'collection') return '/collection/records'
-  if (cat === 'system') return '/receipts'
+  if (cat === 'system') return '/collection/records'
   return null
 }
 

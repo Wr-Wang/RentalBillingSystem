@@ -198,7 +198,7 @@ public class NotificationService : INotificationService
             l.ApprovalTypeId == request.ApprovalTypeId && l.LevelNo == level);
         if (config == null) return;
 
-        await NotifyRoleByIdAsync(config.ApproverRoleId, title, content, "ApprovalRequest",
+        await NotifyRoleByIdAsync(config.ApproverRoleId, "Approval", title, content, "ApprovalRequest",
             approvalRequestId, request.CompanyId, ct);
     }
 
@@ -244,18 +244,29 @@ public class NotificationService : INotificationService
     public async Task NotifyRoleAsync(string roleCode, string title, string? content,
         string? referenceType = null, Guid? referenceId = null, CancellationToken ct = default)
     {
+        // 保留原签名兼容，默认使用 "Approval" 分类
+        await NotifyRoleAsync(roleCode, "Approval", title, content,
+            referenceType, referenceId, null, ct);
+    }
+
+    public async Task NotifyRoleAsync(string roleCode, string category, string title,
+        string? content, string? referenceType = null, Guid? referenceId = null,
+        Guid? companyId = null, CancellationToken ct = default)
+    {
         var role = await _uow.Roles.GetByCodeAsync(roleCode, ct);
         if (role == null) return;
 
-        await NotifyRoleByIdAsync(role.Id, title, content, referenceType, referenceId, null, ct);
+        await NotifyRoleByIdAsync(role.Id, category, title, content,
+            referenceType, referenceId, companyId, ct);
     }
 
     // =====================================================================
     // 内部辅助方法
     // =====================================================================
 
-    private async Task NotifyRoleByIdAsync(Guid roleId, string title, string? content,
-        string? referenceType, Guid? referenceId, Guid? companyId, CancellationToken ct)
+    private async Task NotifyRoleByIdAsync(Guid roleId, string category, string title,
+        string? content, string? referenceType, Guid? referenceId, Guid? companyId,
+        CancellationToken ct)
     {
         var allUsers = await _uow.Users.GetAllWithRolesAsync(ct);
         var userIds = allUsers
@@ -265,7 +276,7 @@ public class NotificationService : INotificationService
 
         foreach (var userId in userIds)
         {
-            var notification = new Notification(userId, "Approval",
+            var notification = new Notification(userId, category,
                 title, content, referenceType, referenceId, companyId);
             await CreateAsync(notification, ct);
         }
