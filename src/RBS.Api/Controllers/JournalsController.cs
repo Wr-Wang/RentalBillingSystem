@@ -28,16 +28,18 @@ public class JournalsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? period,
+        [FromQuery] string? billMonth,
         [FromQuery] string? contractNo,
         [FromQuery] Guid? feeCodeId,
         [FromQuery] bool? glPosted,
+        [FromQuery] bool? isBilled,
         [FromQuery] Guid? contractId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
     {
         var companyId = _tenant.EffectiveCompanyId;
-        var result = await _journalAppService.GetPagedAsync(companyId, period, contractNo, feeCodeId, glPosted, contractId, page, pageSize);
+        var result = await _journalAppService.GetPagedAsync(companyId, period, billMonth, contractNo, feeCodeId, glPosted, isBilled, contractId, page, pageSize);
         return Ok(result);
     }
 

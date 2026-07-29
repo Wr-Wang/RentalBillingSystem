@@ -14,24 +14,35 @@
     <div class="filter-bar">
       <el-form :inline="true" :model="filters" size="small" label-width="auto">
         <el-form-item label="账期">
-          <el-date-picker v-model="filters.period" type="month" placeholder="账期" value-format="yyyy-MM" clearable style="width:130px;" @change="fetchData" />
+          <el-date-picker v-model="filters.period" type="month" placeholder="账期" value-format="YYYY-MM" clearable editable="false" style="width:130px;" @change="handleFilterChange" />
         </el-form-item>
         <el-form-item label="合同">
-          <el-input v-model="filters.contractNo" placeholder="合同号" clearable style="width:130px;" @clear="fetchData" @keyup.enter="fetchData" />
+          <el-select v-model="filters.contractId" placeholder="全部" clearable filterable style="width:130px;" @change="handleFilterChange">
+            <el-option v-for="c in contracts" :key="c.id" :label="c.contractNo + (c.tenantName ? ' - ' + c.tenantName : '')" :value="c.id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="费用类型">
-          <el-select v-model="filters.feeCodeId" placeholder="全部" clearable filterable style="width:140px;" @change="fetchData">
+          <el-select v-model="filters.feeCodeId" placeholder="全部" clearable filterable style="width:140px;" @change="handleFilterChange">
             <el-option v-for="fc in feeCodes" :key="fc.id" :label="fc.name" :value="fc.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="GL">
-          <el-select v-model="filters.glPosted" placeholder="全部" clearable style="width:90px;" @change="fetchData">
+          <el-select v-model="filters.glPosted" placeholder="全部" clearable style="width:90px;" @change="handleFilterChange">
             <el-option label="已入账" :value="true" />
             <el-option label="未入账" :value="false" />
           </el-select>
         </el-form-item>
+        <el-form-item label="账单月">
+          <el-date-picker v-model="filters.billMonth" type="month" placeholder="账单月" value-format="YYYY-MM" clearable editable="false" style="width:130px;" @change="handleFilterChange" />
+        </el-form-item>
+        <el-form-item label="生成账单">
+          <el-select v-model="filters.isBilled" placeholder="全部" clearable style="width:100px;" @change="handleFilterChange">
+            <el-option label="已生成" :value="true" />
+            <el-option label="未生成" :value="false" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="fetchData">查询</el-button>
+          <el-button type="primary" @click="handleFilterChange">查询</el-button>
           <el-button @click="resetFilters">重置</el-button>
         </el-form-item>
       </el-form>
@@ -95,6 +106,13 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="生成账单" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.isBilled ? 'success' : 'info'" size="small" effect="plain">
+              {{ row.isBilled ? '已生成' : '未生成' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="billedAt" label="出账时间" min-width="160" show-overflow-tooltip />
       </el-table>
 
@@ -120,7 +138,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { formatDate } from '@/utils/chinaTime'
-import { getJournals, generateJournals, getFeeCodes, postJournals } from '@/api'
+import { getJournals, generateJournals, getFeeCodes, postJournals, getContracts } from '@/api'
 import { Refresh, InfoFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 
@@ -132,7 +150,8 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const feeCodes = ref([])
-const filters = ref({ period: '', contractNo: '', feeCodeId: null, glPosted: null })
+const contracts = ref([])
+const filters = ref({ period: null, billMonth: null, contractId: null, feeCodeId: null, glPosted: null, isBilled: null })
 const selectedIds = ref([])
 const posting = ref(false)
 
@@ -144,10 +163,12 @@ const fetchData = async () => {
   loading.value = true
   try {
     const params = { page: page.value, pageSize: pageSize.value }
-    if (filters.value.period) params.period = filters.value.period
-    if (filters.value.contractNo) params.contractNo = filters.value.contractNo
+    if (filters.value.period && /^\d{4}-\d{2}$/.test(filters.value.period)) params.period = filters.value.period
+    if (filters.value.billMonth && /^\d{4}-\d{2}$/.test(filters.value.billMonth)) params.billMonth = filters.value.billMonth
+    if (filters.value.contractId) params.contractId = filters.value.contractId
     if (filters.value.feeCodeId) params.feeCodeId = filters.value.feeCodeId
     if (filters.value.glPosted !== null && filters.value.glPosted !== '') params.glPosted = filters.value.glPosted
+    if (filters.value.isBilled !== null && filters.value.isBilled !== '') params.isBilled = filters.value.isBilled
 
     const res = await getJournals(params)
     list.value = (res.items || []).map(r => ({
@@ -160,7 +181,7 @@ const fetchData = async () => {
       amount: r.amount || 0,
       dueDate: r.dueDate || '',
       glPosted: r.glPosted || false,
-      isBilled: r.isBilled || r.glPosted || false,
+      isBilled: r.isBilled || false,
       billMonth: r.billMonth || '',
       billedAt: r.billedAt ? (r.billedAt.slice ? r.billedAt.slice(0, 16).replace('T', ' ') : r.billedAt) : ''
     }))
@@ -179,6 +200,13 @@ const fetchFeeCodes = async () => {
   } catch { feeCodes.value = [] }
 }
 
+const fetchContracts = async () => {
+  try {
+    const res = await getContracts({ pageSize: 200 })
+    contracts.value = (res.items || res.data || res || [])
+  } catch { contracts.value = [] }
+}
+
 const handleGenerate = async () => {
   try {
     await generateJournals({})
@@ -187,7 +215,12 @@ const handleGenerate = async () => {
 }
 
 const resetFilters = () => {
-  filters.value = { period: '', contractNo: '', feeCodeId: null, glPosted: null }
+  filters.value = { period: null, billMonth: null, contractId: null, feeCodeId: null, glPosted: null, isBilled: null }
+  page.value = 1
+  fetchData()
+}
+
+const handleFilterChange = () => {
   page.value = 1
   fetchData()
 }
@@ -215,6 +248,7 @@ async function handlePost() {
 
 onMounted(() => {
   fetchFeeCodes()
+  fetchContracts()
   // 等待用户公司信息加载完成后再请求数据（确保 companyId 已注入）
   if (userStore.profileLoaded) {
     fetchData()
@@ -231,8 +265,8 @@ onMounted(() => {
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .page-header h1 { margin: 0; font-size: 20px; }
 .page-actions { display: flex; gap: 8px; }
-.filter-bar { background: #f5f7fa; border-radius: 6px; padding: 8px 16px; margin-bottom: 16px; }
-.filter-bar .el-form-item { margin-bottom: 0; }
+.filter-bar { background: #f5f7fa; border-radius: 6px; padding: 12px 16px 4px; margin-bottom: 16px; }
+.filter-bar .el-form-item { margin-bottom: 8px; }
 .filter-bar .el-form--inline .el-form-item { margin-right: 12px; }
 :deep(.el-table th.el-table__cell) { background-color: #f5f7fa; font-weight: 600; color: #303133; }
 .el-card + .el-card { margin-top: 16px; }

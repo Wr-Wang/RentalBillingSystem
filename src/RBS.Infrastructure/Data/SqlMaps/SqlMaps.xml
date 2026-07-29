@@ -900,18 +900,22 @@
       LEFT JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
       WHERE j.CompanyId = @CoId
       AND (@Period IS NULL OR j.Period = @Period)
+      AND (@BM IS NULL OR j.BillMonth = @BM)
       AND (@CNo IS NULL OR j.ContractId IN (SELECT Id FROM Contracts WHERE ContractNo LIKE @CNo))
       AND (@FId IS NULL OR j.FeeCodeId = @FId)
       AND (@GLP IS NULL OR j.GLPosted = @GLP)
+      AND (@IB IS NULL OR j.IsBilled = @IB)
       AND (@CId IS NULL OR j.ContractId = @CId)
       ORDER BY j.CreatedAt DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY]]>
   </select>
   <select id="Billing.Select.Journal.PagedCount">
     <![CDATA[SELECT COUNT(1) FROM Journals j WHERE j.CompanyId = @CoId
       AND (@Period IS NULL OR j.Period = @Period)
+      AND (@BM IS NULL OR j.BillMonth = @BM)
       AND (@CNo IS NULL OR j.ContractId IN (SELECT Id FROM Contracts WHERE ContractNo LIKE @CNo))
       AND (@FId IS NULL OR j.FeeCodeId = @FId)
       AND (@GLP IS NULL OR j.GLPosted = @GLP)
+      AND (@IB IS NULL OR j.IsBilled = @IB)
       AND (@CId IS NULL OR j.ContractId = @CId)]]>
   </select>
   <select id="Billing.Select.Journal.ById">
@@ -997,7 +1001,7 @@
     <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND GLPosted = 0]]>
   </update>
   <select id="Billing.Select.Journal.UnbilledByContract">
-    <![CDATA[SELECT Id, Amount, GLPosted, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND IsBilled = 0]]>
+    <![CDATA[SELECT Id, Amount, GLPosted, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND IsBilled = 0 AND (BillMonth IS NULL OR BillMonth <= @P)]]>
   </select>
   <select id="Scheduling.Select.Journal.CheckExistsByFeeConfig">
     <![CDATA[SELECT COUNT(1) FROM Journals
@@ -1007,7 +1011,8 @@
     <![CDATA[SELECT j.FeeCodeId, j.Amount, ISNULL(fc.Name,'') AS FeeName, j.Id AS JournalId
       FROM Journals j LEFT JOIN FeeCodes fc ON fc.Id=j.FeeCodeId
       WHERE j.ContractId=@Cid AND j.Period<=@P AND j.Amount>0
-        AND (j.DebitNoteId IS NULL OR NOT EXISTS (SELECT 1 FROM DebitNotes WHERE Id=j.DebitNoteId))]]>
+        AND (j.DebitNoteId IS NULL OR NOT EXISTS (SELECT 1 FROM DebitNotes WHERE Id=j.DebitNoteId))
+        AND (j.BillMonth IS NULL OR j.BillMonth <= @P)]]>
   </select>
   <select id="Scheduling.Select.FeeConfig.OpenActive">
     <![CDATA[SELECT cf.Id, cf.FeeCodeId, cf.Amount, cf.BillingMode, cf.CompanyId, cf.EffectiveDate

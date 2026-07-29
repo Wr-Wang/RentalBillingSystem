@@ -251,7 +251,7 @@ public class BillJob : ScheduledJobBase
                 // 处理历史未入账 Journals（GLPosted=0 自动过账）
                 var unbilled = (await conn.QueryAsync<dynamic>(
                     _sql.Get("Billing.Select.Journal.UnbilledByContract"),
-                    new { CId = contract.Id }, tx)).ToList();
+                    new { CId = contract.Id, P = targetMonth }, tx)).ToList();
 
                 foreach (var ub in unbilled)
                 {

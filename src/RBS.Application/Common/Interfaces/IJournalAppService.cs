@@ -8,7 +8,7 @@ public interface IJournalAppService
     /// <summary>
     /// 分页查询日记账
     /// </summary>
-    Task<object> GetPagedAsync(Guid? companyId, string? period, string? contractNo, Guid? feeCodeId, bool? glPosted, Guid? contractId, int page, int pageSize);
+    Task<object> GetPagedAsync(Guid? companyId, string? period, string? billMonth, string? contractNo, Guid? feeCodeId, bool? glPosted, bool? isBilled, Guid? contractId, int page, int pageSize);
 
     /// <summary>
     /// 根据 ID 获取日记账详情，不存在时返回 null

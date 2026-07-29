@@ -186,6 +186,11 @@ public class DebitNoteService : IDebitNoteService
                 new { Id = Guid.NewGuid(), DebitNoteId = noteId, FeeCodeId = journal.FeeCodeId,
                     FeeName = feeName, Amount = journal.Amount, JournalId = journal.Id,
                     CreatedBy = _currentUser.UserId, CreatedAt = ChinaTime.Now });
+
+            // 回写 Journals 的 IsBilled 和 DebitNoteId，与 BillJob Step04 保持一致
+            await conn.ExecuteAsync(
+                _sql.Get("Billing.Update.Journal.SetDebitNoteId"),
+                new { DNId = noteId, Id = journal.Id });
         }
 
         // 5. 写入收款快照

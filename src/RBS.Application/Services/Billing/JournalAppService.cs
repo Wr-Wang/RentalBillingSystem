@@ -39,7 +39,7 @@ public class JournalAppService : IJournalAppService
         _receivableGen = receivableGen;
     }
 
-    public async Task<object> GetPagedAsync(Guid? companyId, string? period, string? contractNo, Guid? feeCodeId, bool? glPosted, Guid? contractId, int page, int pageSize)
+    public async Task<object> GetPagedAsync(Guid? companyId, string? period, string? billMonth, string? contractNo, Guid? feeCodeId, bool? glPosted, bool? isBilled, Guid? contractId, int page, int pageSize)
     {
         var effectiveCompanyId = companyId ?? _tenant.EffectiveCompanyId;
         if (effectiveCompanyId == null) return new { items = new List<object>(), total = 0 };
@@ -47,9 +47,9 @@ public class JournalAppService : IJournalAppService
         using var conn = _db.CreateConnection();
         conn.Open();
         var items = await conn.QueryAsync(_sql.Get("Billing.Select.Journal.Paged"),
-            new { CoId = effectiveCompanyId, Period = period, CNo = $"%{contractNo}%", FId = feeCodeId, GLP = glPosted, CId = contractId, Offset = (page - 1) * pageSize, PageSize = pageSize });
+            new { CoId = effectiveCompanyId, Period = period, BM = billMonth, CNo = $"%{contractNo}%", FId = feeCodeId, GLP = glPosted, IB = isBilled, CId = contractId, Offset = (page - 1) * pageSize, PageSize = pageSize });
         var total = await conn.QuerySingleAsync<int>(_sql.Get("Billing.Select.Journal.PagedCount"),
-            new { CoId = effectiveCompanyId, Period = period, CNo = $"%{contractNo}%", FId = feeCodeId, GLP = glPosted, CId = contractId });
+            new { CoId = effectiveCompanyId, Period = period, BM = billMonth, CNo = $"%{contractNo}%", FId = feeCodeId, GLP = glPosted, IB = isBilled, CId = contractId });
         return new { items, total, page, pageSize };
     }
 
