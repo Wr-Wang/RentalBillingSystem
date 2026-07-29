@@ -53,9 +53,9 @@
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column prop="level" label="层级" width="80">
+        <el-table-column prop="level" label="层级" width="90">
           <template #default="{ row }">
-            <el-tag :type="levelTag(row.level)" size="small">{{ levelLabel(row.level) }}</el-tag>
+            <el-tag :color="levelColor(row.level)" effect="dark" size="small" style="border:none;">{{ levelLabel(row.level) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="全路径" min-width="260">
@@ -204,9 +204,9 @@ function levelLabel(level) {
   return map[level] || '未知'
 }
 
-function levelTag(level) {
-  const map = { 1: '', 2: 'success', 3: 'warning', 4: 'info', 5: 'info' }
-  return map[level] || 'info'
+function levelColor(level) {
+  const map = { 1: '#409EFF', 2: '#67C23A', 3: '#E6A23C', 4: '#9B59B6', 5: '#909399' }
+  return map[level] || '#909399'
 }
 
 async function fetchList() {
