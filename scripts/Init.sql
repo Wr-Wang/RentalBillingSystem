@@ -5673,4 +5673,85 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Regions]') AND name=N'IX_Regions_ParentCode')
 CREATE INDEX [IX_Regions_ParentCode] ON [Regions]([ParentCode])
 GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[Regions]') AND name=N'IX_Regions_Level')
+CREATE INDEX [IX_Regions_Level] ON [Regions]([Level])
+    INCLUDE ([Code], [Name], [ParentCode], [FullPath], [SortOrder])
+GO
+
+-- ===================================================================
+-- 为所有 _Audit 审计表增加 AuditChangedFields 列
+-- ===================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Companies_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Companies_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Users_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Users_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Roles_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Roles_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Menus_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Menus_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApprovalTypes_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [ApprovalTypes_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApprovalLevelConfigs_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [ApprovalLevelConfigs_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApprovalRequests_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [ApprovalRequests_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ApprovalRecords_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [ApprovalRecords_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[HousingUnits_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [HousingUnits_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RoomTypes_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [RoomTypes_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[FloorLevelBands_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [FloorLevelBands_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RoomPricingStandards_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [RoomPricingStandards_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Tenants_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Tenants_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Contracts_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Contracts_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractFeeConfigs_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [ContractFeeConfigs_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[RenewalRequests_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [RenewalRequests_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[FeeCodes_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [FeeCodes_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[FeeCodeTemplates_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [FeeCodeTemplates_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[TaxRateConfigs_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [TaxRateConfigs_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Journals_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Journals_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[DebitNotes_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [DebitNotes_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[PaymentChannels_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [PaymentChannels_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[Receipts_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [Receipts_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[DepositLogs_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [DepositLogs_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[CollectionStages_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [CollectionStages_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[CollectionRecords_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [CollectionRecords_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[AccountingSubjects_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [AccountingSubjects_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[BankStatements_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [BankStatements_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[JobSchedules_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [JobSchedules_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[JobTemplates_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [JobTemplates_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[JobScheduleExecutions_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [JobScheduleExecutions_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[HolidayCalendars_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [HolidayCalendars_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[InterestConfigs_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [InterestConfigs_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ImportBatches_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [ImportBatches_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ImportBatchItems_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [ImportBatchItems_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[UserRoles_Audit]') AND name=N'AuditChangedFields')
+    ALTER TABLE [UserRoles_Audit] ADD [AuditChangedFields] NVARCHAR(MAX) NULL;
+GO
 

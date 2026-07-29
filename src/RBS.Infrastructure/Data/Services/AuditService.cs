@@ -232,6 +232,80 @@ public class AuditService : IAuditService
         return _configLoader.GetAllTables();
     }
 
+    /// <summary>
+    /// 回滚到指定版本 — 从 _Audit 表读取版本数据，恢复主表
+    /// </summary>
+    public async Task<AuditRollbackResult> RollbackAsync(string tableName, string recordId, int versionNo, CancellationToken ct = default)
+    {
+        var auditTable = $"{SanitizeTableName(tableName)}_Audit";
+
+        using var conn = _db.CreateConnection();
+        conn.Open();
+
+        // 1. 检查审计表是否存在
+        var tableExists = await conn.QuerySingleAsync<int>(
+            "SELECT COUNT(1) FROM sys.tables WHERE name = @Name", new { Name = auditTable });
+        if (tableExists == 0)
+        {
+            return new AuditRollbackResult
+            {
+                Success = false,
+                ErrorCode = "TABLE_NOT_FOUND",
+                ErrorMessage = $"审计表 {auditTable} 不存在"
+            };
+        }
+
+        // 2. 读取指定版本的审计记录
+        var auditRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            $"SELECT * FROM [{auditTable}] WHERE Id=@Id AND AuditVersionNo=@Ver",
+            new { Id = recordId, Ver = versionNo });
+
+        if (auditRow == null)
+        {
+            return new AuditRollbackResult
+            {
+                Success = false,
+                ErrorCode = "VERSION_NOT_FOUND",
+                ErrorMessage = $"未找到版本 {versionNo} 的审计记录"
+            };
+        }
+
+        // 3. 获取最新版本（对比差异）
+        var latestVersion = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            $"SELECT TOP 1 * FROM [{auditTable}] WHERE Id=@Id ORDER BY AuditVersionNo DESC",
+            new { Id = recordId });
+
+        var sourceRow = latestVersion ?? auditRow;
+
+        // 4. 构建 UPDATE 语句恢复主表
+        var updateFields = new List<string>();
+        var updateParms = new Dictionary<string, object?>();
+        var rowDict = ((IDictionary<string, object?>)sourceRow);
+
+        foreach (var kv in rowDict)
+        {
+            var key = kv.Key;
+            if (key is "AuditId" or "AuditAction" or "AuditVersionNo" or "AuditChangedAt" or "AuditChangedBy"
+                or "AuditChangedHostname" or "AuditChangedFields" or "RowVersion" or "Id")
+                continue;
+            updateFields.Add($"[{key}]=@{key}");
+            updateParms[key] = kv.Value;
+        }
+
+        updateParms["Id"] = recordId;
+        var sql = $"UPDATE [{tableName}] SET {string.Join(", ", updateFields)} WHERE Id=@Id";
+        await conn.ExecuteAsync(sql, updateParms);
+
+        return new AuditRollbackResult
+        {
+            Success = true,
+            Table = tableName,
+            RecordId = recordId,
+            VersionNo = versionNo,
+            ErrorMessage = $"已回滚到版本 {versionNo}"
+        };
+    }
+
     private static string SanitizeTableName(string tableName)
     {
         var sanitized = new string(tableName.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray());

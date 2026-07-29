@@ -220,6 +220,18 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", parms);
     }
 
     /// <summary>
+    /// 根据合同 ID 列表批量获取合同编号字典
+    /// </summary>
+    public async Task<Dictionary<Guid, string>> GetIdNoPairsAsync(List<Guid> ids, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var pairs = await conn.QueryAsync<(Guid Id, string No)>(
+            _sql.Get("Lease.Select.Contract.IdNoPairs"),
+            new { Ids = ids });
+        return pairs.ToDictionary(c => c.Id, c => c.No);
+    }
+
+    /// <summary>
     /// 创建新合同（仅写入主表，不含租客关联和费用配置）
     /// </summary>
     public async Task<ContractDto> CreateAsync(CreateContractRequest request, CancellationToken ct = default)

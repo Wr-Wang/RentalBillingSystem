@@ -1,13 +1,9 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Import;
 using RBS.Core.Entities.Import;
-using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
-using RBS.Core.Interfaces.Services;
-using System.Data;
 
 namespace RBS.Api.Controllers;
 
@@ -18,15 +14,11 @@ public class ImportsController : ControllerBase
 {
     private readonly IImportService _importService;
     private readonly IUnitOfWork _uow;
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
 
-    public ImportsController(IImportService importService, IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
+    public ImportsController(IImportService importService, IUnitOfWork uow)
     {
         _importService = importService;
         _uow = uow;
-        _db = db;
-        _sql = sql;
     }
 
     [HttpPost("submit")]
@@ -54,39 +46,8 @@ public class ImportsController : ControllerBase
             }
         }
 
-        // Load items with proper type mapping via Dapper
-        using var conn = _db.CreateConnection(); conn.Open();
-        var rows = await conn.QueryAsync<dynamic>(
-            _sql.Get("Import.Select.BatchItem.ByBatchId"),
-            new { Id = id });
-
-        var items = rows.Select(r =>
-        {
-            var dict = (IDictionary<string, object>)r;
-            var resp = new ImportBatchItemResponse
-            {
-                RowIndex = (int)dict["RowIndex"],
-                IsValid = (bool)dict["IsValid"],
-                ErrorCode = dict["ErrorCode"]?.ToString(),
-                ErrorMessage = dict["ErrorMessage"]?.ToString(),
-                FixSuggestion = dict["FixSuggestion"]?.ToString()
-            };
-
-            // HousingUnit-specific fields
-            string? importType = dict["ImportType"]?.ToString();
-            if (importType == "HousingUnit" || dict.ContainsKey("BuildingName"))
-            {
-                resp.BuildingName = dict["BuildingName"]?.ToString();
-                resp.FloorName = dict["FloorName"]?.ToString();
-                resp.UnitNo = dict["UnitNo"]?.ToString();
-                resp.FullCode = dict["FullCode"]?.ToString();
-                resp.RoomTypeName = dict["RoomTypeName"]?.ToString();
-                resp.Area = dict["Area"] != null ? Convert.ToDecimal(dict["Area"]) : null;
-                resp.Orientation = dict["Orientation"]?.ToString();
-                resp.BaseRentAmount = dict["BaseRentAmount"] != null ? Convert.ToDecimal(dict["BaseRentAmount"]) : null;
-            }
-            return resp;
-        }).ToList();
+        // Load items via Application Service
+        var items = await _importService.GetBatchItemsAsync(id, ct);
 
         return Ok(new
         {

@@ -1,7 +1,6 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RBS.Core.Interfaces.Persistence;
+using RBS.Application.Common.Interfaces;
 
 namespace RBS.Api.Controllers;
 
@@ -10,18 +9,11 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class SystemLogsController : ControllerBase
 {
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
-    public SystemLogsController(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
+    private readonly ISystemLogService _systemLogService;
+    public SystemLogsController(ISystemLogService systemLogService) { _systemLogService = systemLogService; }
 
     private bool IsSuperAdmin => User.FindFirst("IsSuperAdmin")?.Value == "True";
     private IActionResult? RequireSuperAdmin() => IsSuperAdmin ? null : Forbid();
-
-    private static readonly string Columns = @"
-        Id AS id, Level AS level, Message AS message, Exception AS exception, Source AS source, Path AS path, Method AS method,
-        IpAddress AS ipAddress, UserAgent AS userAgent,
-        UserId AS userId, UserDisplayName AS userDisplayName,
-        CreatedAt AS createdAt";
 
     [HttpGet]
     public async Task<IActionResult> GetList(
@@ -33,23 +25,8 @@ public class SystemLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-
-        var where = new List<string>();
-        var parms = new DynamicParameters();
-        if (!string.IsNullOrEmpty(level)) { where.Add("Level = @Level"); parms.Add("@Level", level); }
-        if (startDate.HasValue) { where.Add("CreatedAt >= @StartDate"); parms.Add("@StartDate", startDate.Value); }
-        if (endDate.HasValue) { where.Add("CreatedAt <= @EndDate"); parms.Add("@EndDate", endDate.Value); }
-
-        var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
-        var offset = (page - 1) * pageSize;
-        parms.Add("@Offset", offset);
-        parms.Add("@PageSize", pageSize);
-
-        var total = await conn.QuerySingleAsync<int>(string.Format(_sql.Get("Common.Select.SystemLog.Count"), w), parms);
-        var items = await conn.QueryAsync(string.Format(_sql.Get("Common.Select.SystemLog.Paged"), Columns, w), parms);
-
-        return Ok(new { items, total, page, pageSize });
+        var result = await _systemLogService.GetListAsync(page, pageSize, level, startDate, endDate, ct);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]
@@ -58,8 +35,7 @@ public class SystemLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-        var log = await conn.QuerySingleOrDefaultAsync(string.Format(_sql.Get("Common.Select.SystemLog.ById"), Columns), new { Id = id });
+        var log = await _systemLogService.GetDetailAsync(id, ct);
         if (log == null) return NotFound();
         return Ok(log);
     }
@@ -70,8 +46,7 @@ public class SystemLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(_sql.Get("Common.Delete.SystemLog.ById"), new { Id = id });
+        await _systemLogService.DeleteAsync(id, ct);
         return NoContent();
     }
 
@@ -81,8 +56,7 @@ public class SystemLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(_sql.Get("Common.Delete.SystemLog.All"));
+        await _systemLogService.ClearAllAsync(ct);
         return NoContent();
     }
 }

@@ -25,4 +25,10 @@ public class DapperMeterReadingRepository : DapperRepository<MeterReading>, IMet
         { using var conn = _db.CreateConnection(); conn.Open(); return (await conn.QueryAsync<MeterReading>(_sql.Get("Utility.Select.MeterReading.History"), new { Id = contractFeeConfigId, Y = year, M = month })).ToList(); }
     public async Task<bool> ReadingExistsAsync(Guid contractFeeConfigId, int year, int month, CancellationToken ct = default)
         { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QuerySingleAsync<int>(_sql.Get("Utility.Select.MeterReading.Exists"), new { Id = contractFeeConfigId, Y = year, M = month }) > 0; }
+    public async Task ConfirmAsync(Guid id, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Utility.Update.MeterReading.Confirm"), new { Id = id }); }
+    public async Task ConfirmWithReadingAsync(Guid id, decimal currentReading, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); await conn.ExecuteAsync(_sql.Get("Utility.Update.MeterReading.ConfirmWithReading"), new { Id = id, Current = currentReading }); }
+    public async Task<IEnumerable<dynamic>> GetByCompanyMonthAsync(Guid companyId, int year, int month, CancellationToken ct = default)
+        { using var conn = _db.CreateConnection(); conn.Open(); return await conn.QueryAsync(_sql.Get("Utility.Select.MeterReading.ByCompanyMonth"), new { CompanyId = companyId, Year = year, Month = month }); }
 }

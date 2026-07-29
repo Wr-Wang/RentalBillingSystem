@@ -51,6 +51,8 @@ public static class DependencyInjection
         services.AddScoped<IFloorLevelBandService, FloorLevelBandService>();
         services.AddScoped<IInterestConfigService, InterestConfigService>();
         services.AddScoped<IAutoRenewConfigService, AutoRenewConfigService>();
+        services.AddScoped<IApiLogService, ApiLogService>();
+        services.AddScoped<ISystemLogService, SystemLogService>();
         services.AddScoped<IHousingUnitService, HousingUnitService>();
         services.AddScoped<ITenantAppService, TenantAppService>();
         services.AddScoped<IApprovalService, ApprovalService>();

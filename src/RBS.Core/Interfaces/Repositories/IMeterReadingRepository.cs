@@ -38,4 +38,29 @@ public interface IMeterReadingRepository : IRepository<MeterReading>
     /// <param name="ct">取消令牌</param>
     /// <returns>已存在读数时返回 true，否则 false</returns>
     Task<bool> ReadingExistsAsync(Guid contractFeeConfigId, int year, int month, CancellationToken ct = default);
+
+    /// <summary>
+    /// 确认抄表记录（仅变更状态为 Confirmed）。
+    /// </summary>
+    /// <param name="id">抄表记录 ID</param>
+    /// <param name="ct">取消令牌</param>
+    Task ConfirmAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// 确认抄表记录并写入当前读数。
+    /// </summary>
+    /// <param name="id">抄表记录 ID</param>
+    /// <param name="currentReading">当前读数</param>
+    /// <param name="ct">取消令牌</param>
+    Task ConfirmWithReadingAsync(Guid id, decimal currentReading, CancellationToken ct = default);
+
+    /// <summary>
+    /// 按公司、年月查询抄表记录（含 FeeCodeId）。
+    /// </summary>
+    /// <param name="companyId">公司 ID</param>
+    /// <param name="year">年份</param>
+    /// <param name="month">月份</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>抄表记录列表</returns>
+    Task<IEnumerable<dynamic>> GetByCompanyMonthAsync(Guid companyId, int year, int month, CancellationToken ct = default);
 }

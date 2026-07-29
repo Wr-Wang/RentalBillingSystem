@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Billing;
-using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
-using Dapper;
 
 namespace RBS.Api.Controllers;
 
@@ -13,13 +12,11 @@ namespace RBS.Api.Controllers;
 public class CollectionRecordsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
-    public CollectionRecordsController(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql)
+    private readonly IContractService _contractService;
+    public CollectionRecordsController(IUnitOfWork uow, IContractService contractService)
     {
         _uow = uow;
-        _db = db;
-        _sql = sql;
+        _contractService = contractService;
     }
 
     [HttpGet]
@@ -31,15 +28,7 @@ public class CollectionRecordsController : ControllerBase
 
         // 批量查询合同号
         var contractIds = all.Select(r => r.ContractId).Distinct().ToList();
-        Dictionary<Guid, string> contractNoMap;
-        using (var conn = _db.CreateConnection())
-        {
-            conn.Open();
-            var contracts = await conn.QueryAsync<(Guid Id, string No)>(
-                _sql.Get("Lease.Select.Contract.IdNoPairs"),
-                new { Ids = contractIds });
-            contractNoMap = contracts.ToDictionary(c => c.Id, c => c.No);
-        }
+        var contractNoMap = await _contractService.GetIdNoPairsAsync(contractIds, ct);
 
         var result = all.Select(r => new
         {

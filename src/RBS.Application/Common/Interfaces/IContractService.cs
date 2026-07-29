@@ -108,4 +108,11 @@ public interface IContractService
     /// <returns>{ status, requestId?, approvalRequestId?, message }</returns>
     Task<object> ModifySubmitAsync(Guid contractId, ContractModifySubmitRequest request, Guid userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// 根据合同 ID 列表批量获取合同编号（No）字典
+    /// </summary>
+    /// <param name="ids">合同 ID 列表</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>合同 ID → 合同编号 字典</returns>
+    Task<Dictionary<Guid, string>> GetIdNoPairsAsync(List<Guid> ids, CancellationToken ct = default);
 }

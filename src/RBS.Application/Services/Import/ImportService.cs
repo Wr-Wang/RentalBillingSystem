@@ -1,8 +1,11 @@
+using System.Data;
 using System.Text.Json;
+using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Approval;
 using RBS.Application.DTOs.Import;
 using RBS.Core.Entities.Import;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Services;
 using RBS.Core.Interfaces.UnitOfWork;
 
@@ -15,6 +18,8 @@ public class ImportService : IImportService
     private readonly ICurrentUserService _currentUser;
     private readonly ITenantService _tenantService;
     private readonly IApprovalService _approvalService;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
     private readonly Dictionary<string, IImportTypeHandler> _handlers;
 
     public ImportService(
@@ -22,12 +27,16 @@ public class ImportService : IImportService
         ICurrentUserService currentUser,
         ITenantService tenantService,
         IApprovalService approvalService,
+        IDbConnectionFactory db,
+        ISqlLoader sql,
         IEnumerable<IImportTypeHandler> handlers)
     {
         _uow = uow;
         _currentUser = currentUser;
         _tenantService = tenantService;
         _approvalService = approvalService;
+        _db = db;
+        _sql = sql;
         _handlers = handlers.ToDictionary(h => h.ImportType, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -148,6 +157,45 @@ public class ImportService : IImportService
         batch.SetRowCounts(created, 0);
 
         await _uow.CommitAsync(ct);
+    }
+
+    public async Task<List<ImportBatchItemResponse>> GetBatchItemsAsync(Guid batchId, CancellationToken ct)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        var rows = await conn.QueryAsync<dynamic>(
+            _sql.Get("Import.Select.BatchItem.ByBatchId"),
+            new { Id = batchId });
+
+        var items = rows.Select(r =>
+        {
+            var dict = (IDictionary<string, object>)r;
+            var resp = new ImportBatchItemResponse
+            {
+                RowIndex = (int)dict["RowIndex"],
+                IsValid = (bool)dict["IsValid"],
+                ErrorCode = dict["ErrorCode"]?.ToString(),
+                ErrorMessage = dict["ErrorMessage"]?.ToString(),
+                FixSuggestion = dict["FixSuggestion"]?.ToString()
+            };
+
+            // HousingUnit-specific fields
+            string? importType = dict["ImportType"]?.ToString();
+            if (importType == "HousingUnit" || dict.ContainsKey("BuildingName"))
+            {
+                resp.BuildingName = dict["BuildingName"]?.ToString();
+                resp.FloorName = dict["FloorName"]?.ToString();
+                resp.UnitNo = dict["UnitNo"]?.ToString();
+                resp.FullCode = dict["FullCode"]?.ToString();
+                resp.RoomTypeName = dict["RoomTypeName"]?.ToString();
+                resp.Area = dict["Area"] != null ? Convert.ToDecimal(dict["Area"]) : null;
+                resp.Orientation = dict["Orientation"]?.ToString();
+                resp.BaseRentAmount = dict["BaseRentAmount"] != null ? Convert.ToDecimal(dict["BaseRentAmount"]) : null;
+            }
+            return resp;
+        }).ToList();
+
+        return items;
     }
 
     private async Task<ImportValidationContext> BuildValidationContextAsync(

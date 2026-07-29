@@ -99,4 +99,50 @@ public interface IJobScheduleExecutionService
     /// 查询 BillJob 最新成功排期的 Month（用于确定应收截断月份）
     /// </summary>
     Task<string?> GetLatestSuccessMonthAsync(Guid companyId);
+
+    // ===== 状态操作 =====
+
+    /// <summary>跳过排期（Failed/Pending → Skipped）</summary>
+    Task<bool> SkipAsync(Guid id, string? reason, CancellationToken ct = default);
+
+    /// <summary>暂停排期（Pending → Paused）</summary>
+    Task<bool> PauseAsync(Guid id, string? reason, CancellationToken ct = default);
+
+    /// <summary>取消排期（Pending/Skipped/Paused → Cancelled）</summary>
+    Task<bool> CancelAsync(Guid id, string? reason, CancellationToken ct = default);
+
+    /// <summary>恢复排期（Paused/Skipped → Pending）</summary>
+    Task<bool> ResumeAsync(Guid id, string? reason, CancellationToken ct = default);
+
+    // ===== 心跳 =====
+
+    /// <summary>获取排期心跳日志</summary>
+    Task<IEnumerable<dynamic>> GetHeartbeatsAsync(Guid executionId, int take, CancellationToken ct = default);
+
+    // ===== 重试辅助 =====
+
+    /// <summary>获取失败状态的排期（供重试用）</summary>
+    Task<ExecutionDto?> GetFailedExecutionAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>获取活跃状态的调度任务（供重试用）</summary>
+    Task<JobScheduleDto?> GetActiveScheduleAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>原子抢占排期（Pending → Processing）</summary>
+    Task<bool> ClaimExecutionAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>标记排期为完成</summary>
+    Task CompleteExecutionAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>标记排期为失败</summary>
+    Task FailExecutionAsync(Guid id, string reason, CancellationToken ct = default);
+
+    // ===== 反转 =====
+
+    /// <summary>反转出账（取消本批次产生的所有数据）</summary>
+    Task<(bool HasPayment, string? Error)> ReverseExecutionAsync(Guid taskLogId, string targetMonth, DateTime startedAt, DateTime? completedAt, string? reason, CancellationToken ct = default);
+
+    // ===== 清理 =====
+
+    /// <summary>清理日记账历史数据（仅超级管理员）</summary>
+    Task<(int DeletedOrphanGLEntries, string? Error)> CleanupJournalHistoryAsync(CancellationToken ct = default);
 }

@@ -90,4 +90,23 @@ public interface ITaskLogRepository
     /// <param name="id">任务日志 ID</param>
     /// <param name="ct">取消令牌</param>
     Task MarkStaleAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// 强制完成任务日志（将 Running/Processing 状态的日志标记为 Completed）。
+    /// 用于修复卡住的调度任务。
+    /// </summary>
+    /// <param name="id">任务日志 ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>是否更新成功</returns>
+    Task<bool> ForceCompleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// 按任务名称、公司和目标月份完成任务日志。
+    /// </summary>
+    Task CompleteByNameAsync(string jobName, Guid companyId, string month, CancellationToken ct = default);
+
+    /// <summary>
+    /// 按任务名称、公司和目标月份标记任务日志为失败。
+    /// </summary>
+    Task FailByNameAsync(string jobName, Guid companyId, string month, string error, CancellationToken ct = default);
 }

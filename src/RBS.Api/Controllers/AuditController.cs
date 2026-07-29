@@ -1,9 +1,7 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Organization;
-using RBS.Core.Interfaces.Persistence;
 
 namespace RBS.Api.Controllers;
 
@@ -13,14 +11,10 @@ namespace RBS.Api.Controllers;
 public class AuditController : ControllerBase
 {
     private readonly IAuditService _auditService;
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
 
-    public AuditController(IAuditService auditService, IDbConnectionFactory db, ISqlLoader sql)
+    public AuditController(IAuditService auditService)
     {
         _auditService = auditService;
-        _db = db;
-        _sql = sql;
     }
 
     /// <summary>获取所有已配置的审计表清单（供前端下拉列表动态加载）</summary>
@@ -78,51 +72,14 @@ public class AuditController : ControllerBase
         if (recordId == null || !versionNo.HasValue)
             return BadRequest(new { message = "需要 recordId 和 versionNo" });
 
-        var auditTable = $"{tableName}_Audit";
+        var result = await _auditService.RollbackAsync(tableName, recordId.Value.ToString(), versionNo.Value, ct);
 
-        using var conn = _db.CreateConnection(); conn.Open();
+        if (result.ErrorCode == "TABLE_NOT_FOUND")
+            return BadRequest(new { message = result.ErrorMessage });
+        if (result.ErrorCode == "VERSION_NOT_FOUND")
+            return NotFound(new { message = result.ErrorMessage });
 
-        // 1. 检查审计表是否存在
-        var tableExists = await conn.QuerySingleAsync<int>(
-            _sql.Get("Common.Select.AuditTable.Exists"), new { Name = auditTable });
-        if (tableExists == 0)
-            return BadRequest(new { message = $"审计表 {auditTable} 不存在" });
-
-        // 2. 读取指定版本的审计记录
-        var auditRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            string.Format(_sql.Get("Common.Select.AuditRecord.ByVersion"), auditTable),
-            new { Id = recordId.Value.ToString(), Ver = versionNo.Value });
-
-        if (auditRow == null)
-            return NotFound(new { message = $"未找到版本 {versionNo} 的审计记录" });
-
-        // 3. 获取最新版本（对比差异）
-        var latestVersion = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            string.Format(_sql.Get("Common.Select.AuditRecord.Latest"), auditTable),
-            new { Id = recordId.Value.ToString() });
-
-        var sourceRow = latestVersion ?? auditRow;
-
-        // 4. 构建 UPDATE 语句恢复主表
-        var updateFields = new List<string>();
-        var updateParms = new Dictionary<string, object?>();
-        var rowDict = ((IDictionary<string, object?>)sourceRow);
-
-        foreach (var kv in rowDict)
-        {
-            var key = kv.Key;
-            if (key is "AuditId" or "AuditAction" or "AuditVersionNo" or "AuditChangedAt" or "AuditChangedBy"
-                or "AuditChangedHostname" or "AuditChangedFields" or "RowVersion" or "Id")
-                continue;
-            updateFields.Add($"[{key}]=@{key}");
-            updateParms[key] = kv.Value;
-        }
-
-        updateParms["Id"] = recordId.Value;
-        var sql = $"UPDATE [{tableName}] SET {string.Join(", ", updateFields)} WHERE Id=@Id";
-        await conn.ExecuteAsync(sql, updateParms);
-
-        return Ok(new { message = $"已回滚到版本 {versionNo}", table = tableName, recordId = recordId.Value });
+        return Ok(new { message = result.ErrorMessage, table = result.Table, recordId = result.RecordId });
     }
 
     /// <summary>审计统计</summary>

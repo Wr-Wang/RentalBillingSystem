@@ -1,9 +1,8 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RBS.Api.Models;
+using RBS.Application.Common.Interfaces;
+using RBS.Application.DTOs.SystemConfig;
 using RBS.Core.Common;
-using RBS.Core.Interfaces.Persistence;
 
 namespace RBS.Api.Controllers;
 
@@ -12,9 +11,8 @@ namespace RBS.Api.Controllers;
 [Authorize]
 public class ApiLogsController : ControllerBase
 {
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
-    public ApiLogsController(IDbConnectionFactory db, ISqlLoader sql) { _db = db; _sql = sql; }
+    private readonly IApiLogService _apiLogService;
+    public ApiLogsController(IApiLogService apiLogService) { _apiLogService = apiLogService; }
 
     private bool IsSuperAdmin => User.FindFirst("IsSuperAdmin")?.Value == "True";
     private IActionResult? RequireSuperAdmin() => IsSuperAdmin ? null : Forbid();
@@ -33,39 +31,8 @@ public class ApiLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-
-        var where = new List<string>();
-        var parms = new DynamicParameters();
-
-        if (!string.IsNullOrEmpty(method)) { where.Add("HttpMethod = @Method"); parms.Add("@Method", method); }
-        if (!string.IsNullOrEmpty(path)) { where.Add("ApiPath LIKE @Path"); parms.Add("@Path", $"%{path}%"); }
-        if (statusCode.HasValue) { where.Add("StatusCode = @StatusCode"); parms.Add("@StatusCode", statusCode.Value); }
-        if (userId.HasValue) { where.Add("UserId = @UserId"); parms.Add("@UserId", userId.Value); }
-
-        // 默认近 7 天日期范围，避免全表扫描（使用东八区时间）
-        var chinaNow = ChinaTime.Now;
-        startDate ??= chinaNow.AddDays(-7);
-        endDate ??= chinaNow.AddDays(1);
-        // 前端传东八区时间，转 UTC 后比对（数据库存 UTC）
-        where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value.AddHours(-8));
-        where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value.AddHours(-8));
-
-        var w = "WHERE " + string.Join(" AND ", where);
-        var offset = (page - 1) * pageSize;
-        parms.Add("@Offset", offset);
-        parms.Add("@PageSize", pageSize);
-
-        // 总数 + 数据 一次查询（COUNT(*) OVER() 窗口函数）
-        var sql = $@"
-            SELECT COUNT(*) OVER() AS Total,
-                   Id, HttpMethod, ApiPath, StatusCode, DurationMs, ClientIp, UserId, RequestAt
-            FROM ApiLogs {w}
-            ORDER BY RequestAt DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
-
-        var rows = (await conn.QueryAsync<ApiLogListItem>(sql, parms)).ToList();
-        var total = rows.Count > 0 ? rows[0].Total : 0;
+        var (rows, total) = await _apiLogService.GetListAsync(
+            page, pageSize, method, path, statusCode, userId, startDate, endDate, ct);
 
         return Ok(new
         {
@@ -91,11 +58,7 @@ public class ApiLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-        var log = await conn.QuerySingleOrDefaultAsync<ApiLogDetail>(
-            @"SELECT Id, HttpMethod, ApiPath, QueryString, RequestBody, StatusCode, ResponseBody,
-                     DurationMs, ClientIp, UserAgent, UserId, UserDisplayName, RequestAt
-              FROM ApiLogs WHERE Id = @Id", new { Id = id });
+        var log = await _apiLogService.GetDetailAsync(id, ct);
         if (log == null) return NotFound();
 
         return Ok(new
@@ -122,8 +85,7 @@ public class ApiLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync(_sql.Get("Common.Delete.ApiLog.ById"), new { Id = id });
+        await _apiLogService.DeleteAsync(id, ct);
         return NoContent();
     }
 
@@ -135,27 +97,7 @@ public class ApiLogsController : ControllerBase
         var auth = RequireSuperAdmin();
         if (auth != null) return auth;
 
-        using var conn = _db.CreateConnection(); conn.Open();
-
-        // 无日期条件 = 清空全部 → TRUNCATE 秒级完成（比 DELETE 逐批快百倍）
-        if (!startDate.HasValue && !endDate.HasValue)
-        {
-            await conn.ExecuteAsync("TRUNCATE TABLE ApiLogs");
-        }
-        else
-        {
-            var where = new List<string>();
-            var parms = new DynamicParameters();
-            if (startDate.HasValue) { where.Add("RequestAt >= @StartDate"); parms.Add("@StartDate", startDate.Value.AddHours(-8)); }
-            if (endDate.HasValue) { where.Add("RequestAt <= @EndDate"); parms.Add("@EndDate", endDate.Value.AddHours(-8)); }
-            var w = "WHERE " + string.Join(" AND ", where);
-
-            // 批次删除，避免锁表
-            await conn.ExecuteAsync($@"
-                DELETE TOP(1000) FROM ApiLogs {w};
-                WHILE @@ROWCOUNT > 0
-                    DELETE TOP(1000) FROM ApiLogs {w};", parms);
-        }
+        await _apiLogService.DeleteByRangeAsync(startDate, endDate, ct);
         return NoContent();
     }
 }

@@ -1,4 +1,5 @@
 using Dapper;
+using RBS.Core.Common;
 using RBS.Core.Entities.Scheduling;
 using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.Repositories;
@@ -133,5 +134,28 @@ public class DapperTaskLogRepository : ITaskLogRepository
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Scheduling.Update.TaskLog.MarkStale"),
             new { Id = id });
+    }
+
+    public async Task<bool> ForceCompleteAsync(Guid id, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await conn.ExecuteAsync(
+            "UPDATE TaskLogs SET Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status IN ('Running','Processing')",
+            new { Id = id });
+        return affected > 0;
+    }
+
+    public async Task CompleteByNameAsync(string jobName, Guid companyId, string month, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync(_sql.Get("Scheduling.Update.TaskLog.CompleteByName"),
+            new { Status = "Completed", Now = ChinaTime.Now, Name = jobName, Cid = companyId, Month = month });
+    }
+
+    public async Task FailByNameAsync(string jobName, Guid companyId, string month, string error, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync(_sql.Get("Scheduling.Update.TaskLog.FailByName"),
+            new { Status = "Failed", Now = ChinaTime.Now, Error = error, Name = jobName, Cid = companyId, Month = month });
     }
 }

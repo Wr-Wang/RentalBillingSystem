@@ -53,6 +53,19 @@ public class AuditQuery
 }
 
 /// <summary>
+/// 审计回滚结果
+/// </summary>
+public class AuditRollbackResult
+{
+    public bool Success { get; set; }
+    public string? ErrorCode { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? Table { get; set; }
+    public string? RecordId { get; set; }
+    public int VersionNo { get; set; }
+}
+
+/// <summary>
 /// 审计版本对比结果
 /// </summary>
 public class AuditCompareDto

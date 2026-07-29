@@ -10,4 +10,7 @@ public interface IImportService
 
     /// <summary>审批通过后执行创建（由 ApprovalCompletedEventHandler 调用）</summary>
     Task ExecuteApprovedImportAsync(Guid batchId, CancellationToken ct);
+
+    /// <summary>获取导入批次明细行列表（含 HousingUnit 特有字段）</summary>
+    Task<List<ImportBatchItemResponse>> GetBatchItemsAsync(Guid batchId, CancellationToken ct);
 }

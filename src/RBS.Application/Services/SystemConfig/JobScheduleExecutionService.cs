@@ -226,6 +226,172 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
         await _uow.CommitAsync(ct);
     }
 
+    // ===== 状态操作 =====
+
+    public async Task<bool> SkipAsync(Guid id, string? reason, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await conn.ExecuteAsync(
+            _sql.Get("Scheduling.Update.Execution.Skip"),
+            new { Id = id, Reason = reason ?? "手动跳过" });
+        return affected > 0;
+    }
+
+    public async Task<bool> PauseAsync(Guid id, string? reason, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await conn.ExecuteAsync(
+            _sql.Get("Scheduling.Update.Execution.Pause"),
+            new { Id = id, Reason = reason ?? "手动暂停" });
+        return affected > 0;
+    }
+
+    public async Task<bool> CancelAsync(Guid id, string? reason, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await conn.ExecuteAsync(
+            _sql.Get("Scheduling.Update.Execution.Cancel"),
+            new { Id = id, Reason = reason ?? "手动取消" });
+        return affected > 0;
+    }
+
+    public async Task<bool> ResumeAsync(Guid id, string? reason, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await conn.ExecuteAsync(
+            _sql.Get("Scheduling.Update.Execution.Resume"),
+            new { Id = id, Reason = reason ?? "手动恢复" });
+        return affected > 0;
+    }
+
+    // ===== 心跳 =====
+
+    public async Task<IEnumerable<dynamic>> GetHeartbeatsAsync(Guid executionId, int take, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        return await conn.QueryAsync(
+            _sql.Get("Scheduling.Select.ExecutionHeartbeat.ByExecutionId"),
+            new { Id = executionId, Take = take });
+    }
+
+    // ===== 重试辅助 =====
+
+    public async Task<ExecutionDto?> GetFailedExecutionAsync(Guid id, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var entity = await conn.QuerySingleOrDefaultAsync<JobScheduleExecution>(
+            _sql.Get("Scheduling.Select.Execution.FailedById"), new { Id = id });
+        return entity is null ? null : Map(entity);
+    }
+
+    public async Task<JobScheduleDto?> GetActiveScheduleAsync(Guid id, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var entity = await conn.QuerySingleOrDefaultAsync<JobSchedule>(
+            _sql.Get("Scheduling.Select.JobSchedule.ActiveById"), new { Id = id });
+        return entity is null ? null : MapToJobScheduleDto(entity);
+    }
+
+    public async Task<bool> ClaimExecutionAsync(Guid id, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        var affected = await conn.ExecuteAsync(
+            _sql.Get("Scheduling.Update.Execution.Claim"), new { Id = id });
+        return affected > 0;
+    }
+
+    public async Task CompleteExecutionAsync(Guid id, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync(
+            _sql.Get("Scheduling.Update.Execution.Complete"), new { Id = id });
+    }
+
+    public async Task FailExecutionAsync(Guid id, string reason, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        await conn.ExecuteAsync(
+            _sql.Get("Scheduling.Update.Execution.Fail"), new { Id = id, Reason = reason });
+    }
+
+    // ===== 反转 =====
+
+    public async Task<(bool HasPayment, string? Error)> ReverseExecutionAsync(
+        Guid taskLogId, string targetMonth, DateTime startedAt, DateTime? completedAt, string? reason, CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            var hasPayment = await conn.QuerySingleAsync<int>(
+                _sql.Get("Scheduling.Select.Receipt.HasPaymentByPeriod"), new { P = targetMonth });
+            if (hasPayment > 0)
+                return (true, "该账期已有收款记录，禁止反转");
+
+            var taskEnd = completedAt ?? ChinaTime.Now;
+
+            await conn.ExecuteAsync(
+                _sql.Get("Scheduling.Update.DebitNote.CancelByTaskLog"),
+                new { Start = startedAt, End = taskEnd, Reason = reason ?? "管理员反转" }, tx);
+
+            await conn.ExecuteAsync(
+                _sql.Get("Scheduling.Delete.Journal.ByTimeRange"),
+                new { Start = startedAt, End = taskEnd }, tx);
+
+            await conn.ExecuteAsync(
+                _sql.Get("Scheduling.Delete.Journal.ByPeriodTimeRange"),
+                new { P = targetMonth, Start = startedAt, End = taskEnd }, tx);
+
+            await conn.ExecuteAsync(
+                _sql.Get("Scheduling.Update.TaskLog.Reversed"), new { Id = taskLogId }, tx);
+
+            tx.Commit();
+            return (false, null);
+        }
+        catch (Exception ex)
+        {
+            tx.Rollback();
+            return (false, ex.Message);
+        }
+    }
+
+    // ===== 清理 =====
+
+    public async Task<(int DeletedOrphanGLEntries, string? Error)> CleanupJournalHistoryAsync(CancellationToken ct = default)
+    {
+        using var conn = _db.CreateConnection(); conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        try
+        {
+            var deletedOrphanGLEntries = await conn.ExecuteAsync(
+                _sql.Get("Accounting.Delete.GLEntry.OrphanJournalPost"), transaction: tx);
+
+            tx.Commit();
+
+            try
+            {
+                await conn.ExecuteAsync(
+                    @"INSERT INTO SystemLogs (Id, Level, Category, Message, MachineName, CreatedAt)
+                      VALUES (@Id, 'Info', 'DataCleanup', @Msg, @Machine, DATEADD(HOUR, 8, GETUTCDATE()))",
+                    new
+                    {
+                        Id = Guid.NewGuid(),
+                        Msg = $"数据清理完成: OrphanGLEntries={deletedOrphanGLEntries}",
+                        Machine = Environment.MachineName
+                    });
+            }
+            catch { }
+
+            return (deletedOrphanGLEntries, null);
+        }
+        catch (Exception ex)
+        {
+            tx.Rollback();
+            return (0, ex.Message);
+        }
+    }
 
     /// <summary>调整日期到最近工作日（向前或向后）</summary>
     private DateTime AdjustToWorkingDay(DateTime date, HashSet<DateTime> holidays, HashSet<DateTime> makeupDays)
@@ -261,6 +427,21 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
             return false;
         return true;
     }
+
+    private static JobScheduleDto MapToJobScheduleDto(JobSchedule s) => new()
+    {
+        Id = s.Id,
+        JobName = s.JobName,
+        ScheduleType = s.ScheduleType,
+        Hour = s.Hour,
+        Minute = s.Minute,
+        DayOfMonth = s.DayOfMonth,
+        IsActive = s.IsActive,
+        Description = s.Description,
+        TemplateCode = s.TemplateCode,
+        LastRunAt = s.LastRunAt,
+        LastRunStatus = s.LastRunStatus
+    };
 
     internal static ExecutionDto Map(JobScheduleExecution e) => new()
     {

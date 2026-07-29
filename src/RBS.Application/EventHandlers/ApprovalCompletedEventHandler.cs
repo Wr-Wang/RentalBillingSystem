@@ -225,13 +225,11 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
                         new { ExpiryDate = result.EffectiveEndDate, ContractId = bizData.ContractId }, ct);
                     await _uow.CommitAsync(ct);
 
-            try { using (var conn2 = _db.CreateConnection()) { conn2.Open();
-                    await conn2.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
-                        new { Id = Guid.NewGuid(), ContractId = bizData.ContractId, ChangeType = "TERMINATE",
-                            Title = "合同终止", Detail = bizData.Reason ?? "",
-                            OldValue = (decimal?)null, NewValue = (decimal?)null,
-                            EffectiveDate = bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
-                            OperatorId = CurrentUserId, OperatorName = "" }); } } catch { }
+            try { await _timelineService.InsertChangeHistoryAsync(bizData.ContractId, "TERMINATE",
+                    "合同终止", bizData.Reason ?? "",
+                    null, null,
+                    bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
+                    CurrentUserId, ct: ct); } catch { }
                 }
                 else
                 {
@@ -345,10 +343,9 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             }
             else
             {
-                using (var conn2 = _db.CreateConnection()) { conn2.Open();
-                    await InsertChangeHistoryAsync(conn2, null, item.ContractId, "FEE_ADJUST",
-                        "费用调价", item.FeeName + ": " + item.OldAmount.ToString("F2") + " -> " + item.NewAmount.ToString("F2"),
-                        item.OldAmount, item.NewAmount, effectiveDate, userId); }
+                await _timelineService.InsertChangeHistoryAsync(item.ContractId, "FEE_ADJUST",
+                    "费用调价", item.FeeName + ": " + item.OldAmount.ToString("F2") + " -> " + item.NewAmount.ToString("F2"),
+                    item.OldAmount, item.NewAmount, effectiveDate, userId, ct: ct);
 
                 // 固定金额：调 Amount
                 var fixedConfigId = Guid.NewGuid();
@@ -447,9 +444,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             var firstItem = feeItems.FirstOrDefault();
             if (firstItem != null)
             {
-                var contract = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                    "SELECT CompanyId FROM Contracts WHERE Id = @Id", new { Id = firstItem.ContractId });
-                companyId = contract?.CompanyId is Guid cid ? cid : Guid.Empty;
+                var contractDto = await _contractService.GetByIdAsync(firstItem.ContractId, ct);
+                companyId = contractDto?.CompanyId;
             }
         }
 
@@ -579,11 +575,8 @@ if (chargeType == "OneTime")
         if (contract != null) await _uow.Contracts.UpdateAsync(contract, ct);
 
         // ★ 审计：记录到期前活跃费用配置
-        List<dynamic> activeCfgs;
-        using (var auditConn = _db.CreateConnection()) { auditConn.Open();
-            activeCfgs = (await auditConn.QueryAsync(
-                _sql.Get("Lease.Select.ContractFeeConfig.ActiveByContract"),
-                new { Id = bizData.ContractId })).ToList(); }
+        var contractDto = await _contractService.GetByIdAsync(bizData.ContractId, ct);
+        var activeCfgs = contractDto?.FeeConfigs?.Where(f => f.IsActive).ToList() ?? new();
 
         await _uow.ExecuteSqlRawAsync(
             _sql.Get("Contract.Update.ContractFeeConfig.ExpireByContract"),
@@ -591,7 +584,7 @@ if (chargeType == "OneTime")
         foreach (var cfg in activeCfgs)
         {
             await _auditWriter.LogChangesAsync("ContractFeeConfigs",
-                ((IDictionary<string, object>)cfg)["Id"]?.ToString() ?? Guid.Empty.ToString(), "Update",
+                cfg.Id.ToString(), "Update",
                 new Dictionary<string, object?>
                 {
                     ["ContractId"] = bizData.ContractId,
@@ -602,13 +595,11 @@ if (chargeType == "OneTime")
 
         await _uow.CommitAsync(ct);
 
-        try { using var conn = _db.CreateConnection(); conn.Open();
-            await conn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
-                new { Id = Guid.NewGuid(), ContractId = bizData.ContractId, ChangeType = "TERMINATE",
-                    Title = "合同终止", Detail = bizData.Reason ?? "",
-                    OldValue = (decimal?)null, NewValue = (decimal?)null,
-                    EffectiveDate = bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
-                    OperatorId = CurrentUserId, OperatorName = "" }); } catch { }
+        try { await _timelineService.InsertChangeHistoryAsync(bizData.ContractId, "TERMINATE",
+                "合同终止", bizData.Reason ?? "",
+                null, null,
+                bizData.ActualEndDate?.ToString("yyyy-MM-dd"),
+                CurrentUserId, ct: ct); } catch { }
 
         // 生成押金结算凭证（独立事务，失败不阻断终止主流程）
         try
@@ -960,23 +951,11 @@ if (chargeType == "OneTime")
         // 写入变更历史（独立连接，失败不阻断主流程）
         try
         {
-            using var histConn = _db.CreateConnection();
-            histConn.Open();
             var detail = BuildModifyChangeDetail(request);
-            await histConn.ExecuteAsync(_sql.Get("Contract.Insert.ChangeHistory.Default"),
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    ContractId = request.ContractId,
-                    ChangeType = "CONTRACT_MODIFY",
-                    Title = "修改合同信息",
-                    Detail = detail,
-                    OldValue = (decimal?)null,
-                    NewValue = (decimal?)null,
-                    EffectiveDate = (string?)null,
-                    OperatorId = CurrentUserId,
-                    OperatorName = ""
-                });
+            await _timelineService.InsertChangeHistoryAsync(request.ContractId, "CONTRACT_MODIFY",
+                "修改合同信息", detail,
+                null, null, null,
+                CurrentUserId, ct: ct);
         }
         catch { /* 变更历史写入失败不影响主流程 */ }
 

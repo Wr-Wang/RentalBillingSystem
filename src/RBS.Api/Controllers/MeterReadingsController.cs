@@ -1,9 +1,7 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Entities.Billing;
-using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Api.Controllers;
@@ -14,9 +12,7 @@ namespace RBS.Api.Controllers;
 public class MeterReadingsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
-    private readonly IDbConnectionFactory _db;
-    private readonly ISqlLoader _sql;
-    public MeterReadingsController(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql) { _uow = uow; _db = db; _sql = sql; }
+    public MeterReadingsController(IUnitOfWork uow) { _uow = uow; }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? contractFeeConfigId, CancellationToken ct)
@@ -40,9 +36,7 @@ public class MeterReadingsController : ControllerBase
     {
         var entity = await _uow.MeterReadings.GetByIdAsync(id, ct);
         if (entity == null) return NotFound();
-        await _db.CreateConnection().ExecuteAsync(
-            _sql.Get("Utility.Update.MeterReading.ConfirmWithReading"),
-            new { Current = dto.CurrentReading, Id = id });
+        await _uow.MeterReadings.ConfirmWithReadingAsync(id, dto.CurrentReading, ct);
         return Ok(new { id, status = "Confirmed" });
     }
 
@@ -53,9 +47,7 @@ public class MeterReadingsController : ControllerBase
         if (entity == null) return NotFound();
         if (entity.Status == "Draft")
         {
-            // DapperRepository 不支持属性赋值，使用 SQL 更新
-            await _db.CreateConnection().ExecuteAsync(
-                _sql.Get("Utility.Update.MeterReading.Confirm"), new { Id = id });
+            await _uow.MeterReadings.ConfirmAsync(id, ct);
         }
         return Ok(new { id, status = "Confirmed" });
     }
@@ -66,9 +58,7 @@ public class MeterReadingsController : ControllerBase
         if (companyId == null) return Ok(new List<object>());
         var y = year ?? RBS.Core.Common.ChinaTime.Now.Year;
         var m = month ?? RBS.Core.Common.ChinaTime.Now.Month;
-        using var conn = _db.CreateConnection(); conn.Open();
-        var rows = await conn.QueryAsync(_sql.Get("Utility.Select.MeterReading.ByCompanyMonth"),
-            new { CompanyId = companyId.Value, Year = y, Month = m });
+        var rows = await _uow.MeterReadings.GetByCompanyMonthAsync(companyId.Value, y, m, ct);
         return Ok(rows);
     }
 
