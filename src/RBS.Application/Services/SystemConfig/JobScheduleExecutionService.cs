@@ -1,7 +1,9 @@
+using Dapper;
 using RBS.Application.Common.Interfaces;
 using RBS.Core.Common;
 using RBS.Application.DTOs.SystemConfig;
 using RBS.Core.Entities.SystemConfig;
+using RBS.Core.Interfaces.Persistence;
 using RBS.Core.Interfaces.UnitOfWork;
 
 namespace RBS.Application.Services.SystemConfig;
@@ -9,7 +11,9 @@ namespace RBS.Application.Services.SystemConfig;
 public class JobScheduleExecutionService : IJobScheduleExecutionService
 {
     private readonly IUnitOfWork _uow;
-    public JobScheduleExecutionService(IUnitOfWork uow) => _uow = uow;
+    private readonly IDbConnectionFactory _db;
+    private readonly ISqlLoader _sql;
+    public JobScheduleExecutionService(IUnitOfWork uow, IDbConnectionFactory db, ISqlLoader sql) { _uow = uow; _db = db; _sql = sql; }
 
     public async Task<List<ExecutionDto>> GetExecutionsAsync(Guid jobScheduleId, int months, CancellationToken ct = default)
     {
@@ -202,6 +206,15 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
 
         await _uow.CommitAsync(ct);
         return created.OrderBy(e => e.TargetDate).Select(Map).ToList();
+    }
+
+    public async Task<string?> GetLatestSuccessMonthAsync(Guid companyId)
+    {
+        using var conn = _db.CreateConnection();
+        conn.Open();
+        return await conn.QuerySingleOrDefaultAsync<string>(
+            _sql.Get("Scheduling.Select.Execution.LatestSuccessMonth"),
+            new { CompanyId = companyId });
     }
 
     public async Task DeleteFutureAsync(Guid jobScheduleId, CancellationToken ct = default)

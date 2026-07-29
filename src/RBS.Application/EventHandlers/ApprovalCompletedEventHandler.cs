@@ -41,7 +41,18 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
     private readonly IContractTimelineService _timelineService;
     private readonly IAuditLogWriter _auditWriter;
     private readonly ICurrentUserService _currentUser;
+    private readonly IJobScheduleExecutionService _executionService;
     private Guid CurrentUserId => _currentUser?.UserId ?? Guid.Empty;
+
+    /// <summary>查询 BillJob 最新成功排期的 Month，计算 refDate（用于 CalculateMonthlySplit）</summary>
+    private async Task<DateTime> GetRefDateAsync(Guid companyId)
+    {
+        var month = await _executionService.GetLatestSuccessMonthAsync(companyId);
+        if (string.IsNullOrEmpty(month)) return ChinaTime.Now;
+        var parts = month.Split('-');
+        return new DateTime(int.Parse(parts[0]), int.Parse(parts[1]),
+            DateTime.DaysInMonth(int.Parse(parts[0]), int.Parse(parts[1])));
+    }
 
     /// <summary>
     /// 构造函数
@@ -71,7 +82,8 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         IServiceProvider serviceProvider,
         IContractTimelineService timelineService,
         IAuditLogWriter auditWriter,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IJobScheduleExecutionService executionService)
     {
         _importService = importService;
         _contractService = contractService;
@@ -87,6 +99,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         _timelineService = timelineService;
         _auditWriter = auditWriter;
         _currentUser = currentUser;
+        _executionService = executionService;
     }
 
     /// <summary>
@@ -356,45 +369,40 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
             }
         }
 
-        await _uow.CommitAsync(ct);
-
-        // ★ Commit 之后再生成补差 Supplementary JE（FeeConfig 已落库，
-        //    补差 JE 生成失败不影响 FeeConfig 变更，可手动重试）
-        var currentMonth = ChinaTime.Now.ToString("yyyy-MM");
-        var companyId = bizData.CompanyId;
-
-        foreach (var item in feeItems)
+                // 校验：生效月不能 <= BillJob 最新已执行月份（已出账月份不允许调价）
+        var month = await _executionService.GetLatestSuccessMonthAsync(bizData.CompanyId);
+        if (!string.IsNullOrEmpty(month))
         {
-            var effDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
-            if (string.IsNullOrEmpty(effDate)) continue;
-            var effMonth = effDate.Substring(0, 7);
-
-            // 生效月 M ≤ 当前月+1 → 已出账单范围 → 生成补差
-            if (string.Compare(effMonth, currentMonth, StringComparison.Ordinal) <= 0 ||
-                effMonth == ChinaTime.Now.AddMonths(1).ToString("yyyy-MM"))
+            foreach (var item in feeItems)
             {
-                var diff = item.NewAmount - item.OldAmount;
-                if (diff == 0) continue;
+                var effDate = item.EffectiveDate ?? bizData.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
+                if (string.IsNullOrEmpty(effDate)) continue;
+                var effMonth = effDate.Substring(0, 7);
 
-                // 生效月按天分摊差价
-                var effDateObj = DateTime.Parse(effDate);
-                var daysInMonth = DateTime.DaysInMonth(effDateObj.Year, effDateObj.Month);
-                var occupiedDays = daysInMonth - effDateObj.Day + 1;
-                var proratedDiff = Math.Round(diff / daysInMonth * occupiedDays, 2);
-                if (proratedDiff == 0) continue;
-
-                try
+                if (string.Compare(effMonth, month, StringComparison.Ordinal) <= 0)
                 {
-                    using var jeConn = _db.CreateConnection();
-                    jeConn.Open();
-                    await InsertJournalAsync(jeConn, null,
-                        companyId, item.ContractId, item.FeeCodeId, null,
-                        effMonth, proratedDiff, ChinaTime.Now,
-                        "Supplementary", $"调价补差 {item.FeeName} {effMonth}");
+                    var effParts = effMonth.Split('-');
+                    var effYear = int.Parse(effParts[0]); var effMon = int.Parse(effParts[1]);
+                    var refParts = month.Split('-');
+                    var refYear = int.Parse(refParts[0]); var refMon = int.Parse(refParts[1]);
+                    var affected = new List<string>();
+                    int y = effYear, m = effMon;
+                    while (y < refYear || (y == refYear && m <= refMon))
+                    {
+                        affected.Add(y + "年" + m.ToString("D2") + "月");
+                        m++; if (m > 12) { y++; m = 1; }
+                    }
+                    var nextDate = DateTime.Parse(month + "-01").AddMonths(1);
+                    var errMsg = "费用 \"" + item.FeeName + "\" 的生效日期 " + effDate
+                        + " 影响以下月份已生成的账单："
+                        + string.Join("、", affected) + "的账单已生成，调价无法追溯已出账月份。"
+                        + "请将生效日期调整为 " + nextDate.ToString("yyyy-MM-dd") + " 或之后。";
+                    throw new InvalidOperationException(errMsg);
                 }
-                catch { /* 补差 JE 失败不影响 FeeConfig 变更，可手动重试 */ }
             }
         }
+
+        await _uow.CommitAsync(ct);
     }
 
     /// <summary>
@@ -448,21 +456,7 @@ public class ApprovalCompletedEventHandler : IEventHandler<ApprovalCompletedEven
         using var tx = conn.BeginTransaction();
         try
         {
-            // 查询 BillJob 最新成功排期的 Month（确定应收截断月份）
-            var latestSuccessMonth = await conn.QuerySingleOrDefaultAsync<string>(
-                _sql.Get("Scheduling.Select.Execution.LatestSuccessMonth"),
-                new { CompanyId = companyId ?? Guid.Empty }, tx);
-            DateTime refDate;
-            if (!string.IsNullOrEmpty(latestSuccessMonth))
-            {
-                var parts = latestSuccessMonth.Split('-');
-                refDate = new DateTime(int.Parse(parts[0]), int.Parse(parts[1]),
-                    DateTime.DaysInMonth(int.Parse(parts[0]), int.Parse(parts[1])));
-            }
-            else
-            {
-                refDate = ChinaTime.Now;
-            }
+            var refDate = await GetRefDateAsync(companyId ?? Guid.Empty);
 
             foreach (var item in feeItems)
             {
@@ -742,7 +736,8 @@ if (chargeType == "OneTime")
 		                if (feeChargeType == "Recurring")
 		                {
 		                    var effDate = f.EffectiveDate ?? request.StartDate.ToString("yyyy-MM-dd");
-		                    await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
+		                    var refDate = await GetRefDateAsync(request.CompanyId);
+                    await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
 		                        conn, tx, _sql, _billingDomain,
 		                        contractId, (Guid)f.FeeCodeId,
 		                        (decimal)f.Amount, (string)f.BillingMode,
@@ -1123,10 +1118,11 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	                            new { Id = request.FeeCodeId }, tx);
 	            var feeChargeType = (string)(feeCodeInfo?.ChargeType ?? "Recurring");
 
+            var refDate = await GetRefDateAsync(contract!.CompanyId);
 	            if (feeChargeType == "Recurring")
 	            {
 	                var segments = _billingDomain.CalculateMonthlySplit(
-	                    request.Amount, request.EffectiveDate, ChinaTime.Now,
+	                    request.Amount, request.EffectiveDate, refDate,
 	                    contract!.StartDate, contract!.EndDate);
 	                var segIds = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
 	                    conn, tx, _sql, _billingDomain,

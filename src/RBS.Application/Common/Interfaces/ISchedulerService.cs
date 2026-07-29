@@ -94,4 +94,9 @@ public interface IJobScheduleExecutionService
     /// 删除指定调度任务的所有未来执行记录
     /// </summary>
     Task DeleteFutureAsync(Guid jobScheduleId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询 BillJob 最新成功排期的 Month（用于确定应收截断月份）
+    /// </summary>
+    Task<string?> GetLatestSuccessMonthAsync(Guid companyId);
 }

@@ -25,8 +25,9 @@ public class ContractFeeConfigsController : ControllerBase
     private readonly IUnitOfWork _uow;
     private readonly IApprovalService _approvalService;
     private readonly IBillingDomainService _billingDomain;
+    private readonly IJobScheduleExecutionService _executionService;
 
-    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser, IUnitOfWork uow, IApprovalService approvalService, IBillingDomainService billingDomain)
+    public ContractFeeConfigsController(IDbConnectionFactory db, ISqlLoader sql, ICurrentUserService currentUser, IUnitOfWork uow, IApprovalService approvalService, IBillingDomainService billingDomain, IJobScheduleExecutionService executionService)
     {
         _db = db;
         _sql = sql;
@@ -34,6 +35,7 @@ public class ContractFeeConfigsController : ControllerBase
         _uow = uow;
         _approvalService = approvalService;
         _billingDomain = billingDomain;
+        _executionService = executionService;
     }
 
     [HttpGet]
@@ -147,6 +149,17 @@ public class ContractFeeConfigsController : ControllerBase
         Guid id;
         if (request.ChargeType == "Recurring")
         {
+            // 查询 BillJob 最新成功排期的 Month 作为拆分基准
+            DateTime refDate;
+            var month = await _executionService.GetLatestSuccessMonthAsync(contract.CompanyId);
+            if (!string.IsNullOrEmpty(month))
+            {
+                var parts = month.Split('-');
+                refDate = new DateTime(int.Parse(parts[0]), int.Parse(parts[1]),
+                    DateTime.DaysInMonth(int.Parse(parts[0]), int.Parse(parts[1])));
+            }
+            else { refDate = ChinaTime.Now; }
+
             // 周期费用：按月拆分
             var ids = await RecurringFeeSplitHelper.InsertMonthlySplitFeeConfigs(
                 conn, null, _sql, _billingDomain,
@@ -155,7 +168,7 @@ public class ContractFeeConfigsController : ControllerBase
                 request.Unit, request.UnitPrice,
                 request.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd"),
                 _currentUser.UserId,
-                contract.StartDate, contract.EndDate);
+                contract.StartDate, contract.EndDate, refDate);
             id = ids.Last(); // 用于 ChangeHistory，用长期配置的 ID
         }
         else
