@@ -469,7 +469,7 @@
       ISNULL(SUM(r.Amount), 0) AS TotalReceived
       FROM Journals j
       JOIN FeeCodes fc ON fc.Id = j.FeeCodeId
-      LEFT JOIN Receipts r ON r.CompanyId = j.CompanyId
+      LEFT JOIN Receipts r ON r.ContractId = j.ContractId
         AND FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period
         AND r.Status = 'Confirmed'
       WHERE (@Period IS NULL OR j.Period = @Period) AND (@CompanyId IS NULL OR j.CompanyId = @CompanyId)

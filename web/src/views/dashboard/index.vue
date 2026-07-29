@@ -461,8 +461,9 @@ async function loadData() {
     // 今日收款
     const dr = await getDailyReceipt({ date: today, companyId })
     const details = dr.details || dr || []
-    const totalReceived = details.reduce((s, r) => s + (r.total || 0), 0)
-    const totalCount = details.reduce((s, r) => s + (r.cnt || 0), 0)
+    const confirmed = details.filter(r => r.status === 'Confirmed')
+    const totalReceived = confirmed.reduce((s, r) => s + (r.total || 0), 0)
+    const totalCount = confirmed.reduce((s, r) => s + (r.cnt || 0), 0)
     todayStats.value = { received: totalReceived, count: totalCount }
   } catch { /* ignore */ }
 
@@ -474,7 +475,7 @@ async function loadData() {
     monthStats.value = {
       receivable: ta,
       received: tr,
-      overdue: ta - tr,
+      overdue: Math.max(0, ta - tr),
       collectionRate: ta > 0 ? Math.round((tr / ta) * 100) : 0
     }
   } catch { /* ignore */ }
@@ -483,8 +484,8 @@ async function loadData() {
     // 逾期明细
     const od = await getOverdueDetail({ companyId })
     overdueList.value = od || []
-    overdueContracts.value = od?.length || 0
-    pendingCollection.value = od?.filter(p => (p.daysOverdue || 0) > 7).length || 0
+    overdueContracts.value = new Set(od?.map(x => x.contractId) || []).size
+    pendingCollection.value = new Set(od?.filter(p => (p.daysOverdue || 0) > 7).map(x => x.contractId) || []).size
   } catch { /* ignore */ }
 
   // 最近收款
@@ -522,7 +523,7 @@ async function loadData() {
     const actives = (allContractsRes?.items || []).filter(c => c.status === 'Active')
     const expiringSoon = actives.filter(c => c.endDate && new Date(c.endDate) < new Date(chinaTime.now().getTime() + 14 * 86400000))
     if (expiringSoon.length > 0) items.push({ type: '续签', tagType: 'primary', content: `${expiringSoon.length} 份合同即将到期`, date: today })
-    if (overduePlans?.length > 0) items.push({ type: '催缴', tagType: 'danger', content: `${overduePlans.length} 户逾期欠费`, date: today })
+    if (overduePlans?.length > 0) items.push({ type: '催缴', tagType: 'danger', content: `${new Set(overduePlans.map(x => x.contractId)).size} 户逾期欠费`, date: today })
     const unreadTotal = unreadCounts?.Total || 0
     if (unreadTotal > 0) items.push({ type: '通知', tagType: 'info', content: `${unreadTotal} 条未读通知`, date: today })
     todoList.value = items.length > 0 ? items : [{ type: '提示', tagType: 'info', content: '暂无待办事项，一切正常', date: today }]
@@ -554,7 +555,8 @@ async function loadDailyTrend(period, companyId) {
     try {
       const dr = await getDailyReceipt({ date: dateStr, companyId })
       const details = dr.details || dr || []
-      const total = details.reduce((s, r) => s + (r.total || 0), 0)
+      const confirmed = details.filter(r => r.status === 'Confirmed')
+      const total = confirmed.reduce((s, r) => s + (r.total || 0), 0)
       data.push(total)
     } catch { data.push(0) }
   }

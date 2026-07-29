@@ -57,12 +57,14 @@ public class ReportingService : IReportingService
 
         var enriched = raw.Select(p =>
         {
-            var info = contractDict.GetValueOrDefault((Guid)p.ContractId);
+            contractDict.TryGetValue((Guid)p.ContractId, out var info);
             return new
             {
                 Id = (Guid)p.Id, ContractId = (Guid)p.ContractId, FeeCodeId = (Guid)p.FeeCodeId,
                 Period = (string)p.Period, Amount = (decimal)p.Amount,
-                DueDate = (DateTime)p.DueDate, DaysOverdue = (int)p.DaysOverdue
+                DueDate = (DateTime)p.DueDate, DaysOverdue = (int)p.DaysOverdue,
+                ContractNo = info.Item2 ?? "", TenantName = info.Item3 ?? "",
+                RoomFullCode = info.Item4 ?? ""
             };
         }).OrderByDescending(p => p.DaysOverdue).ToList();
 
