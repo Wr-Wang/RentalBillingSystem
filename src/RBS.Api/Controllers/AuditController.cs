@@ -17,11 +17,11 @@ public class AuditController : ControllerBase
         _auditService = auditService;
     }
 
-    /// <summary>获取所有已配置的审计表清单（供前端下拉列表动态加载）</summary>
+    /// <summary>获取所有已配置的审计表清单（供前端下拉列表动态加载，含各表变更总条数）</summary>
     [HttpGet("tables")]
-    public IActionResult GetAuditTables()
+    public async Task<IActionResult> GetAuditTables(CancellationToken ct)
     {
-        var tables = _auditService.GetAuditTables();
+        var tables = await _auditService.GetAuditTablesAsync(ct);
         return Ok(tables);
     }
 

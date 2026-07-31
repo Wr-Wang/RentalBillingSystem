@@ -18,7 +18,7 @@ public interface IAuditService
     Task<AuditStatsDto> GetStatsAsync(CancellationToken ct = default);
 
     /// <summary>获取所有已配置的审计表清单（供前端动态加载）</summary>
-    List<AuditTableInfo> GetAuditTables();
+    Task<List<AuditTableInfo>> GetAuditTablesAsync(CancellationToken ct = default);
 
     /// <summary>回滚到指定版本 — 从 _Audit 表读取版本数据，恢复主表</summary>
     Task<AuditRollbackResult> RollbackAsync(string tableName, string recordId, int versionNo, CancellationToken ct = default);
@@ -31,4 +31,5 @@ public class AuditTableInfo
 {
     public string TableName { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    public int TotalChanges { get; set; }
 }

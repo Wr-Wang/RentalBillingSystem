@@ -22,14 +22,16 @@ public class AuditService : IAuditService
 {
     private readonly IDbConnectionFactory _db;
     private readonly AuditFieldConfigLoader _configLoader;
+    private readonly ISqlLoader _sql;
 
     /// <summary>
     /// 初始化审计服务
     /// </summary>
-    public AuditService(IDbConnectionFactory db, AuditFieldConfigLoader configLoader)
+    public AuditService(IDbConnectionFactory db, AuditFieldConfigLoader configLoader, ISqlLoader sql)
     {
         _db = db;
         _configLoader = configLoader;
+        _sql = sql;
     }
 
     /// <summary>
@@ -226,10 +228,33 @@ public class AuditService : IAuditService
 
     /// <summary>
     /// 获取所有已配置的审计表清单（供前端动态加载下拉列表）
+    /// 同时统计每张审计表的数据变更总条数（sys.dm_db_partition_stats 毫秒级返回）
     /// </summary>
-    public List<AuditTableInfo> GetAuditTables()
+    public async Task<List<AuditTableInfo>> GetAuditTablesAsync(CancellationToken ct = default)
     {
-        return _configLoader.GetAllTables();
+        var tables = _configLoader.GetAllTables();
+        if (tables.Count == 0) return tables;
+
+        using var conn = _db.CreateConnection();
+        conn.Open();
+
+        // 单查询统计所有 _Audit 表的行数（基于索引，近似值，适合展示用途）
+        var rows = await conn.QueryAsync<(string TableName, long TotalRows)>(
+            _sql.Get("Audit.Select.Table.RowCounts"), ct);
+
+        // 构建 业务表名(去 _Audit 后缀) → 行数 的映射，忽略大小写
+        var countMap = rows
+            .Where(r => r.TableName.EndsWith("_Audit", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(
+                r => r.TableName[..^"_Audit".Length],
+                r => r.TotalRows,
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach (var t in tables)
+        {
+            t.TotalChanges = (int)countMap.GetValueOrDefault(t.TableName, 0);
+        }
+        return tables;
     }
 
     /// <summary>

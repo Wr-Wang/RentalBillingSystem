@@ -6,11 +6,11 @@
 
     <!-- 搜索栏 -->
     <div class="search-bar">
-      <el-select v-model="search.tableName" placeholder="选择实体类型" clearable filterable style="width: 200px;" @change="onTableChange">
+      <el-select v-model="search.tableName" placeholder="选择实体类型" clearable filterable style="width: 220px;" @change="onTableChange">
         <el-option
           v-for="t in entityTypes"
           :key="t.tableName"
-          :label="t.displayName"
+          :label="`${t.displayName} (${(t.totalChanges ?? 0).toLocaleString()})`"
           :value="t.tableName"
         />
       </el-select>
