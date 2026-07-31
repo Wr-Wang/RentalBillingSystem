@@ -250,19 +250,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
                         parms.Add($"@{k}", prop?.GetValue(entry.Entity));
                     }
 
-                    // RowVersion 乐观锁：实体有此属性时加入 WHERE 条件
-                    var rvProp = entry.Entity.GetType().GetProperty("RowVersion");
-                    if (rvProp != null && rvProp.GetValue(entry.Entity) is byte[] rv)
-                    {
-                        sql += " AND RowVersion=@RowVersion";
-                        parms.Add("@RowVersion", rv);
-                    }
-
                     var rowCount = await conn.ExecuteAsync(sql, parms, tx);
-                    if (rowCount == 0 && rvProp != null)
-                    {
-                        throw new InvalidOperationException($"并发冲突：{tableName}(Id={id}) 已被其他操作修改，请刷新后重试");
-                    }
                     affected += rowCount;
 
                     // 收集审计：记录全量快照（延迟写入避免与事务表竞争）
@@ -428,7 +416,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
             }
             catch (InvalidOperationException)
             {
-                // 并发冲突（RowVersion 不匹配）不重试，直接抛出
+                // 业务层异常（如状态守卫冲突）不重试，直接抛出
                 throw;
             }
             catch (Exception ex) when (attempt < maxRetries && IsTransient(ex))
@@ -522,7 +510,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     /// <summary>
     /// 将实体对象转换为字典（用于快照比较）
     /// </summary>
-    /// <remarks>排除 DomainEvents、RowVersion、导航属性和只读计算属性</remarks>
+    /// <remarks>排除 DomainEvents、导航属性和只读计算属性</remarks>
     /// <param name="entity">实体对象</param>
     /// <returns>属性名→属性值的字典</returns>
     internal static Dictionary<string, object?> EntityToDict(object entity)
@@ -531,7 +519,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
         foreach (var p in props)
         {
-            if (p.Name is "DomainEvents" or "RowVersion") continue;
+            if (p.Name is "DomainEvents") continue;
             if (!p.CanWrite) continue; // 排除计算属性（如 IsVacant/IsRented）
             if (IsNavProp(p)) continue;
             dict[p.Name] = p.GetValue(entity);
@@ -548,7 +536,7 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
     internal static Dictionary<string, object?> DiffDict(Dictionary<string, object?> old, Dictionary<string, object?> now)
     {
         var diff = new Dictionary<string, object?>();
-        var exclude = new HashSet<string> { "RowVersion", "UpdatedAt", "UpdatedBy", "UpdatedIp", "UpdatedHostname" };
+        var exclude = new HashSet<string> { "UpdatedAt", "UpdatedBy", "UpdatedIp", "UpdatedHostname" };
         foreach (var kv in now)
         {
             if (exclude.Contains(kv.Key)) continue;
@@ -574,6 +562,6 @@ public class DapperUnitOfWork : IUnitOfWork, IChangeTracker
         if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
             return false;
         return t == typeof(System.Collections.IList) || t.IsGenericType ||
-               p.Name is "DomainEvents" or "RowVersion" or "Records" or "Roles";
+               p.Name is "DomainEvents" or "Records" or "Roles";
     }
 }

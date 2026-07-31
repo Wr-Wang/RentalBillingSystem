@@ -22,8 +22,6 @@ public class Contract : AggregateRoot, IHasCompany
     public ContractStatus Status { get; private set; } = ContractStatus.Draft;
     /// <summary>所属公司标识，用于多租户数据隔离</summary>
     public Guid CompanyId { get; private set; }
-    /// <summary>乐观并发控制版本戳，由数据库自动维护</summary>
-    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     // ===== 续签链字段 =====
     /// <summary>上一份合同的标识，用于追溯续签历史链</summary>

@@ -16,7 +16,7 @@ internal static class AuditHelper
         var props = entity.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
         foreach (var p in props)
         {
-            if (IsNavProp(p) || p.Name is "DomainEvents" or "RowVersion") continue;
+            if (IsNavProp(p) || p.Name is "DomainEvents") continue;
             if (!p.CanWrite) continue; // 排除计算属性
             dict[p.Name] = p.GetValue(entity);
         }
@@ -32,6 +32,6 @@ internal static class AuditHelper
         if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
             return false;
         return t == typeof(System.Collections.IList) || t.IsGenericType ||
-               p.Name is "DomainEvents" or "RowVersion" or "Records" or "Roles";
+               p.Name is "DomainEvents" or "Records" or "Roles";
     }
 }

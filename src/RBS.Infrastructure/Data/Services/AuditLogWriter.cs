@@ -16,7 +16,7 @@ namespace RBS.Infrastructure.Data.Services;
 ///   <item><description>写入前检查审计表是否存在（IF EXISTS sys.tables）</description></item>
 ///   <item><description>AuditVersionNo 自动递增（MAX + 1），支持同一记录多次修改</description></item>
 ///   <item><description>使用 SqlCommand 参数化查询，防止 SQL 注入</description></item>
-///   <item><description>动态拼接列名（由 changes 字典驱动），Id/RowVersion 字段自动排除</description></item>
+///   <item><description>动态拼接列名（由 changes 字典驱动），Id 字段自动排除</description></item>
 ///   <item><description>v2 增强：写入 AuditChangedFields 列标记变更字段，支持前端精准展示</description></item>
 /// </list>
 /// 设计模式：独立连接写入 + 失败 LogWarning（Fire-and-Forget with fail-logged）。
@@ -72,7 +72,7 @@ public class AuditLogWriter : IAuditLogWriter
             string? hostname = null;
             foreach (var kv in changes)
             {
-                if (kv.Key is "Id" or "RowVersion") continue;
+                if (kv.Key is "Id") continue;
                 if (hostname == null &&
                     (string.Equals(kv.Key, "CreatedHostname", StringComparison.Ordinal) ||
                      string.Equals(kv.Key, "UpdatedHostname", StringComparison.Ordinal)))
@@ -155,8 +155,7 @@ IF EXISTS (SELECT 1 FROM sys.tables WHERE name = @tableName)
             foreach (var kv in changes)
             {
                 // 跳过审计元数据列
-                if (kv.Key is "Id" or "RowVersion"
-                    or "AuditAction" or "AuditVersionNo" or "AuditChangedAt"
+                if (kv.Key is "Id" or "AuditAction" or "AuditVersionNo" or "AuditChangedAt"
                     or "AuditChangedBy" or "AuditChangedHostname" or "AuditChangedFields")
                     continue;
 
@@ -215,7 +214,7 @@ IF EXISTS (SELECT 1 FROM sys.tables WHERE name = @tableName)
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
 
-        // byte[] 比较（RowVersion 类型）
+        // byte[] 比较（如二进制字段）
         if (a is byte[] ba && b is byte[] bb)
             return ba.AsSpan().SequenceEqual(bb);
 

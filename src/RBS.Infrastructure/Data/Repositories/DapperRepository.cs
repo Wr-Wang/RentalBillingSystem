@@ -151,7 +151,7 @@ public class DapperRepository<T> : IRepository<T> where T : AuditableEntity
         if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
             return false;
         return t == typeof(System.Collections.IList) || t.IsGenericType ||
-               p.Name is "DomainEvents" or "RowVersion" or "Records" or "Roles";
+               p.Name is "DomainEvents" or "Records" or "Roles";
     }
 
     private static string InferTableName()

@@ -131,7 +131,7 @@ IUnitOfWork
 - **无 EF Core**：纯 Dapper + 手写 SQL，无存储过程
 - **无外键约束**：本系统禁止使用外键约束，通过领域层保证数据一致性（见[数据库规范](memory/db-conventions.md)）
 - **审计镜像表**：每张业务表对应一张 `{Table}_Audit` 镜像表（相同字段 + AuditId/AuditAction/AuditVersionNo/AuditChangedAt），通过应用层 `AuditLogWriter` 在事务提交后异步写入
-- **乐观锁**：RowVersion 字段由应用层 DapperUnitOfWork 的 `CommitWithRetryAsync()` 负责（最多 3 次重试）
+- **状态守卫**：通过 `WHERE Status='Pending'` 原子 UPDATE + `rows==0` 冲突检测实现并发控制
 - **软删除**：统一使用 `IsActive = 0` 标记删除，非物理删除
 
 ### 定时调度引擎
@@ -414,7 +414,7 @@ RentalBillingSystem/
 | **主键** | Guid + `NEWSEQUENTIALID()` |
 | **审计字段** | CreatedBy/CreatedAt/UpdatedAt 由基类自动维护 |
 | **多租户** | 实现 `IHasCompany` 接口自动获得公司级数据隔离 |
-| **乐观锁** | RowVersion + `CommitWithRetryAsync()`（最多 3 次重试），由应用层负责 |
+| **状态守卫** | `WHERE Status='Pending'` 原子 UPDATE + `rows==0` 冲突检测，由应用层负责 |
 | **变更追踪** | 继承 AuditableEntity 自动获得审计日志；每张业务表对应 `*_Audit` 镜像表 |
 | **软删除** | 统一 `IsActive = 0`，非物理删除 |
 | **外键** | 禁止使用数据库外键约束，由领域层保证引用完整性 |

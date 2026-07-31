@@ -15,7 +15,7 @@ public interface IAuditService
     /// <param name="tableName">实体表名（如 Users、ApprovalRequests）</param>
     /// <param name="entityId">实体主键值的字符串表示</param>
     /// <param name="action">操作类型（Insert/Update/Delete）</param>
-    /// <param name="changes">变更的字段名→值字典，已自动过滤 RowVersion 等无需审计的字段</param>
+    /// <param name="changes">变更的字段名→值字典，已自动过滤无需审计的字段</param>
     /// <param name="ct">取消令牌</param>
     Task LogChangesAsync(string tableName, string entityId, string action, Dictionary<string, object?> changes, CancellationToken ct = default);
 }

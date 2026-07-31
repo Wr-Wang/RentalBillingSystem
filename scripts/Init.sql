@@ -829,7 +829,6 @@ CREATE TABLE [ApprovalRequests] (
     [CallbackError] NVARCHAR(MAX) , -- 回调错误,
     [CallbackRetryCount] INT NOT NULL DEFAULT (0) , -- 重试次数,
     [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
-    [RowVersion] TIMESTAMP NOT NULL , -- 乐观锁,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
@@ -861,7 +860,6 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'回调状�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'回调错误', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalRequests', @level2type = N'COLUMN', @level2name = N'CallbackError'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'重试次数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalRequests', @level2type = N'COLUMN', @level2name = N'CallbackRetryCount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'合同ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalRequests', @level2type = N'COLUMN', @level2name = N'ContractId'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'乐观锁', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalRequests', @level2type = N'COLUMN', @level2name = N'RowVersion'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalRequests', @level2type = N'COLUMN', @level2name = N'CompanyId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalRequests', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ApprovalRequests', @level2type = N'COLUMN', @level2name = N'CreatedAt'
@@ -1839,7 +1837,6 @@ CREATE TABLE [Contracts] (
     [TerminationReason] NVARCHAR(500) , -- 终止原因,
     [SuspendedAt] DATETIME2 , -- 暂停时间,
     [ResumedAt] DATETIME2 , -- 恢复时间,
-    [RowVersion] TIMESTAMP NOT NULL , -- 乐观锁,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
@@ -1879,7 +1876,6 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'终止时�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'终止原因', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'TerminationReason'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'暂停时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'SuspendedAt'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'恢复时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'ResumedAt'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'乐观锁', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'RowVersion'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'CompanyId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Contracts', @level2type = N'COLUMN', @level2name = N'CreatedAt'
@@ -3628,7 +3624,6 @@ CREATE TABLE [Receipts] (
     [RejectReason] NVARCHAR(256) NULL , -- 驳回原因,
     [ConfirmedAt] DATETIME2 NULL , -- 确认时间,
     [ConfirmedBy] UNIQUEIDENTIFIER NULL , -- 确认人,
-    [RowVersion] TIMESTAMP NOT NULL , -- 乐观锁,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
@@ -3652,7 +3647,6 @@ EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'支付通�
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款金额', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'Amount'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'收款时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'ReceivedDate'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'状态', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'Status'
-EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'乐观锁', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'RowVersion'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'所属公司ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'CompanyId'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建人', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'CreatedBy'
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Receipts', @level2type = N'COLUMN', @level2name = N'CreatedAt'

@@ -713,7 +713,7 @@ public class ApprovalService : IApprovalService
         var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
         foreach (var p in props)
         {
-            if (p.Name is "DomainEvents" or "RowVersion") continue;
+            if (p.Name is "DomainEvents") continue;
             if (!p.CanWrite) continue;
             if (p.PropertyType == typeof(System.Collections.IList) || p.PropertyType.IsGenericType) continue;
             dict[p.Name] = p.GetValue(entity);

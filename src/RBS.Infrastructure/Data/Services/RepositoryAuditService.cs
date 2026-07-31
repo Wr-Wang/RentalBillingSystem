@@ -155,7 +155,7 @@ public class RepositoryAuditService
         var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
         foreach (var p in props)
         {
-            if (p.Name is "DomainEvents" or "RowVersion") continue;
+            if (p.Name is "DomainEvents") continue;
             if (!p.CanWrite) continue;
             if (IsNavProp(p)) continue;
             dict[p.Name] = p.GetValue(entity);
@@ -169,6 +169,6 @@ public class RepositoryAuditService
         if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
             return false;
         return t == typeof(System.Collections.IList) || t.IsGenericType
-               || p.Name is "DomainEvents" or "RowVersion" or "Records" or "Roles";
+               || p.Name is "DomainEvents" or "Records" or "Roles";
     }
 }

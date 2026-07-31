@@ -66,11 +66,6 @@ public class ApprovalRequest : AggregateRoot, IHasCompany
     public Guid CompanyId { get; private set; }
 
     /// <summary>
-    /// 乐观并发控制行版本号
-    /// </summary>
-    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
-
-    /// <summary>
     /// 关联合同标识（统一并发控制用）
     /// 用于在审批操作期间锁定关联合同，防止并发操作导致数据不一致
     /// </summary>

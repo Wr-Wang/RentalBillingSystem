@@ -286,7 +286,7 @@ public class AuditService : IAuditService
         {
             var key = kv.Key;
             if (key is "AuditId" or "AuditAction" or "AuditVersionNo" or "AuditChangedAt" or "AuditChangedBy"
-                or "AuditChangedHostname" or "AuditChangedFields" or "RowVersion" or "Id")
+                or "AuditChangedHostname" or "AuditChangedFields" or "Id")
                 continue;
             updateFields.Add($"[{key}]=@{key}");
             updateParms[key] = kv.Value;

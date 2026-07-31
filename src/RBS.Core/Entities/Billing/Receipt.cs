@@ -27,8 +27,6 @@ public class Receipt : AggregateRoot, IHasCompany
     public string Status { get; private set; }
     /// <summary>公司标识，实现 IHasCompany 接口</summary>
     public Guid CompanyId { get; private set; }
-    /// <summary>乐观并发控制版本戳，用于 EF Core 并发冲突检测</summary>
-    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     // ===== 驳回信息 =====
     /// <summary>驳回原因，驳回时填写</summary>

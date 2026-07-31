@@ -14,7 +14,7 @@ using RBS.Core.Entities.Base;
 /// - GLPosted 标记是否已写入总账
 /// - Amount 允许负数，用于红字冲销错误记录
 /// - ParentJournalId 指向被冲销/被调整的源日记账
-/// - 无 RowVersion（从不 UPDATE）
+/// - 不可变实体，INSERT 后从不 UPDATE
 /// - Updated* 审计字段保留（继承 AuditableEntity），但永不 populate
 /// </summary>
 public class Journal : AuditableEntity, IHasCompany
