@@ -93,7 +93,7 @@ public class TerminateJob : ITerminateJob
                     Period = period, Amt = depositAmt, Due = dueDate,
                     EntryType = "Adjustment", BilledAt = billedAt,
                     DNId = (Guid?)null, ParentId = (Guid?)null,
-                    Summary = "合同终止押金结算", CBy = Guid.Empty
+                    Summary = "合同终止押金结算", CBy = SystemUsers.Scheduler
                 }, tx);
 
             // 贷方：6051 扣款（如有）
@@ -107,7 +107,7 @@ public class TerminateJob : ITerminateJob
                         Period = period, Amt = deduction, Due = dueDate,
                         EntryType = "Adjustment", BilledAt = billedAt,
                         DNId = (Guid?)null, ParentId = (Guid?)null,
-                        Summary = "终止扣款", CBy = Guid.Empty
+                        Summary = "终止扣款", CBy = SystemUsers.Scheduler
                     }, tx);
 
             // 贷方：1122 抵扣欠费
@@ -121,7 +121,7 @@ public class TerminateJob : ITerminateJob
                         Period = period, Amt = offsetAmt, Due = dueDate,
                         EntryType = "Adjustment", BilledAt = billedAt,
                         DNId = (Guid?)null, ParentId = (Guid?)null,
-                        Summary = "押金抵扣欠费", CBy = Guid.Empty
+                        Summary = "押金抵扣欠费", CBy = SystemUsers.Scheduler
                     }, tx);
 
             // 贷方：1001 退还押金
@@ -135,7 +135,7 @@ public class TerminateJob : ITerminateJob
                         Period = period, Amt = refundAmt, Due = dueDate,
                         EntryType = "Adjustment", BilledAt = billedAt,
                         DNId = (Guid?)null, ParentId = (Guid?)null,
-                        Summary = "退还押金", CBy = Guid.Empty
+                        Summary = "退还押金", CBy = SystemUsers.Scheduler
                     }, tx);
 
             await _stepLogger.CompleteStepAsync(step02, 1, null, ct);

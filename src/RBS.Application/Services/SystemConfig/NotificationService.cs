@@ -147,6 +147,10 @@ public class NotificationService : INotificationService
 
     public async Task CreateAsync(Notification notification, CancellationToken ct = default)
     {
+        // 记录通知触发人（系统任务无当前用户时为 Guid.Empty）
+        if (notification.CreatedBy == Guid.Empty)
+            notification.SetCreatedBy(_currentUser?.UserId ?? Guid.Empty);
+
         using var conn = _db.CreateConnection();
         await conn.ExecuteAsync(_sql.Get("Notification.Insert.Notification.Default"),
             new
@@ -160,7 +164,8 @@ public class NotificationService : INotificationService
                 notification.ReferenceType,
                 notification.ReferenceId,
                 notification.IsRead,
-                notification.CreatedAt
+                notification.CreatedAt,
+                notification.CreatedBy
             });
     }
 

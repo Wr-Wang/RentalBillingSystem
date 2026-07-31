@@ -374,7 +374,7 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
             {
                 await conn.ExecuteAsync(
                     @"INSERT INTO SystemLogs (Id, Level, Category, Message, MachineName, CreatedAt)
-                      VALUES (@Id, 'Info', 'DataCleanup', @Msg, @Machine, DATEADD(HOUR, 8, GETUTCDATE()))",
+                      VALUES (@Id, 'Info', 'DataCleanup', @Msg, @Machine, dbo.fn_ChinaTimeNow())",
                     new
                     {
                         Id = Guid.NewGuid(),

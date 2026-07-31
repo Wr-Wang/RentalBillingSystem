@@ -25,8 +25,11 @@ public class RepositoryAuditService
         _currentUser = currentUser;
     }
 
-    /// <summary>写入创建审计 + 填充 CreatedIp/CreatedHostname/CreatedBy</summary>
-    public async Task WriteCreateAsync<T>(string tableName, T entity, CancellationToken ct = default)
+    /// <summary>
+    /// 填充创建审计字段（CreatedBy/CreatedIp/CreatedHostname）到实体，供 INSERT 前调用。
+    /// 这样数据库写入时字段已就位（此前在 INSERT 后才填充，导致 CreatedBy 恒为 Guid.Empty、IP/Hostname 恒为 NULL）。
+    /// </summary>
+    public void PopulateCreatedFields<T>(T entity)
     {
         // 从请求上下文填充 CreatedIp/CreatedHostname
         if (_clientInfo != null)
@@ -36,7 +39,11 @@ public class RepositoryAuditService
         }
         // 如果服务层传了 Guid.Empty，用当前登录用户填充
         EnsureCreatedBy(entity);
+    }
 
+    /// <summary>写入创建审计日志（INSERT 后调用）</summary>
+    public async Task WriteCreateLogAsync<T>(string tableName, T entity, CancellationToken ct = default)
+    {
         var dict = EntityToDict(entity);
         var createdBy = ResolveUserId(entity, useUpdated: false);
         await _auditWriter.LogChangesAsync(tableName, GetEntityId(entity), "Create", dict, createdBy, ct);

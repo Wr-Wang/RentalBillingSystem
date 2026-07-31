@@ -345,7 +345,7 @@ public class SchedulingHostedService : BackgroundService
                 RunMode = "Execute",
                 Status = status,
                 StartedAt = ChinaTime.Now,
-                CreatedBy = Guid.Empty
+                CreatedBy = SystemUsers.Scheduler
             });
         return id;
     }

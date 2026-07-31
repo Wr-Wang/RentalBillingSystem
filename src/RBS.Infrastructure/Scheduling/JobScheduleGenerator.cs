@@ -104,7 +104,7 @@ public class JobScheduleGenerator : BackgroundService
                     {
                         Id = Guid.NewGuid(), SId = (Guid)s.Id, CId = (Guid)s.CompanyId,
                         Date = nextRun.Value.ToUniversalTime(), Month = targetMonth,
-                        CBy = Guid.Empty, Now = DateTime.UtcNow
+                        CBy = SystemUsers.Scheduler, Now = ChinaTime.Now
                     });
 
                 Console.WriteLine("生成排期: " + (string)s.JobName + " -> " + nr.ToString("yyyy-MM-dd HH:mm"));

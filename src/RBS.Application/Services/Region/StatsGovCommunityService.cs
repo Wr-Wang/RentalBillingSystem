@@ -59,8 +59,8 @@ public class StatsGovCommunityService
         dt.Columns.Add("CreatedBy", typeof(Guid));
         dt.Columns.Add("CreatedAt", typeof(DateTime));
 
-        var now = DateTime.UtcNow;
-        var sysUserId = Guid.Empty;
+        var now = RBS.Core.Common.ChinaTime.Now;
+        var sysUserId = SystemUsers.DataSync;
 
         foreach (var v in villages)
         {
@@ -73,7 +73,7 @@ public class StatsGovCommunityService
             row["FullPath"] = DBNull.Value;
             row["SortOrder"] = 0;
             row["CreatedBy"] = sysUserId;
-            row["CreatedAt"] = DateTime.UtcNow;
+            row["CreatedAt"] = now;
             dt.Rows.Add(row);
         }
 

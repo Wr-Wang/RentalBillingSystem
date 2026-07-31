@@ -38,8 +38,8 @@ public class StatsGovRegionService
     public async Task<SyncResult> SyncAllAsync()
     {
         var result = new SyncResult();
-        var now = DateTime.UtcNow;
-        var sysUserId = Guid.Empty;
+        var now = RBS.Core.Common.ChinaTime.Now;
+        var sysUserId = SystemUsers.DataSync;
 
         // 1. 下载街道数据（9 位编码）
         _logger.LogInformation("下载街道数据...");

@@ -41,9 +41,10 @@ public class DapperRoleRepository : IRoleRepository
     }
     public async Task<Role> AddAsync(Role entity, CancellationToken ct = default)
     {
+        _auditService.PopulateCreatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Authorization.Insert.Role.Default"), entity);
-        await _auditService.WriteCreateAsync("Roles", entity, ct);
+        await _auditService.WriteCreateLogAsync("Roles", entity, ct);
         return entity;
     }
     public async Task UpdateAsync(Role entity, CancellationToken ct = default)

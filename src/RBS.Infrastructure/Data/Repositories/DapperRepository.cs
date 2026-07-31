@@ -72,6 +72,9 @@ public class DapperRepository<T> : IRepository<T> where T : AuditableEntity
 
     public async Task<T> AddAsync(T entity, CancellationToken ct = default)
     {
+        // ★ 审计装饰器：INSERT 前填充 CreatedBy/CreatedIp/CreatedHostname，确保入库
+        _auditService.PopulateCreatedFields(entity);
+
         using var conn = _db.CreateConnection(); conn.Open();
         var exclude = new HashSet<string> { "UpdatedBy", "UpdatedAt", "UpdatedIp", "UpdatedHostname" };
         var props = typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
@@ -81,8 +84,8 @@ public class DapperRepository<T> : IRepository<T> where T : AuditableEntity
         var vals = string.Join(",", props.Select(p => "@" + p));
         await conn.ExecuteAsync($"INSERT INTO [{_tableName}] ({cols}) VALUES ({vals})", entity);
 
-        // ★ 审计装饰器统一处理
-        await _auditService.WriteCreateAsync(_tableName, entity, ct);
+        // ★ 审计装饰器统一处理：INSERT 后写审计日志
+        await _auditService.WriteCreateLogAsync(_tableName, entity, ct);
         _tracker?.Track(entity, _tableName);
         return entity;
     }

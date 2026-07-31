@@ -94,13 +94,13 @@ public class SettleJob : ScheduledJobBase
                                     CNo = contract.ContractNo ?? "", Period = targetMonth,
                                     SId = subjects["2203"], SCode = "2203", Dir = "Debit",
                                     Amt = amt, SrcType = "SettleOffset", SrcId = (Guid?)null,
-                                    Desc = "", CBy = Guid.Empty }, tx);
+                                    Desc = "", CBy = SystemUsers.Scheduler }, tx);
                             await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
                                 new { Id = Guid.NewGuid(), CoId = companyId, CId = contract.Id,
                                     CNo = contract.ContractNo ?? "", Period = targetMonth,
                                     SId = subjects["1122"], SCode = "1122", Dir = "Credit",
                                     Amt = amt, SrcType = "SettleOffset", SrcId = (Guid?)null,
-                                    Desc = "", CBy = Guid.Empty }, tx);
+                                    Desc = "", CBy = SystemUsers.Scheduler }, tx);
                         }
                         // 扣减合同预存金额 + 欠款余额
                         await conn.ExecuteAsync(
@@ -143,7 +143,7 @@ public class SettleJob : ScheduledJobBase
                             SubjId = subjects["1122"], Period = targetMonth,
                             Amt = interest, Due = today,
                             BilledAt = billedAt, DNId = (Guid?)null,
-                            ParentId = (Guid)journal.Id, Summary = "", CBy = Guid.Empty }, tx);
+                            ParentId = (Guid)journal.Id, Summary = "", CBy = SystemUsers.Scheduler }, tx);
                     // 同步更新合同欠款余额
                     await conn.ExecuteAsync(
                         _sql.Get("Billing.Update.Contract.OutstandingBalanceAddInterest"),

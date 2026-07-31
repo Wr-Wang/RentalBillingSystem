@@ -45,9 +45,10 @@ public class DapperCompanyRepository : ICompanyRepository
 
     public async Task<Company> AddAsync(Company entity, CancellationToken ct = default)
     {
+        _auditService.PopulateCreatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Organization.Insert.Company.Default"), entity);
-        await _auditService.WriteCreateAsync("Companies", entity, ct);
+        await _auditService.WriteCreateLogAsync("Companies", entity, ct);
         return entity;
     }
 

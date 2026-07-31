@@ -43,8 +43,8 @@
     <![CDATA[SELECT COUNT(1) FROM Users WHERE Username=@Username AND Id!=@Id]]>
   </select>
   <insert id="Identity.Insert.User.Default">
-    <![CDATA[INSERT INTO Users (Id,Username,PasswordHash,DisplayName,Phone,Email,IsActive,CompanyId,IsSuperAdmin,CreatedBy,CreatedAt)
-      VALUES(@Id,@Username,@PasswordHash,@DisplayName,@Phone,@Email,@IsActive,@CompanyId,@IsSuperAdmin,@CreatedBy,@CreatedAt)]]>
+    <![CDATA[INSERT INTO Users (Id,Username,PasswordHash,DisplayName,Phone,Email,IsActive,CompanyId,IsSuperAdmin,CreatedBy,CreatedAt,CreatedIp,CreatedHostname)
+      VALUES(@Id,@Username,@PasswordHash,@DisplayName,@Phone,@Email,@IsActive,@CompanyId,@IsSuperAdmin,@CreatedBy,@CreatedAt,@CreatedIp,@CreatedHostname)]]>
   </insert>
   <update id="Identity.Update.User.Default">
     <![CDATA[UPDATE Users SET DisplayName=@DisplayName,PasswordHash=@PasswordHash,Phone=@Phone,Email=@Email,
@@ -98,7 +98,7 @@
       SELECT MenuId FROM RoleMenus WHERE RoleId=@Id]]>
   </select>
   <insert id="Authorization.Insert.Role.Default">
-    <![CDATA[INSERT INTO Roles (Id,Name,Code,Description,IsActive,CreatedBy,CreatedAt) VALUES(@Id,@Name,@Code,@Description,@IsActive,@CreatedBy,@CreatedAt)]]>
+    <![CDATA[INSERT INTO Roles (Id,Name,Code,Description,IsActive,CreatedBy,CreatedAt,CreatedIp,CreatedHostname) VALUES(@Id,@Name,@Code,@Description,@IsActive,@CreatedBy,@CreatedAt,@CreatedIp,@CreatedHostname)]]>
   </insert>
   <update id="Authorization.Update.Role.Default">
     <![CDATA[UPDATE Roles SET Name=@Name,Code=@Code,Description=@Description,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
@@ -129,8 +129,8 @@
     <![CDATA[SELECT COUNT(1) FROM Menus WHERE Id=@Id]]>
   </select>
   <insert id="Authorization.Insert.Menu.Default">
-    <![CDATA[INSERT INTO Menus (Id,Name,PermissionCode,Path,Icon,ParentId,SortOrder,IsActive,Scope,CreatedBy,CreatedAt)
-      VALUES(@Id,@Name,@PermissionCode,@Path,@Icon,@ParentId,@SortOrder,@IsActive,@Scope,@CreatedBy,@CreatedAt)]]>
+    <![CDATA[INSERT INTO Menus (Id,Name,PermissionCode,Path,Icon,ParentId,SortOrder,IsActive,Scope,CreatedBy,CreatedAt,CreatedIp,CreatedHostname)
+      VALUES(@Id,@Name,@PermissionCode,@Path,@Icon,@ParentId,@SortOrder,@IsActive,@Scope,@CreatedBy,@CreatedAt,@CreatedIp,@CreatedHostname)]]>
   </insert>
   <update id="Authorization.Update.Menu.Default">
     <![CDATA[UPDATE Menus SET Name=@Name,Path=@Path,Icon=@Icon,SortOrder=@SortOrder,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
@@ -158,8 +158,8 @@
     <![CDATA[SELECT COUNT(1) FROM Companies WHERE Id=@Id]]>
   </select>
   <insert id="Organization.Insert.Company.Default">
-    <![CDATA[INSERT INTO Companies (Id,Name,Code,ContactPerson,Phone,Address,IdType,IdNumber,BankName,BankAccount,BankAccountName,SettlementCycle,SettlementDay,CommissionRate,Remark,IsActive,CreatedBy,CreatedAt)
-      VALUES(@Id,@Name,@Code,@ContactPerson,@Phone,@Address,@IdType,@IdNumber,@BankName,@BankAccount,@BankAccountName,@SettlementCycle,@SettlementDay,@CommissionRate,@Remark,@IsActive,@CreatedBy,@CreatedAt)]]>
+    <![CDATA[INSERT INTO Companies (Id,Name,Code,ContactPerson,Phone,Address,IdType,IdNumber,BankName,BankAccount,BankAccountName,SettlementCycle,SettlementDay,CommissionRate,Remark,IsActive,CreatedBy,CreatedAt,CreatedIp,CreatedHostname)
+      VALUES(@Id,@Name,@Code,@ContactPerson,@Phone,@Address,@IdType,@IdNumber,@BankName,@BankAccount,@BankAccountName,@SettlementCycle,@SettlementDay,@CommissionRate,@Remark,@IsActive,@CreatedBy,@CreatedAt,@CreatedIp,@CreatedHostname)]]>
   </insert>
   <update id="Organization.Update.Company.Default">
     <![CDATA[UPDATE Companies SET Name=@Name,Code=@Code,ContactPerson=@ContactPerson,Phone=@Phone,Address=@Address,IsActive=@IsActive,UpdatedBy=@UpdatedBy,UpdatedAt=@UpdatedAt,UpdatedIp=@UpdatedIp,UpdatedHostname=@UpdatedHostname WHERE Id=@Id]]>
@@ -199,9 +199,9 @@
   </select>
   <insert id="Approval.Insert.Request.Default">
     <![CDATA[INSERT INTO ApprovalRequests (Id, RequestNo, ApprovalTypeId, Title, Description, TargetEntityId, TargetEntityType,
-      CurrentLevel, MaxLevel, Status, CompanyId, CreatedBy, CreatedAt)
+      CurrentLevel, MaxLevel, Status, CompanyId, CreatedBy, CreatedAt, CreatedIp, CreatedHostname)
       VALUES (@Id, @RequestNo, @ApprovalTypeId, @Title, @Description, @TargetEntityId, @TargetEntityType,
-      @CurrentLevel, @MaxLevel, @Status, @CompanyId, @CreatedBy, @CreatedAt)]]>
+      @CurrentLevel, @MaxLevel, @Status, @CompanyId, @CreatedBy, @CreatedAt, @CreatedIp, @CreatedHostname)]]>
   </insert>
   <select id="Approval.Select.Request.MaxSeqNoByDate">
     <![CDATA[SELECT ISNULL(MAX(CAST(RIGHT(RequestNo, 6) AS INT)), 0)
@@ -345,7 +345,7 @@
   <!-- 作废账单 -->
   <update id="DebitNote.Update.DebitNote.Cancel">
     <![CDATA[UPDATE DebitNotes SET Status='Cancelled',
-      UpdatedBy=@CancelledBy, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE())
+      UpdatedBy=@CancelledBy, UpdatedAt=dbo.fn_ChinaTimeNow()
       WHERE Id=@Id AND Status IN ('Published', 'Draft')]]>
   </update>
   <!-- 收款回写账单：递增已收、更新状态 -->
@@ -376,7 +376,7 @@
       TotalAmount, TotalReceived, Status, GeneratedAt, GeneratedBy, IsHistorical, CompanyId, CreatedBy, CreatedAt,
       ContractNo, TenantName, BuildingAddress, CompanyName, PreviousBalance)
       VALUES (@Id, @ContractId, @PeriodYear, @PeriodMonth, @BillNo, @DueDate,
-      @TotalAmount, 0, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @GeneratedBy, 0, @CompanyId, @CreatedBy, DATEADD(HOUR, 8, GETUTCDATE()),
+      @TotalAmount, 0, 'Published', dbo.fn_ChinaTimeNow(), @GeneratedBy, 0, @CompanyId, @CreatedBy, dbo.fn_ChinaTimeNow(),
       @ContractNo, @TenantName, @BuildingAddress, @CompanyName, @PreviousBalance)]]>
   </insert>
   <!-- 账单详情（含合同号+公司名） -->
@@ -589,28 +589,28 @@
   </select>
   <insert id="Scheduling.Insert.TaskLog.Default">
     <![CDATA[INSERT INTO TaskLogs (Id, TaskName, CompanyId, ContractId, TargetMonth, TriggerType, RunMode, Status, StartedAt, HeartbeatAt, CreatedBy, CreatedAt)
-      VALUES (@Id, @TaskName, @CompanyId, @ContractId, @TargetMonth, @TriggerType, @RunMode, @Status, @StartedAt, @StartedAt, @CreatedBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      VALUES (@Id, @TaskName, @CompanyId, @ContractId, @TargetMonth, @TriggerType, @RunMode, @Status, @StartedAt, @StartedAt, @CreatedBy, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <update id="Scheduling.Update.TaskLog.Complete">
-    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()),
-      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, DATEADD(HOUR, 8, GETUTCDATE())),
+    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=dbo.fn_ChinaTimeNow(),
+      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, dbo.fn_ChinaTimeNow()),
       TotalCount=@Total, SuccessCount=@Success, FailCount=@Fail, WarningCount=@Warn, Summary=@Summary
       WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskLog.Fail">
-    <![CDATA[UPDATE TaskLogs SET Status='Failed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()),
-      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, DATEADD(HOUR, 8, GETUTCDATE())), ErrorMessage=@Error
+    <![CDATA[UPDATE TaskLogs SET Status='Failed', CompletedAt=dbo.fn_ChinaTimeNow(),
+      TotalDurationMs=DATEDIFF(MILLISECOND, StartedAt, dbo.fn_ChinaTimeNow()), ErrorMessage=@Error
       WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskLog.Heartbeat">
-    <![CDATA[UPDATE TaskLogs SET HeartbeatAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id]]>
+    <![CDATA[UPDATE TaskLogs SET HeartbeatAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskLog.DryRunResult">
-    <![CDATA[UPDATE TaskLogs SET ResultData=@Data, Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id]]>
+    <![CDATA[UPDATE TaskLogs SET ResultData=@Data, Status='Completed', CompletedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id]]>
   </update>
   <select id="Scheduling.Select.TaskLog.Stale">
     <![CDATA[SELECT * FROM TaskLogs WHERE Status IN ('Running','RollingBack')
-      AND HeartbeatAt < DATEADD(MINUTE, -@Min, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      AND HeartbeatAt < DATEADD(MINUTE, -@Min, dbo.fn_ChinaTimeNow())]]>
   </select>
   <update id="Scheduling.Update.TaskLog.MarkStale">
     <![CDATA[UPDATE TaskLogs SET Status='Stale' WHERE Id=@Id]]>
@@ -734,15 +734,15 @@
   <!-- TaskStepLogs -->
   <insert id="Scheduling.Insert.TaskStepLog.Default">
     <![CDATA[INSERT INTO TaskStepLogs (Id, TaskLogId, StepName, StepDisplayName, ParentId, SortOrder, Status, StartedAt)
-      VALUES (@Id, @TaskLogId, @StepName, @StepDisplayName, @ParentId, @SortOrder, 'Running', DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      VALUES (@Id, @TaskLogId, @StepName, @StepDisplayName, @ParentId, @SortOrder, 'Running', dbo.fn_ChinaTimeNow())]]>
   </insert>
   <update id="Scheduling.Update.TaskStepLog.Complete">
-    <![CDATA[UPDATE TaskStepLogs SET Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()),
-      DurationMs=DATEDIFF(MILLISECOND, StartedAt, DATEADD(HOUR, 8, GETUTCDATE())), AffectedCount=@Count WHERE Id=@Id]]>
+    <![CDATA[UPDATE TaskStepLogs SET Status='Completed', CompletedAt=dbo.fn_ChinaTimeNow(),
+      DurationMs=DATEDIFF(MILLISECOND, StartedAt, dbo.fn_ChinaTimeNow()), AffectedCount=@Count WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskStepLog.Fail">
-    <![CDATA[UPDATE TaskStepLogs SET Status='Failed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()),
-      DurationMs=DATEDIFF(MILLISECOND, StartedAt, DATEADD(HOUR, 8, GETUTCDATE())), ErrorMessage=@Error WHERE Id=@Id]]>
+    <![CDATA[UPDATE TaskStepLogs SET Status='Failed', CompletedAt=dbo.fn_ChinaTimeNow(),
+      DurationMs=DATEDIFF(MILLISECOND, StartedAt, dbo.fn_ChinaTimeNow()), ErrorMessage=@Error WHERE Id=@Id]]>
   </update>
   <update id="Scheduling.Update.TaskStepLog.Skip">
     <![CDATA[UPDATE TaskStepLogs SET Status='Skipped', Message=@Reason WHERE Id=@Id]]>
@@ -759,10 +759,10 @@
     <![CDATA[SELECT * FROM BillJobFailedContracts WHERE TaskLogId = @TaskLogId ORDER BY FailedAt]]>
   </select>
   <update id="Scheduling.Update.BillJobFailedContract.MarkRetried">
-    <![CDATA[UPDATE BillJobFailedContracts SET IsRetried = 1, RetriedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id]]>
+    <![CDATA[UPDATE BillJobFailedContracts SET IsRetried = 1, RetriedAt = dbo.fn_ChinaTimeNow() WHERE Id = @Id]]>
   </update>
   <update id="Scheduling.Update.BillJobFailedContract.MarkRetriedBatch">
-    <![CDATA[UPDATE BillJobFailedContracts SET IsRetried = 1, RetriedAt = DATEADD(HOUR, 8, GETUTCDATE())
+    <![CDATA[UPDATE BillJobFailedContracts SET IsRetried = 1, RetriedAt = dbo.fn_ChinaTimeNow()
       WHERE TaskLogId = @TaskLogId AND ContractId IN @ContractIds]]>
   </update>
 
@@ -786,13 +786,13 @@
   <select id="Notification.Select.Notification.DedupCheck">
     <![CDATA[SELECT COUNT(1) FROM [Notifications]
       WHERE [UserId] = @UserId AND [Category] = @Category
-      AND CAST(DATEADD(HOUR, 8, [CreatedAt]) AS DATE) = CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)]]>
+      AND CAST(DATEADD(HOUR, 8, [CreatedAt]) AS DATE) = CAST(dbo.fn_ChinaTimeNow() AS DATE)]]>
   </select>
   <insert id="Notification.Insert.Notification.Default">
     <![CDATA[INSERT INTO [Notifications] ([Id], [UserId], [CompanyId], [Category], [Title], [Content],
-      [ReferenceType], [ReferenceId], [IsRead], [CreatedAt])
+      [ReferenceType], [ReferenceId], [IsRead], [CreatedAt], [CreatedBy])
       VALUES (@Id, @UserId, @CompanyId, @Category, @Title, @Content,
-      @ReferenceType, @ReferenceId, @IsRead, @CreatedAt)]]>
+      @ReferenceType, @ReferenceId, @IsRead, @CreatedAt, @CreatedBy)]]>
   </insert>
   <update id="Notification.Update.Notification.MarkRead">
     <![CDATA[UPDATE [Notifications] SET [IsRead] = 1 WHERE [Id] = @Id AND [UserId] = @UserId]]>
@@ -856,7 +856,7 @@
   <select id="Billing.Select.Journal.OverdueByCompany">
     <![CDATA[SELECT j.Id, j.CompanyId, j.ContractId, j.FeeCodeId, j.Period, j.Amount, j.DueDate, j.BillMonth,
       COALESCE(r.Received, 0) AS Received,
-      DATEDIFF(DAY, j.DueDate, CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)) AS DaysOverdue
+      DATEDIFF(DAY, j.DueDate, CAST(dbo.fn_ChinaTimeNow() AS DATE)) AS DaysOverdue
       FROM Journals j
       OUTER APPLY (
         SELECT ISNULL(SUM(r.Amount), 0) AS Received
@@ -865,7 +865,7 @@
           AND FORMAT(r.ReceivedDate, 'yyyy-MM') = j.Period
           AND r.Status = 'Confirmed'
       ) r
-      WHERE j.CompanyId = @CompanyId AND j.DueDate < CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
+      WHERE j.CompanyId = @CompanyId AND j.DueDate < CAST(dbo.fn_ChinaTimeNow() AS DATE)
         AND j.Amount > COALESCE(r.Received, 0)]]>
   </select>
   <select id="Billing.Select.Journal.OverdueByContract">
@@ -888,7 +888,7 @@
       TotalAmount, TotalReceived, IsHistorical, DueDate, Status, GeneratedAt, GeneratedBy, CreatedBy, CreatedAt,
       ContractNo, TenantName, BuildingAddress, CompanyName, PreviousBalance)
       VALUES (@Id, @NoteNo, @CId, @PeriodYear, @PeriodMonth, @CoId,
-      @Amt, 0, @IsHist, @Due, 'Published', DATEADD(HOUR, 8, GETUTCDATE()), @CBy, @CBy, DATEADD(HOUR, 8, GETUTCDATE()),
+      @Amt, 0, @IsHist, @Due, 'Published', dbo.fn_ChinaTimeNow(), @CBy, @CBy, dbo.fn_ChinaTimeNow(),
       @ContractNo, @TenantName, @BuildingAddress, @CompanyName, @PreviousBalance)]]>
   </insert>
 
@@ -957,7 +957,7 @@
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
       @SubjId, @Period, @Amt, @Due, @EntryType, 1, @BilledAt,
 	      @Period,
-	      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+	      @DNId, @ParentId, @Summary, @CBy, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <insert id="Billing.Insert.Journal.Unposted">
     <![CDATA[INSERT INTO Journals (Id, CompanyId, ContractId, FeeCodeId, FeeConfigId,
@@ -966,7 +966,7 @@
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
       @SubjId, @Period, @Amt, dbo.fn_CalculateDueDate(@BilledAt), @EntryType, 0, @BilledAt,
 	      dbo.fn_CalculateBillMonth(@BilledAt),
-	      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+	      @DNId, @ParentId, @Summary, @CBy, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <select id="Billing.Select.Journal.ByCompanyPeriod">
     <![CDATA[SELECT j.*, COALESCE(SUM(ra.Amount), 0) AS ReceivedAmount
@@ -992,13 +992,13 @@
       HAVING j.Amount > COALESCE(SUM(ra.Amount), 0)]]>
   </select>
   <update id="Billing.Update.Journal.MarkPosted">
-    <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND GLPosted = 0]]>
+    <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = dbo.fn_ChinaTimeNow() WHERE Id = @Id AND GLPosted = 0]]>
   </update>
   <update id="Billing.Update.Journal.MarkPostedByPeriod">
-    <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE CompanyId = @CoId AND Period = @Period AND GLPosted = 0]]>
+    <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = dbo.fn_ChinaTimeNow() WHERE CompanyId = @CoId AND Period = @Period AND GLPosted = 0]]>
   </update>
   <update id="Billing.Update.Journal.Post">
-    <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND GLPosted = 0]]>
+    <![CDATA[UPDATE Journals SET GLPosted = 1, PostedAt = dbo.fn_ChinaTimeNow() WHERE Id = @Id AND GLPosted = 0]]>
   </update>
   <select id="Billing.Select.Journal.UnbilledByContract">
     <![CDATA[SELECT Id, Amount, GLPosted, CompanyId, ContractId, Period FROM Journals WHERE ContractId = @CId AND IsBilled = 0 AND (BillMonth IS NULL OR BillMonth <= @P)]]>
@@ -1060,7 +1060,7 @@
   
   <insert id="Accounting.Insert.GL.Entry">
     <![CDATA[INSERT INTO GeneralLedgerEntries (Id, CompanyId, ContractId, ContractNo, Period, SubjectId, SubjectCode, Direction, Amount, SourceType, SourceId, Description, CreatedBy, CreatedAt)
-      VALUES (@Id, @CoId, @CId, @CNo, @Period, @SId, @SCode, @Dir, @Amt, @SrcType, @SrcId, @Desc, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      VALUES (@Id, @CoId, @CId, @CNo, @Period, @SId, @SCode, @Dir, @Amt, @SrcType, @SrcId, @Desc, @CBy, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <insert id="Billing.Insert.Journal.Interest">
     <![CDATA[INSERT INTO Journals (Id, CompanyId, ContractId, FeeCodeId, FeeConfigId,
@@ -1069,7 +1069,7 @@
       VALUES (@Id, @CoId, @CId, @FId, @FConfigId,
       @SubjId, @Period, @Amt, dbo.fn_CalculateDueDate(@BilledAt), 'Interest', 0, @BilledAt,
 	      dbo.fn_CalculateBillMonth(@BilledAt),
-	      @DNId, @ParentId, @Summary, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+	      @DNId, @ParentId, @Summary, @CBy, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <select id="Billing.Select.Journal.InterestExists">
     <![CDATA[SELECT COUNT(1) FROM Journals WHERE ParentJournalId = @ParentId AND EntryType = 'Interest']]>
@@ -1191,7 +1191,7 @@
   <!-- ===== Prepaid（预收明细）===== -->
   <insert id="Billing.Insert.Prepaid.Default">
     <![CDATA[INSERT INTO PrepaidDetails (Id, CompanyId, ContractId, ReceiptId, JournalId, Period, Amount, AppliedAmount, Balance, Direction, Status, CreatedBy, CreatedAt)
-      VALUES (@Id, @CoId, @CId, @RId, @JId, @Period, @Amt, 0, @Amt, @Dir, 'Pending', @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      VALUES (@Id, @CoId, @CId, @RId, @JId, @Period, @Amt, 0, @Amt, @Dir, 'Pending', @CBy, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <select id="Billing.Select.Prepaid.ByContract">
     <![CDATA[SELECT * FROM PrepaidDetails WHERE CompanyId = @CoId AND ContractId = @CId ORDER BY CreatedAt DESC]]>
@@ -1226,24 +1226,24 @@
       UpdatedBy = @p0, UpdatedAt = @p1 WHERE Id = @p2 AND Status = 'PendingApproval']]>
   </update>
   <update id="Approval.Update.RenewalRequest.ToRejected">
-    <![CDATA[UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE())
+    <![CDATA[UPDATE RenewalRequests SET Status = 'Rejected', UpdatedAt = dbo.fn_ChinaTimeNow()
       WHERE Id = @Id AND Status = 'PendingApproval']]>
   </update>
   <update id="Approval.Update.Request.SetStatus">
     <![CDATA[UPDATE ApprovalRequests SET Status = @Status WHERE Id = @Id]]>
   </update>
   <update id="Approval.Update.Request.RollbackToPending">
-    <![CDATA[UPDATE ApprovalRequests SET Status = 'Pending', UpdatedBy = @UpdatedBy, UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND Status = 'Approved']]>
+    <![CDATA[UPDATE ApprovalRequests SET Status = 'Pending', UpdatedBy = @UpdatedBy, UpdatedAt = dbo.fn_ChinaTimeNow() WHERE Id = @Id AND Status = 'Approved']]>
   </update>
   <update id="Approval.Update.Request.Resubmit">
-    <![CDATA[UPDATE ApprovalRequests SET Status = 'Pending', CurrentLevel = 1, UpdatedBy = @UpdatedBy, UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND Status = 'Cancelled']]>
+    <![CDATA[UPDATE ApprovalRequests SET Status = 'Pending', CurrentLevel = 1, UpdatedBy = @UpdatedBy, UpdatedAt = dbo.fn_ChinaTimeNow() WHERE Id = @Id AND Status = 'Cancelled']]>
   </update>
   <update id="Approval.Update.ContractFeeConfig.ExpireById">
-    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0, UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @p1 AND IsActive = 1]]>
+    <![CDATA[UPDATE ContractFeeConfigs SET ExpiryDate = @p0, IsActive = 0, UpdatedAt = dbo.fn_ChinaTimeNow() WHERE Id = @p1 AND IsActive = 1]]>
   </update>
   <insert id="Approval.Insert.ContractFeeConfig.CopyFrom">
     <![CDATA[INSERT INTO ContractFeeConfigs (Id, ContractId, FeeCodeId, Amount, BillingMode, IsActive, EffectiveDate, ExpiryDate, CreatedBy, CreatedAt, CompanyId)
-      SELECT NEWID(), @p0, FeeCodeId, @p1, BillingMode, 1, @p2, NULL, @p3, DATEADD(HOUR, 8, GETUTCDATE()), CompanyId
+      SELECT NEWID(), @p0, FeeCodeId, @p1, BillingMode, 1, @p2, NULL, @p3, dbo.fn_ChinaTimeNow(), CompanyId
       FROM ContractFeeConfigs WHERE Id = @p4]]>
   </insert>
   <select id="Approval.Select.Request.PendingCount">
@@ -1276,10 +1276,10 @@
     <![CDATA[UPDATE ApprovalBizData SET ApprovalRequestId = @ApprovalRequestId WHERE Id = @Id]]>
   </update>
   <update id="Approval.Update.ApprovalBizData.MarkProcessed">
-    <![CDATA[UPDATE ApprovalBizData SET IsProcessed = 1, ProcessedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id AND IsProcessed = 0]]>
+    <![CDATA[UPDATE ApprovalBizData SET IsProcessed = 1, ProcessedAt = dbo.fn_ChinaTimeNow() WHERE Id = @Id AND IsProcessed = 0]]>
   </update>
   <update id="Approval.Update.ApprovalBizData.SetApprovalRequestId">
-    <![CDATA[UPDATE ApprovalBizData SET ApprovalRequestId = @ApprovalRequestId, UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id = @Id]]>
+    <![CDATA[UPDATE ApprovalBizData SET ApprovalRequestId = @ApprovalRequestId, UpdatedAt = dbo.fn_ChinaTimeNow() WHERE Id = @Id]]>
   </update>
 
   <select id="Approval.Select.ApprovalFeeItems.ByApprovalRequestId">
@@ -1309,7 +1309,7 @@
   </insert>
   <insert id="Contract.Insert.ChangeHistory.Default">
     <![CDATA[INSERT INTO ChangeHistory (Id, ContractId, ChangeType, Title, Detail, OldValue, NewValue, EffectiveDate, OperatorId, OperatorName, CreatedAt)
-      VALUES (@Id, @ContractId, @ChangeType, @Title, @Detail, @OldValue, @NewValue, @EffectiveDate, @OperatorId, @OperatorName, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+      VALUES (@Id, @ContractId, @ChangeType, @Title, @Detail, @OldValue, @NewValue, @EffectiveDate, @OperatorId, @OperatorName, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <select id="Contract.Select.ChangeHistory.ByContract">
     <![CDATA[SELECT
@@ -1477,7 +1477,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   </select>
   <insert id="Lease.Insert.DepositLog.Default">
     <![CDATA[INSERT INTO DepositLogs (Id, ContractId, ActionType, Amount, BalanceAfter, Remarks, OperatedBy, OperatedAt, CompanyId, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractId, @ActionType, @Amount, @BalanceAfter, @Remarks, @OperatedBy, DATEADD(HOUR, 8, GETUTCDATE()), @CompanyId, @CreatedBy, @CreatedAt)]]>
+      VALUES (@Id, @ContractId, @ActionType, @Amount, @BalanceAfter, @Remarks, @OperatedBy, dbo.fn_ChinaTimeNow(), @CompanyId, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="Lease.Update.RenewalRequest.Complete">
     <![CDATA[UPDATE RenewalRequests SET NewContractId = @NewContractId, Status = 'Completed', UpdatedAt = @Now WHERE Id = @Id]]>
@@ -1502,7 +1502,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <!-- DepositLog（押金日志） -->
   <insert id="Contract.Insert.DepositLog.Refund">
     <![CDATA[INSERT INTO DepositLogs (Id, ContractId, ActionType, Amount, BalanceAfter, Remarks, OperatedBy, OperatedAt, CompanyId, CreatedBy, CreatedAt)
-      VALUES (@Id, @ContractId, 'Refund', @Amount, @BalanceAfter, @Remarks, @OperatedBy, DATEADD(HOUR, 8, GETUTCDATE()), @CompanyId, @CreatedBy, @CreatedAt)]]>
+      VALUES (@Id, @ContractId, 'Refund', @Amount, @BalanceAfter, @Remarks, @OperatedBy, dbo.fn_ChinaTimeNow(), @CompanyId, @CreatedBy, @CreatedAt)]]>
   </insert>
 
   <!-- ================================================================
@@ -1656,7 +1656,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
           AND r.Status = 'Confirmed'
       ) r
       LEFT JOIN HousingUnits h ON h.Id = c.RoomId
-      WHERE j.DueDate < CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
+      WHERE j.DueDate < CAST(dbo.fn_ChinaTimeNow() AS DATE)
         AND j.Amount > COALESCE(r.Received, 0)
       ORDER BY j.DueDate]]>
   </select>
@@ -1733,7 +1733,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
           SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS TodayFailed,
           SUM(CASE WHEN Status = 'Running' THEN 1 ELSE 0 END) AS RunningCount
       FROM TaskLogs
-      WHERE CAST(DATEADD(HOUR, 8, StartedAt) AS DATE) = CAST(DATEADD(HOUR, 8, GETUTCDATE()) AS DATE)
+      WHERE CAST(DATEADD(HOUR, 8, StartedAt) AS DATE) = CAST(dbo.fn_ChinaTimeNow() AS DATE)
         AND (RunMode IS NULL OR RunMode = 'Execute');
       SELECT COUNT(1) AS YesterdayTotal
       FROM TaskLogs
@@ -1752,7 +1752,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
         COUNT(1) AS TotalCount,
         SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS FailCount
     FROM TaskLogs
-    WHERE StartedAt >= DATEADD(DAY, -@Days, DATEADD(HOUR, 8, GETUTCDATE()))
+    WHERE StartedAt >= DATEADD(DAY, -@Days, dbo.fn_ChinaTimeNow())
       AND (RunMode IS NULL OR RunMode = 'Execute')
     GROUP BY CAST(StartedAt AS DATE)
     ORDER BY Date]]>
@@ -1764,7 +1764,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
         AVG(CAST(TotalDurationMs AS FLOAT)) AS AvgDurationMs,
         COUNT(1) AS ExecutionCount
     FROM TaskLogs
-    WHERE StartedAt >= DATEADD(DAY, -@Days, DATEADD(HOUR, 8, GETUTCDATE()))
+    WHERE StartedAt >= DATEADD(DAY, -@Days, dbo.fn_ChinaTimeNow())
       AND Status IN ('Completed', 'Failed')
       AND TotalDurationMs IS NOT NULL
     GROUP BY TaskName
@@ -1777,7 +1777,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
         COUNT(1) AS Count
     FROM TaskLogs
     WHERE Status = 'Failed'
-      AND StartedAt >= DATEADD(DAY, -@Days, DATEADD(HOUR, 8, GETUTCDATE()))
+      AND StartedAt >= DATEADD(DAY, -@Days, dbo.fn_ChinaTimeNow())
     GROUP BY COALESCE(NULLIF(LEFT(ErrorMessage, 30), ''), 'Unknown')
     ORDER BY Count DESC]]>
   </select>
@@ -1942,10 +1942,10 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       VALUES (@Id, @Name, @Phone, @IdCard, @Email, @Wechat, @EmergencyContact, @EmergencyPhone, @Address, @Remark, @CompanyId, @ContractId, @IsPrimary, @Status, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="TenantCreate.Update.Request.Complete">
-    <![CDATA[UPDATE TenantCreateRequests SET Status='Completed', NewTenantId=@NewTenantId, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Executing']]>
+    <![CDATA[UPDATE TenantCreateRequests SET Status='Completed', NewTenantId=@NewTenantId, UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Executing']]>
   </update>
   <update id="TenantCreate.Update.Request.Reject">
-    <![CDATA[UPDATE TenantCreateRequests SET Status='Rejected', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='PendingApproval']]>
+    <![CDATA[UPDATE TenantCreateRequests SET Status='Rejected', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
   <update id="TenantCreate.Update.Request.LockExecuting">
     <![CDATA[UPDATE TenantCreateRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
@@ -1970,10 +1970,10 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[UPDATE ContractCreateRequests SET Status='PendingApproval' WHERE Id=@Id AND Status='Draft']]>
   </update>
   <update id="ContractCreate.Update.Request.Complete">
-    <![CDATA[UPDATE ContractCreateRequests SET Status='Completed', NewContractId=@NewContractId, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Executing']]>
+    <![CDATA[UPDATE ContractCreateRequests SET Status='Completed', NewContractId=@NewContractId, UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Executing']]>
   </update>
   <update id="ContractCreate.Update.Request.Reject">
-    <![CDATA[UPDATE ContractCreateRequests SET Status='Rejected', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='PendingApproval']]>
+    <![CDATA[UPDATE ContractCreateRequests SET Status='Rejected', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
   <update id="ContractCreate.Update.Request.LockExecuting">
     <![CDATA[UPDATE ContractCreateRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
@@ -2006,13 +2006,13 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       VALUES (@Id, @ContractId, @StartDate, @EndDate, @PaymentCycle, @AutoRenew, @AllowDepositAsLastRent, @PaymentDueDay, @TenantPhone, @Remark, @Status, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="ContractModify.Update.Request.Complete">
-    <![CDATA[UPDATE ContractModifyRequests SET Status='Completed', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Executing']]>
+    <![CDATA[UPDATE ContractModifyRequests SET Status='Completed', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Executing']]>
   </update>
   <update id="ContractModify.Update.Request.Reject">
-    <![CDATA[UPDATE ContractModifyRequests SET Status='Rejected', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='PendingApproval']]>
+    <![CDATA[UPDATE ContractModifyRequests SET Status='Rejected', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
   <update id="ContractModify.Update.Request.Submit">
-    <![CDATA[UPDATE ContractModifyRequests SET Status='PendingApproval', ApprovalRequestId=@ApprovalRequestId, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Draft']]>
+    <![CDATA[UPDATE ContractModifyRequests SET Status='PendingApproval', ApprovalRequestId=@ApprovalRequestId, UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Draft']]>
   </update>
   <update id="ContractModify.Update.Request.LockExecuting">
     <![CDATA[UPDATE ContractModifyRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
@@ -2027,7 +2027,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
         PaymentDueDay = ISNULL(@PaymentDueDay, PaymentDueDay),
         TenantPhone = ISNULL(@TenantPhone, TenantPhone),
         Remark = ISNULL(@Remark, Remark),
-        UpdatedAt = DATEADD(HOUR, 8, GETUTCDATE())
+        UpdatedAt = dbo.fn_ChinaTimeNow()
       WHERE Id = @ContractId]]>
   </update>
   <select id="ContractModify.Select.Request.ByApprovalRequestId">
@@ -2043,10 +2043,10 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[UPDATE SupplementaryFeeRequests SET Status='PendingApproval' WHERE Id=@Id AND Status='Draft']]>
   </update>
   <update id="SupplementaryFee.Update.Request.Complete">
-    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Completed', FeeConfigId=@FeeConfigId, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Executing']]>
+    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Completed', FeeConfigId=@FeeConfigId, UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Executing']]>
   </update>
   <update id="SupplementaryFee.Update.Request.Reject">
-    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Rejected', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='PendingApproval']]>
+    <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Rejected', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
   <update id="SupplementaryFee.Update.Request.LockExecuting">
     <![CDATA[UPDATE SupplementaryFeeRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
@@ -2068,13 +2068,13 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
       VALUES (@Id, @ContractId, @CompanyId, @PeriodFrom, @PeriodTo, @Status, @CreatedBy, @CreatedAt)]]>
   </insert>
   <update id="ReceivableGenerate.Update.Request.Submit">
-    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='PendingApproval', ApprovalRequestId=@ApprovalRequestId, UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Draft']]>
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='PendingApproval', ApprovalRequestId=@ApprovalRequestId, UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Draft']]>
   </update>
   <update id="ReceivableGenerate.Update.Request.Complete">
-    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Completed', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Executing']]>
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Completed', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Executing']]>
   </update>
   <update id="ReceivableGenerate.Update.Request.Reject">
-    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Rejected', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='PendingApproval']]>
+    <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Rejected', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='PendingApproval']]>
   </update>
   <update id="ReceivableGenerate.Update.Request.LockExecuting">
     <![CDATA[UPDATE ReceivableGenerateRequests SET Status='Executing', UpdatedAt=@Now WHERE Id=@Id AND Status='PendingApproval']]>
@@ -2126,7 +2126,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT * FROM [JobSchedules] WHERE [Id]=@Id AND [IsActive]=1]]>
   </select>
     <update id="Scheduling.Update.DebitNote.CancelByTaskLog">
-    <![CDATA[UPDATE DebitNotes SET Status='Cancelled', CancelledAt=DATEADD(HOUR, 8, GETUTCDATE()), CancelReason=@Reason WHERE CreatedAt >= @Start AND CreatedAt <= @End AND Status='Published']]>
+    <![CDATA[UPDATE DebitNotes SET Status='Cancelled', CancelledAt=dbo.fn_ChinaTimeNow(), CancelReason=@Reason WHERE CreatedAt >= @Start AND CreatedAt <= @End AND Status='Published']]>
   </update>
     <delete id="Scheduling.Delete.Voucher.ByReceivablePlanTimeRange">
     <![CDATA[DELETE FROM Vouchers WHERE SourceEntityType='ReceivablePlan' AND CreatedAt >= @Start AND CreatedAt <= @End]]>
@@ -2168,7 +2168,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
         )]]>
   </update>
   <update id="Scheduling.Update.TaskLog.ForceCompleteById">
-    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status IN ('Running','Processing')]]>
+    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status IN ('Running','Processing')]]>
   </update>
 
   <!-- ================================================================
@@ -2214,7 +2214,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
        模块：Collection — 控制器级别 SQL（ReceiptsController）
        ================================================================ -->
   <update id="Collection.Update.Receipt.Confirm">
-    <![CDATA[UPDATE Receipts SET Status='Confirmed', UpdatedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status='Pending']]>
+    <![CDATA[UPDATE Receipts SET Status='Confirmed', UpdatedAt=dbo.fn_ChinaTimeNow() WHERE Id=@Id AND Status='Pending']]>
   </update>
   <select id="Collection.Select.Receipt.StatusById">
     <![CDATA[SELECT Status FROM Receipts WHERE Id=@Id]]>
@@ -2294,7 +2294,7 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
        TemplateCode, IsActive, CompanyId, Description, CreatedBy, CreatedAt)
       VALUES
       (NEWID(), @JobName, @ScheduleType, @Hour, @Minute, @DayOfMonth,
-       @TemplateCode, @IsActive, @Cid, @Desc, @CBy, DATEADD(HOUR, 8, GETUTCDATE()))]]>
+       @TemplateCode, @IsActive, @Cid, @Desc, @CBy, dbo.fn_ChinaTimeNow())]]>
   </insert>
   <!-- ================================================================
        模块：Common（通用）— 行政区划

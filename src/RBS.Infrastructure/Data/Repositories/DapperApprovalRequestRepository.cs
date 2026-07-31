@@ -44,9 +44,10 @@ public class DapperApprovalRequestRepository : IApprovalRequestRepository
     public async Task<ApprovalRequest> AddAsync(ApprovalRequest entity, CancellationToken ct = default)
     {
         if (entity.CreatedAt == default) entity.SetCreated(Guid.NewGuid(), ChinaTime.Now, null, null);
+        _auditService.PopulateCreatedFields(entity);
         using var conn = _db.CreateConnection(); conn.Open();
         await conn.ExecuteAsync(_sql.Get("Approval.Insert.Request.Default"), entity);
-        await _auditService.WriteCreateAsync("ApprovalRequests", entity, ct);
+        await _auditService.WriteCreateLogAsync("ApprovalRequests", entity, ct);
         return entity;
     }
 

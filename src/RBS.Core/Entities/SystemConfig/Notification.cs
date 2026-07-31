@@ -60,6 +60,11 @@ public class Notification
     public DateTime CreatedAt { get; private set; }
 
     /// <summary>
+    /// 通知触发人 ID — 记录是谁触发了这条通知（用户触发取当前用户，系统任务触发为 Guid.Empty）
+    /// </summary>
+    public Guid CreatedBy { get; private set; }
+
+    /// <summary>
     /// 私有构造函数，仅用于 EF Core 反序列化，禁止直接调用
     /// </summary>
     private Notification() { }
@@ -91,4 +96,7 @@ public class Notification
 
     /// <summary>将通知标记为已读</summary>
     public void MarkAsRead() => IsRead = true;
+
+    /// <summary>设置通知触发人 ID（用户触发时由服务层填充）</summary>
+    public void SetCreatedBy(Guid userId) => CreatedBy = userId;
 }

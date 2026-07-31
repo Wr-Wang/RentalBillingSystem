@@ -32,7 +32,7 @@ CREATE TABLE [Companies] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [Remark] NVARCHAR(500) , -- 备注,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -172,7 +172,7 @@ CREATE TABLE [Users] (
     [DefaultCompanyId] UNIQUEIDENTIFIER , -- 默认公司ID,
     [IsSuperAdmin] BIT NOT NULL DEFAULT (0) , -- 是否超级管理员,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -293,7 +293,7 @@ CREATE TABLE [Roles] (
     [CompanyId] UNIQUEIDENTIFIER , -- 所属公司ID,
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -396,7 +396,9 @@ CREATE TABLE [UserRoles] (
     [UserId] UNIQUEIDENTIFIER NOT NULL , -- 用户ID,
     [RoleId] UNIQUEIDENTIFIER NOT NULL , -- 角色ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -435,7 +437,7 @@ CREATE TABLE [Menus] (
     [Scope] VARCHAR(20) NOT NULL DEFAULT ('Company') , -- 可见范围,
     [CompanyId] UNIQUEIDENTIFIER , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -550,7 +552,9 @@ CREATE TABLE [RoleMenus] (
     [RoleId] UNIQUEIDENTIFIER NOT NULL , -- 角色ID,
     [MenuId] UNIQUEIDENTIFIER NOT NULL , -- 菜单ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -584,7 +588,7 @@ CREATE TABLE [ApprovalTypes] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -699,7 +703,7 @@ CREATE TABLE [ApprovalLevelConfigs] (
     [CumulativeWindowDays] INT NOT NULL DEFAULT (19) , -- 累计检查窗口天数,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -831,7 +835,7 @@ CREATE TABLE [ApprovalRequests] (
     [ContractId] UNIQUEIDENTIFIER , -- 合同ID,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -969,9 +973,9 @@ CREATE TABLE [ApprovalRecords] (
     [ApproverId] UNIQUEIDENTIFIER NOT NULL , -- 审批人ID,
     [Action] VARCHAR(20) NOT NULL , -- 审批动作,
     [Comment] NVARCHAR(500) , -- 审批意见,
-    [OperatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 操作时间,
+    [OperatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 操作时间,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -1091,7 +1095,7 @@ CREATE TABLE [ApprovalBizData] (
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
     [UpdatedAt] DATETIME2 , -- 更新时间,
     [UpdatedIp] VARCHAR(45) , -- 更新IP,
@@ -1146,7 +1150,9 @@ CREATE TABLE [ApprovalFeeItems] (
     [Unit] NVARCHAR(20) , -- 计量单位,
     [EffectiveDate] VARCHAR(10) , -- 生效日期（每条费用独立，yyyy-MM-dd）,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -1192,7 +1198,7 @@ CREATE TABLE [HousingUnits] (
     [Orientation] VARCHAR(50) , -- 朝向,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -1327,7 +1333,7 @@ CREATE TABLE [RoomTypes] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -1440,7 +1446,7 @@ CREATE TABLE [FloorLevelBands] (
     [SortOrder] INT NOT NULL DEFAULT (0) , -- 排序,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -1549,7 +1555,7 @@ CREATE TABLE [RoomPricingStandards] (
     [Remarks] NVARCHAR(500) , -- 备注,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -1665,7 +1671,7 @@ CREATE TABLE [Tenants] (
     [Remarks] NVARCHAR(500) , -- 备注,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -1775,9 +1781,9 @@ CREATE UNIQUE INDEX [IX_Tenants_Audit_Id_Version] ON [Tenants_Audit]([Id], [Audi
 -- 23b. Tenant 表扩充字段
 -- ===================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Tenants') AND name='Wechat')
-    ALTER TABLE Tenants ADD Wechat NVARCHAR(64) NULL;
+    ALTER TABLE Tenants ADD Wechat VARCHAR(45) NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Tenants') AND name='EmergencyContact')
-    ALTER TABLE Tenants ADD EmergencyContact NVARCHAR(64) NULL;
+    ALTER TABLE Tenants ADD EmergencyContact VARCHAR(45) NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('Tenants') AND name='EmergencyPhone')
     ALTER TABLE Tenants ADD EmergencyPhone NVARCHAR(32) NULL;
 GO
@@ -1791,9 +1797,9 @@ CREATE TABLE [TenantCreateRequests] (
     [Name] NVARCHAR(64) NOT NULL,
     [Phone] NVARCHAR(32) NULL,
     [IdCard] NVARCHAR(32) NULL,
-    [Email] NVARCHAR(64) NULL,
-    [Wechat] NVARCHAR(64) NULL,
-    [EmergencyContact] NVARCHAR(64) NULL,
+    [Email] VARCHAR(45) NULL,
+    [Wechat] VARCHAR(45) NULL,
+    [EmergencyContact] VARCHAR(45) NULL,
     [EmergencyPhone] NVARCHAR(32) NULL,
     [Address] NVARCHAR(256) NULL,
     [Remark] NVARCHAR(500) NULL,
@@ -1804,8 +1810,10 @@ CREATE TABLE [TenantCreateRequests] (
     [ApprovalRequestId] UNIQUEIDENTIFIER NULL,
     [NewTenantId] UNIQUEIDENTIFIER NULL,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()),
-    [UpdatedAt] DATETIME2 NULL
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())),
+    [UpdatedAt] DATETIME2 NULL ,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -1839,7 +1847,7 @@ CREATE TABLE [Contracts] (
     [ResumedAt] DATETIME2 , -- 恢复时间,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -1997,8 +2005,10 @@ CREATE TABLE [ContractTenants] (
     [TenantId] UNIQUEIDENTIFIER NOT NULL , -- 租客ID,
     [IsPrimary] BIT NOT NULL DEFAULT (0) , -- 是否主租客,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    CONSTRAINT [PK_ContractTenants] PRIMARY KEY (ContractId, TenantId)
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    CONSTRAINT [PK_ContractTenants] PRIMARY KEY (ContractId, TenantId) ,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -2035,7 +2045,7 @@ CREATE TABLE [ContractFeeConfigs] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -2173,13 +2183,13 @@ CREATE TABLE [ContractCreateRequests] (
     [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
     [NewContractId] UNIQUEIDENTIFIER NULL , -- 新合同ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [CreatedIp] NVARCHAR(64) NULL , -- 创建IP,
-    [CreatedHostname] NVARCHAR(128) NULL , -- 创建主机名,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
     [UpdatedAt] DATETIME2 NULL , -- 更新时间,
-    [UpdatedIp] NVARCHAR(64) NULL , -- 更新IP,
-    [UpdatedHostname] NVARCHAR(128) NULL -- 更新主机名
+    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
 )
 GO
 
@@ -2221,13 +2231,13 @@ CREATE TABLE [ContractCreateRequestTenants] (
     [TenantId] UNIQUEIDENTIFIER NOT NULL , -- 租客ID,
     [IsPrimary] BIT NOT NULL DEFAULT (0) , -- 是否主租客,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [CreatedIp] NVARCHAR(64) NULL , -- 创建IP,
-    [CreatedHostname] NVARCHAR(128) NULL , -- 创建主机名,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
     [UpdatedAt] DATETIME2 NULL , -- 更新时间,
-    [UpdatedIp] NVARCHAR(64) NULL , -- 更新IP,
-    [UpdatedHostname] NVARCHAR(128) NULL -- 更新主机名
+    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
 )
 GO
 
@@ -2264,13 +2274,13 @@ CREATE TABLE [ContractCreateRequestFees] (
     [UnitPrice] DECIMAL(18,4) NULL , -- 单价,
     [EffectiveDate] NVARCHAR(10) NULL , -- 生效日期,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [CreatedIp] NVARCHAR(64) NULL , -- 创建IP,
-    [CreatedHostname] NVARCHAR(128) NULL , -- 创建主机名,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
     [UpdatedAt] DATETIME2 NULL , -- 更新时间,
-    [UpdatedIp] NVARCHAR(64) NULL , -- 更新IP,
-    [UpdatedHostname] NVARCHAR(128) NULL -- 更新主机名
+    [UpdatedIp] VARCHAR(45) NULL , -- 更新IP,
+    [UpdatedHostname] VARCHAR(100) NULL -- 更新主机名
 )
 GO
 
@@ -2315,8 +2325,10 @@ CREATE TABLE [ContractModifyRequests] (
     [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态,
     [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -2367,8 +2379,10 @@ CREATE TABLE [SupplementaryFeeRequests] (
     [FeeConfigId] UNIQUEIDENTIFIER NULL , -- 费用配置ID,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -2415,8 +2429,10 @@ CREATE TABLE [SupplementaryFeeRequestItems] (
     [ReceivablePlanId] UNIQUEIDENTIFIER NULL , -- 应收计划ID,
     [VoucherId] UNIQUEIDENTIFIER NULL , -- 凭证ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -2455,8 +2471,10 @@ CREATE TABLE [ReceivableGenerateRequests] (
     [Status] NVARCHAR(32) NOT NULL DEFAULT ('Draft') , -- 状态,
     [ApprovalRequestId] UNIQUEIDENTIFIER NULL , -- 审批请求ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -2500,8 +2518,10 @@ CREATE TABLE [ReceivableGenerateRequestItems] (
     [ReceivablePlanId] UNIQUEIDENTIFIER NULL , -- 应收计划ID,
     [VoucherId] UNIQUEIDENTIFIER NULL , -- 凭证ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 NULL -- 更新时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [UpdatedAt] DATETIME2 NULL , -- 更新时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -2544,7 +2564,7 @@ CREATE TABLE [ChangeHistory] (
     [EffectiveDate] DATETIME , -- 生效日期,
     [OperatorId] UNIQUEIDENTIFIER , -- 操作人ID,
     [OperatorName] NVARCHAR(50) , -- 操作人姓名,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) -- 创建时间
 )
 GO
 
@@ -2591,7 +2611,7 @@ CREATE TABLE [RenewalRequests] (
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [Remark] NVARCHAR(500) , -- 备注,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
     [UpdatedAt] DATETIME2 -- 更新时间
 )
@@ -2717,7 +2737,7 @@ CREATE TABLE [FeeCodes] (
     [IsRequired] BIT NOT NULL DEFAULT (0) , -- 是否必选,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -2840,7 +2860,7 @@ CREATE TABLE [FeeCodeTemplates] (
     [SortOrder] INT NOT NULL , -- 排序,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -2951,7 +2971,7 @@ CREATE TABLE [TaxRateConfigs] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -3045,6 +3065,14 @@ CREATE UNIQUE INDEX [IX_TaxRateConfigs_Audit_Id_Version] ON [TaxRateConfigs_Audi
 -- ===================================================================
 -- 工具函数：账单月/到期日计算（25日20:00截点，前→次月，后→下下月）
 -- ===================================================================
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'dbo.fn_ChinaTimeNow')) DROP FUNCTION dbo.fn_ChinaTimeNow
+GO
+CREATE FUNCTION dbo.fn_ChinaTimeNow()
+RETURNS DATETIME2 AS
+BEGIN
+    RETURN DATEADD(HOUR, 8, GETUTCDATE());
+END
+GO
 IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id=OBJECT_ID(N'dbo.fn_CalculateBillMonth')) DROP FUNCTION dbo.fn_CalculateBillMonth
 GO
 CREATE FUNCTION dbo.fn_CalculateBillMonth(@BilledAt DATETIME2)
@@ -3097,7 +3125,7 @@ CREATE TABLE [Journals] (
     [ParentJournalId] UNIQUEIDENTIFIER NULL , -- 关联源日记账ID（利息/调整/冲销指向被操作的源记录）,
     [Summary] NVARCHAR(500) NULL , -- 摘要说明,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
     [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
@@ -3245,12 +3273,12 @@ CREATE TABLE [DebitNotes] (
     [TotalAmount] DECIMAL(18,2) NOT NULL , -- 应收总金额,
     [TotalReceived] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 已收总金额,
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 状态,
-    [GeneratedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 生成时间,
+    [GeneratedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 生成时间,
     [GeneratedBy] UNIQUEIDENTIFIER NOT NULL , -- 生成人,
     [IsHistorical] BIT NOT NULL DEFAULT (0) , -- 是否历史账单,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -3425,8 +3453,10 @@ CREATE TABLE [DebitNoteItems] (
     [Description] NVARCHAR(500) , -- 说明,
     [SortOrder] INT NOT NULL DEFAULT (0) , -- 排序,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
-    [UpdatedAt] DATETIME2 -- 更新时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [UpdatedAt] DATETIME2 , -- 更新时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -3467,7 +3497,7 @@ CREATE TABLE [AutoRenewConfigs] (
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Active') , -- 状态,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -3511,7 +3541,7 @@ CREATE TABLE [PaymentChannels] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -3618,15 +3648,15 @@ CREATE TABLE [Receipts] (
     [ContractId] UNIQUEIDENTIFIER NULL , -- 关联合同ID,
     [PaymentChannelId] UNIQUEIDENTIFIER NULL , -- 支付通道ID,
     [Amount] DECIMAL(18,2) NOT NULL , -- 收款金额,
-    [ReceivedDate] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 收款日期,
-    [ReferenceNo] NVARCHAR(128) NULL , -- 参考号,
+    [ReceivedDate] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 收款日期,
+    [ReferenceNo] VARCHAR(100) NULL , -- 参考号,
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 状态: Pending | Confirmed | Rejected | Cancelled,
     [RejectReason] NVARCHAR(256) NULL , -- 驳回原因,
     [ConfirmedAt] DATETIME2 NULL , -- 确认时间,
     [ConfirmedBy] UNIQUEIDENTIFIER NULL , -- 确认人,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
     [CreatedHostname] VARCHAR(100) NULL , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER NULL , -- 更新人,
@@ -3737,10 +3767,10 @@ CREATE TABLE [DepositLogs] (
     [RelatedReceiptId] UNIQUEIDENTIFIER , -- 关联收据ID,
     [Remarks] NVARCHAR(500) , -- 备注,
     [OperatedBy] UNIQUEIDENTIFIER NOT NULL , -- 操作人,
-    [OperatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 操作时间,
+    [OperatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 操作时间,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -3864,7 +3894,7 @@ CREATE TABLE [CollectionStages] (
     [IsAuto] BIT NOT NULL DEFAULT (1) , -- 是否自动执行,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -3972,11 +4002,11 @@ CREATE TABLE [CollectionRecords] (
     [Channel] VARCHAR(20) NOT NULL , -- 发送渠道,
     [Content] NVARCHAR(MAX) NOT NULL , -- 发送内容,
     [Status] VARCHAR(20) NOT NULL , -- 状态,
-    [SentAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 发送时间,
+    [SentAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 发送时间,
     [OperatedBy] UNIQUEIDENTIFIER , -- 操作人,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -4027,7 +4057,7 @@ CREATE TABLE [AccountingSubjects] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -4159,7 +4189,9 @@ CREATE TABLE [GeneralLedgerEntries] (
     [Description] NVARCHAR(128)    NULL     , -- 摘要,
     [CreatedBy]   UNIQUEIDENTIFIER NOT NULL , -- 创建人,
     [CreatedAt]   DATETIME2        NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间（东八区）,
-    [UpdatedAt]   DATETIME2        NULL      -- 更新时间
+    [UpdatedAt]   DATETIME2        NULL , -- 更新时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -4210,7 +4242,9 @@ CREATE TABLE [BankReconciliations] (
     [SystemTotal] DECIMAL(18,2) NOT NULL DEFAULT (0) , -- 系统总额,
     [CompletedAt] DATETIME2 , -- 完成时间,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -4248,7 +4282,9 @@ CREATE TABLE [BankStatements] (
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Unmatched') , -- 状态,
     [ImportBatchId] UNIQUEIDENTIFIER , -- 导入批次ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -4293,7 +4329,9 @@ CREATE TABLE [BankStatements_Audit] (
     [Status] VARCHAR(20) , -- 状态,
     [ImportBatchId] UNIQUEIDENTIFIER , -- 导入批次ID,
     [CreatedBy] UNIQUEIDENTIFIER , -- 创建人,
-    [CreatedAt] DATETIME2 -- 创建时间
+    [CreatedAt] DATETIME2 , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -4350,7 +4388,7 @@ CREATE TABLE [JobSchedules] (
     [TargetDate] DATETIME2 , -- 最近一次执行成功的时间（来自 JobScheduleExecutions.TargetDate）,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -4475,7 +4513,7 @@ CREATE TABLE [JobScheduleExecutions] (
     [IsCustom] BIT NOT NULL DEFAULT (0) , -- 是否自定义,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] NVARCHAR(50) , -- 创建IP,
     [CreatedHostname] NVARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -4522,7 +4560,7 @@ CREATE TABLE [ExecutionHeartbeats] (
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 公司ID,
     [TargetMonth] NVARCHAR(7) NOT NULL , -- 目标月份,
     [HeartbeatAt] DATETIME2 NOT NULL , -- 心跳时间,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 记录时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) -- 记录时间
 )
 GO
 
@@ -4560,7 +4598,7 @@ CREATE TABLE [JobTemplates] (
     [DefaultMinute] INT , -- 默认分钟,
     [DefaultDayOfMonth] INT , -- 默认月中的天,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) -- 创建时间
 )
 GO
 
@@ -4673,7 +4711,7 @@ CREATE TABLE [ApiLogs] (
     [DurationMs] INT DEFAULT (0) , -- 耗时ms,
     [QueryString] NVARCHAR(2000) , -- 查询参数,
     [UserAgent] NVARCHAR(500) , -- 用户代理,
-    [RequestAt] DATETIME2 DEFAULT (GETUTCDATE()) , -- 请求时间,
+    [RequestAt] DATETIME2 DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 请求时间,
     [ResponseAt] DATETIME2 -- 响应时间
 )
 GO
@@ -4746,7 +4784,9 @@ CREATE TABLE [TaskLogs] (
     [Params] NVARCHAR(MAX) , -- 执行参数,
     [ResultData] NVARCHAR(MAX) , -- 执行结果数据,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -4878,7 +4918,7 @@ CREATE TABLE [SystemLogs] (
     [UserAgent] NVARCHAR(500) , -- 用户代理,
     [UserId] UNIQUEIDENTIFIER , -- 操作用户ID,
     [UserDisplayName] NVARCHAR(100) , -- 操作用户名,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) -- 创建时间
 )
 GO
 
@@ -4914,7 +4954,7 @@ CREATE TABLE [HolidayCalendars] (
     [IsWorkingDay] BIT NOT NULL DEFAULT (0) , -- false=放假, true=调休上班,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -5019,7 +5059,7 @@ CREATE TABLE [InterestConfigs] (
     [IsActive] BIT NOT NULL DEFAULT (1) , -- 是否启用,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) , -- 创建时间,
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
     [CreatedIp] VARCHAR(45) , -- 创建IP,
     [CreatedHostname] VARCHAR(100) , -- 创建主机名,
     [UpdatedBy] UNIQUEIDENTIFIER , -- 更新人,
@@ -5130,7 +5170,8 @@ CREATE TABLE [Notifications] (
     [ReferenceType] VARCHAR(50) , -- 关联类型,
     [ReferenceId] UNIQUEIDENTIFIER , -- 关联ID,
     [IsRead] BIT NOT NULL DEFAULT (0) , -- 是否已读,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间,
+    [CreatedBy] UNIQUEIDENTIFIER NULL -- 触发人ID（用户触发=当前用户，系统任务=NULL）
 )
 GO
 
@@ -5174,7 +5215,9 @@ CREATE TABLE [ImportBatches] (
     [ErrorMessage] NVARCHAR(MAX) , -- 错误信息,
     [CompanyId] UNIQUEIDENTIFIER NOT NULL , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -5220,7 +5263,9 @@ CREATE TABLE [ImportBatches_Audit] (
     [ErrorMessage] NVARCHAR(MAX) , -- 错误信息,
     [CompanyId] UNIQUEIDENTIFIER , -- 所属公司ID,
     [CreatedBy] UNIQUEIDENTIFIER , -- 创建人,
-    [CreatedAt] DATETIME2 -- 创建时间
+    [CreatedAt] DATETIME2 , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -5265,7 +5310,9 @@ CREATE TABLE [ImportBatchItems] (
     [Status] VARCHAR(20) NOT NULL DEFAULT ('Pending') , -- 状态,
     [ErrorMessage] NVARCHAR(2000) , -- 错误信息,
     [CreatedBy] UNIQUEIDENTIFIER NOT NULL , -- 创建人,
-    [CreatedAt] DATETIME2 NOT NULL DEFAULT (GETUTCDATE()) -- 创建时间
+    [CreatedAt] DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())) , -- 创建时间
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 
@@ -5313,57 +5360,57 @@ GO
 -- v2026.07.13: ContractCreateRequests 补充审计字段
 -- =================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'CreatedIp')
-ALTER TABLE [ContractCreateRequests] ADD [CreatedIp] NVARCHAR(64) NULL
+ALTER TABLE [ContractCreateRequests] ADD [CreatedIp] VARCHAR(45) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'CreatedHostname')
-ALTER TABLE [ContractCreateRequests] ADD [CreatedHostname] NVARCHAR(128) NULL
+ALTER TABLE [ContractCreateRequests] ADD [CreatedHostname] VARCHAR(100) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'UpdatedBy')
 ALTER TABLE [ContractCreateRequests] ADD [UpdatedBy] UNIQUEIDENTIFIER NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'UpdatedIp')
-ALTER TABLE [ContractCreateRequests] ADD [UpdatedIp] NVARCHAR(64) NULL
+ALTER TABLE [ContractCreateRequests] ADD [UpdatedIp] VARCHAR(45) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequests]') AND name=N'UpdatedHostname')
-ALTER TABLE [ContractCreateRequests] ADD [UpdatedHostname] NVARCHAR(128) NULL
+ALTER TABLE [ContractCreateRequests] ADD [UpdatedHostname] VARCHAR(100) NULL
 GO
 
 -- =================================================================
 -- v2026.07.13: ContractCreateRequestTenants 补充审计字段
 -- =================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'CreatedIp')
-ALTER TABLE [ContractCreateRequestTenants] ADD [CreatedIp] NVARCHAR(64) NULL
+ALTER TABLE [ContractCreateRequestTenants] ADD [CreatedIp] VARCHAR(45) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'CreatedHostname')
-ALTER TABLE [ContractCreateRequestTenants] ADD [CreatedHostname] NVARCHAR(128) NULL
+ALTER TABLE [ContractCreateRequestTenants] ADD [CreatedHostname] VARCHAR(100) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'UpdatedBy')
 ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedBy] UNIQUEIDENTIFIER NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'UpdatedIp')
-ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedIp] NVARCHAR(64) NULL
+ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedIp] VARCHAR(45) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestTenants]') AND name=N'UpdatedHostname')
-ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedHostname] NVARCHAR(128) NULL
+ALTER TABLE [ContractCreateRequestTenants] ADD [UpdatedHostname] VARCHAR(100) NULL
 GO
 
 -- =================================================================
 -- v2026.07.13: ContractCreateRequestFees 补充审计字段
 -- =================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'CreatedIp')
-ALTER TABLE [ContractCreateRequestFees] ADD [CreatedIp] NVARCHAR(64) NULL
+ALTER TABLE [ContractCreateRequestFees] ADD [CreatedIp] VARCHAR(45) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'CreatedHostname')
-ALTER TABLE [ContractCreateRequestFees] ADD [CreatedHostname] NVARCHAR(128) NULL
+ALTER TABLE [ContractCreateRequestFees] ADD [CreatedHostname] VARCHAR(100) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'UpdatedBy')
 ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedBy] UNIQUEIDENTIFIER NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'UpdatedIp')
-ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedIp] NVARCHAR(64) NULL
+ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedIp] VARCHAR(45) NULL
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'[ContractCreateRequestFees]') AND name=N'UpdatedHostname')
-ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedHostname] NVARCHAR(128) NULL
+ALTER TABLE [ContractCreateRequestFees] ADD [UpdatedHostname] VARCHAR(100) NULL
 GO
 
 -- =================================================================
@@ -5371,7 +5418,7 @@ GO
 -- =================================================================
 DECLARE @CompanyId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM Companies)
 DECLARE @SysUserId UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000000'
-DECLARE @Now DATETIME2 = GETUTCDATE()
+DECLARE @Now DATETIME2 = dbo.fn_ChinaTimeNow()
 
 -- 审批类型
 IF NOT EXISTS (SELECT 1 FROM ApprovalTypes WHERE Code = 'RECEIVABLE_GENERATE')
@@ -5385,7 +5432,7 @@ GO
 DECLARE @TypeId UNIQUEIDENTIFIER = (SELECT Id FROM ApprovalTypes WHERE Code = 'RECEIVABLE_GENERATE')
 DECLARE @CompanyId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM Companies)
 DECLARE @SysUserId UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000000'
-DECLARE @Now DATETIME2 = GETUTCDATE()
+DECLARE @Now DATETIME2 = dbo.fn_ChinaTimeNow()
 
 -- Level 1: 运营主管（≤10万）
 IF NOT EXISTS (SELECT 1 FROM ApprovalLevelConfigs WHERE ApprovalTypeId = @TypeId AND LevelNo = 1)
@@ -5421,7 +5468,7 @@ GO
 DECLARE @AcctCompanyId uniqueidentifier = (SELECT TOP 1 Id FROM Companies ORDER BY CreatedAt);
 DECLARE @AcctUserId uniqueidentifier = (SELECT TOP 1 Id FROM Users WHERE Username = 'admin');
 IF @AcctUserId IS NULL SELECT TOP 1 @AcctUserId = Id FROM Users ORDER BY CreatedAt;
-DECLARE @AcctNow datetime2 = DATEADD(HOUR, 8, GETUTCDATE());
+DECLARE @AcctNow datetime2 = dbo.fn_ChinaTimeNow();
 
 -- 资产类（1xxx）借方科目
 IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1001')
@@ -5495,7 +5542,9 @@ CREATE TABLE [UserRoles_Audit] (
     [UserId] UNIQUEIDENTIFIER ,
     [RoleId] UNIQUEIDENTIFIER ,
     [CreatedBy] UNIQUEIDENTIFIER ,
-    [CreatedAt] DATETIME2
+    [CreatedAt] DATETIME2 ,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'用户角色关联表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'UserRoles_Audit'
@@ -5596,7 +5645,9 @@ CREATE TABLE [ImportBatchItems_Audit] (
     [Status] VARCHAR(20) ,
     [ErrorMessage] NVARCHAR(2000) ,
     [CreatedBy] UNIQUEIDENTIFIER ,
-    [CreatedAt] DATETIME2
+    [CreatedAt] DATETIME2 ,
+    [CreatedIp] VARCHAR(45) NULL , -- 创建IP,
+    [CreatedHostname] VARCHAR(100) NULL -- 创建主机名
 )
 GO
 EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'导入明细表审计', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'ImportBatchItems_Audit'
@@ -5620,7 +5671,7 @@ CREATE TABLE [Regions] (
     [FullPath]   NVARCHAR(500),                      -- 全路径
     [SortOrder]  INT NOT NULL DEFAULT (0),           -- 排序序号
     [CreatedBy]  UNIQUEIDENTIFIER NOT NULL,           -- 创建人
-    [CreatedAt]  DATETIME2 NOT NULL DEFAULT (GETUTCDATE()), -- 创建时间
+    [CreatedAt]  DATETIME2 NOT NULL DEFAULT (DATEADD(HOUR, 8, GETUTCDATE())), -- 创建时间
     [CreatedIp]  VARCHAR(45),                         -- 创建IP
     [CreatedHostname] VARCHAR(100),                   -- 创建主机名
     [UpdatedBy]  UNIQUEIDENTIFIER,                    -- 更新人

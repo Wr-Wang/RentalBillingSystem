@@ -205,7 +205,7 @@ public class BillJob : ScheduledJobBase
                         SubjId = journal.AccountingSubjectId, Period = targetMonth,
                         Amt = journal.Amount, Due = journal.DueDate, EntryType = journal.EntryType,
                         BilledAt = journal.BilledAt, DNId = journal.DebitNoteId,
-                        ParentId = journal.ParentJournalId, Summary = journal.Summary, CBy = Guid.Empty
+                        ParentId = journal.ParentJournalId, Summary = journal.Summary, CBy = SystemUsers.Scheduler
                     });
                     totalAmount += journal.Amount;
                     created++;
@@ -223,7 +223,7 @@ public class BillJob : ScheduledJobBase
                             CNo = contractNo ?? "", Period = targetMonth,
                             SId = subjects["1122"], SCode = "1122", Dir = "Debit",
                             Amt = journal.Amount, SrcType = "BillJob", SrcId = journal.Id,
-                            Desc = "", CBy = Guid.Empty
+                            Desc = "", CBy = SystemUsers.Scheduler
                         });
                         glBatch.Add(new
                         {
@@ -231,7 +231,7 @@ public class BillJob : ScheduledJobBase
                             CNo = contractNo ?? "", Period = targetMonth,
                             SId = subjects["6001"], SCode = "6001", Dir = "Credit",
                             Amt = journal.Amount, SrcType = "BillJob", SrcId = journal.Id,
-                            Desc = "", CBy = Guid.Empty
+                            Desc = "", CBy = SystemUsers.Scheduler
                         });
                     }
                 }
@@ -268,13 +268,13 @@ public class BillJob : ScheduledJobBase
                                 CNo = contractNo ?? "", Period = targetMonth,
                                 SId = subjects["1122"], SCode = "1122", Dir = "Debit",
                                 Amt = ubAmt, SrcType = "BillJob", SrcId = (Guid)ub.Id,
-                                Desc = "", CBy = Guid.Empty }, tx);
+                                Desc = "", CBy = SystemUsers.Scheduler }, tx);
                         await conn.ExecuteAsync(_sql.Get("Accounting.Insert.GL.Entry"),
                             new { Id = Guid.NewGuid(), CoId = contract.CompanyId, CId = contract.Id,
                                 CNo = contractNo ?? "", Period = targetMonth,
                                 SId = subjects["6001"], SCode = "6001", Dir = "Credit",
                                 Amt = ubAmt, SrcType = "BillJob", SrcId = (Guid)ub.Id,
-                                Desc = "", CBy = Guid.Empty }, tx);
+                                Desc = "", CBy = SystemUsers.Scheduler }, tx);
                     }
                 }
 
@@ -326,7 +326,7 @@ public class BillJob : ScheduledJobBase
                             Id = Guid.NewGuid(), DebitNoteId = dnId,
                             FeeCodeId = t.FeeCodeId, FeeName = t.FeeName,
                             Amount = t.Amount, JournalId = t.JournalId,
-                            CreatedBy = Guid.Empty, CreatedAt = ChinaTime.Now
+                            CreatedBy = SystemUsers.Scheduler, CreatedAt = ChinaTime.Now
                         }).ToList();
                         await conn.ExecuteAsync(_sql.Get("Billing.Insert.DebitNoteItem.Default"), itemBatch, tx);
                     }
@@ -474,7 +474,7 @@ public class BillJob : ScheduledJobBase
                 Id = req.DnId, NoteNo = noteNo,
                 CId = req.ContractId, CoId = req.CompanyId, Amt = req.TotalAmount,
                 IsHist = req.IsHistorical, Due = req.DueDate,
-                PeriodYear = periodYear, PeriodMonth = periodMonth, CBy = Guid.Empty,
+                PeriodYear = periodYear, PeriodMonth = periodMonth, CBy = SystemUsers.Scheduler,
                 ContractNo = req.ContractNo,
                 TenantName = tenantName ?? "",
                 BuildingAddress = buildingAddress ?? "",
