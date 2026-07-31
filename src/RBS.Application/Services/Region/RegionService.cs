@@ -98,7 +98,7 @@ public class RegionService : IRegionService
     public async Task DeleteByLevelAsync(int level)
     {
         using var conn = _db.CreateConnection(); conn.Open();
-        await conn.ExecuteAsync("DELETE FROM Regions WHERE Level>=@Level",
+        await conn.ExecuteAsync(_sql.Get("Common.Delete.Region.ByLevelFrom"),
             new { Level = level }, commandTimeout: 120);
     }
 

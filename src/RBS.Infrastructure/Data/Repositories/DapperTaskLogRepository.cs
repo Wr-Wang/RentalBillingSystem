@@ -140,7 +140,7 @@ public class DapperTaskLogRepository : ITaskLogRepository
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var affected = await conn.ExecuteAsync(
-            "UPDATE TaskLogs SET Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status IN ('Running','Processing')",
+            _sql.Get("Scheduling.Update.TaskLog.ForceCompleteById"),
             new { Id = id });
         return affected > 0;
     }

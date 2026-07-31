@@ -26,6 +26,7 @@ public class JobScheduleGenerator : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JobScheduleGenerator> _logger;
+    private readonly ISqlLoader _sql;
     /// <summary>生成间隔（1 小时）</summary>
     private static readonly TimeSpan GenerateInterval = TimeSpan.FromHours(1);
 
@@ -34,10 +35,12 @@ public class JobScheduleGenerator : BackgroundService
     /// </summary>
     /// <param name="scopeFactory">服务作用域工厂</param>
     /// <param name="logger">日志记录器</param>
-    public JobScheduleGenerator(IServiceScopeFactory scopeFactory, ILogger<JobScheduleGenerator> logger)
+    /// <param name="sql">SQL 模板加载器</param>
+    public JobScheduleGenerator(IServiceScopeFactory scopeFactory, ILogger<JobScheduleGenerator> logger, ISqlLoader sql)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _sql = sql;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,8 +79,7 @@ public class JobScheduleGenerator : BackgroundService
         conn.Open();
 
         var schedules = await conn.QueryAsync<dynamic>(
-            "SELECT Id, JobName, ScheduleType, Hour, Minute, DayOfMonth, CompanyId " +
-            "FROM JobSchedules WHERE IsActive = 1");
+            _sql.Get("Scheduling.Select.JobSchedule.ActiveAll"));
 
         var now = ChinaTime.Now;
         var windowEnd = now.AddHours(1);
@@ -92,13 +94,12 @@ public class JobScheduleGenerator : BackgroundService
                 var nr = nextRun.Value; var targetMonth = $"{nr.Year}-{nr.Month:D2}";
 
                 var exists = await conn.QuerySingleAsync<int>(
-                    "SELECT COUNT(1) FROM JobScheduleExecutions WHERE JobScheduleId = @Id AND Month = @Month",
+                    _sql.Get("Scheduling.Select.Execution.ExistsByScheduleAndMonth"),
                     new { Id = (Guid)s.Id, Month = targetMonth });
                 if (exists > 0) continue;
 
                 await conn.ExecuteAsync(
-                    @"INSERT INTO JobScheduleExecutions (Id, JobScheduleId, CompanyId, TargetDate, OriginalDate, Month, Status, IsAdjusted, IsCustom, CreatedBy, CreatedAt)
-                      VALUES (@Id, @SId, @CId, @Date, @Date, @Month, 'Pending', 0, 0, @CBy, @Now)",
+                    _sql.Get("Scheduling.Insert.Execution.Default"),
                     new
                     {
                         Id = Guid.NewGuid(), SId = (Guid)s.Id, CId = (Guid)s.CompanyId,

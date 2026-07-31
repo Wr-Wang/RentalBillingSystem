@@ -115,7 +115,7 @@ public class SchedulingHostedService : BackgroundService
             // 预加载所有关联的 JobSchedule（仅活跃的）
             var scheduleIds = dueExecutions.Select(e => e.JobScheduleId).Distinct().ToList();
             var schedules = (await Dapper.SqlMapper.QueryAsync<JobSchedule>(conn,
-                "SELECT * FROM [JobSchedules] WHERE [Id] IN @Ids",
+                Sql.Get("Scheduling.Select.JobSchedule.ByIds"),
                 new { Ids = scheduleIds }))
                 .ToDictionary(s => s.Id);
 
@@ -277,7 +277,7 @@ public class SchedulingHostedService : BackgroundService
 
             // 更新排期最后执行时间
             await Dapper.SqlMapper.ExecuteAsync(conn,
-                "UPDATE JobSchedules SET TargetDate = @TargetDate WHERE Id = @Id",
+                Sql.Get("Scheduling.Update.JobSchedule.TargetDateById"),
                 new { TargetDate = execution.TargetDate, Id = schedule.Id });
 
             // 更新任务日志
@@ -408,14 +408,7 @@ public class SchedulingHostedService : BackgroundService
 
             var heartbeatTimeout = ChinaTime.Now.AddMinutes(-10);
             var resetStale = await Dapper.SqlMapper.ExecuteAsync(conn,
-                @"UPDATE e SET e.[Status]='Pending'
-                  FROM [JobScheduleExecutions] e
-                  WHERE e.[Status] IN ('Processing','Running')
-                    AND NOT EXISTS (
-                      SELECT 1 FROM [ExecutionHeartbeats] h
-                      WHERE h.[ExecutionId]=e.[Id]
-                        AND h.[HeartbeatAt]>=@Threshold
-                    )",
+                Sql.Get("Scheduling.Update.Execution.ResetStaleByHeartbeat"),
                 new { Threshold = heartbeatTimeout });
             if (resetStale > 0)
                 _logger.LogWarning("恢复 {Count} 个僵死排期（心跳超时）", resetStale);

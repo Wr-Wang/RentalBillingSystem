@@ -2139,6 +2139,39 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   </update>
 
   <!-- ================================================================
+       模块：Scheduling — 调度引擎基础设施（SchedulingHostedService / JobScheduleGenerator / DapperTaskLogRepository）
+       ================================================================ -->
+  <select id="Scheduling.Select.JobSchedule.ByIds">
+    <![CDATA[SELECT * FROM [JobSchedules] WHERE [Id] IN @Ids]]>
+  </select>
+  <select id="Scheduling.Select.JobSchedule.ActiveAll">
+    <![CDATA[SELECT Id, JobName, ScheduleType, Hour, Minute, DayOfMonth, CompanyId FROM JobSchedules WHERE IsActive = 1]]>
+  </select>
+  <select id="Scheduling.Select.Execution.ExistsByScheduleAndMonth">
+    <![CDATA[SELECT COUNT(1) FROM JobScheduleExecutions WHERE JobScheduleId = @Id AND Month = @Month]]>
+  </select>
+  <insert id="Scheduling.Insert.Execution.Default">
+    <![CDATA[INSERT INTO JobScheduleExecutions (Id, JobScheduleId, CompanyId, TargetDate, OriginalDate, Month, Status, IsAdjusted, IsCustom, CreatedBy, CreatedAt)
+      VALUES (@Id, @SId, @CId, @Date, @Date, @Month, 'Pending', 0, 0, @CBy, @Now)]]>
+  </insert>
+  <update id="Scheduling.Update.JobSchedule.TargetDateById">
+    <![CDATA[UPDATE JobSchedules SET TargetDate = @TargetDate WHERE Id = @Id]]>
+  </update>
+  <update id="Scheduling.Update.Execution.ResetStaleByHeartbeat">
+    <![CDATA[UPDATE e SET e.[Status]='Pending'
+      FROM [JobScheduleExecutions] e
+      WHERE e.[Status] IN ('Processing','Running')
+        AND NOT EXISTS (
+          SELECT 1 FROM [ExecutionHeartbeats] h
+          WHERE h.[ExecutionId]=e.[Id]
+            AND h.[HeartbeatAt]>=@Threshold
+        )]]>
+  </update>
+  <update id="Scheduling.Update.TaskLog.ForceCompleteById">
+    <![CDATA[UPDATE TaskLogs SET Status='Completed', CompletedAt=DATEADD(HOUR, 8, GETUTCDATE()) WHERE Id=@Id AND Status IN ('Running','Processing')]]>
+  </update>
+
+  <!-- ================================================================
        模块：Accounting — 控制器级别 SQL（VouchersController / LedgerController）
        ================================================================ -->
   <select id="Accounting.Select.Voucher.NextSequenceNo">
@@ -2237,6 +2270,15 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <select id="Lease.Select.Contract.HasActiveByRoom">
     <![CDATA[SELECT COUNT(1) FROM Contracts WHERE RoomId=@RoomId AND Status='Active']]>
   </select>
+  <select id="Lease.Select.Contract.StartDateById">
+    <![CDATA[SELECT StartDate FROM Contracts WHERE Id = @Id]]>
+  </select>
+  <select id="Lease.Select.Contract.RangeById">
+    <![CDATA[SELECT StartDate, EndDate FROM Contracts WHERE Id=@Id]]>
+  </select>
+  <select id="Lease.Select.Contract.ExistsById">
+    <![CDATA[SELECT COUNT(1) FROM Contracts WHERE Id=@Id]]>
+  </select>
 
   <!-- ================================================================
        模块：Scheduling（调度 — JobSchedule 模板复制）
@@ -2306,6 +2348,9 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
   <select id="Common.Select.Region.ExistsByCode">
     <![CDATA[SELECT COUNT(1) FROM Regions WHERE Code=@Code]]>
   </select>
+  <delete id="Common.Delete.Region.ByLevelFrom">
+    <![CDATA[DELETE FROM Regions WHERE Level>=@Level]]>
+  </delete>
 
   <!-- ================================================================
        模块：Audit（变更审计）

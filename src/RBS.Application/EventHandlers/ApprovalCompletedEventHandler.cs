@@ -521,7 +521,7 @@ if (chargeType == "OneTime")
 
                     // 插入 ReceivablePlan（一次性费用应收计划，关联到 FeeConfig 实例以支持同费用多次添加）
                     // 使用 Unposted SQL，GLPosted=0，待收款确认后再过账
-                    var feeContract = await conn.QuerySingleOrDefaultAsync("SELECT StartDate FROM Contracts WHERE Id = @Id", new { Id = item.ContractId }, tx);
+                    var feeContract = await conn.QuerySingleOrDefaultAsync(_sql.Get("Lease.Select.Contract.StartDateById"), new { Id = item.ContractId }, tx);
                     var contractStart = feeContract != null ? (DateTime)feeContract.StartDate : ChinaTime.Now;
                     var period = (item.EffectiveDate ?? ChinaTime.Now.ToString("yyyy-MM-dd")).Substring(0, 7);
                     await InsertJournalAsync(conn, tx,
@@ -816,7 +816,7 @@ if (chargeType == "OneTime")
         {
             // 补充 FeeConfig：按现有 Recurring 费用的生效日和全额月租展开月度分段
             var contractRow = await conn.QuerySingleOrDefaultAsync<dynamic>(
-                "SELECT StartDate, EndDate FROM Contracts WHERE Id=@Id",
+                _sql.Get("Lease.Select.Contract.RangeById"),
                 new { Id = request.ContractId }, tx);
             if (contractRow != null)
             {
@@ -993,7 +993,7 @@ private async Task HandleContractTenantChangeAsync(ApprovalCompletedEvent @event
 	        {
 	            // 验证合同存在
 	            var contractExists = await conn.QuerySingleAsync<int>(
-	                "SELECT COUNT(1) FROM Contracts WHERE Id=@Id", new { Id = bizData.ContractId }, tx);
+	                _sql.Get("Lease.Select.Contract.ExistsById"), new { Id = bizData.ContractId }, tx);
 	            if (contractExists == 0) return;
 
 	            if (bizData.ChangeType == "TENANT_ADD")
