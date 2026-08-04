@@ -107,8 +107,10 @@ var app = builder.Build();
 // 1. 全局异常捕获（需放在最前面，捕获所有下游异常）
 app.UseMiddleware<RBS.Api.Middleware.ExceptionLoggingMiddleware>();
 
-// 2. Swagger（仅开发环境）
-if (app.Environment.IsDevelopment())
+// 2. Swagger
+//    开发环境始终开启；生产环境通过配置 appsettings.json 的
+//    Swagger:Enabled=true 手动开启（改配置即可，无需改环境变量）
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
