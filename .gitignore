@@ -64,3 +64,6 @@ fix_params.py
 
 publish/
 
+docs/Docker部署学习教程.md
+.gitignore
+docs/前端Docker部署指南.md

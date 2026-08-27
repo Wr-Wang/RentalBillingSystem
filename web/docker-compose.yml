@@ -1,0 +1,27 @@
+# ============================================================
+#  web 前端 Docker Compose 编排
+#
+#  用法（在 web/ 目录下执行）：
+#    首次构建启动：  docker compose up -d --build
+#    查看日志：      docker compose logs -f
+#    停止并删除容器： docker compose down
+#    重新构建（改了前端代码后）： docker compose up -d --build
+#
+#  访问地址：http://localhost:8082
+# ============================================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rbs-web
+    ports:
+      # 宿主机 8082 → 容器内 80（80/8080/8081 已被本机 IIS 占用，故用 8082）
+      - "8082:80"
+    restart: unless-stopped
+    extra_hosts:
+      # 让容器把 www.rbsapi.com 解析到"宿主机"（后端跑在本机 IIS）
+      # host-gateway = Docker 自动指向宿主机；
+      # 若你的环境里 host-gateway 不生效，可改成：- "www.rbsapi.com:192.168.31.19"
+      - "www.rbsapi.com:host-gateway"
