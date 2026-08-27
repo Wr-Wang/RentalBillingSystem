@@ -13,7 +13,10 @@
 services:
   web:
     build:
-      context: .
+      # 从远程代码仓库构建（GitHub，master 分支的 web/ 子目录）
+      # 语法：git地址#分支:子目录 —— Dockerfile 在仓库 web/ 下，故上下文指向 web/
+      # 注意：构建用的是 GitHub 上已提交的代码，本地未提交的改动不会生效
+      context: https://github.com/Wr-Wang/RentalBillingSystem.git#master:web
       dockerfile: Dockerfile
     container_name: rbs-web
     ports:
