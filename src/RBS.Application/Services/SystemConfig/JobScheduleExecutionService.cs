@@ -296,7 +296,7 @@ public class JobScheduleExecutionService : IJobScheduleExecutionService
     {
         using var conn = _db.CreateConnection(); conn.Open();
         var affected = await conn.ExecuteAsync(
-            _sql.Get("Scheduling.Update.Execution.Claim"), new { Id = id });
+            _sql.Get("Scheduling.Update.Execution.ClaimRetry"), new { Id = id });
         return affected > 0;
     }
 
