@@ -524,6 +524,7 @@ DECLARE @AT_ContractModify uniqueidentifier;
 DECLARE @AT_ContractRenew uniqueidentifier;
 DECLARE @AT_ContractFeeChange uniqueidentifier;
 DECLARE @AT_ChangeRequest uniqueidentifier;
+DECLARE @AT_ContractModifyOther uniqueidentifier;
 
 IF NOT EXISTS (SELECT 1 FROM [ApprovalTypes] WHERE [Code] = 'BATCH_IMPORT_ROOMS')
     INSERT INTO [ApprovalTypes] ([Id],[Name],[Code],[Description],[IsActive],[CompanyId],[CreatedBy],[CreatedAt])
@@ -598,96 +599,96 @@ DECLARE @R_FinDir uniqueidentifier; SELECT @R_FinDir = [Id] FROM [Roles] WHERE [
 DECLARE @R_GenMgr uniqueidentifier; SELECT @R_GenMgr = [Id] FROM [Roles] WHERE [Code] = 'GeneralManager';
 
 IF @AT_BatchImport IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_BatchImport,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_BatchImport,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_BatchImport IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [LevelNo] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_BatchImport,2,@R_DeptMgr,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_BatchImport,2,@R_DeptMgr,@R_DeptMgr,2,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_BatchImport IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_BatchImport AND [LevelNo] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_BatchImport,3,@R_GenMgr,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_BatchImport,3,@R_GenMgr,@R_GenMgr,3,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractCreate IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractCreate,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractCreate,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractCreate IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [LevelNo] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractCreate,2,@R_DeptMgr,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractCreate,2,@R_DeptMgr,@R_DeptMgr,2,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractCreate IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractCreate AND [LevelNo] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractCreate,3,@R_GenMgr,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractCreate,3,@R_GenMgr,@R_GenMgr,3,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractTerminate IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractTerminate,1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractTerminate,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',0,5000,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractTerminate IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [LevelNo] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractTerminate,2,@R_DeptMgr,5000,50000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractTerminate,2,@R_DeptMgr,@R_DeptMgr,2,'AnyOne',5000,50000,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractTerminate IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractTerminate AND [LevelNo] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractTerminate,3,@R_GenMgr,50000,99999999,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractTerminate,3,@R_GenMgr,@R_GenMgr,3,'AnyOne',50000,99999999,@Cid,@SysUserId,@Now);
 
 IF @AT_ReceiptReverse IS NOT NULL AND @R_FinSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ReceiptReverse,1,@R_FinSup,0,50000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ReceiptReverse,1,@R_FinSup,@R_FinSup,1,'AnyOne',0,50000,@Cid,@SysUserId,@Now);
 
 IF @AT_ReceiptReverse IS NOT NULL AND @R_FinDir IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [LevelNo] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ReceiptReverse,2,@R_FinDir,50000,99999999,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ReceiptReverse,2,@R_FinDir,@R_FinDir,2,'AnyOne',50000,99999999,@Cid,@SysUserId,@Now);
 
 IF @AT_ReceiptReverse IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ReceiptReverse AND [LevelNo] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ReceiptReverse,3,@R_GenMgr,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ReceiptReverse,3,@R_GenMgr,@R_GenMgr,3,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_Discount IS NOT NULL AND @R_FinSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_Discount,1,@R_FinSup,0,5000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_Discount,1,@R_FinSup,@R_FinSup,1,'AnyOne',0,5000,@Cid,@SysUserId,@Now);
 
 IF @AT_Discount IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [LevelNo] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_Discount,2,@R_DeptMgr,5000,50000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_Discount,2,@R_DeptMgr,@R_DeptMgr,2,'AnyOne',5000,50000,@Cid,@SysUserId,@Now);
 
 IF @AT_Discount IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_Discount AND [LevelNo] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_Discount,3,@R_GenMgr,50000,99999999,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_Discount,3,@R_GenMgr,@R_GenMgr,3,'AnyOne',50000,99999999,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractModify IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModify AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractModify,1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractModify,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',0,5000,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractModify IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModify AND [LevelNo] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractModify,2,@R_DeptMgr,5000,99999999,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractModify,2,@R_DeptMgr,@R_DeptMgr,2,'AnyOne',5000,99999999,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractModifyOther IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractModifyOther AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractModifyOther,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractModifyOther,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ChangeRequest IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ChangeRequest AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ChangeRequest,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ChangeRequest,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractFeeChange IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractFeeChange AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractFeeChange,1,@R_OpsSup,NULL,NULL,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractFeeChange,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',NULL,NULL,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractRenew IS NOT NULL AND @R_OpsSup IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [LevelNo] = 1)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractRenew,1,@R_OpsSup,0,5000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractRenew,1,@R_OpsSup,@R_OpsSup,1,'AnyOne',0,5000,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractRenew IS NOT NULL AND @R_DeptMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [LevelNo] = 2)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractRenew,2,@R_DeptMgr,5000,50000,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractRenew,2,@R_DeptMgr,@R_DeptMgr,2,'AnyOne',5000,50000,@Cid,@SysUserId,@Now);
 
 IF @AT_ContractRenew IS NOT NULL AND @R_GenMgr IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [ApprovalLevelConfigs] WHERE [ApprovalTypeId] = @AT_ContractRenew AND [LevelNo] = 3)
-    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
-    VALUES (NEWID(),@AT_ContractRenew,3,@R_GenMgr,50000,99999999,@Cid,@SysUserId,@Now);
+    INSERT INTO [ApprovalLevelConfigs] ([Id],[ApprovalTypeId],[LevelNo],[ApproverRoleId],[RoleId],[Level],[ApprovalMode],[MinAmount],[MaxAmount],[CompanyId],[CreatedBy],[CreatedAt])
+    VALUES (NEWID(),@AT_ContractRenew,3,@R_GenMgr,@R_GenMgr,3,'AnyOne',50000,99999999,@Cid,@SysUserId,@Now);
 
 PRINT N'审批类型及级别数据初始化完成！';
 GO
@@ -1229,12 +1230,6 @@ DECLARE @M_System_TaxRateEdit uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_TaxRateEdit,N'编辑税率','system:taxrateedit',@M_System_TaxRate,11,1,@SysUserId,@Now);
 
-DECLARE @M_System_SubjectCreate uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-
-DECLARE @M_System_SubjectEdit uniqueidentifier = NEWID();
-INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
-
 DECLARE @M_System_HolidayCreate uniqueidentifier = NEWID();
 INSERT INTO [Menus] ([Id],[Name],[PermissionCode],[ParentId],[SortOrder],[IsActive],[CreatedBy],[CreatedAt])
 VALUES (@M_System_HolidayCreate,N'新增节假日','system:holidaycreate',@M_System_Holiday,10,1,@SysUserId,@Now);
@@ -1509,3 +1504,116 @@ GO
 -- ===================================================================
 -- SeedBase.sql - 结束
 -- ===================================================================
+-- =================================================================
+-- v2026.07.16: RECEIVABLE_GENERATE 审批类型 + 三级审批配置
+-- =================================================================
+DECLARE @CompanyId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM Companies)
+DECLARE @SysUserId UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000000'
+DECLARE @Now DATETIME2 = dbo.fn_ChinaTimeNow()
+
+-- 审批类型
+IF NOT EXISTS (SELECT 1 FROM ApprovalTypes WHERE Code = 'RECEIVABLE_GENERATE')
+BEGIN
+  INSERT INTO ApprovalTypes (Id, Code, Name, Description, RoutingStrategy, IsActive, CompanyId, CreatedBy, CreatedAt)
+  VALUES (NEWID(), 'RECEIVABLE_GENERATE', '应收生成', '手动触发生成应收，按金额路由审批级别', 'Fixed', 1, @CompanyId, @SysUserId, @Now)
+END
+GO
+
+-- 三级审批级别配置
+DECLARE @TypeId UNIQUEIDENTIFIER = (SELECT Id FROM ApprovalTypes WHERE Code = 'RECEIVABLE_GENERATE')
+DECLARE @CompanyId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM Companies)
+DECLARE @SysUserId UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000000'
+DECLARE @Now DATETIME2 = dbo.fn_ChinaTimeNow()
+
+-- Level 1: 运营主管（≤10万）
+IF NOT EXISTS (SELECT 1 FROM ApprovalLevelConfigs WHERE ApprovalTypeId = @TypeId AND LevelNo = 1)
+BEGIN
+  INSERT INTO ApprovalLevelConfigs (Id, ApprovalTypeId, LevelNo, ApproverRoleId, RoleId, Level, ApprovalMode,
+    MinAmount, MaxAmount, IsCumulativeCheck, CumulativeWindowDays, CompanyId, CreatedBy, CreatedAt)
+  SELECT NEWID(), @TypeId, 1, r.Id, r.Id, 1, 'AnyOne', 0, 100000, 0, 0, @CompanyId, @SysUserId, @Now
+  FROM Roles r WHERE r.Code = 'OpsSupervisor'
+END
+
+-- Level 2: 部门经理（10万~50万）
+IF NOT EXISTS (SELECT 1 FROM ApprovalLevelConfigs WHERE ApprovalTypeId = @TypeId AND LevelNo = 2)
+BEGIN
+  INSERT INTO ApprovalLevelConfigs (Id, ApprovalTypeId, LevelNo, ApproverRoleId, RoleId, Level, ApprovalMode,
+    MinAmount, MaxAmount, IsCumulativeCheck, CumulativeWindowDays, CompanyId, CreatedBy, CreatedAt)
+  SELECT NEWID(), @TypeId, 2, r.Id, r.Id, 2, 'AnyOne', 100000.01, 500000, 0, 0, @CompanyId, @SysUserId, @Now
+  FROM Roles r WHERE r.Code = 'DeptManager'
+END
+
+-- Level 3: 总经理（>50万）
+IF NOT EXISTS (SELECT 1 FROM ApprovalLevelConfigs WHERE ApprovalTypeId = @TypeId AND LevelNo = 3)
+BEGIN
+  INSERT INTO ApprovalLevelConfigs (Id, ApprovalTypeId, LevelNo, ApproverRoleId, RoleId, Level, ApprovalMode,
+    MinAmount, MaxAmount, IsCumulativeCheck, CumulativeWindowDays, CompanyId, CreatedBy, CreatedAt)
+  SELECT NEWID(), @TypeId, 3, r.Id, r.Id, 3, 'AnyOne', 500000.01, 999999999, 0, 0, @CompanyId, @SysUserId, @Now
+  FROM Roles r WHERE r.Code = 'GeneralManager'
+END
+GO
+
+-- ===================================================================
+-- 会计科目种子数据（幂等插入）
+-- ===================================================================
+DECLARE @AcctCompanyId uniqueidentifier = (SELECT TOP 1 Id FROM Companies ORDER BY CreatedAt);
+DECLARE @AcctUserId uniqueidentifier = (SELECT TOP 1 Id FROM Users WHERE Username = 'admin');
+IF @AcctUserId IS NULL SELECT TOP 1 @AcctUserId = Id FROM Users ORDER BY CreatedAt;
+DECLARE @AcctNow datetime2 = dbo.fn_ChinaTimeNow();
+
+-- 资产类（1xxx）借方科目
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1001')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1001',N'库存现金',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1002')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1002',N'银行存款',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1122')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1122',N'应收账款',NULL,1,'Debit',0,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '112201')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'112201',N'应收房租','1122',2,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '112202')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'112202',N'应收押金','1122',2,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '1131')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'1131',N'其他应收款',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+
+-- 负债类（2xxx）贷方科目
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2202')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2202',N'应付款',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2203')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2203',N'预收账款',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2221')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2221',N'应交税费',NULL,1,'Credit',0,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '222101')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'222101',N'应交增值税','2221',2,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '2241')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'2241',N'其他应付款',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+
+-- 损益类（6xxx）收入贷方/成本借方
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6001')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6001',N'主营业务收入',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6051')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6051',N'其他业务收入',NULL,1,'Credit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6401')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6401',N'主营业务成本',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6601')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6601',N'管理费用',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+IF NOT EXISTS (SELECT 1 FROM AccountingSubjects WHERE Code = '6602')
+    INSERT INTO AccountingSubjects (Id,Code,Name,ParentCode,Level,Direction,IsLeaf,IsActive,CompanyId,CreatedBy,CreatedAt)
+    VALUES (NEWID(),'6602',N'财务费用',NULL,1,'Debit',1,1,@AcctCompanyId,@AcctUserId,@AcctNow);
+
+PRINT N'会计科目种子数据已初始化。';
+GO
