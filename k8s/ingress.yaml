@@ -1,0 +1,72 @@
+# ============================================================
+#  NGINX Ingress —— 按域名把请求路由到两个站点
+#
+#    www.rbsapi.com   → rbs-api-svc:8080   （API 站点，可直接访问 /swagger）
+#    www.rbsadmin.com → rbs-web-svc:80     （Web 站点）
+#
+#  前置：
+#    1) ingress-nginx 控制器已安装（见部署手册阶段 4）：
+#         kubectl apply -f k8s/ingress-nginx.yaml
+#       或
+#         kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.1/deploy/static/provider/kind/deploy.yaml
+#    2) 两个 Service 已存在（rbs-api-svc / rbs-web-svc）
+#
+#  用法：
+#    kubectl apply -f ingress.yaml
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rbs-api-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: www.rbsapi.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rbs-api-svc
+                port:
+                  number: 8080
+    - host: rbsapi.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rbs-api-svc
+                port:
+                  number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rbs-web-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: www.rbsadmin.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rbs-web-svc
+                port:
+                  number: 80
+    - host: rbsadmin.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rbs-web-svc
+                port:
+                  number: 80

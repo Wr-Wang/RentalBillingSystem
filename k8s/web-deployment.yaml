@@ -1,0 +1,43 @@
+# ============================================================
+#  rbs-web 前端 Deployment
+#
+#  用法：
+#    kubectl apply -f web-deployment.yaml
+#
+#  前置：镜像已导入集群（web-web:latest）：
+#    cd ../web && docker build -t web-web:latest .
+#    kind load docker-image web-web:latest --name rbs
+#
+#  发布新版本：重新 build + kind load 后，执行：
+#    kubectl rollout restart deployment rbs-web
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rbs-web
+  labels:
+    app: rbs-web
+spec:
+  replicas: 3                       # 3 个副本，k8s 自动分散到 6 个 worker 节点
+  selector:
+    matchLabels:
+      app: rbs-web                  # 管理规则：选中 label 为 app=rbs-web 的 Pod
+  template:
+    metadata:
+      labels:
+        app: rbs-web
+    spec:
+      containers:
+        - name: rbs-web
+          image: web-web:latest
+          imagePullPolicy: IfNotPresent   # 节点本机有镜像就用本机（kind load 导入的），不强制去仓库拉
+          ports:
+            - containerPort: 80           # nginx 监听端口
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

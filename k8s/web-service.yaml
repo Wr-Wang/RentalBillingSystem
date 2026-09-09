@@ -1,0 +1,33 @@
+# ============================================================
+#  rbs-web 前端 Service（NodePort）
+#
+#  用法：
+#    kubectl apply -f web-service.yaml
+#
+#  访问：http://localhost:30882（Docker Desktop 会自动把 NodePort 映射到宿主机）
+# ============================================================
+
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: rbs-web-svc
+# spec:
+#   type: NodePort                       # 暴露到每个节点的一个固定端口
+#   selector:
+#     app: rbs-web                       # 选择所有 label 为 app=rbs-web 的 Pod（负载均衡）
+#   ports:
+#     - port: 80                         # 集群内访问端口
+#       targetPort: 80                   # Pod 里 nginx 的端口
+#       nodePort: 30882                  # 节点上暴露的端口（合法范围 30000-32767）
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rbs-web-svc
+spec:
+  type: LoadBalancer                     # ← 从 NodePort 改成 LoadBalancer
+  selector:
+    app: rbs-web
+  ports:
+    - port: 30882                        # ← 宿主机访问端口（避开 IIS 的 80）
+      targetPort: 80                     # Pod 里 nginx 端口

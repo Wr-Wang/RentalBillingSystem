@@ -2155,8 +2155,14 @@ FROM ContractFeeConfigs cf LEFT JOIN FeeCodes fc ON fc.Id = cf.FeeCodeId WHERE c
     <![CDATA[SELECT COUNT(1) FROM JobScheduleExecutions WHERE JobScheduleId = @Id AND Month = @Month]]>
   </select>
   <insert id="Scheduling.Insert.Execution.Default">
+    <!-- 原子条件插入（3 副本并发安全）：UPDLOCK+HOLDLOCK 锁住 (JobScheduleId, Month) 谓词区间，
+         防止两个副本同时通过 NOT EXISTS 检查插入重复执行记录；无唯一索引也不依赖 READ COMMITTED 行为 -->
     <![CDATA[INSERT INTO JobScheduleExecutions (Id, JobScheduleId, CompanyId, TargetDate, OriginalDate, Month, Status, IsAdjusted, IsCustom, CreatedBy, CreatedAt)
-      VALUES (@Id, @SId, @CId, @Date, @Date, @Month, 'Pending', 0, 0, @CBy, @Now)]]>
+      SELECT @Id, @SId, @CId, @Date, @Date, @Month, 'Pending', 0, 0, @CBy, @Now
+      WHERE NOT EXISTS (
+        SELECT 1 FROM JobScheduleExecutions WITH (UPDLOCK, HOLDLOCK)
+        WHERE JobScheduleId = @SId AND Month = @Month
+      )]]>
   </insert>
   <update id="Scheduling.Update.JobSchedule.TargetDateById">
     <![CDATA[UPDATE JobSchedules SET TargetDate = @TargetDate WHERE Id = @Id]]>

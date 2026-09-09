@@ -1,0 +1,23 @@
+# ============================================================
+#  rbs-web NodePort Service（专用于 kind 多节点集群）
+#
+#  这是【兜底】入口：主入口是域名 http://www.rbsadmin.com（走 ingress，见 ingress.yaml）。
+#  本 Service 走 NodePort 30883（经 kind-config 的 extraPortMappings 映射到宿主机），
+#  ingress 故障时可用 http://localhost:30883 直达 web。
+#
+#  ⚠️ 用 30883 而不是 30882：内置集群(Docker Desktop K8s)的
+#     LoadBalancer 已占用宿主机 30882，避免端口冲突。
+# ============================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rbs-web-svc
+spec:
+  type: NodePort                       # kind 集群用 NodePort（端口会映射到宿主机）
+  selector:
+    app: rbs-web                       # 选择 label 为 app=rbs-web 的 Pod（负载均衡）
+  ports:
+    - port: 80                         # 集群内访问端口
+      targetPort: 80                   # Pod 里 nginx 端口
+      nodePort: 30883                  # 节点上暴露的端口（合法范围 30000-32767）

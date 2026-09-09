@@ -1,0 +1,18 @@
+# ============================================================
+#  rbs-api ClusterIP Service
+#
+#  web 的 nginx 通过集群内 DNS 名 rbs-api-svc 访问 API。
+#  kind 多节点集群下不需要对外暴露（web 反代即可）。
+# ============================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rbs-api-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: rbs-api                       # 选择 label 为 app=rbs-api 的 Pod
+  ports:
+    - port: 8080                       # 集群内访问端口（nginx 反代目标）
+      targetPort: 8080                 # Pod 里 API 监听端口

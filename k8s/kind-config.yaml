@@ -1,0 +1,65 @@
+# ============================================================
+#  kind 多节点集群配置（1 控制平面 + 6 worker = 7 节点）
+#
+#  用法（在 k8s/ 目录或任意位置）：
+#    kind create cluster --config kind-config.yaml
+#
+#  集群名：rbs（kind create / kind load / kind delete 都要带 --name rbs）
+#
+#  ⚠️ 两个站点用【域名】访问，靠 ingress 按 Host 头路由：
+#       www.rbsapi.com   → rbs-api-svc:8080   （API 站点，可直接开 Swagger）
+#       www.rbsadmin.com → rbs-web-svc:80     （Web 站点）
+#     hosts 文件把这两个域名指向 127.0.0.1（见部署手册阶段 0），
+#     ingress 控制器监听下面映射出来的宿主机 80/443。
+#
+#  ⚠️ 同一个 hostPort 只能映射在一个节点上（多个节点映射会端口冲突）：
+#      - 80/443 映射在【控制面】节点（ingress 控制器 DaemonSet 也调度在它上面）
+#      - NodePort 30883 兜底映射在 worker-1（http://localhost:30883 直达 web）
+#
+#  ⚠️ 改了这个文件后要重建集群才生效：
+#     kind delete cluster --name rbs
+#     kind create cluster --config kind-config.yaml
+# ============================================================
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: rbs
+nodes:
+  # 固定用 v1.36.1 节点镜像：kind v0.33 默认的 v1.37.0 在当前 Docker Desktop 上
+  # 起不来 systemd（报 "could not find a log line that matches Multi-User System"），
+  # 而 v1.36.1 本机已有且 Docker Desktop 内置集群验证过可用。
+  - role: control-plane      # 控制平面节点（有 NoSchedule 污点，普通 Pod 不会调度上来）
+    image: kindest/node:v1.36.1
+    # 打上 ingress-ready 标签：ingress-nginx 控制器 DaemonSet 只调度到这个节点
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    # 把 ingress 控制器的 80/443 映射到宿主机，供两个域名访问
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+  - role: worker             # 工作节点 1
+    image: kindest/node:v1.36.1
+    extraPortMappings:
+      # 兜底：把 NodePort 30883 映射到宿主机 localhost:30883 直达 web。
+      # containerPort 必须 = web-service-nodeport.yaml 的 nodePort，两边一致才通。
+      - containerPort: 30883
+        hostPort: 30883
+        protocol: TCP
+  - role: worker             # 工作节点 2
+    image: kindest/node:v1.36.1
+  - role: worker             # 工作节点 3
+    image: kindest/node:v1.36.1
+  - role: worker             # 工作节点 4
+    image: kindest/node:v1.36.1
+  - role: worker             # 工作节点 5
+    image: kindest/node:v1.36.1
+  - role: worker             # 工作节点 6
+    image: kindest/node:v1.36.1

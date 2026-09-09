@@ -1,7 +1,3 @@
-#pragma warning disable CA1416 // System.Drawing 仅 Windows 支持，本应用仅在 Windows 部署
-
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Text.RegularExpressions;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
@@ -62,8 +58,12 @@ public class NotePdf
                 document.Add(Cheque());
                 if (!string.IsNullOrWhiteSpace(entity.Barcode))
                 {
-                    document.Add(GenBatCode(entity.Barcode, 58f));
-                    document.Add(BatCodeTitle(entity.BarcodeTitle));
+                    var barcode = GenBatCode(writer, entity.Barcode, 58f);
+                    if (barcode != null)
+                    {
+                        document.Add(barcode);
+                        document.Add(BatCodeTitle(entity.BarcodeTitle));
+                    }
                 }
                 AddTextWatermark(writer, "繳款通知書", "DEMAND NOTE");
             }
@@ -107,8 +107,12 @@ public class NotePdf
                 document.Add(Cheque());
                 if (!string.IsNullOrWhiteSpace(entity.Barcode))
                 {
-                    document.Add(GenBatCode(entity.Barcode, 36f));
-                    document.Add(BatCodeTitle(entity.BarcodeTitle));
+                    var barcode = GenBatCode(writer, entity.Barcode, 36f);
+                    if (barcode != null)
+                    {
+                        document.Add(barcode);
+                        document.Add(BatCodeTitle(entity.BarcodeTitle));
+                    }
                 }
                 AddTextWatermark(writer, "最後通知", "FINAL DEMAND");
             }
@@ -506,7 +510,7 @@ public class NotePdf
 
             using var stream = new MemoryStream(fileByte);
             var img = iTextSharp.text.Image.GetInstance(stream);
-            img.ScalePercent(22f);
+            img.ScaleAbsoluteWidth(55f);   // 原实现把 250px GIF 缩到 22% ≈ 55pt，保持相同视觉尺寸
             img.SetAbsolutePosition(520f, absoluteY);
             return img;
         }
@@ -525,12 +529,9 @@ public class NotePdf
         {
             using var qrGenerator = new QRCodeGenerator();
             using var qrCodeData = qrGenerator.CreateQrCode(fpsQrContent, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new QRCode(qrCodeData);
-            using var qrCodeImage = qrCode.GetGraphic(20);
-            using var bitmap = new Bitmap(qrCodeImage, 250, 250);
-            using var ms = new MemoryStream();
-            bitmap.Save(ms, ImageFormat.Gif);
-            return ms.ToArray();
+            // PngByteQRCode 直接输出 PNG（跨平台，不经过 System.Drawing）
+            var qrCode = new PngByteQRCode(qrCodeData);
+            return qrCode.GetGraphic(20);
         }
         catch
         {
@@ -746,28 +747,41 @@ public class NotePdf
     // ===================================================================
     // GenBatCode
     // ===================================================================
-    private iTextSharp.text.Image GenBatCode(string code, float absoluteY = 58f)
+    private iTextSharp.text.Image? GenBatCode(PdfWriter writer, string code, float absoluteY = 58f)
     {
-        var code128 = new Barcode128
+        try
         {
-            CodeType = 9,
-            ChecksumText = true,
-            GenerateChecksum = true,
-            StartStopText = true,
-            Code = code,
-            Font = Helvetica
-        };
+            var code128 = new Barcode128
+            {
+                CodeType = 9,
+                ChecksumText = true,
+                GenerateChecksum = true,
+                StartStopText = true,
+                Code = code,
+                Font = Helvetica
+            };
 
-        using var bm = new Bitmap(code128.CreateDrawingImage(Color.Black, Color.White));
-        using var ms = new MemoryStream();
-        bm.Save(ms, ImageFormat.Gif);
-        var bytes = ms.ToArray();
 
-        var img = iTextSharp.text.Image.GetInstance(bytes);
-        img.ScaleAbsoluteHeight(35f);
-        img.ScaleAbsoluteWidth(270f);
-        img.SetAbsolutePosition(230f, absoluteY);
-        return img;
+
+            // 跨平台方案：不经过 System.Drawing（Windows 专属），用 iTextSharp 直接把条码矢量画进 PDF 模板。
+            // 先量出条码实际尺寸，再按实际尺寸生成模板，保持与原 CreateDrawingImage 一致的几何。
+            var probe = writer.DirectContent.CreateTemplate(600f, 120f);
+            var size = code128.PlaceBarcode(probe, BaseColor.BLACK, BaseColor.WHITE);
+            var w = size.Width > 1f ? size.Width : 270f;
+            var h = size.Height > 1f ? size.Height : 35f;
+
+            var template = writer.DirectContent.CreateTemplate(w, h);
+            code128.PlaceBarcode(template, BaseColor.BLACK, BaseColor.WHITE);
+            var img = iTextSharp.text.Image.GetInstance(template);
+            img.ScaleAbsoluteHeight(35f);
+            img.ScaleAbsoluteWidth(270f);
+            img.SetAbsolutePosition(230f, absoluteY);
+            return img;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // ===================================================================
