@@ -75,6 +75,8 @@ public static class DependencyInjection
         services.AddScoped<RegionApiSyncService>();
         services.AddScoped<StatsGovCommunityService>();
         services.AddScoped<StatsGovRegionService>();
+        // 四级/五级同步进度跟踪器（单例，后台任务写、前端轮询读）
+        services.AddSingleton<StatsGovSyncProgress>();
 
         // 调度执行监控
         services.AddScoped<ITaskMonitorService, TaskMonitorService>();

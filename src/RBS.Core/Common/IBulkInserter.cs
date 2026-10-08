@@ -14,5 +14,7 @@ public interface IBulkInserter
     /// <param name="tableName">目标表名</param>
     /// <param name="dataTable">已填充数据的 DataTable（列名需匹配目标表）</param>
     /// <param name="ct">取消令牌</param>
-    Task BulkInsertAsync(string tableName, DataTable dataTable, CancellationToken ct = default);
+    /// <param name="onRowsCopied">写入进度回调（参数为已写入 SqlServer 的累计行数），用于展示实时导入进度</param>
+    /// <param name="bulkCopyTimeoutSeconds">批量写入超时（秒），0 表示不限；大数据量请显式放大（默认 600s，SqlBulkCopy 原生默认仅 30s）</param>
+    Task BulkInsertAsync(string tableName, DataTable dataTable, CancellationToken ct = default, Action<long>? onRowsCopied = null, int bulkCopyTimeoutSeconds = 600);
 }

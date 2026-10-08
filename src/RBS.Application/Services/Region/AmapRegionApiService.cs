@@ -94,47 +94,43 @@ public class AmapRegionApiService : IRegionApiService
 
             var result = new List<RegionApiDto>();
             var province = response.Districts[0];
-            int level = LevelToInt(province.Level);
-            var cities = province.Districts ?? new();
+            var seenCodes = new HashSet<string>();   // 防重复编码兜底
 
-            foreach (var city in cities)
+            // 高德数据仅取 省/市/区（level ≤ district）三级。
+            // 街道(street)及以下层级（4/5 级）由“国家统计局”同步（StatsGov）写入，不走高德；
+            // 且高德对街道级会复用父级 adcode（如济源/东莞等直管街道的市），
+            // 若街道一并入库会撞 Regions.Code 唯一索引（IX_Regions_Code）。
+            void Walk(AmapDistrict node, string fullPath)
             {
-                result.Add(new RegionApiDto
+                var children = node.Districts ?? new();
+                var sort = 0;
+                foreach (var child in children)
                 {
-                    Code = city.AdCode, Name = city.Name,
-                    ParentCode = provinceCode, Level = level + 1,
-                    FullPath = $"{province.Name}/{city.Name}", SortOrder = 0
-                });
+                    int childLevel = LevelToInt(child.Level);
+                    if (childLevel >= 4) continue;   // 只要省市区，街道及以下跳过
 
-                var districts = city.Districts ?? new();
-                foreach (var dist in districts)
-                {
+                    if (!seenCodes.Add(child.AdCode))
+                    {
+                        _logger.LogWarning("高德省全量数据含重复编码 {Code}（{Name}），已跳过", child.AdCode, child.Name);
+                        continue;
+                    }
+
+                    var childFullPath = string.IsNullOrEmpty(fullPath) ? child.Name : $"{fullPath}/{child.Name}";
                     result.Add(new RegionApiDto
                     {
-                        Code = dist.AdCode, Name = dist.Name,
-                        ParentCode = city.AdCode, Level = level + 2,
-                        FullPath = $"{province.Name}/{city.Name}/{dist.Name}", SortOrder = 0
+                        Code = child.AdCode,
+                        Name = child.Name,
+                        ParentCode = node.AdCode,
+                        Level = childLevel,
+                        FullPath = childFullPath,
+                        SortOrder = sort++
                     });
 
-                    // 高德 API 中街道的 adcode 与区级相同，须生成唯一编码
-                    var streets = dist.Districts ?? new();
-                    for (int si = 0; si < streets.Count; si++)
-                    {
-                        var street = streets[si];
-                        // 合成唯一编码：区代码 + 3位序号（如 440105001）
-                        var uniqueCode = dist.AdCode + (si + 1).ToString("D3");
-                        result.Add(new RegionApiDto
-                        {
-                            Code = uniqueCode,
-                            Name = street.Name,
-                            ParentCode = dist.AdCode,
-                            Level = level + 3,
-                            FullPath = $"{province.Name}/{city.Name}/{dist.Name}/{street.Name}",
-                            SortOrder = si
-                        });
-                    }
+                    Walk(child, childFullPath);
                 }
             }
+
+            Walk(province, province.Name);
             return result;
         }
         catch (Exception ex)

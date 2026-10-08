@@ -98,8 +98,9 @@ public class RegionService : IRegionService
     public async Task DeleteByLevelAsync(int level)
     {
         using var conn = _db.CreateConnection(); conn.Open();
+        // 四五级数据量可达 66 万行，删除可能远超默认 30s，给到 10 分钟
         await conn.ExecuteAsync(_sql.Get("Common.Delete.Region.ByLevelFrom"),
-            new { Level = level }, commandTimeout: 120);
+            new { Level = level }, commandTimeout: 600);
     }
 
     public async Task<bool> ExistsAsync(string code)

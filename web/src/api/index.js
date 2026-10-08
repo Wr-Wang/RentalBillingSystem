@@ -438,6 +438,8 @@ export function getAllRegions() { return request({ url: '/regions', method: 'get
 export function upsertRegion(data) { return request({ url: '/regions', method: 'post', data }) }
 export function deleteRegion(code) { return request({ url: `/regions/${code}`, method: 'delete' }) }
 export function syncRegions(includeStreet) { return request({ url: '/regions/sync', method: 'post', params: { includeStreet }, timeout: 300000 }) }
-export function syncStatsGov() { return request({ url: '/regions/syncStatsGov', method: 'post', timeout: 600000 }) }
+// 触发四级/五级同步：任务在后台执行、接口立即返回，进度走 syncStatsGovProgress 轮询
+export function syncStatsGov() { return request({ url: '/regions/syncStatsGov', method: 'post', timeout: 60000 }) }
+export function syncStatsGovProgress() { return request({ url: '/regions/syncStatsGov/progress', method: 'get', timeout: 30000 }) }
 
 // Change Requests

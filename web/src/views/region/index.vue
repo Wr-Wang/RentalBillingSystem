@@ -137,7 +137,7 @@
     <el-dialog :draggable="true" v-model="showStatsGov" title="同步街道/社区数据" width="440px">
       <el-alert type="warning" :closable="false" style="margin-bottom:12px">
         <p><strong>此操作会先删除现有四级/五级数据，再重新写入，耗时 2-5 分钟。</strong></p>
-        <p>同步期间请勿刷新页面或关闭系统，否则可能导致区域数据不完整。</p>
+        <p>确认后将弹出实时进度窗口，任务在后台执行，无需停留本页。</p>
       </el-alert>
       <p>从国家统计局数据集拉取街道级（9 位编码）和社区级（12 位编码）数据，通过 SqlBulkCopy 批量写入。</p>
       <p style="color:#909399;font-size:13px;margin-top:8px">数据来源：国家统计局《统计用区划代码和城乡划分代码》</p>
@@ -148,16 +148,58 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 四级/五级同步进度弹窗（后台执行 + 轮询实时进度） -->
+    <el-dialog
+      v-model="showStatsGovProgress"
+      title="正在同步街道/社区数据"
+      width="560px"
+      align-center
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+    >
+      <div class="stats-gov-progress">
+        <div class="stats-gov-stage">
+          <el-icon class="is-loading" :size="18" color="#e6a23c"><Loading /></el-icon>
+          <span class="stats-gov-stage-text">{{ statsProgress.stage }}</span>
+        </div>
+
+        <el-progress
+          v-if="statsProgress.total > 0"
+          :percentage="statsGovPercent"
+          :stroke-width="18"
+          :text-inside="true"
+        />
+        <el-progress
+          v-else
+          :percentage="40"
+          :indeterminate="true"
+          :duration="2"
+          :stroke-width="18"
+        />
+
+        <div v-if="statsProgress.total > 0" class="stats-gov-count">{{ statsGovDetail }}</div>
+
+        <div v-if="statsProgress.lines.length" class="stats-gov-lines">
+          <div v-for="(ln, i) in statsProgress.lines" :key="i" class="stats-gov-line">{{ ln }}</div>
+        </div>
+
+        <el-alert type="warning" :closable="false">
+          共写入约 66 万条数据，预计 2-5 分钟。任务在后台执行，离开本页也不会中断。
+        </el-alert>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CopyDocument } from '@element-plus/icons-vue'
 import {
   getRegionProvinces, getRegionChildren, searchRegions,
-  upsertRegion, deleteRegion, syncRegions, syncStatsGov
+  upsertRegion, deleteRegion, syncRegions, syncStatsGov, syncStatsGovProgress
 } from '../../api'
 
 const tableRef = ref(null)
@@ -171,6 +213,42 @@ const showStatsGov = ref(false)
 const syncing = ref(false)
 const syncingCommunity = ref(false)
 const syncIncludeStreet = ref(true)
+
+// ---- 四级/五级同步进度（后台任务 + 轮询） ----
+const showStatsGovProgress = ref(false)
+const statsProgress = reactive({ running: false, stage: '正在准备…', processed: 0, total: 0, unit: 'rows', lines: [], succeeded: false, error: '', synced: 0 })
+const statsGovPercent = computed(() => {
+  if (statsProgress.total > 0) {
+    const pct = Math.round((statsProgress.processed / statsProgress.total) * 100)
+    return Math.max(0, Math.min(100, pct))
+  }
+  return 0
+})
+// 实时速率采样（下载时 bytes/s，入库时 rows/s，仅用于展示 ETA）
+const statsGovSample = { t: 0, p: 0 }
+let statsGovRate = 0
+// 进度条下方的明细文字：字节/MB 或 条数，下载阶段附实时速度与预估剩余时间
+const statsGovDetail = computed(() => {
+  const t = statsProgress.total
+  const p = statsProgress.processed
+  const u = statsProgress.unit
+  let main
+  if (u === 'bytes') {
+    main = t > 0 ? `${formatBytes(p)} / ${formatBytes(t)}` : `${formatBytes(p)}`
+  } else {
+    main = t > 0 ? `${formatCount(p)} / ${formatCount(t)} 条` : `${formatCount(p)} 条`
+  }
+  if (statsProgress.running && u === 'bytes') {
+    if (t > 0 && p < t && statsGovRate > 0) {
+      const remainSec = (t - p) / statsGovRate
+      main += `（${formatSpeed(statsGovRate)} · 约剩 ${formatEta(remainSec)}）`
+    } else if (statsGovRate > 0) {
+      main += `（${formatSpeed(statsGovRate)}）`
+    }
+  }
+  return main
+})
+let statsGovTimer = null
 const searchForm = reactive({ keyword: '' })
 const formRef = ref(null)
 
@@ -359,23 +437,155 @@ async function handleSync() {
   }
 }
 
+/** 千分位格式化（620000 → 620,000） */
+function formatCount(n) {
+  return (Number(n) || 0).toLocaleString('en-US')
+}
+
+/** 字节数人性化（1234567 → 1.2 MB） */
+function formatBytes(n) {
+  const v = Number(n) || 0
+  if (v >= 1024 * 1024) return (v / 1024 / 1024).toFixed(1) + ' MB'
+  if (v >= 1024) return (v / 1024).toFixed(1) + ' KB'
+  return v + ' B'
+}
+
+/** 速度人性化（bytes/s → MB/s 或 KB/s） */
+function formatSpeed(bytesPerSec) {
+  const v = Number(bytesPerSec) || 0
+  if (v >= 1024 * 1024) return (v / 1024 / 1024).toFixed(1) + ' MB/s'
+  if (v >= 1024) return (v / 1024).toFixed(1) + ' KB/s'
+  return v.toFixed(0) + ' B/s'
+}
+
+/** 秒数 → “x 分 y 秒” */
+function formatEta(sec) {
+  sec = Math.max(0, Math.round(Number(sec) || 0))
+  if (sec < 60) return sec + ' 秒'
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return m + ' 分' + (s > 0 ? ` ${s} 秒` : '')
+}
+
+function stopStatsGovPolling() {
+  if (statsGovTimer) {
+    clearInterval(statsGovTimer)
+    statsGovTimer = null
+  }
+}
+
+function applyStatsGov(s) {
+  if (!s) return
+  const now = Date.now()
+  const nextUnit = s.unit || 'rows'
+  const nextP = s.processed || 0
+  // 阶段切换（单位变化）或进度被重置时，重新开始测速
+  if (nextUnit !== statsProgress.unit || nextP < statsProgress.processed) {
+    statsGovRate = 0
+    statsGovSample.t = now
+    statsGovSample.p = nextP
+  } else if (statsGovSample.t && now > statsGovSample.t) {
+    const dt = (now - statsGovSample.t) / 1000
+    const dp = nextP - statsGovSample.p
+    if (dt > 0.4 && dp >= 0) statsGovRate = dp / dt // 平滑不过度
+    statsGovSample.t = now
+    statsGovSample.p = nextP
+  } else {
+    statsGovSample.p = nextP
+  }
+  statsProgress.running = !!s.running
+  statsProgress.stage = s.stage || statsProgress.stage
+  statsProgress.processed = nextP
+  statsProgress.total = s.total || 0
+  statsProgress.unit = nextUnit
+  statsProgress.lines = Array.isArray(s.lines) ? s.lines : []
+  statsProgress.succeeded = !!s.succeeded
+  statsProgress.error = s.error || ''
+  statsProgress.synced = s.synced || 0
+}
+
+/**
+ * 轮询后台同步任务直到结束，期间持续刷新进度 UI。
+ * @returns {Promise<object|null>} 最终快照（succeeded=true 表示成功；可能因超时返回兜底对象）
+ */
+function waitStatsGovFinished() {
+  return new Promise(resolve => {
+    stopStatsGovPolling()
+    let attempts = 0
+    statsGovTimer = setInterval(async () => {
+      attempts++
+      let snap = null
+      try { snap = await syncStatsGovProgress() } catch { snap = null }
+      if (snap) applyStatsGov(snap)
+      // 结束（成功/失败）或兜底超时（约 30 分钟）后停止轮询
+      if (snap && !snap.running) {
+        stopStatsGovPolling()
+        resolve(snap)
+      } else if (attempts >= 1800) {
+        stopStatsGovPolling()
+        resolve({
+          running: false, succeeded: false, stage: '等待超时',
+          processed: snap?.processed || 0, total: snap?.total || 0,
+          lines: snap?.lines || [], synced: snap?.synced || 0,
+          error: snap?.error || '等待超时，请到服务器日志确认结果'
+        })
+      }
+    }, 1000)
+  })
+}
+
 async function handleSyncStatsGov() {
+  if (syncingCommunity.value) return
   syncingCommunity.value = true
   showStatsGov.value = false
+
+  // 打开实时进度弹窗（原弹窗不再立即关闭无反馈）
+  Object.assign(statsProgress, { running: false, stage: '正在启动同步任务…', processed: 0, total: 0, unit: 'rows', lines: [], succeeded: false, error: '', synced: 0 })
+  statsGovSample.t = 0
+  statsGovSample.p = 0
+  statsGovRate = 0
+  showStatsGovProgress.value = true
+
   try {
-    const res = await syncStatsGov()
-    const lines = (res?.progress || []).join('<br>')
-    ElMessageBox.alert(lines || `同步完成，共 ${res?.synced || 0} 条`, '同步结果',
-      { dangerouslyUseHTMLString: true, confirmButtonText: '知道了' })
-    await fetchList()
+    await syncStatsGov()
   } catch (e) {
-    ElMessage.warning('四级/五级数据同步未完成，可稍后重试')
+    // 409 = 已有任务在执行，跟随其进度继续等待；其余启动失败则直接提示
+    if (e?.response?.status !== 409) {
+      stopStatsGovPolling()
+      showStatsGovProgress.value = false
+      ElMessage.warning(e?.response?.data?.message || '同步任务启动失败，请稍后重试')
+      syncingCommunity.value = false
+      return
+    }
+  }
+
+  try {
+    const final = await waitStatsGovFinished()
+    showStatsGovProgress.value = false
+
+    if (final?.succeeded) {
+      const lines = (final.lines || []).join('<br>')
+      ElMessageBox.alert(
+        lines || `同步完成，共 ${formatCount(final.synced)} 条`,
+        `同步完成（共 ${formatCount(final.synced)} 条）`,
+        { dangerouslyUseHTMLString: true, confirmButtonText: '知道了' }
+      )
+      await fetchList()
+    } else {
+      ElMessage.warning(final?.error || '四级/五级数据同步未完成，可稍后重试')
+      if ((final?.lines || []).length > 0) {
+        ElMessageBox.alert((final.lines || []).join('<br>'), '同步中断',
+          { dangerouslyUseHTMLString: true, confirmButtonText: '知道了' })
+      }
+    }
   } finally {
+    stopStatsGovPolling()
     syncingCommunity.value = false
   }
 }
 
 onMounted(fetchList)
+onBeforeUnmount(stopStatsGovPolling)
 </script>
 
 <style scoped>
@@ -393,4 +603,19 @@ onMounted(fetchList)
   white-space: nowrap;
   vertical-align: middle;
 }
+
+/* 四级/五级同步进度弹窗 */
+.stats-gov-progress { padding: 2px 4px 4px; }
+.stats-gov-stage { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.stats-gov-stage-text { font-size: 14px; color: #303133; }
+.stats-gov-count { margin-top: 6px; font-size: 12px; color: #909399; }
+.stats-gov-lines {
+  margin: 12px 0;
+  max-height: 150px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: #f5f7fa;
+  border-radius: 6px;
+}
+.stats-gov-line { font-size: 12px; color: #606266; line-height: 1.9; }
 </style>

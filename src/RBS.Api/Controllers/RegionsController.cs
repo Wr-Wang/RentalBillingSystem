@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RBS.Application.Common.Interfaces;
 using RBS.Application.DTOs.Region;
 using RBS.Application.Services.Region;
@@ -13,13 +15,22 @@ public class RegionsController : ControllerBase
 {
     private readonly IRegionService _regionService;
     private readonly RegionApiSyncService _syncService;
-    private readonly StatsGovRegionService _statsGovService;
+    private readonly StatsGovSyncProgress _statsGovProgress;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<RegionsController> _logger;
 
-    public RegionsController(IRegionService regionService, RegionApiSyncService syncService, StatsGovRegionService statsGovService)
+    public RegionsController(
+        IRegionService regionService,
+        RegionApiSyncService syncService,
+        StatsGovSyncProgress statsGovProgress,
+        IServiceScopeFactory scopeFactory,
+        ILogger<RegionsController> logger)
     {
         _regionService = regionService;
         _syncService = syncService;
-        _statsGovService = statsGovService;
+        _statsGovProgress = statsGovProgress;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     /// <summary>获取省份列表</summary>
@@ -79,12 +90,45 @@ public class RegionsController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>同步四级/五级数据（国家统计局 9+12 位编码，街道 4 万 + 社区 62 万条）</summary>
+    /// <summary>
+    /// 触发四级/五级数据同步（国家统计局 9+12 位编码，街道 4 万 + 社区 62 万条）。
+    /// 任务在后台执行、接口立即返回，前端通过 <see cref="GetStatsGovProgress"/> 轮询实时进度。
+    /// </summary>
     [HttpPost("syncStatsGov")]
-    public async Task<IActionResult> SyncStatsGov()
+    public IActionResult SyncStatsGov()
     {
-        var result = await _statsGovService.SyncAllAsync();
-        return Ok(result);
+        if (!_statsGovProgress.TryBegin())
+            return Conflict(new { message = "已有一个四级/五级同步任务正在执行，请稍候" });
+
+        _ = Task.Run(RunStatsGovImportAsync);
+        return Accepted();
+    }
+
+    /// <summary>获取四级/五级数据同步的实时进度（前端轮询）</summary>
+    [HttpGet("syncStatsGov/progress")]
+    public IActionResult GetStatsGovProgress() => Ok(_statsGovProgress.GetSnapshot());
+
+    private async Task RunStatsGovImportAsync()
+    {
+        try
+        {
+            // 用独立 scope 在请求结束后继续执行（服务为 Scoped，自行解析会随请求释放）
+            using var scope = _scopeFactory.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<StatsGovRegionService>();
+            var result = await service.SyncAllAsync();
+
+            if (result.Done)
+                _statsGovProgress.Succeed(result.Synced);
+            else
+                _statsGovProgress.Fail("同步数据下载失败或数据为空");
+        }
+        catch (Exception ex)
+        {
+            // 带上前进阶段信息，便于区分是下载超时还是入库阶段异常
+            _logger.LogError(ex, "四级/五级同步失败");
+            var stage = _statsGovProgress.GetSnapshot().Stage;
+            _statsGovProgress.Fail(string.IsNullOrEmpty(stage) ? ex.Message : $"{stage}：{ex.Message}");
+        }
     }
 
     /// <summary>从第三方 API 同步行政区划数据</summary>
