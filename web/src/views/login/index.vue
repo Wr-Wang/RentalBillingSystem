@@ -44,7 +44,7 @@
         </el-form-item>
       </el-form>
       <div class="login-footer">
-        <p>演示账号: admin / admin123</p>
+        <p>演示账号: admin / 123456</p>
       </div>
     </div>
   </div>
@@ -74,7 +74,7 @@ const rules = {
 
 onMounted(() => {
   loginForm.username = 'admin'
-  loginForm.password = 'admin123'
+  loginForm.password = '123456'
 })
 
 async function handleLogin() {

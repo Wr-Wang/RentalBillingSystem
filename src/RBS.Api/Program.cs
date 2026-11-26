@@ -61,12 +61,26 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// ===== CORS — 允许 Vue 开发服务器跨域访问 =====
+// ===== CORS — 允许 Vue 开发服务器 / 生产前端域名跨域访问 =====
+// 允许的来源在 appsettings.json 的 Cors:AllowedOrigins 中配置，
+// 这样切换部署域名时无需改代码；未配置时回退到本地开发地址。
+// 注意：WithOrigins + AllowCredentials 不支持通配符，必须写完整协议+域名。
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [
+        "http://localhost:5173",   // Vite 开发服务器
+        "http://localhost:5174",
+        "http://localhost",        // IIS 本地浏览
+        "http://127.0.0.1",
+        "http://www.rbsweb.com",   // 生产前端（HTTP）
+        "https://www.rbsweb.com"   // 生产前端（HTTPS）
+    ];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowWebApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

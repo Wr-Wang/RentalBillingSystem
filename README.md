@@ -254,11 +254,29 @@ SchedulingHostedService (BackgroundService, 60s 轮询)
 
 ### 数据库初始化
 
+一键完成建库、建表与种子数据（详见 [database/README.md](database/README.md)）：
+
+```powershell
+# Windows PowerShell（不传 -Password 会交互式输入）
+.\database\init-db.ps1 -Server "." -Username sa -Password "your_password"
+```
+
 ```bash
-# 使用 sqlcmd 执行初始化脚本
-sqlcmd -S . -U sa -P "your_password" -d master -i scripts/Init.sql
-sqlcmd -S . -U sa -P "your_password" -d RBS -i scripts/SeedBase.sql
-sqlcmd -S . -U sa -P "your_password" -d RBS -i scripts/SeedBiz.sql
+# Linux / macOS / Windows Git Bash
+bash database/init-db.sh -S . -U sa -P "your_password"
+```
+
+空库上按顺序执行：`database/00_create_database.sql` → `scripts/Init.sql` → `scripts/SeedBase.sql` → `scripts/SeedBiz.sql`；
+库中已有表时整体跳过，避免覆盖已有数据（重建请用 `-Recreate`）。
+初始化完成后默认登录账号为 **admin / 123456**，其余种子账号见 [database/README.md](database/README.md#默认登录账号)。
+
+如需手动执行（仅限空库）：
+
+```bash
+sqlcmd -S . -U sa -P "your_password" -C -I -d master -v DatabaseName=RBS -i database/00_create_database.sql
+sqlcmd -S . -U sa -P "your_password" -C -I -d RBS -i scripts/Init.sql
+sqlcmd -S . -U sa -P "your_password" -C -I -d RBS -i scripts/SeedBase.sql
+sqlcmd -S . -U sa -P "your_password" -C -I -d RBS -i scripts/SeedBiz.sql
 ```
 
 ### 启动后端

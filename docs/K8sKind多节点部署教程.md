@@ -402,7 +402,7 @@ kubectl get pods -l app=rbs-web
 kubectl exec -it <Pod名> -- wget -qO- http://www.rbsapi.com/api/health
 ```
 
-**期望**：返回后端健康信息。然后回到浏览器登录（admin / admin123），**登录成功 = 全链路通**：
+**期望**：返回后端健康信息。然后回到浏览器登录（admin / 123456），**登录成功 = 全链路通**：
 
 ```
 浏览器 localhost:30882 → NodePort → Service → Pod nginx → www.rbsapi.com(hostAliases→宿主机) → IIS → SQL Server

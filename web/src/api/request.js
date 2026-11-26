@@ -17,11 +17,13 @@ import { broadcast } from '../utils/broadcast'
 
 // ---------------------------------------------------------------------------
 // Axios 实例：所有 API 请求的基础配置
-// - baseURL: '/api' → 通过 Vite proxy 转发到后端 (localhost:5000)
+// - baseURL: 生产构建读取 VITE_API_BASE_URL（见 .env.production，
+//            如 http://www.rbsapi.com/api）；未配置时回退 '/api'，
+//            开发环境由 Vite proxy 转发到后端
 // - timeout: 30s 超时自动断开
 // ---------------------------------------------------------------------------
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000
 })
 
